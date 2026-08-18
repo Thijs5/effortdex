@@ -1,0 +1,65 @@
+/* Design tokens — the single source of truth for color, type, spacing,
+   radius and motion. Custom properties pierce shadow DOM boundaries, so
+   every component (page-level CSS and Web Component shadow roots alike)
+   reads from here instead of redefining its own values. */
+
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+
+:root {
+  /* Color */
+  --ink: #1b1f1c;
+  --ink-soft: #3a4238;
+  --paper: #eef1e4;
+  --paper-panel: #e5e9d8;
+  --lcd: #d7dfc8;
+  --lcd-deep: #c3cfae;
+  --lcd-line: rgba(27, 31, 28, 0.16);
+  --poke-red: #e3350d;
+  --poke-red-dark: #a8260a;
+  --gold: #eab429;
+  --gold-soft: #f6dfa0;
+  --teal: #2f6f62;
+  --teal-soft: #bcd8cf;
+  --line: rgba(27, 31, 28, 0.14);
+  --surface: #fff;
+
+  /* Elevation */
+  --shadow-panel: 0 10px 30px rgba(27, 31, 28, 0.18);
+  --shadow-suggestions: 0 8px 20px rgba(27, 31, 28, 0.18);
+  --shadow-trained: 0 0 0 2px var(--gold), 0 8px 18px rgba(234, 180, 41, 0.35);
+
+  /* Type */
+  --font-display: 'Space Grotesk', system-ui, sans-serif;
+  --font-body: 'Inter', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+
+  --font-size-2xs: 0.65rem;
+  --font-size-xs: 0.7rem;
+  --font-size-sm: 0.78rem;
+  --font-size-md: 0.85rem;
+  --font-size-lg: 0.95rem;
+  --font-size-xl: 1.05rem;
+  --font-size-input: 16px; /* >=16px keeps mobile Safari from zooming on focus */
+
+  /* Spacing scale */
+  --space-1: 0.25rem;
+  --space-2: 0.4rem;
+  --space-3: 0.55rem;
+  --space-4: 0.9rem;
+  --space-5: 1.4rem;
+
+  /* Radius scale */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 22px;
+  --radius-pill: 999px;
+
+  /* Motion */
+  --transition-fast: 0.12s ease;
+  --transition-med: 0.2s ease;
+  --transition-bar: 0.35s ease;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}

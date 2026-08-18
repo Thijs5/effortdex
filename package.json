@@ -1,0 +1,6 @@
+{
+  "name": "pokelogger",
+  "private": true,
+  "type": "module",
+  "description": "Local-only Pokémon EV training tracker built with native Web Components."
+}
