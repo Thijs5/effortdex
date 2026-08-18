@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Pokélogger</title>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><circle cx=%2216%22 cy=%2216%22 r=%2214%22 fill=%22%23e3350d%22/><path d=%22M2 16h28%22 stroke=%22%231b1f1c%22 stroke-width=%223%22/><circle cx=%2216%22 cy=%2216%22 r=%226%22 fill=%22%23fff%22 stroke=%22%231b1f1c%22 stroke-width=%223%22/></svg>" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="device">
+    <header class="bezel">
+      <div class="lights" aria-hidden="true">
+        <span class="light light--red"></span>
+        <span class="light light--amber"></span>
+        <span class="light light--green"></span>
+      </div>
+      <h1>Pok<span class="e-accent">é</span>logger</h1>
+      <p class="tagline">Effort value field log</p>
+      <div class="stat-readout">
+        <div class="stat-chip">
+          <span class="stat-num" id="stat-caught">0</span>
+          <span class="stat-label">Caught</span>
+        </div>
+        <div class="stat-chip stat-chip--gold">
+          <span class="stat-num" id="stat-trained">0</span>
+          <span class="stat-label">Fully trained</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="panel catch-panel" aria-labelledby="catch-heading">
+        <h2 id="catch-heading">Catch a Pok&eacute;mon</h2>
+        <p class="hint">Search a species to add it to your roster and start logging its EVs.</p>
+        <div class="catch-form">
+          <pokemon-search id="catch-search" placeholder="e.g. Bulbasaur"></pokemon-search>
+          <button id="catch-btn" class="btn btn--primary" disabled>Catch!</button>
+        </div>
+        <p id="catch-status" class="status-line" aria-live="polite"></p>
+
+        <div class="legend">
+          <h3>Training aids</h3>
+          <ul>
+            <li><strong>Power items</strong> add a flat +8 EVs to one stat every battle.</li>
+            <li><strong>Pok&eacute;rus</strong> doubles all EVs earned in a battle.</li>
+            <li>Every stat caps at 252; the total caps at 510.</li>
+          </ul>
+        </div>
+      </section>
+
+      <section class="panel roster-panel" aria-labelledby="roster-heading">
+        <h2 id="roster-heading">My Pok&eacute;mon</h2>
+        <p id="empty-state" class="empty-state">
+          No Pok&eacute;mon caught yet &mdash; catch one on the left to start tracking EVs.
+        </p>
+        <div id="roster" class="roster"></div>
+      </section>
+    </main>
+
+    <footer class="bezel-footer">
+      <span>Data via PokéAPI &middot; stored locally in this browser</span>
+    </footer>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
