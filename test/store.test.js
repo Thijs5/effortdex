@@ -161,6 +161,24 @@ test('power item gives +8 EVs on a recognized Gen VII+ title, and on unset/unrec
   assert.equal(romEntry.evs.atk, 9); // unrecognized version falls back to modern bonus
 });
 
+test('pokerus does not double EVs in titles where it is nonfunctional', () => {
+  for (const name of ["Let's Go Pikachu", 'Legends Arceus', 'Scarlet']) {
+    store.createParty(`${name} run`, '', name);
+    const entry = store.catchPokemon(mon());
+    store.setPokerus(entry.uid, true);
+    store.logDefeat(entry.uid, opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 }));
+    assert.equal(entry.evs.atk, 1, `expected no doubling in ${name}`);
+  }
+});
+
+test('pokerus still doubles EVs in ordinary titles of the same generations', () => {
+  store.createParty('Sun run', '', 'Sun'); // Gen 7, unlike Let's Go
+  const entry = store.catchPokemon(mon());
+  store.setPokerus(entry.uid, true);
+  store.logDefeat(entry.uid, opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 }));
+  assert.equal(entry.evs.atk, 2);
+});
+
 test('Macho Brace doubles all EVs gained in battle, on a recognized Gen III-VI title', () => {
   store.createParty('Emerald run', '', 'Emerald'); // Gen 3
   const entry = store.catchPokemon(mon());

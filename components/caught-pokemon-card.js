@@ -98,6 +98,8 @@ export class CaughtPokemonCard extends HTMLElement {
         .vitamin-btn[data-capped] { opacity: 0.55; }
 
         .pokerus-toggle { cursor: pointer; }
+        .pokerus-toggle:has(input:disabled) { cursor: not-allowed; opacity: 0.55; }
+        .pokerus-note { flex-basis: 100%; margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--ink-soft); }
         .dot {
           width: 9px; height: 9px; border-radius: 50%; background: var(--lcd-deep);
           box-shadow: inset 0 0 0 1px var(--ink-soft); transition: background var(--transition-fast), box-shadow var(--transition-fast);
@@ -174,6 +176,7 @@ export class CaughtPokemonCard extends HTMLElement {
                 <input type="checkbox" class="pokerus" />
                 <span class="dot"></span> Pokérus
               </label>
+              <p class="pokerus-note" hidden>Pokérus doesn't double EVs in this game.</p>
             </section>
 
             <section class="vitamins">
@@ -219,6 +222,7 @@ export class CaughtPokemonCard extends HTMLElement {
     this.$evSummary = shadow.querySelector('ev-summary');
     this.$powerItem = shadow.querySelector('.power-item');
     this.$pokerus = shadow.querySelector('.pokerus');
+    this.$pokerusNote = shadow.querySelector('.pokerus-note');
     this.$vitaminGrid = shadow.querySelector('.vitamin-grid');
     this.$vitaminStatus = shadow.querySelector('.vitamin-status');
     this.$evolveBtn = shadow.querySelector('.evolve-btn');
@@ -485,6 +489,9 @@ export class CaughtPokemonCard extends HTMLElement {
 
     this._populateTrainingItemOptions(store.powerItemBonus(), store.trainingItemAvailability());
     this.$pokerus.checked = !!e.pokerus;
+    const pokerusAvailable = store.pokerusAvailable();
+    this.$pokerus.disabled = !pokerusAvailable;
+    this.$pokerusNote.hidden = pokerusAvailable;
     this.$vitaminStatus.textContent = '';
     this._updateVitaminButtons(e);
     this.$details.open = this._historyOpen;
