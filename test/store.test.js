@@ -161,6 +161,45 @@ test('power item gives +8 EVs on a recognized Gen VII+ title, and on unset/unrec
   assert.equal(romEntry.evs.atk, 9); // unrecognized version falls back to modern bonus
 });
 
+test('Macho Brace doubles all EVs gained in battle, on a recognized Gen III-VI title', () => {
+  store.createParty('Emerald run', '', 'Emerald'); // Gen 3
+  const entry = store.catchPokemon(mon());
+  store.setMachoBrace(entry.uid, true);
+  store.logDefeat(entry.uid, opponent({ hp: 1, atk: 2, def: 0, spa: 0, spd: 0, spe: 0 }));
+  assert.equal(entry.evs.hp, 2);
+  assert.equal(entry.evs.atk, 4);
+});
+
+test('setting a power item clears the Macho Brace and vice versa (one held item slot)', () => {
+  store.createParty('Platinum run', '', 'Platinum'); // Gen 4
+  const entry = store.catchPokemon(mon());
+  store.setMachoBrace(entry.uid, true);
+  store.setPowerItem(entry.uid, 'bracer');
+  assert.equal(entry.machoBrace, false);
+  assert.equal(entry.powerItem, 'bracer');
+
+  store.setMachoBrace(entry.uid, true);
+  assert.equal(entry.machoBrace, true);
+  assert.equal(entry.powerItem, null);
+});
+
+test('trainingItemAvailability offers only what existed in that generation', () => {
+  store.createParty('Red run', '', 'Red'); // Gen 1: neither item existed
+  assert.deepEqual(store.trainingItemAvailability(), { machoBrace: false, powerItems: false });
+
+  store.createParty('Emerald run', '', 'Emerald'); // Gen 3: Macho Brace only
+  assert.deepEqual(store.trainingItemAvailability(), { machoBrace: true, powerItems: false });
+
+  store.createParty('Platinum run', '', 'Platinum'); // Gen 4-6: both
+  assert.deepEqual(store.trainingItemAvailability(), { machoBrace: true, powerItems: true });
+
+  store.createParty('Sun run', '', 'Sun'); // Gen 7+: power items only, Macho Brace dropped
+  assert.deepEqual(store.trainingItemAvailability(), { machoBrace: false, powerItems: true });
+
+  store.createParty('ROM hack run', '', 'Radical Red'); // unrecognized -> modern fallback
+  assert.deepEqual(store.trainingItemAvailability(), { machoBrace: false, powerItems: true });
+});
+
 test('useVitamin stops at 100 EVs on a recognized Gen III-VII title', () => {
   store.createParty('Emerald run', '', 'Emerald'); // Gen 3
   const entry = store.catchPokemon(mon());
