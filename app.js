@@ -339,4 +339,14 @@ if ('serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js');
   });
+
+  // The worker calls skipWaiting()/clients.claim() on activate, so once a
+  // pushed update takes control of this tab, reload to pick up the new
+  // shell instead of leaving the user on stale JS until their next visit.
+  let refreshing = false;
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshing) return;
+    refreshing = true;
+    window.location.reload();
+  });
 }

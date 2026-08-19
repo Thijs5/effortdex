@@ -25,6 +25,11 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Stamp cache name with release tag
+        run: |
+          sed -i "s/const CACHE_NAME = '[^']*';/const CACHE_NAME = 'pokelogger-shell-${GITHUB_REF_NAME}-${GITHUB_SHA::7}';/" sw.js
+          grep CACHE_NAME sw.js
+
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
         with:
