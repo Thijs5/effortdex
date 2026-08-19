@@ -283,12 +283,77 @@ button, input, select {
 
 .roster {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: var(--space-4);
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--space-3);
 }
 
 @media (max-width: 520px) {
   .roster { grid-template-columns: 1fr; }
+}
+
+.roster-card {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  background: var(--lcd);
+  border: 1px solid var(--lcd-line);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+  text-decoration: none;
+  color: inherit;
+  transition: box-shadow var(--transition-med), transform var(--transition-fast);
+}
+.roster-card:hover { box-shadow: var(--shadow-panel); transform: translateY(-1px); }
+
+.roster-card-sprite {
+  flex: 0 0 auto;
+  width: 36px;
+  height: 36px;
+  image-rendering: pixelated;
+  background: rgba(255, 255, 255, 0.5);
+  border-radius: var(--radius-sm);
+  object-fit: contain;
+}
+
+.roster-card-body {
+  min-width: 0;
+  flex: 1 1 auto;
+  display: grid;
+  gap: 0.15rem;
+}
+.roster-card-name {
+  font-family: var(--font-display);
+  font-weight: 600;
+  font-size: var(--font-size-md);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.roster-card-meta {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-2xs);
+  color: var(--ink-soft);
+  text-transform: capitalize;
+}
+
+.roster-card-evbar {
+  flex: 1 1 80px;
+  max-width: 96px;
+  min-width: 60px;
+}
+
+.roster-card-star {
+  flex: 0 0 auto;
+}
+
+/* ---------- Pokémon detail view ("/<slug>/<uid>") ---------- */
+.pokemon-view {
+  padding: var(--space-4) clamp(1.2rem, 3vw, 2.2rem) var(--space-5);
+  display: grid;
+  gap: var(--space-4);
+}
+.pokemon-view caught-pokemon-card {
+  max-width: 980px;
 }
 
 /* ---------- buttons ---------- */

@@ -4,8 +4,8 @@
 // all domain logic lives in lib/, and each custom element owns its own
 // rendering.
 
-import { TOTAL_CAP } from './lib/constants.js';
-import { titleCase, totalEvs } from './lib/utils.js';
+import { TOTAL_CAP, FALLBACK_SPRITE } from './lib/constants.js';
+import { titleCase, totalEvs, formatEvYield } from './lib/utils.js';
 import { api, store } from './lib/services.js';
 import { attachDesignSystem } from './lib/design-system.js';
 import { KNOWN_GAME_NAMES } from './lib/game-versions.js';
@@ -13,6 +13,7 @@ import * as router from './lib/router.js';
 import './components/pokemon-search.js';
 import './components/caught-pokemon-card.js';
 import './components/game-cartridge.js';
+import './components/ev-bar.js';
 
 // Let light-DOM markup (the party dialog) use the same .ds-field/.ds-btn
 // primitives every shadow-DOM component uses — one shared stylesheet.
@@ -38,9 +39,15 @@ const editPartyBtn = document.getElementById('edit-party-btn');
 
 const catchSearch = document.getElementById('catch-search');
 const catchBtn = document.getElementById('catch-btn');
+const catchEvPreview = document.getElementById('catch-ev-preview');
 const catchStatus = document.getElementById('catch-status');
 const roster = document.getElementById('roster');
 const emptyState = document.getElementById('empty-state');
+
+const pokemonView = document.getElementById('pokemon-view');
+const backToRoster = document.getElementById('back-to-roster');
+const pokemonCard = document.createElement('caught-pokemon-card');
+pokemonView.appendChild(pokemonCard);
 
 const partyDialog = document.getElementById('party-dialog');
 const partyForm = document.getElementById('party-form');
@@ -74,6 +81,9 @@ function interceptLinkClick(el, onNavigate) {
 }
 
 interceptLinkClick(backToParties, () => router.navigateHome());
+
+let backToRosterSlug = null;
+interceptLinkClick(backToRoster, () => router.navigateToParty(backToRosterSlug));
 
 /* ------------------------------------------------------------------ */
 /* Party create/edit dialog                                            */
@@ -155,7 +165,20 @@ catchSearch.addEventListener('pokemon-pick', (e) => {
   pendingCatch = e.detail.name;
   catchBtn.disabled = false;
   catchBtn.textContent = `Catch ${titleCase(e.detail.name)}!`;
+  previewCatchYield(e.detail.name);
 });
+
+async function previewCatchYield(name) {
+  catchEvPreview.textContent = 'Checking EV yield…';
+  try {
+    const mon = await api.getPokemon(name);
+    if (pendingCatch !== name) return; // user picked something else meanwhile
+    const gained = formatEvYield(mon.evYield);
+    catchEvPreview.textContent = gained ? `Base EV yield: ${gained}` : 'Base EV yield: none';
+  } catch {
+    if (pendingCatch === name) catchEvPreview.textContent = '';
+  }
+}
 
 catchBtn.addEventListener('click', async () => {
   if (!pendingCatch) return;
@@ -165,42 +188,54 @@ catchBtn.addEventListener('click', async () => {
     const mon = await api.getPokemon(pendingCatch);
     store.catchPokemon(mon);
     catchStatus.textContent = `Caught ${titleCase(mon.name)}!`;
+    // Warm the evolution-chain cache now, so its detail page's Evolve
+    // button doesn't have to wait on (or be offline-blocked by) a fetch.
+    api.getEvolutionOptions(mon.name).catch(() => {});
   } catch (err) {
     catchStatus.textContent = err.message || 'Could not catch that Pokémon.';
   }
   pendingCatch = null;
   catchBtn.disabled = true;
   catchBtn.textContent = 'Catch!';
+  catchEvPreview.textContent = '';
   setTimeout(() => {
     catchStatus.textContent = '';
   }, 3000);
 });
 
 /* ------------------------------------------------------------------ */
-/* Roster (keeps <caught-pokemon-card> elements alive across renders   */
-/* so open history panels etc. survive a Store change)                 */
+/* Roster ("/<party-slug>") — summary rows linking to each Pokémon's   */
+/* own detail page, same rebuild-from-scratch pattern as renderPicker  */
 /* ------------------------------------------------------------------ */
 
-const cardMap = new Map();
-function renderRoster(entries) {
+function renderRoster(party) {
+  const entries = party.pokemon;
   emptyState.hidden = entries.length > 0;
-
-  const seen = new Set();
+  roster.innerHTML = '';
   for (const entry of entries) {
-    seen.add(entry.uid);
-    let card = cardMap.get(entry.uid);
-    if (!card) {
-      card = document.createElement('caught-pokemon-card');
-      cardMap.set(entry.uid, card);
-      roster.appendChild(card);
-    }
-    card.entry = entry;
-  }
-  for (const [uid, card] of cardMap) {
-    if (!seen.has(uid)) {
-      card.remove();
-      cardMap.delete(uid);
-    }
+    const trained = totalEvs(entry.evs) >= TOTAL_CAP;
+    const displayName = entry.nickname || titleCase(entry.speciesName);
+    const speciesMeta = entry.nickname
+      ? titleCase(entry.speciesName)
+      : `#${String(entry.speciesId).padStart(3, '0')}`;
+
+    const row = document.createElement('a');
+    row.className = 'roster-card';
+    row.href = router.pokemonPath(party.slug, entry.uid);
+    row.innerHTML = `
+      <img class="roster-card-sprite" src="${entry.sprite || FALLBACK_SPRITE}" alt="" />
+      <div class="roster-card-body">
+        <span class="roster-card-name">${escapeHtml(displayName)}</span>
+        <span class="roster-card-meta">Lv. ${entry.level} &middot; ${escapeHtml(speciesMeta)}</span>
+      </div>
+      <ev-bar class="roster-card-evbar"></ev-bar>
+      ${trained ? '<span class="roster-card-star ds-pill-badge" title="Fully trained">★</span>' : ''}
+    `;
+    const evBar = row.querySelector('ev-bar');
+    evBar.max = TOTAL_CAP;
+    evBar.value = totalEvs(entry.evs);
+    interceptLinkClick(row, () => router.navigateToPokemon(party.slug, entry.uid));
+    roster.appendChild(row);
   }
 }
 
@@ -244,16 +279,17 @@ function escapeHtml(s) {
 /* ------------------------------------------------------------------ */
 
 function render() {
-  const slug = router.currentSlug();
+  const { partySlug, pokemonUid } = router.currentRoute();
 
-  if (!slug) {
+  if (!partySlug) {
     pickerView.hidden = false;
     partyView.hidden = true;
+    pokemonView.hidden = true;
     renderPicker();
     return;
   }
 
-  const party = store.getPartyBySlug(slug);
+  const party = store.getPartyBySlug(partySlug);
   if (!party) {
     router.navigateHome(); // unknown/stale slug — bounce to the picker
     return;
@@ -263,15 +299,32 @@ function render() {
     return;
   }
 
+  if (pokemonUid) {
+    const entry = party.pokemon.find((e) => e.uid === pokemonUid);
+    if (!entry) {
+      router.navigateToParty(party.slug); // stale link, or this Pokémon was just released
+      return;
+    }
+    pickerView.hidden = true;
+    partyView.hidden = true;
+    pokemonView.hidden = false;
+    backToRosterSlug = party.slug;
+    backToRoster.href = router.partyPath(party.slug);
+    backToRoster.textContent = `← ${party.name}`;
+    pokemonCard.entry = entry;
+    return;
+  }
+
   pickerView.hidden = true;
   partyView.hidden = false;
+  pokemonView.hidden = true;
   activePartyName.textContent = party.name;
   activePartyGame.hidden = !party.gameVersion;
   activePartyGameCart.name = party.gameVersion;
   activePartyGameLabel.textContent = party.gameVersion;
   activePartyDescription.hidden = !party.description;
   activePartyDescription.textContent = party.description;
-  renderRoster(party.pokemon);
+  renderRoster(party);
 }
 
 router.onRouteChange(render);
