@@ -27,11 +27,15 @@ secure context.)
 - **Parties** — group caught Pokémon by save file or playthrough, each
   with its own name, description and game version (shown as a small
   cartridge icon matching that title's generation). The game version
-  isn't just cosmetic: it decides which era's vitamin mechanic applies
-  (see Vitamins below), so pick a real recognized title when you can.
+  isn't just cosmetic: it decides which era's vitamin and power item
+  mechanics apply (see below), so pick a real recognized title when you
+  can.
 - **EV tracking** — six stat bars per Pokémon plus a total, with power
-  item (+8 flat) and Pokérus (×2) support, correctly capped at 252/stat
-  and 510/total.
+  item and Pokérus (×2) support, correctly capped at 252/stat and
+  510/total. Power items give +4 EVs on a recognized Gen IV-VI party
+  (their original strength) and +8 from Gen VII onward — an unset or
+  unrecognized game version falls back to the modern +8
+  ([Bulbapedia](https://bulbapedia.bulbagarden.net/wiki/Effort_values)).
 - **Vitamins** — feed HP Up, Protein, Iron, Calcium, Zinc or Carbos
   (+10 EVs each) straight from the roster card; every button spells out
   exactly which stat it feeds. Capped at 252/stat and 510/total like
