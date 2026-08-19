@@ -3,7 +3,7 @@ import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { Store } from '../lib/store.js';
-import { STAT_CAP, TOTAL_CAP } from '../lib/constants.js';
+import { STAT_CAP, TOTAL_CAP, VITAMIN_BONUS } from '../lib/constants.js';
 
 function mon(overrides = {}) {
   return { id: 1, name: 'bulbasaur', sprite: null, ...overrides };
@@ -108,6 +108,66 @@ test('revertEvolution undoes the most recent evolution without touching EVs or h
   assert.equal(entry.evolutions.length, 0);
   assert.equal(entry.evs.atk, 1);
   assert.equal(entry.history.length, 1);
+});
+
+test('useVitamin raises exactly its target stat by the vitamin bonus', () => {
+  const entry = store.catchPokemon(mon());
+  const result = store.useVitamin(entry.uid, 'protein'); // targets atk
+  assert.equal(result.applied, VITAMIN_BONUS);
+  assert.equal(result.stat, 'atk');
+  assert.equal(entry.evs.atk, VITAMIN_BONUS);
+  assert.equal(entry.evs.hp, 0);
+  assert.equal(entry.history[0].kind, 'vitamin');
+});
+
+test('useVitamin is clamped by the same 252/510 caps as battling', () => {
+  const entry = store.catchPokemon(mon());
+  for (let i = 0; i < 30; i++) store.useVitamin(entry.uid, 'protein');
+  assert.equal(entry.evs.atk, STAT_CAP);
+
+  const last = store.useVitamin(entry.uid, 'protein');
+  assert.equal(last.applied, 0);
+});
+
+test('useVitamin respects the shared 510 total cap across stats', () => {
+  const entry = store.catchPokemon(mon());
+  const opp = opponent({ hp: 252, atk: 252, def: 0, spa: 0, spd: 0, spe: 0 });
+  store.logDefeat(entry.uid, opp); // fills hp + atk to 252/252, total 504
+
+  const result = store.useVitamin(entry.uid, 'iron'); // targets def, room left = 6
+  assert.equal(result.applied, 6);
+  assert.equal(Object.values(entry.evs).reduce((a, b) => a + b, 0), TOTAL_CAP);
+});
+
+test('useVitamin stops at 100 EVs on a recognized Gen III-VII title', () => {
+  store.createParty('Emerald run', '', 'Emerald'); // Gen 3
+  const entry = store.catchPokemon(mon());
+  for (let i = 0; i < 10; i++) store.useVitamin(entry.uid, 'protein');
+  assert.equal(entry.evs.atk, 100); // last dose crosses into the 100+ zone, still applied
+
+  const blocked = store.useVitamin(entry.uid, 'protein');
+  assert.equal(blocked.applied, 0);
+  assert.equal(blocked.blockedByCutoff, true);
+  assert.equal(entry.evs.atk, 100);
+});
+
+test('useVitamin has no 100-EV cutoff on Gen VIII+ (removed) or Gen I-II (never existed)', () => {
+  store.createParty('Sword run', '', 'Sword'); // Gen 8
+  const swordEntry = store.catchPokemon(mon());
+  for (let i = 0; i < 11; i++) store.useVitamin(swordEntry.uid, 'protein');
+  assert.equal(swordEntry.evs.atk, 110);
+
+  store.createParty('Red run', '', 'Red'); // Gen 1
+  const redEntry = store.catchPokemon(mon({ id: 2, name: 'charmander' }));
+  for (let i = 0; i < 11; i++) store.useVitamin(redEntry.uid, 'protein');
+  assert.equal(redEntry.evs.atk, 110);
+});
+
+test('useVitamin has no cutoff when the game version is unset or unrecognized', () => {
+  store.createParty('ROM hack run', '', 'Radical Red'); // unrecognized -> no known gen
+  const entry = store.catchPokemon(mon());
+  for (let i = 0; i < 11; i++) store.useVitamin(entry.uid, 'protein');
+  assert.equal(entry.evs.atk, 110);
 });
 
 test('deleting the active party falls back to another remaining party', () => {
