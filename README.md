@@ -30,11 +30,16 @@ secure context.)
   isn't just cosmetic: it decides which era's vitamin and power item
   mechanics apply (see below), so pick a real recognized title when you
   can.
-- **EV tracking** — six stat bars per Pokémon plus a total, with power
-  item and Pokérus (×2) support, correctly capped at 252/stat and
-  510/total. Power items give +4 EVs on a recognized Gen IV-VI party
-  (their original strength) and +8 from Gen VII onward — an unset or
-  unrecognized game version falls back to the modern +8
+- **EV tracking** — six stat bars per Pokémon plus a total, with a held
+  training item and Pokérus (×2) support, correctly capped at 252/stat
+  and 510/total. The training item dropdown only offers what actually
+  existed for that party's generation: the **Macho Brace** (Gen III-VI,
+  doubles all EVs gained in battle) and **Power items** (Gen IV onward,
+  +4 EVs on their stat through Gen VI, +8 from Gen VII on) — a Gen I-II
+  party gets neither, Gen III gets only the Macho Brace, Gen IV-VI gets
+  both (pick one — same held-item slot), and Gen VII+ gets only Power
+  items. An unset or unrecognized game version falls back to modern
+  behavior: Power items only, at +8
   ([Bulbapedia](https://bulbapedia.bulbagarden.net/wiki/Effort_values)).
 - **Vitamins** — feed HP Up, Protein, Iron, Calcium, Zinc or Carbos
   (+10 EVs each) straight from the roster card; every button spells out
