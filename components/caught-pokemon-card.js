@@ -1,4 +1,4 @@
-import { POWER_ITEMS, STAT_LABEL, POWER_ITEM_BONUS, TOTAL_CAP, FALLBACK_SPRITE, MIN_LEVEL, MAX_LEVEL } from '../lib/constants.js';
+import { POWER_ITEMS, VITAMINS, STAT_LABEL, POWER_ITEM_BONUS, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, TOTAL_CAP, FALLBACK_SPRITE, MIN_LEVEL, MAX_LEVEL } from '../lib/constants.js';
 import { titleCase, totalEvs, formatEvYield } from '../lib/utils.js';
 import { api, store } from '../lib/services.js';
 import { attachDesignSystem } from '../lib/design-system.js';
@@ -92,6 +92,11 @@ export class CaughtPokemonCard extends HTMLElement {
         .aids label { display: flex; align-items: center; gap: var(--space-2); color: var(--ink-soft); flex-wrap: wrap; }
         select.power-item { max-width: 100%; }
 
+        .vitamins { display: grid; gap: var(--space-2); }
+        .vitamin-grid { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+        .vitamin-status { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--teal); min-height: 1em; }
+        .vitamin-btn[data-capped] { opacity: 0.55; }
+
         .pokerus-toggle { cursor: pointer; }
         .dot {
           width: 9px; height: 9px; border-radius: 50%; background: var(--lcd-deep);
@@ -129,6 +134,7 @@ export class CaughtPokemonCard extends HTMLElement {
         ul.hist-list li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); font-size: var(--font-size-xs); }
         ul.hist-list li.empty { display: block; color: var(--ink-soft); }
         ul.hist-list img { width: 24px; height: 24px; image-rendering: pixelated; flex: 0 0 auto; }
+        ul.hist-list .vitamin-icon { width: 24px; flex: 0 0 auto; text-align: center; font-size: var(--font-size-input); }
         ul.hist-list li > div { flex: 1 1 140px; min-width: 0; }
         ul.hist-list strong { display: block; text-transform: capitalize; }
         ul.hist-list .gain { display: block; color: var(--teal); font-family: var(--font-mono); }
@@ -170,6 +176,12 @@ export class CaughtPokemonCard extends HTMLElement {
               </label>
             </section>
 
+            <section class="vitamins">
+              <h3 class="section-title">Vitamins</h3>
+              <div class="vitamin-grid"></div>
+              <p class="vitamin-status" aria-live="polite"></p>
+            </section>
+
             <div class="evolve-panel">
               <button class="evolve-btn ds-btn ds-btn--outline ds-btn--sm" type="button">Evolve ▸</button>
               <div class="evolve-options" hidden></div>
@@ -207,6 +219,8 @@ export class CaughtPokemonCard extends HTMLElement {
     this.$evSummary = shadow.querySelector('ev-summary');
     this.$powerItem = shadow.querySelector('.power-item');
     this.$pokerus = shadow.querySelector('.pokerus');
+    this.$vitaminGrid = shadow.querySelector('.vitamin-grid');
+    this.$vitaminStatus = shadow.querySelector('.vitamin-status');
     this.$evolveBtn = shadow.querySelector('.evolve-btn');
     this.$evolveOptions = shadow.querySelector('.evolve-options');
     this.$evolveStatus = shadow.querySelector('.evolve-status');
@@ -219,6 +233,7 @@ export class CaughtPokemonCard extends HTMLElement {
     this.$histList = shadow.querySelector('.hist-list');
 
     this._populatePowerItemOptions();
+    this._populateVitaminButtons();
     this._wireEvents();
   }
 
@@ -232,6 +247,21 @@ export class CaughtPokemonCard extends HTMLElement {
       opt.value = p.id;
       opt.textContent = `${p.label} (+${POWER_ITEM_BONUS} ${STAT_LABEL[p.stat]})`;
       this.$powerItem.appendChild(opt);
+    }
+  }
+
+  // Each button spells out exactly which stat it feeds (e.g. "Protein
+  // +10 ATK") so there's no need to remember which vitamin maps to which
+  // stat — that mapping is the whole point of showing it here.
+  _populateVitaminButtons() {
+    for (const v of VITAMINS) {
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'vitamin-btn ds-btn ds-btn--outline ds-btn--sm';
+      btn.dataset.vitamin = v.id;
+      btn.textContent = `${v.label} +${VITAMIN_BONUS} ${STAT_LABEL[v.stat]}`;
+      btn.title = `Feed ${v.label} — raises ${STAT_LABEL[v.stat]} EVs by up to ${VITAMIN_BONUS}`;
+      this.$vitaminGrid.appendChild(btn);
     }
   }
 
@@ -257,6 +287,11 @@ export class CaughtPokemonCard extends HTMLElement {
     this.$pokerus.addEventListener('change', () => {
       store.setPokerus(this._entry.uid, this.$pokerus.checked);
       if (this._pendingOpponent) this._previewBattle(this._pendingOpponent);
+    });
+    this.$vitaminGrid.addEventListener('click', (e) => {
+      const btn = e.target.closest('.vitamin-btn');
+      if (!btn) return;
+      this._useVitamin(btn.dataset.vitamin);
     });
     this.$search.addEventListener('pokemon-pick', (e) => {
       this._pendingOpponent = e.detail.name;
@@ -306,6 +341,20 @@ export class CaughtPokemonCard extends HTMLElement {
       this.$status.textContent = '';
     } catch (err) {
       this.$status.textContent = err.message || 'Could not log that battle.';
+    }
+  }
+
+  /** Feeds one vitamin and reports exactly which stat moved and by how much. */
+  _useVitamin(vitaminId) {
+    const vitamin = VITAMINS.find((v) => v.id === vitaminId);
+    const result = store.useVitamin(this._entry.uid, vitaminId);
+    if (!result || !vitamin) return;
+    if (result.applied) {
+      this.$vitaminStatus.textContent = `${vitamin.label}: +${result.applied} ${STAT_LABEL[vitamin.stat]}`;
+    } else if (result.blockedByCutoff) {
+      this.$vitaminStatus.textContent = `${vitamin.label}: no EVs gained — this game stops vitamins once ${STAT_LABEL[vitamin.stat]} has ${VITAMIN_STAT_CUTOFF}+ EVs`;
+    } else {
+      this.$vitaminStatus.textContent = `${vitamin.label}: no EVs gained — ${STAT_LABEL[vitamin.stat]} is already maxed out`;
     }
   }
 
@@ -416,6 +465,8 @@ export class CaughtPokemonCard extends HTMLElement {
 
     this.$powerItem.value = e.powerItem || '';
     this.$pokerus.checked = !!e.pokerus;
+    this.$vitaminStatus.textContent = '';
+    this._updateVitaminButtons(e);
     this.$details.open = this._historyOpen;
     this.$histCount.textContent = e.history.length;
     this.$histList.innerHTML =
@@ -423,7 +474,43 @@ export class CaughtPokemonCard extends HTMLElement {
       '<li class="empty">No battles logged yet.</li>';
   }
 
+  // Marks a button dim before it's even clicked when this game's rules
+  // mean it wouldn't gain anything — the Gen III-VII 100-EV vitamin
+  // cutoff, or the stat already sitting at the 252 cap.
+  _updateVitaminButtons(e) {
+    const cutoffApplies = store.vitaminCutoffApplies();
+    for (const btn of this.$vitaminGrid.children) {
+      const vitamin = VITAMINS.find((v) => v.id === btn.dataset.vitamin);
+      const stat = e.evs[vitamin.stat];
+      const cappedByCutoff = cutoffApplies && stat >= VITAMIN_STAT_CUTOFF;
+      const cappedByStatCap = stat >= 252;
+      if (cappedByCutoff || cappedByStatCap) {
+        btn.dataset.capped = '';
+        btn.title = cappedByCutoff
+          ? `This game stops vitamins once ${STAT_LABEL[vitamin.stat]} has ${VITAMIN_STAT_CUTOFF}+ EVs`
+          : `${STAT_LABEL[vitamin.stat]} is already at the 252 cap`;
+      } else {
+        delete btn.dataset.capped;
+        btn.title = `Feed ${vitamin.label} — raises ${STAT_LABEL[vitamin.stat]} EVs by up to ${VITAMIN_BONUS}`;
+      }
+    }
+  }
+
   _historyItemHtml(h) {
+    if (h.kind === 'vitamin') {
+      const gained = h.applied
+        ? `+${h.applied} ${STAT_LABEL[h.stat]}`
+        : h.blockedByCutoff
+          ? `No EVs gained (${STAT_LABEL[h.stat]} ≥ ${VITAMIN_STAT_CUTOFF} EVs, this game's vitamin limit)`
+          : 'No EVs gained (capped)';
+      return `<li>
+        <span class="vitamin-icon" aria-hidden="true">💊</span>
+        <div>
+          <strong>${h.vitaminLabel}</strong>
+          <span class="gain">${gained}</span>
+        </div>
+      </li>`;
+    }
     const gained = formatEvYield(h.applied);
     const itemLabel = h.powerItem ? POWER_ITEMS.find((p) => p.id === h.powerItem)?.label : null;
     const tags = [itemLabel, h.pokerus ? 'Pokérus ×2' : null].filter(Boolean).join(' · ');
