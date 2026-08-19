@@ -1,4 +1,4 @@
-import { POWER_ITEMS, VITAMINS, STAT_LABEL, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, TOTAL_CAP, FALLBACK_SPRITE, MIN_LEVEL, MAX_LEVEL } from '../lib/constants.js';
+import { POWER_ITEMS, VITAMINS, STAT_LABEL, MACHO_BRACE_MULTIPLIER, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, TOTAL_CAP, FALLBACK_SPRITE, MIN_LEVEL, MAX_LEVEL } from '../lib/constants.js';
 import { titleCase, totalEvs, formatEvYield } from '../lib/utils.js';
 import { api, store } from '../lib/services.js';
 import { attachDesignSystem } from '../lib/design-system.js';
@@ -167,7 +167,7 @@ export class CaughtPokemonCard extends HTMLElement {
 
             <section class="aids">
               <label>
-                Power item
+                Training item
                 <select class="power-item ds-field"></select>
               </label>
               <label class="pokerus-toggle">
@@ -236,21 +236,31 @@ export class CaughtPokemonCard extends HTMLElement {
     this._wireEvents();
   }
 
-  // Rebuilt on every render (not just once) because the bonus shown
-  // depends on the entry's party's game version, and this one component
-  // instance is reused across different parties as the user navigates.
-  _populatePowerItemOptions(bonus) {
-    const selected = this.$powerItem.value;
+  // Rebuilt on every render (not just once) because which items are even
+  // offered — and the Power item bonus shown — depends on the entry's
+  // party's game version, and this one component instance is reused
+  // across different parties as the user navigates. Value is 'macho-brace'
+  // for the Macho Brace, a power item id, or '' for none.
+  _populateTrainingItemOptions(bonus, availability) {
+    const selected = this._entry.machoBrace ? 'macho-brace' : this._entry.powerItem || '';
     this.$powerItem.innerHTML = '';
     const noneOpt = document.createElement('option');
     noneOpt.value = '';
     noneOpt.textContent = 'None';
     this.$powerItem.appendChild(noneOpt);
-    for (const p of POWER_ITEMS) {
+    if (availability.machoBrace) {
       const opt = document.createElement('option');
-      opt.value = p.id;
-      opt.textContent = `${p.label} (+${bonus} ${STAT_LABEL[p.stat]})`;
+      opt.value = 'macho-brace';
+      opt.textContent = `Macho Brace (×${MACHO_BRACE_MULTIPLIER} all EVs gained)`;
       this.$powerItem.appendChild(opt);
+    }
+    if (availability.powerItems) {
+      for (const p of POWER_ITEMS) {
+        const opt = document.createElement('option');
+        opt.value = p.id;
+        opt.textContent = `${p.label} (+${bonus} ${STAT_LABEL[p.stat]})`;
+        this.$powerItem.appendChild(opt);
+      }
     }
     this.$powerItem.value = selected;
   }
@@ -286,7 +296,12 @@ export class CaughtPokemonCard extends HTMLElement {
       }
     });
     this.$powerItem.addEventListener('change', () => {
-      store.setPowerItem(this._entry.uid, this.$powerItem.value || null);
+      const val = this.$powerItem.value;
+      if (val === 'macho-brace') {
+        store.setMachoBrace(this._entry.uid, true);
+      } else {
+        store.setPowerItem(this._entry.uid, val || null);
+      }
       if (this._pendingOpponent) this._previewBattle(this._pendingOpponent);
     });
     this.$pokerus.addEventListener('change', () => {
@@ -468,8 +483,7 @@ export class CaughtPokemonCard extends HTMLElement {
     this.$trainedBadge.hidden = !trained;
     this.toggleAttribute('fully-trained', trained);
 
-    this._populatePowerItemOptions(store.powerItemBonus());
-    this.$powerItem.value = e.powerItem || '';
+    this._populateTrainingItemOptions(store.powerItemBonus(), store.trainingItemAvailability());
     this.$pokerus.checked = !!e.pokerus;
     this.$vitaminStatus.textContent = '';
     this._updateVitaminButtons(e);
@@ -518,7 +532,11 @@ export class CaughtPokemonCard extends HTMLElement {
       </li>`;
     }
     const gained = formatEvYield(h.applied);
-    const itemLabel = h.powerItem ? POWER_ITEMS.find((p) => p.id === h.powerItem)?.label : null;
+    const itemLabel = h.machoBrace
+      ? 'Macho Brace'
+      : h.powerItem
+        ? POWER_ITEMS.find((p) => p.id === h.powerItem)?.label
+        : null;
     const tags = [itemLabel, h.pokerus ? 'Pokérus ×2' : null].filter(Boolean).join(' · ');
     return `<li>
       <img src="${h.sprite || FALLBACK_SPRITE}" alt="" />
