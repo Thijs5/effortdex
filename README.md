@@ -26,10 +26,21 @@ secure context.)
 
 - **Parties** — group caught Pokémon by save file or playthrough, each
   with its own name, description and game version (shown as a small
-  cartridge icon matching that title's generation).
+  cartridge icon matching that title's generation). The game version
+  isn't just cosmetic: it decides which era's vitamin mechanic applies
+  (see Vitamins below), so pick a real recognized title when you can.
 - **EV tracking** — six stat bars per Pokémon plus a total, with power
   item (+8 flat) and Pokérus (×2) support, correctly capped at 252/stat
   and 510/total.
+- **Vitamins** — feed HP Up, Protein, Iron, Calcium, Zinc or Carbos
+  (+10 EVs each) straight from the roster card; every button spells out
+  exactly which stat it feeds. Capped at 252/stat and 510/total like
+  battling, and on a recognized Gen III-VII party (Ruby/Sapphire through
+  Sun/Moon/Ultra Sun/Ultra Moon/Let's Go) also stops working on a stat
+  once it already has 100+ EVs, matching those games' real mechanic
+  ([Bulbapedia](https://bulbapedia.bulbagarden.net/wiki/Vitamin)). Gen
+  I-II (no such rule ever existed) and Gen VIII+ (rule removed) have no
+  cutoff, and neither does an unset or unrecognized game version.
 - **EV-yield previews** — before catching a Pokémon or logging a battle,
   see what EVs it would actually yield, so you can decide if it's worth
   it.
@@ -40,6 +51,18 @@ secure context.)
 - **Installable / offline** — a web app manifest and service worker let
   it be installed and used without a network connection; species data
   already looked up stays available offline too.
+
+## Testing
+
+Domain logic (`lib/store.js`) has a unit test suite using Node's
+built-in test runner — no dependencies:
+
+```sh
+npm test
+```
+
+CI (`.github/workflows/test.yml`) runs this on every push to `main`
+and every pull request.
 
 ## Data & privacy
 
