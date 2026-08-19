@@ -54,6 +54,7 @@
             <pokemon-search id="catch-search" placeholder="e.g. Bulbasaur"></pokemon-search>
             <button id="catch-btn" class="btn btn--primary" disabled>Catch!</button>
           </div>
+          <p id="catch-ev-preview" class="status-line" aria-live="polite"></p>
           <p id="catch-status" class="status-line" aria-live="polite"></p>
 
           <div class="legend">
@@ -74,6 +75,11 @@
           <div id="roster" class="roster"></div>
         </section>
       </div>
+    </main>
+
+    <!-- "/<party-slug>/<uid>" — one caught Pokémon's full detail page -->
+    <main id="pokemon-view" class="pokemon-view" hidden>
+      <a id="back-to-roster" class="back-link" href="#/">&larr; Roster</a>
     </main>
 
     <footer class="bezel-footer">

@@ -1,14 +1,16 @@
-import { STATS, POWER_ITEMS, STAT_LABEL, POWER_ITEM_BONUS, TOTAL_CAP, FALLBACK_SPRITE, MIN_LEVEL, MAX_LEVEL } from '../lib/constants.js';
-import { titleCase, totalEvs } from '../lib/utils.js';
+import { POWER_ITEMS, STAT_LABEL, POWER_ITEM_BONUS, TOTAL_CAP, FALLBACK_SPRITE, MIN_LEVEL, MAX_LEVEL } from '../lib/constants.js';
+import { titleCase, totalEvs, formatEvYield } from '../lib/utils.js';
 import { api, store } from '../lib/services.js';
 import { attachDesignSystem } from '../lib/design-system.js';
 import './ev-summary.js';
 import './pokemon-search.js';
 
 /**
- * <caught-pokemon-card> — one roster entry: identity, EV bars, training
- * aids (power item / Pokérus), a "log defeat" form and battle history.
- * Set `.entry` to a Store roster entry; the card re-renders on assignment.
+ * <caught-pokemon-card> — a caught Pokémon's full detail page: identity,
+ * EV bars, training aids (power item / Pokérus), evolution, a "log
+ * defeat" form (with an EV-yield preview before logging) and battle
+ * history. Set `.entry` to a Store roster entry; the card re-renders on
+ * assignment. Meant to be mounted one at a time, full width.
  */
 export class CaughtPokemonCard extends HTMLElement {
   constructor() {
@@ -34,9 +36,9 @@ export class CaughtPokemonCard extends HTMLElement {
         }
         :host([fully-trained]) .card { box-shadow: var(--shadow-trained); }
 
-        header { display: grid; grid-template-columns: 42px 1fr auto; align-items: center; gap: var(--space-3); }
+        header { display: grid; grid-template-columns: 64px 1fr auto; align-items: center; gap: var(--space-4); }
         .sprite {
-          width: 42px; height: 42px; image-rendering: pixelated;
+          width: 64px; height: 64px; image-rendering: pixelated;
           background: rgba(255, 255, 255, 0.5); border-radius: var(--radius-sm); object-fit: contain;
         }
         .titles { min-width: 0; }
@@ -60,8 +62,11 @@ export class CaughtPokemonCard extends HTMLElement {
           border: 1px solid var(--lcd-line); border-radius: var(--radius-sm);
           background: var(--surface); font-family: var(--font-mono); font-size: var(--font-size-input);
         }
-        .evo-note {
+        .evo-row {
           grid-column: 1 / -1;
+          display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap;
+        }
+        .evo-note {
           font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--ink-soft);
         }
         .release {
@@ -71,6 +76,17 @@ export class CaughtPokemonCard extends HTMLElement {
         }
         .release:hover { color: var(--poke-red); }
         .trained-badge { grid-column: 1 / -1; }
+
+        .card-body { display: grid; gap: var(--space-5); }
+        @media (min-width: 760px) {
+          .card-body { grid-template-columns: minmax(240px, 360px) 1fr; align-items: start; }
+        }
+        .card-col { display: grid; gap: var(--space-4); align-content: start; }
+
+        .section-title {
+          margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs);
+          letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft);
+        }
 
         .aids { display: flex; flex-wrap: wrap; gap: var(--space-3); align-items: center; font-size: var(--font-size-xs); }
         .aids label { display: flex; align-items: center; gap: var(--space-2); color: var(--ink-soft); flex-wrap: wrap; }
@@ -84,15 +100,20 @@ export class CaughtPokemonCard extends HTMLElement {
         input.pokerus { position: absolute; opacity: 0; width: 0; height: 0; }
         input.pokerus:checked + .dot { background: var(--teal); box-shadow: 0 0 0 3px var(--teal-soft); }
 
-        .evolve-btn { margin-left: auto; }
+        .evolve-panel { display: grid; gap: var(--space-2); }
         .evolve-options { display: flex; flex-wrap: wrap; gap: var(--space-2); }
         .evolve-option { display: inline-flex; align-items: center; gap: var(--space-2); }
         .evolve-option img { width: 18px; height: 18px; image-rendering: pixelated; }
         .evolve-status { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--teal); min-height: 1em; }
 
         .battle { display: flex; gap: var(--space-2); flex-wrap: wrap; }
+        .battle .section-title { flex-basis: 100%; margin: 0 0 var(--space-1); }
         @media (max-width: 420px) {
           .battle { flex-direction: column; align-items: stretch; }
+        }
+        .battle-preview {
+          flex-basis: 100%; margin: 0; font-family: var(--font-mono);
+          font-size: var(--font-size-xs); color: var(--teal); min-height: 1em;
         }
         .status { flex-basis: 100%; margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--poke-red-dark); min-height: 1em; }
 
@@ -128,35 +149,49 @@ export class CaughtPokemonCard extends HTMLElement {
           </div>
           <button class="release" title="Release Pokémon" aria-label="Release Pokémon">✕</button>
           <span class="trained-badge ds-pill-badge" hidden>★ Fully trained</span>
-          <span class="evo-note" hidden></span>
+          <div class="evo-row" hidden>
+            <span class="evo-note"></span>
+            <button class="undo-evolve ds-btn ds-btn--outline ds-btn--sm" type="button">↺ Undo</button>
+          </div>
         </header>
 
-        <ev-summary></ev-summary>
+        <div class="card-body">
+          <div class="card-col card-col--left">
+            <ev-summary></ev-summary>
 
-        <section class="aids">
-          <label>
-            Power item
-            <select class="power-item ds-field"></select>
-          </label>
-          <label class="pokerus-toggle">
-            <input type="checkbox" class="pokerus" />
-            <span class="dot"></span> Pokérus
-          </label>
-          <button class="evolve-btn ds-btn ds-btn--outline ds-btn--sm" type="button">Evolve ▸</button>
-        </section>
-        <div class="evolve-options" hidden></div>
-        <p class="evolve-status" aria-live="polite"></p>
+            <section class="aids">
+              <label>
+                Power item
+                <select class="power-item ds-field"></select>
+              </label>
+              <label class="pokerus-toggle">
+                <input type="checkbox" class="pokerus" />
+                <span class="dot"></span> Pokérus
+              </label>
+            </section>
 
-        <section class="battle">
-          <pokemon-search placeholder="Defeated Pokémon…"></pokemon-search>
-          <button class="log-defeat ds-btn ds-btn--solid" disabled>Log defeat</button>
-          <p class="status" aria-live="polite"></p>
-        </section>
+            <div class="evolve-panel">
+              <button class="evolve-btn ds-btn ds-btn--outline ds-btn--sm" type="button">Evolve ▸</button>
+              <div class="evolve-options" hidden></div>
+              <p class="evolve-status" aria-live="polite"></p>
+            </div>
+          </div>
 
-        <details class="history">
-          <summary>Battle history (<span class="hist-count">0</span>)</summary>
-          <ul class="hist-list"></ul>
-        </details>
+          <div class="card-col card-col--right">
+            <section class="battle">
+              <h3 class="section-title">Log a battle</h3>
+              <pokemon-search placeholder="Defeated Pokémon…"></pokemon-search>
+              <button class="log-defeat ds-btn ds-btn--solid" disabled>Log defeat</button>
+              <p class="battle-preview" aria-live="polite"></p>
+              <p class="status" aria-live="polite"></p>
+            </section>
+
+            <details class="history">
+              <summary>Battle history (<span class="hist-count">0</span>)</summary>
+              <ul class="hist-list"></ul>
+            </details>
+          </div>
+        </div>
       </article>
     `;
 
@@ -164,7 +199,9 @@ export class CaughtPokemonCard extends HTMLElement {
     this.$nickname = shadow.querySelector('.nickname');
     this.$species = shadow.querySelector('.species');
     this.$level = shadow.querySelector('.level');
+    this.$evoRow = shadow.querySelector('.evo-row');
     this.$evoNote = shadow.querySelector('.evo-note');
+    this.$undoEvolve = shadow.querySelector('.undo-evolve');
     this.$release = shadow.querySelector('.release');
     this.$trainedBadge = shadow.querySelector('.trained-badge');
     this.$evSummary = shadow.querySelector('ev-summary');
@@ -175,6 +212,7 @@ export class CaughtPokemonCard extends HTMLElement {
     this.$evolveStatus = shadow.querySelector('.evolve-status');
     this.$search = shadow.querySelector('pokemon-search');
     this.$logBtn = shadow.querySelector('.log-defeat');
+    this.$battlePreview = shadow.querySelector('.battle-preview');
     this.$status = shadow.querySelector('.status');
     this.$details = shadow.querySelector('.history');
     this.$histCount = shadow.querySelector('.hist-count');
@@ -205,6 +243,7 @@ export class CaughtPokemonCard extends HTMLElement {
       store.setLevel(this._entry.uid, this.$level.value);
     });
     this.$evolveBtn.addEventListener('click', () => this._toggleEvolutions());
+    this.$undoEvolve.addEventListener('click', () => this._undoEvolve());
     this.$release.addEventListener('click', () => {
       const label = titleCase(this._entry.nickname || this._entry.speciesName);
       if (confirm(`Release ${label}? Its EV log will be deleted.`)) {
@@ -213,14 +252,17 @@ export class CaughtPokemonCard extends HTMLElement {
     });
     this.$powerItem.addEventListener('change', () => {
       store.setPowerItem(this._entry.uid, this.$powerItem.value || null);
+      if (this._pendingOpponent) this._previewBattle(this._pendingOpponent);
     });
     this.$pokerus.addEventListener('change', () => {
       store.setPokerus(this._entry.uid, this.$pokerus.checked);
+      if (this._pendingOpponent) this._previewBattle(this._pendingOpponent);
     });
     this.$search.addEventListener('pokemon-pick', (e) => {
       this._pendingOpponent = e.detail.name;
       this.$logBtn.disabled = false;
       this.$logBtn.textContent = `Log defeat: ${titleCase(e.detail.name)}`;
+      this._previewBattle(e.detail.name);
     });
     this.$logBtn.addEventListener('click', () => this._logDefeat());
     this.$details.addEventListener('toggle', () => {
@@ -248,6 +290,7 @@ export class CaughtPokemonCard extends HTMLElement {
     this._pendingOpponent = null;
     this.$logBtn.disabled = true;
     this.$logBtn.textContent = 'Log defeat';
+    this.$battlePreview.textContent = '';
   }
 
   async _redefeat(name) {
@@ -263,6 +306,22 @@ export class CaughtPokemonCard extends HTMLElement {
       this.$status.textContent = '';
     } catch (err) {
       this.$status.textContent = err.message || 'Could not log that battle.';
+    }
+  }
+
+  /** Shows what defeating `name` would earn this Pokémon right now, before it's logged. */
+  async _previewBattle(name) {
+    this.$battlePreview.textContent = 'Checking EV yield…';
+    try {
+      const mon = await api.getPokemon(name);
+      if (this._pendingOpponent !== name) return; // user picked something else meanwhile
+      const { applied } = store.previewDefeat(this._entry.uid, mon);
+      const gained = formatEvYield(applied);
+      this.$battlePreview.textContent = gained
+        ? `Would gain: ${gained}`
+        : 'Would gain: nothing — already maxed out';
+    } catch {
+      if (this._pendingOpponent === name) this.$battlePreview.textContent = '';
     }
   }
 
@@ -305,6 +364,8 @@ export class CaughtPokemonCard extends HTMLElement {
   }
 
   async _evolveInto(name) {
+    const from = titleCase(this._entry.nickname || this._entry.speciesName);
+    if (!confirm(`Evolve ${from} into ${titleCase(name)}? This can't be undone.`)) return;
     this.$evolveStatus.textContent = `Evolving into ${titleCase(name)}…`;
     try {
       const mon = await api.getPokemon(name);
@@ -314,6 +375,21 @@ export class CaughtPokemonCard extends HTMLElement {
     } catch (err) {
       this.$evolveStatus.textContent = err.message || 'Could not evolve.';
     }
+  }
+
+  /** Undoes the most recent evolution — for an accidental click on the wrong option. */
+  async _undoEvolve() {
+    const last = this._entry.evolutions[0];
+    if (!last) return;
+    if (!confirm(`Undo evolution and revert to ${titleCase(last.fromName)}?`)) return;
+    this.$undoEvolve.disabled = true;
+    try {
+      const mon = await api.getPokemon(last.fromName);
+      store.revertEvolution(this._entry.uid, mon);
+    } catch (err) {
+      alert(err.message || 'Could not undo evolution.');
+    }
+    this.$undoEvolve.disabled = false;
   }
 
   _render() {
@@ -327,10 +403,10 @@ export class CaughtPokemonCard extends HTMLElement {
     this.$level.value = e.level;
     if (e.evolutions.length) {
       const last = e.evolutions[0];
-      this.$evoNote.hidden = false;
+      this.$evoRow.hidden = false;
       this.$evoNote.textContent = `Evolved from ${titleCase(last.fromName)} at Lv. ${last.level}`;
     } else {
-      this.$evoNote.hidden = true;
+      this.$evoRow.hidden = true;
     }
     this.$evSummary.evs = e.evs;
 
@@ -348,9 +424,7 @@ export class CaughtPokemonCard extends HTMLElement {
   }
 
   _historyItemHtml(h) {
-    const gained = STATS.filter(({ key }) => h.applied[key] > 0)
-      .map(({ key, label }) => `+${h.applied[key]} ${label}`)
-      .join(', ');
+    const gained = formatEvYield(h.applied);
     const itemLabel = h.powerItem ? POWER_ITEMS.find((p) => p.id === h.powerItem)?.label : null;
     const tags = [itemLabel, h.pokerus ? 'Pokérus ×2' : null].filter(Boolean).join(' · ');
     return `<li>
