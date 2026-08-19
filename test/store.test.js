@@ -139,6 +139,28 @@ test('useVitamin respects the shared 510 total cap across stats', () => {
   assert.equal(Object.values(entry.evs).reduce((a, b) => a + b, 0), TOTAL_CAP);
 });
 
+test('power item gives +4 EVs on a recognized Gen IV-VI title', () => {
+  store.createParty('Platinum run', '', 'Platinum'); // Gen 4
+  const entry = store.catchPokemon(mon());
+  store.setPowerItem(entry.uid, 'bracer'); // atk
+  store.logDefeat(entry.uid, opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 }));
+  assert.equal(entry.evs.atk, 5); // 1 base + 4 legacy bonus
+});
+
+test('power item gives +8 EVs on a recognized Gen VII+ title, and on unset/unrecognized versions', () => {
+  store.createParty('Sun run', '', 'Sun'); // Gen 7
+  const sunEntry = store.catchPokemon(mon());
+  store.setPowerItem(sunEntry.uid, 'bracer');
+  store.logDefeat(sunEntry.uid, opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 }));
+  assert.equal(sunEntry.evs.atk, 9); // 1 + 8 modern bonus
+
+  store.createParty('ROM hack run', '', 'Radical Red');
+  const romEntry = store.catchPokemon(mon({ id: 2, name: 'charmander' }));
+  store.setPowerItem(romEntry.uid, 'bracer');
+  store.logDefeat(romEntry.uid, opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 }));
+  assert.equal(romEntry.evs.atk, 9); // unrecognized version falls back to modern bonus
+});
+
 test('useVitamin stops at 100 EVs on a recognized Gen III-VII title', () => {
   store.createParty('Emerald run', '', 'Emerald'); // Gen 3
   const entry = store.catchPokemon(mon());

@@ -1,4 +1,4 @@
-import { POWER_ITEMS, VITAMINS, STAT_LABEL, POWER_ITEM_BONUS, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, TOTAL_CAP, FALLBACK_SPRITE, MIN_LEVEL, MAX_LEVEL } from '../lib/constants.js';
+import { POWER_ITEMS, VITAMINS, STAT_LABEL, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, TOTAL_CAP, FALLBACK_SPRITE, MIN_LEVEL, MAX_LEVEL } from '../lib/constants.js';
 import { titleCase, totalEvs, formatEvYield } from '../lib/utils.js';
 import { api, store } from '../lib/services.js';
 import { attachDesignSystem } from '../lib/design-system.js';
@@ -232,12 +232,16 @@ export class CaughtPokemonCard extends HTMLElement {
     this.$histCount = shadow.querySelector('.hist-count');
     this.$histList = shadow.querySelector('.hist-list');
 
-    this._populatePowerItemOptions();
     this._populateVitaminButtons();
     this._wireEvents();
   }
 
-  _populatePowerItemOptions() {
+  // Rebuilt on every render (not just once) because the bonus shown
+  // depends on the entry's party's game version, and this one component
+  // instance is reused across different parties as the user navigates.
+  _populatePowerItemOptions(bonus) {
+    const selected = this.$powerItem.value;
+    this.$powerItem.innerHTML = '';
     const noneOpt = document.createElement('option');
     noneOpt.value = '';
     noneOpt.textContent = 'None';
@@ -245,9 +249,10 @@ export class CaughtPokemonCard extends HTMLElement {
     for (const p of POWER_ITEMS) {
       const opt = document.createElement('option');
       opt.value = p.id;
-      opt.textContent = `${p.label} (+${POWER_ITEM_BONUS} ${STAT_LABEL[p.stat]})`;
+      opt.textContent = `${p.label} (+${bonus} ${STAT_LABEL[p.stat]})`;
       this.$powerItem.appendChild(opt);
     }
+    this.$powerItem.value = selected;
   }
 
   // Each button spells out exactly which stat it feeds (e.g. "Protein
@@ -463,6 +468,7 @@ export class CaughtPokemonCard extends HTMLElement {
     this.$trainedBadge.hidden = !trained;
     this.toggleAttribute('fully-trained', trained);
 
+    this._populatePowerItemOptions(store.powerItemBonus());
     this.$powerItem.value = e.powerItem || '';
     this.$pokerus.checked = !!e.pokerus;
     this.$vitaminStatus.textContent = '';
