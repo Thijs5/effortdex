@@ -27,9 +27,9 @@ secure context.)
 - **Parties** — group caught Pokémon by save file or playthrough, each
   with its own name, description and game version (shown as a small
   cartridge icon matching that title's generation). The game version
-  isn't just cosmetic: it decides which era's vitamin and power item
-  mechanics apply (see below), so pick a real recognized title when you
-  can.
+  isn't just cosmetic: it decides which era's vitamin, training item and
+  Pokérus mechanics apply (see below), so pick a real recognized title
+  when you can.
 - **EV tracking** — six stat bars per Pokémon plus a total, with a held
   training item and Pokérus (×2) support, correctly capped at 252/stat
   and 510/total. The training item dropdown only offers what actually
@@ -39,8 +39,12 @@ secure context.)
   party gets neither, Gen III gets only the Macho Brace, Gen IV-VI gets
   both (pick one — same held-item slot), and Gen VII+ gets only Power
   items. An unset or unrecognized game version falls back to modern
-  behavior: Power items only, at +8
-  ([Bulbapedia](https://bulbapedia.bulbagarden.net/wiki/Effort_values)).
+  behavior: Power items only, at +8. Pokérus is disabled (and its stored
+  value ignored even if set beforehand) for the specific titles where it
+  doesn't provide its usual EV-doubling effect: Let's Go Pikachu/Eevee,
+  Legends: Arceus, and Scarlet/Violet
+  ([Bulbapedia](https://bulbapedia.bulbagarden.net/wiki/Effort_values),
+  [Pokérus](https://bulbapedia.bulbagarden.net/wiki/Pok%C3%A9rus)).
 - **Vitamins** — feed HP Up, Protein, Iron, Calcium, Zinc or Carbos
   (+10 EVs each) straight from the roster card; every button spells out
   exactly which stat it feeds. Capped at 252/stat and 510/total like
