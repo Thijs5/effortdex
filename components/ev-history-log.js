@@ -1,35 +1,22 @@
-import { POWER_ITEMS, VITAMINS, STAT_LABEL, VITAMIN_STAT_CUTOFF, FALLBACK_SPRITE, FALLBACK_ONERROR } from '../lib/constants.js';
+import { POWER_ITEMS, VITAMINS, FEATHERS, EV_BERRIES, EXP_SHARE_SPRITE, STAT_LABEL, VITAMIN_STAT_CUTOFF, FALLBACK_SPRITE, FALLBACK_ONERROR } from '../lib/constants.js';
 import { titleCase, formatEvYield, escapeHtml, dayKey, dayLabel } from '../lib/utils.js';
 import { store } from '../lib/services.js';
 import { attachDesignSystem } from '../lib/design-system.js';
+import { POKERUS_ICON_SVG } from '../lib/icons.js';
 
 /**
  * <ev-history-log> — a caught Pokémon's history: every battle, vitamin
- * dose, Pokérus toggle and level change, grouped by date with the most
- * recent day first, inside a collapsible <details>. Set `.entry` to a
- * Store roster entry; the log re-renders on assignment and keeps its
- * open/closed state across re-renders.
+ * dose, Wing, EV-reducing berry, Pokérus toggle, Exp. Share toggle (and
+ * any EVs earned passively through one) and level change, grouped by date
+ * with the most recent day first, inside a collapsible <details>.
+ * Set `.entry` to a Store roster entry; the log re-renders on assignment
+ * and keeps its open/closed state across re-renders.
  *
  * Deleting a record is handled internally (store.deleteHistoryEntry
  * reverts whatever it applied). "↻ Again" dispatches a composed
  * `redefeat` CustomEvent (detail: { name }) — actually re-logging the
  * battle is the parent's job, since it owns the battle status line.
  */
-
-// A small virus glyph for the Pokérus history row — there's no game
-// sprite for the status itself, so a molecule/spore icon stands in,
-// tinted via currentColor by the .hist-icon--pokerus class.
-const POKERUS_ICON_SVG = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <circle cx="12" cy="12" r="5" fill="currentColor" />
-  <circle cx="12" cy="3" r="2" fill="currentColor" />
-  <circle cx="12" cy="21" r="2" fill="currentColor" />
-  <circle cx="3" cy="12" r="2" fill="currentColor" />
-  <circle cx="21" cy="12" r="2" fill="currentColor" />
-  <circle cx="5.5" cy="5.5" r="1.6" fill="currentColor" />
-  <circle cx="18.5" cy="5.5" r="1.6" fill="currentColor" />
-  <circle cx="5.5" cy="18.5" r="1.6" fill="currentColor" />
-  <circle cx="18.5" cy="18.5" r="1.6" fill="currentColor" />
-</svg>`;
 
 export class EvHistoryLog extends HTMLElement {
   constructor() {
@@ -172,6 +159,34 @@ export class EvHistoryLog extends HTMLElement {
         </span>
       </li>`;
     }
+    if (h.kind === 'feather') {
+      const feather = FEATHERS.find((f) => f.id === h.featherId);
+      const gained = h.applied ? `+${h.applied} ${STAT_LABEL[h.stat]}` : 'No EVs gained (capped)';
+      return `<li>
+        <img src="${feather?.sprite || FALLBACK_SPRITE}" alt="" ${FALLBACK_ONERROR} />
+        <div>
+          <strong>${feather?.label || h.featherId}</strong>
+          <span class="gain">${gained}</span>
+        </div>
+        <span class="hist-actions">
+          <button class="delete-hist-btn" type="button" data-id="${h.id}" title="Delete this log entry" aria-label="Delete this log entry">✕</button>
+        </span>
+      </li>`;
+    }
+    if (h.kind === 'berry') {
+      const berry = EV_BERRIES.find((b) => b.id === h.berryId);
+      const gained = h.applied ? `−${h.applied} ${STAT_LABEL[h.stat]}` : `No EVs removed (${STAT_LABEL[h.stat]} already 0)`;
+      return `<li>
+        <img src="${berry?.sprite || FALLBACK_SPRITE}" alt="" ${FALLBACK_ONERROR} />
+        <div>
+          <strong>${berry?.label || h.berryId}</strong>
+          <span class="gain">${gained}</span>
+        </div>
+        <span class="hist-actions">
+          <button class="delete-hist-btn" type="button" data-id="${h.id}" title="Delete this log entry" aria-label="Delete this log entry">✕</button>
+        </span>
+      </li>`;
+    }
     if (h.kind === 'evolve') {
       return `<li>
         <img src="${h.sprite || FALLBACK_SPRITE}" alt="" ${FALLBACK_ONERROR} />
@@ -208,12 +223,43 @@ export class EvHistoryLog extends HTMLElement {
         </span>
       </li>`;
     }
+    if (h.kind === 'exp-share') {
+      return `<li>
+        <img src="${EXP_SHARE_SPRITE}" alt="" ${FALLBACK_ONERROR} />
+        <div>
+          <strong>${h.active ? 'Exp. Share equipped' : 'Exp. Share removed'}</strong>
+          <span class="gain">${h.active ? 'Now earns EVs from other battles' : 'No longer earns EVs from other battles'}</span>
+        </div>
+        <span class="hist-actions">
+          <button class="delete-hist-btn" type="button" data-id="${h.id}" title="Delete this log entry" aria-label="Delete this log entry">✕</button>
+        </span>
+      </li>`;
+    }
     if (h.kind === 'level') {
       return `<li>
         <img src="${this._entry.sprite || FALLBACK_SPRITE}" alt="" ${FALLBACK_ONERROR} />
         <div>
           <strong>${h.toLevel > h.fromLevel ? 'Level up' : 'Level correction'}</strong>
           <span class="gain">Lv. ${h.fromLevel} &rarr; Lv. ${h.toLevel}</span>
+        </div>
+        <span class="hist-actions">
+          <button class="delete-hist-btn" type="button" data-id="${h.id}" title="Delete this log entry" aria-label="Delete this log entry">✕</button>
+        </span>
+      </li>`;
+    }
+    if (h.viaExpShare) {
+      // No item tag: an Exp. Share recipient never inherits the battling
+      // Pokémon's held-item bonus (store.js's _applyExpShare) — only its
+      // own Pokérus can be in play here. No "↻ Again" either: re-triggering
+      // belongs to the Pokémon that actually fought, not this one.
+      const gained = formatEvYield(h.applied);
+      const tags = h.pokerus ? 'Pokérus ×2' : '';
+      return `<li>
+        <img src="${EXP_SHARE_SPRITE}" alt="" ${FALLBACK_ONERROR} />
+        <div>
+          <strong>Exp. Share — vs ${escapeHtml(titleCase(h.opponentName))}</strong>
+          <span class="gain">${gained || 'No EVs gained (capped)'}</span>
+          ${tags ? `<span class="tags">${tags}</span>` : ''}
         </div>
         <span class="hist-actions">
           <button class="delete-hist-btn" type="button" data-id="${h.id}" title="Delete this log entry" aria-label="Delete this log entry">✕</button>
