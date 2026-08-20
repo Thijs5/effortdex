@@ -3,7 +3,7 @@ import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
 import { Store } from '../lib/store.js';
-import { STAT_CAP, TOTAL_CAP, VITAMIN_BONUS } from '../lib/constants.js';
+import { STAT_CAP, TOTAL_CAP, VITAMIN_BONUS, MIN_LEVEL, MAX_LEVEL, DEFAULT_LEVEL } from '../lib/constants.js';
 
 function mon(overrides = {}) {
   return { id: 1, name: 'bulbasaur', sprite: null, ...overrides };
@@ -26,6 +26,15 @@ test('catchPokemon starts with zeroed EVs and no history', () => {
   assert.equal(entry.speciesName, 'bulbasaur');
   assert.deepEqual(entry.evs, { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 });
   assert.equal(entry.history.length, 0);
+  assert.equal(entry.level, DEFAULT_LEVEL);
+});
+
+test('catchPokemon accepts a level, clamped like setLevel', () => {
+  assert.equal(store.catchPokemon(mon()).level, DEFAULT_LEVEL); // omitted -> default
+  assert.equal(store.catchPokemon(mon(), 50).level, 50);
+  assert.equal(store.catchPokemon(mon(), 0).level, MIN_LEVEL);
+  assert.equal(store.catchPokemon(mon(), 9999).level, MAX_LEVEL);
+  assert.equal(store.catchPokemon(mon(), 'not a number').level, DEFAULT_LEVEL);
 });
 
 test('logDefeat applies the opponent EV yield as-is with no modifiers', () => {
@@ -287,6 +296,50 @@ test('deleting the active party falls back to another remaining party', () => {
   store.deleteParty(second.id);
   assert.notEqual(store.activeParty.id, second.id);
   assert.equal(store.state.parties.length, 1);
+});
+
+test('catchPokemon accepts a recognized nature; unrecognized/omitted falls back to null', () => {
+  assert.equal(store.catchPokemon(mon(), undefined, 'adamant').nature, 'adamant');
+  assert.equal(store.catchPokemon(mon()).nature, null); // omitted
+  assert.equal(store.catchPokemon(mon(), undefined, 'not-a-nature').nature, null);
+});
+
+test('setNature sets or clears a caught Pokémon\'s nature', () => {
+  const entry = store.catchPokemon(mon());
+  store.setNature(entry.uid, 'jolly');
+  assert.equal(entry.nature, 'jolly');
+  store.setNature(entry.uid, null);
+  assert.equal(entry.nature, null);
+});
+
+test('natureAvailable follows the game version\'s generation, with an override', () => {
+  store.createParty('Red run', '', 'Red'); // Gen 1: natures didn't exist yet
+  assert.equal(store.natureAvailable(), false);
+  assert.equal(store.catchPokemon(mon(), undefined, 'jolly').nature, null); // silently dropped
+
+  store.createParty('Emerald run', '', 'Emerald'); // Gen 3: natures exist
+  assert.equal(store.natureAvailable(), true);
+  assert.equal(store.catchPokemon(mon(), undefined, 'jolly').nature, 'jolly');
+
+  store.createParty('Red run 2', '', 'Red', { nature: true }); // override forces it on
+  assert.equal(store.natureAvailable(), true);
+});
+
+test('deleteHistoryEntry removes the record and reverts the EVs it applied', () => {
+  const entry = store.catchPokemon(mon());
+  store.logDefeat(entry.uid, opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 }));
+  store.useVitamin(entry.uid, 'iron'); // def +10
+  assert.equal(entry.history.length, 2);
+
+  const [vitaminEntry, battleEntry] = entry.history;
+  store.deleteHistoryEntry(entry.uid, vitaminEntry.id);
+  assert.equal(entry.history.length, 1);
+  assert.equal(entry.evs.def, 0);
+  assert.equal(entry.evs.atk, 1); // battle log untouched
+
+  store.deleteHistoryEntry(entry.uid, battleEntry.id);
+  assert.equal(entry.history.length, 0);
+  assert.equal(entry.evs.atk, 0);
 });
 
 test('state persists across Store instances via localStorage', () => {
