@@ -4,15 +4,15 @@
 // all domain logic lives in lib/, and each custom element owns its own
 // rendering.
 
-import { TOTAL_CAP, FALLBACK_SPRITE } from './lib/constants.js';
-import { titleCase, totalEvs, formatEvYield } from './lib/utils.js';
+import { STAT_CAP, TOTAL_CAP, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, MACHO_BRACE_MULTIPLIER, FALLBACK_SPRITE } from './lib/constants.js';
+import { titleCase, totalEvs, formatEvYield, escapeHtml } from './lib/utils.js';
 import { api, store } from './lib/services.js';
 import { attachDesignSystem } from './lib/design-system.js';
-import { KNOWN_GAME_NAMES } from './lib/game-versions.js';
 import * as router from './lib/router.js';
 import './components/pokemon-search.js';
 import './components/caught-pokemon-card.js';
 import './components/game-cartridge.js';
+import './components/game-version-picker.js';
 import './components/ev-bar.js';
 
 // Let light-DOM markup (the party dialog) use the same .ds-field/.ds-btn
@@ -53,19 +53,15 @@ const partyDialog = document.getElementById('party-dialog');
 const partyForm = document.getElementById('party-form');
 const partyDialogTitle = document.getElementById('party-dialog-title');
 const partyNameInput = document.getElementById('party-name-input');
-const partyGameVersionInput = document.getElementById('party-game-version-input');
+const partyGameVersion = document.getElementById('party-game-version');
 const dialogGameCart = document.getElementById('dialog-game-cart');
-const gameVersionOptions = document.getElementById('game-version-options');
-partyGameVersionInput.addEventListener('input', () => {
-  dialogGameCart.name = partyGameVersionInput.value.trim();
+partyGameVersion.addEventListener('version-change', (e) => {
+  dialogGameCart.name = e.detail.value.trim();
 });
 const partyDescriptionInput = document.getElementById('party-description-input');
 const partySubmitBtn = document.getElementById('party-submit-btn');
 const partyDeleteBtn = document.getElementById('party-delete-btn');
 const partyCancelBtn = document.getElementById('party-cancel-btn');
-
-// Suggestions only — the field stays free text so ROM hacks are always valid input.
-gameVersionOptions.innerHTML = KNOWN_GAME_NAMES.map((n) => `<option value="${n}"></option>`).join('');
 
 backToParties.href = router.partyPath(null);
 
@@ -97,7 +93,7 @@ function openCreateDialog() {
   partySubmitBtn.textContent = 'Create party';
   partyDeleteBtn.hidden = true;
   partyNameInput.value = '';
-  partyGameVersionInput.value = '';
+  partyGameVersion.value = '';
   dialogGameCart.name = '';
   partyDescriptionInput.value = '';
   partyDialog.showModal();
@@ -110,7 +106,7 @@ function openEditDialog(party) {
   partySubmitBtn.textContent = 'Save changes';
   partyDeleteBtn.hidden = false;
   partyNameInput.value = party.name;
-  partyGameVersionInput.value = party.gameVersion;
+  partyGameVersion.value = party.gameVersion;
   dialogGameCart.name = party.gameVersion;
   partyDescriptionInput.value = party.description;
   partyDialog.showModal();
@@ -129,7 +125,7 @@ partyForm.addEventListener('submit', (e) => {
     return;
   }
   const description = partyDescriptionInput.value.trim();
-  const gameVersion = partyGameVersionInput.value.trim();
+  const gameVersion = partyGameVersion.value.trim();
 
   if (dialogEditingId === null) {
     const party = store.createParty(name, description, gameVersion);
@@ -270,8 +266,38 @@ function renderPicker() {
   }
 }
 
-function escapeHtml(s) {
-  return s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+/* ------------------------------------------------------------------ */
+/* Per-game rules legend — the catch panel's cheat sheet, rendered from */
+/* the same Store logic that actually applies these mechanics, so the   */
+/* text can never drift from the behavior again.                        */
+/* ------------------------------------------------------------------ */
+
+const trainingLegend = document.getElementById('training-legend');
+
+function renderLegend() {
+  const items = [];
+  const { machoBrace, powerItems } = store.trainingItemAvailability();
+  if (powerItems) {
+    items.push(`<strong>Power items</strong> add a flat +${store.powerItemBonus()} EVs to one stat every battle.`);
+  }
+  if (machoBrace) {
+    items.push(`<strong>Macho Brace</strong> doubles (&times;${MACHO_BRACE_MULTIPLIER}) all EVs gained in battle.`);
+  }
+  if (!powerItems && !machoBrace) {
+    items.push('No EV-boosting held items exist in this generation.');
+  }
+  items.push(
+    store.pokerusAvailable()
+      ? '<strong>Pok&eacute;rus</strong> doubles all EVs earned in a battle.'
+      : "<strong>Pok&eacute;rus</strong> doesn't boost EVs in this game."
+  );
+  items.push(
+    store.vitaminCutoffApplies()
+      ? `<strong>Vitamins</strong> add +${VITAMIN_BONUS} EVs, but stop once a stat has ${VITAMIN_STAT_CUTOFF}+.`
+      : `<strong>Vitamins</strong> add +${VITAMIN_BONUS} EVs to their stat.`
+  );
+  items.push(`Every stat caps at ${STAT_CAP}; the total caps at ${TOTAL_CAP}.`);
+  trainingLegend.innerHTML = items.map((i) => `<li>${i}</li>`).join('');
 }
 
 /* ------------------------------------------------------------------ */
@@ -324,12 +350,44 @@ function render() {
   activePartyGameLabel.textContent = party.gameVersion;
   activePartyDescription.hidden = !party.description;
   activePartyDescription.textContent = party.description;
+  renderLegend();
   renderRoster(party);
 }
 
 router.onRouteChange(render);
 store.addEventListener('change', render);
 render();
+
+/* ------------------------------------------------------------------ */
+/* Theme toggle — cycles auto → dark → light. "Auto" clears the        */
+/* data-theme attribute so CSS falls back to prefers-color-scheme;     */
+/* index.html re-applies a saved choice before first paint.            */
+/* ------------------------------------------------------------------ */
+
+const themeToggle = document.getElementById('theme-toggle');
+const THEME_KEY = 'pokelogger:theme';
+const THEME_ORDER = ['auto', 'dark', 'light'];
+const THEME_ICONS = { auto: '◐', dark: '☾', light: '☀' };
+
+function applyTheme(theme) {
+  if (theme === 'auto') {
+    delete document.documentElement.dataset.theme;
+    localStorage.removeItem(THEME_KEY);
+  } else {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem(THEME_KEY, theme);
+  }
+  themeToggle.textContent = THEME_ICONS[theme];
+  themeToggle.setAttribute('aria-label', `Theme: ${theme}`);
+  themeToggle.title = `Theme: ${theme} (click to change)`;
+}
+
+applyTheme(localStorage.getItem(THEME_KEY) || 'auto');
+themeToggle.addEventListener('click', () => {
+  const current = localStorage.getItem(THEME_KEY) || 'auto';
+  const next = THEME_ORDER[(THEME_ORDER.indexOf(current) + 1) % THEME_ORDER.length];
+  applyTheme(next);
+});
 
 /* ------------------------------------------------------------------ */
 /* Offline app shell                                                   */

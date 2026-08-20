@@ -33,15 +33,33 @@ button, input, select {
   background: var(--paper-panel);
   border-radius: var(--radius-lg);
   border: 1px solid var(--line);
-  box-shadow: var(--shadow-panel);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), var(--shadow-panel);
   overflow: hidden;
 }
 
 /* ---------- header ---------- */
 .bezel {
-  background: linear-gradient(160deg, var(--poke-red) 0%, var(--poke-red-dark) 100%);
-  color: #fff8ef;
-  padding: var(--space-5) clamp(1.2rem, 3vw, 2.2rem) 1.6rem;
+  position: relative;
+  background: var(--poke-red);
+  color: var(--on-red);
+  padding: var(--space-5) clamp(1.2rem, 3vw, 2.2rem) 1.7rem;
+}
+
+/* Chassis "power stripe" — the tri-band seam along the bezel's bottom
+   edge, the one loud retro-hardware detail this design is remembered by. */
+.bezel::after {
+  content: '';
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 6px;
+  background: linear-gradient(
+    to bottom,
+    var(--gold) 0 2px,
+    var(--poke-red-dark) 2px 4px,
+    var(--footer-bg) 4px 6px
+  );
 }
 
 .bezel h1 {
@@ -56,11 +74,41 @@ button, input, select {
 .tagline {
   margin: 0.15rem 0 0;
   font-family: var(--font-mono);
-  font-size: var(--font-size-md);
+  font-size: var(--font-size-sm);
   letter-spacing: 0.08em;
   text-transform: uppercase;
-  color: rgba(255, 248, 239, 0.75);
+  opacity: 0.8;
 }
+/* Power LED next to the tagline. */
+.tagline::before {
+  content: '';
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--gold);
+  box-shadow: 0 0 6px var(--gold);
+  margin-right: 0.55em;
+  vertical-align: 1px;
+}
+
+.theme-toggle {
+  position: absolute;
+  top: var(--space-4);
+  right: clamp(1.2rem, 3vw, 2.2rem);
+  width: 38px;
+  height: 38px;
+  border: 1px solid rgba(255, 248, 239, 0.45);
+  border-radius: 50%;
+  background: transparent;
+  color: var(--on-red);
+  font-size: 1.05rem;
+  line-height: 1;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: background var(--transition-fast);
+}
+.theme-toggle:hover { background: rgba(255, 248, 239, 0.15); }
 
 /* ---------- layout ---------- */
 .layout {
@@ -310,7 +358,7 @@ button, input, select {
   width: 36px;
   height: 36px;
   image-rendering: pixelated;
-  background: rgba(255, 255, 255, 0.5);
+  background: var(--sprite-bg);
   border-radius: var(--radius-sm);
   object-fit: contain;
 }
@@ -365,13 +413,14 @@ button, input, select {
   font-size: var(--font-size-md);
   cursor: pointer;
   min-height: 38px;
+  touch-action: manipulation;
   transition: transform var(--transition-fast), box-shadow var(--transition-fast), opacity var(--transition-fast);
 }
 .btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 .btn--primary {
   background: var(--poke-red);
-  color: #fff8ef;
+  color: var(--on-red);
   box-shadow: 0 3px 0 var(--poke-red-dark);
 }
 .btn--primary:not(:disabled):hover { transform: translateY(-1px); }
@@ -384,7 +433,7 @@ button, input, select {
   min-height: 34px;
 }
 .btn--ghost:hover { background: var(--lcd); color: var(--ink); }
-.btn--danger:hover { background: #f8d9d0; color: var(--poke-red-dark); border-color: var(--poke-red); }
+.btn--danger:hover { background: var(--danger-soft); color: var(--poke-red); border-color: var(--poke-red); }
 
 /* ---------- party dialog ---------- */
 .party-dialog {
@@ -427,11 +476,23 @@ textarea.ds-field { resize: vertical; }
 
 /* ---------- footer ---------- */
 .bezel-footer {
-  background: var(--ink);
-  color: rgba(238, 241, 228, 0.6);
+  background: var(--footer-bg);
+  color: var(--footer-ink);
   text-align: center;
   padding: var(--space-3);
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
   letter-spacing: 0.04em;
+}
+
+/* ---------- small screens ---------- */
+@media (max-width: 480px) {
+  body { padding: 0.6rem; }
+  .device { border-radius: 14px; }
+  .layout,
+  .picker,
+  .pokemon-view { padding-inline: 0.9rem; }
+  .party-view-header { padding-inline: 0.9rem; }
+  .bezel { padding-inline: 0.9rem; }
+  .theme-toggle { right: 0.9rem; }
 }

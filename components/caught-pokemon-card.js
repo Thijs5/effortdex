@@ -1,5 +1,5 @@
 import { POWER_ITEMS, VITAMINS, STAT_LABEL, MACHO_BRACE_MULTIPLIER, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, TOTAL_CAP, FALLBACK_SPRITE, MIN_LEVEL, MAX_LEVEL } from '../lib/constants.js';
-import { titleCase, totalEvs, formatEvYield } from '../lib/utils.js';
+import { titleCase, totalEvs, formatEvYield, escapeHtml } from '../lib/utils.js';
 import { api, store } from '../lib/services.js';
 import { attachDesignSystem } from '../lib/design-system.js';
 import './ev-summary.js';
@@ -39,7 +39,7 @@ export class CaughtPokemonCard extends HTMLElement {
         header { display: grid; grid-template-columns: 64px 1fr auto; align-items: center; gap: var(--space-4); }
         .sprite {
           width: 64px; height: 64px; image-rendering: pixelated;
-          background: rgba(255, 255, 255, 0.5); border-radius: var(--radius-sm); object-fit: contain;
+          background: var(--sprite-bg); border-radius: var(--radius-sm); object-fit: contain;
         }
         .titles { min-width: 0; }
         .nickname {
@@ -548,11 +548,11 @@ export class CaughtPokemonCard extends HTMLElement {
     return `<li>
       <img src="${h.sprite || FALLBACK_SPRITE}" alt="" />
       <div>
-        <strong>${titleCase(h.opponentName)}</strong>
+        <strong>${escapeHtml(titleCase(h.opponentName))}</strong>
         <span class="gain">${gained || 'No EVs gained (capped)'}</span>
         ${tags ? `<span class="tags">${tags}</span>` : ''}
       </div>
-      <button class="redefeat-btn ds-btn ds-btn--outline ds-btn--sm" type="button" data-name="${h.opponentName}" title="Log another defeat against ${titleCase(h.opponentName)}">↻ Again</button>
+      <button class="redefeat-btn ds-btn ds-btn--outline ds-btn--sm" type="button" data-name="${escapeHtml(h.opponentName)}" title="Log another defeat against ${escapeHtml(titleCase(h.opponentName))}">↻ Again</button>
     </li>`;
   }
 }

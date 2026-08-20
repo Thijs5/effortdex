@@ -37,6 +37,9 @@ export class PokemonSearch extends HTMLElement {
           overflow-y: auto;
         }
         li {
+          display: flex;
+          align-items: center;
+          min-height: 40px;
           padding: var(--space-2) var(--space-3);
           border-radius: var(--radius-sm);
           font-size: var(--font-size-md);
@@ -46,7 +49,9 @@ export class PokemonSearch extends HTMLElement {
         li.active, li:hover { background: var(--lcd); }
       </style>
       <div class="wrap">
-        <input class="ds-field" type="text" autocomplete="off" spellcheck="false" />
+        <input class="ds-field" type="text" role="combobox" aria-expanded="false"
+               autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false"
+               inputmode="search" enterkeyhint="go" />
         <ul class="suggestions" hidden role="listbox"></ul>
       </div>
     `;
@@ -59,7 +64,15 @@ export class PokemonSearch extends HTMLElement {
     this.$input.addEventListener('focus', () => this._ensureNames());
     this.$input.addEventListener('input', () => this._onInput());
     this.$input.addEventListener('keydown', (e) => this._onKeydown(e));
+    // pointerdown on a suggestion fires before this blur, so picking by
+    // touch/mouse wins the race against the hide.
     this.$input.addEventListener('blur', () => setTimeout(() => this._hideList(), 120));
+    this.$list.addEventListener('pointerdown', (e) => {
+      const li = e.target.closest('li[data-name]');
+      if (!li) return;
+      e.preventDefault();
+      this._pick(li.dataset.name);
+    });
   }
 
   async _ensureNames() {
@@ -88,20 +101,16 @@ export class PokemonSearch extends HTMLElement {
       return;
     }
     this.$list.innerHTML = this._matches
-      .map((n) => `<li role="option">${titleCase(n)}</li>`)
+      .map((n) => `<li role="option" data-name="${n}">${titleCase(n)}</li>`)
       .join('');
     this.$list.hidden = false;
-    [...this.$list.children].forEach((li, i) => {
-      li.addEventListener('mousedown', (e) => {
-        e.preventDefault();
-        this._pick(this._matches[i]);
-      });
-    });
+    this.$input.setAttribute('aria-expanded', 'true');
   }
 
   _hideList() {
     this.$list.hidden = true;
     this.$list.innerHTML = '';
+    this.$input.setAttribute('aria-expanded', 'false');
   }
 
   _onKeydown(e) {

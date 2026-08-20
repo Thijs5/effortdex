@@ -19,6 +19,7 @@ const SHELL_PATHS = [
   'components/ev-bar.js',
   'components/ev-summary.js',
   'components/game-cartridge.js',
+  'components/game-version-picker.js',
   'components/pokemon-search.js',
   'lib/constants.js',
   'lib/design-system.js',
