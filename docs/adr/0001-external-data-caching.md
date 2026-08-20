@@ -14,9 +14,9 @@ app needs to observe — a species's base EV yield or its evolution chain
 is effectively static.
 
 Separately, the app holds the user's own data (parties, roster, EVs,
-training aids, battle history) in a single `localStorage["pokelogger:state"]`
+training aids, battle history) in a single `localStorage["effortdex:state"]`
 record. That record is precious, small, and is the intended target for
-future export/import (see chat decision: only `pokelogger:state` should
+future export/import (see chat decision: only `effortdex:state` should
 ever be exported — the API cache is disposable and re-fetchable, and
 mixing the two would bloat exports with data the importer's own cache
 will happily refetch).
@@ -38,7 +38,7 @@ asked (e.g. every `<pokemon-search>` re-fetching/re-parsing the same
 2. Two-tier cache per key: an in-memory `Map` (this session only) in
    front of `localStorage` (persists across reloads). A hit at either
    tier skips the network entirely; a miss populates both.
-3. Cache keys are namespaced under `pokelogger:` and scoped to the
+3. Cache keys are namespaced under `effortdex:` and scoped to the
    *exact* resource requested — one key per species's `/pokemon` data,
    one per species's `/pokemon-species` data, one per evolution chain
    (keyed by the chain's own URL, so sibling species in one family share
@@ -52,9 +52,9 @@ asked (e.g. every `<pokemon-search>` re-fetching/re-parsing the same
    error and the in-memory entry is deleted, so the next attempt gets a
    clean retry instead of a poisoned cache entry.
 6. This cache is **not** part of the user's exportable state. Only
-   `pokelogger:state` is; the `pokelogger:mon:`, `pokelogger:species:`,
-   `pokelogger:evochain:`, `pokelogger:evolutions:` and
-   `pokelogger:species-list` keys are regenerable and excluded on
+   `effortdex:state` is; the `effortdex:mon:`, `effortdex:species:`,
+   `effortdex:evochain:`, `effortdex:evolutions:` and
+   `effortdex:species-list` keys are regenerable and excluded on
    purpose.
 
 ## Consequences
@@ -73,5 +73,5 @@ asked (e.g. every `<pokemon-search>` re-fetching/re-parsing the same
   static enough in practice that staleness risk is lower than the
   complexity cost of a TTL/versioning scheme.
 - Export/import (when built) only needs to read/write
-  `pokelogger:state` — the API cache keys are intentionally invisible to
+  `effortdex:state` — the API cache keys are intentionally invisible to
   that feature.

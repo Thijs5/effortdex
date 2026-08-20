@@ -120,16 +120,38 @@ test('evolvePokemon changes species identity but preserves EVs and history', () 
   assert.equal(entry.evolutions[0].toName, 'ivysaur');
 });
 
-test('revertEvolution undoes the most recent evolution without touching EVs or history', () => {
+test('revertEvolution restores the previous identity from the event snapshot — no species data needed', () => {
   const entry = store.catchPokemon(mon());
   store.logDefeat(entry.uid, opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 }));
   store.evolvePokemon(entry.uid, mon({ id: 2, name: 'ivysaur' }));
+  assert.equal(entry.history.length, 3); // evolutions show up in the log too
 
-  store.revertEvolution(entry.uid, mon({ id: 1, name: 'bulbasaur' }));
+  store.revertEvolution(entry.uid);
   assert.equal(entry.speciesName, 'bulbasaur');
+  assert.equal(entry.speciesId, 1);
   assert.equal(entry.evolutions.length, 0);
   assert.equal(entry.evs.atk, 1);
   assert.equal(entry.history.length, 2); // battle + the catch seed entry
+});
+
+test('deleting an evolve event from the history is the same as undoing that evolution', () => {
+  const entry = store.catchPokemon(mon());
+  store.evolvePokemon(entry.uid, mon({ id: 2, name: 'ivysaur' }));
+  const evolveRecord = entry.history.find((h) => h.kind === 'evolve');
+  assert.equal(evolveRecord.fromName, 'bulbasaur');
+  assert.equal(evolveRecord.toName, 'ivysaur');
+
+  store.deleteHistoryEntry(entry.uid, evolveRecord.id);
+  assert.equal(entry.speciesName, 'bulbasaur');
+  assert.equal(entry.evolutions.length, 0);
+});
+
+test('the catch event is never deletable', () => {
+  const entry = store.catchPokemon(mon());
+  const catchRecord = entry.history.find((h) => h.kind === 'catch');
+  store.deleteHistoryEntry(entry.uid, catchRecord.id);
+  assert.equal(entry.history.length, 1); // still there
+  assert.equal(entry.speciesName, 'bulbasaur');
 });
 
 test('useVitamin raises exactly its target stat by the vitamin bonus', () => {
@@ -462,4 +484,154 @@ test('state persists across Store instances via localStorage', () => {
 
   const reloaded = new Store();
   assert.equal(reloaded.activeParty.pokemon[0].nickname, 'Buddy');
+});
+
+test('migrates a v1 (pre-event-sourcing) save: identity, level, EVs and Pokérus survive as events', () => {
+  const v1Entry = {
+    uid: 'old-1',
+    speciesName: 'ivysaur',
+    speciesId: 2,
+    sprite: 'https://sprites.example/2.png',
+    baseStats: { hp: 60, atk: 62, def: 63, spa: 80, spd: 80, spe: 60 },
+    nickname: 'Buddy',
+    level: 32,
+    nature: 'adamant',
+    powerItem: 'bracer',
+    machoBrace: false,
+    pokerus: true,
+    evs: { hp: 0, atk: 44, def: 0, spa: 0, spd: 0, spe: 10 },
+    history: [{ id: 'x', kind: 'battle', opponentName: 'rattata' }], // dropped by design
+    evolutions: [{ fromName: 'bulbasaur', toName: 'ivysaur' }], // dropped by design
+  };
+  const v1Party = { id: 'p1', name: 'Old party', pokemon: [v1Entry] }; // also missing description/gameVersion/overrides/slug
+  localStorage.setItem('effortdex:state', JSON.stringify({ parties: [v1Party], activePartyId: 'p1' }));
+
+  const loaded = new Store();
+  const party = loaded.state.parties[0];
+  assert.equal(party.description, ''); // party backfills still apply post-migration
+  assert.equal(party.slug, 'old-party');
+  assert.deepEqual(party.overrides, { powerItemBonus: null, powerItems: null, machoBrace: null, vitaminCutoff: null, pokerus: null, nature: null });
+
+  const entry = party.pokemon[0];
+  assert.equal(entry.uid, 'old-1');
+  assert.equal(entry.nickname, 'Buddy');
+  assert.equal(entry.nature, 'adamant');
+  assert.equal(entry.powerItem, 'bracer');
+  // Projected from the synthesized events:
+  assert.equal(entry.speciesName, 'ivysaur');
+  assert.equal(entry.level, 32);
+  assert.equal(entry.pokerus, true);
+  assert.deepEqual(entry.evs, { hp: 0, atk: 44, def: 0, spa: 0, spd: 0, spe: 10 });
+  // Old per-record history is not converted — only the synthesized events remain.
+  const kinds = entry.events.map((e) => e.kind);
+  assert.deepEqual(kinds, ['catch', 'imported', 'pokerus']);
+});
+
+test('a migrated save persists as schema 2 and round-trips', () => {
+  const v1Entry = { uid: 'old-1', speciesName: 'bulbasaur', speciesId: 1, level: 7, evs: { hp: 0, atk: 4, def: 0, spa: 0, spd: 0, spe: 0 }, history: [] };
+  localStorage.setItem('effortdex:state', JSON.stringify({ parties: [{ id: 'p1', name: 'Old party', pokemon: [v1Entry] }], activePartyId: 'p1' }));
+
+  const migrated = new Store();
+  migrated.renamePokemon('old-1', 'Kept'); // triggers a save in the new schema
+
+  const reloaded = new Store();
+  const entry = reloaded.activeParty.pokemon[0];
+  assert.equal(entry.nickname, 'Kept');
+  assert.equal(entry.level, 7);
+  assert.equal(entry.evs.atk, 4);
+});
+
+test('corrupt or unrecognized saved state falls back to a fresh empty state', () => {
+  localStorage.setItem('effortdex:state', 'not json {');
+  assert.deepEqual(new Store().state, { schema: 2, parties: [], activePartyId: null });
+
+  // The ancient pre-party shape is no longer migrated (ADR 0006 §7).
+  localStorage.setItem('effortdex:state', JSON.stringify({ caughtPokemon: [] }));
+  assert.deepEqual(new Store().state, { schema: 2, parties: [], activePartyId: null });
+});
+
+test('only source data is persisted — projections are rebuilt from events at load', () => {
+  const entry = store.catchPokemon(mon());
+  store.logDefeat(entry.uid, opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 }));
+
+  const persisted = JSON.parse(localStorage.getItem('effortdex:state'));
+  const persistedEntry = persisted.parties[0].pokemon[0];
+  assert.equal(persistedEntry.evs, undefined);
+  assert.equal(persistedEntry.level, undefined);
+  assert.equal(persistedEntry.speciesName, undefined);
+  assert.equal(persistedEntry.history, undefined);
+  assert.ok(Array.isArray(persistedEntry.events));
+
+  const reloaded = new Store();
+  const rebuilt = reloaded.activeParty.pokemon[0];
+  assert.equal(rebuilt.speciesName, 'bulbasaur');
+  assert.equal(rebuilt.evs.atk, 1);
+  assert.equal(rebuilt.level, DEFAULT_LEVEL);
+});
+
+test('a held Macho Brace stops applying when the game version no longer offers it', () => {
+  store.createParty('Emerald run', '', 'Emerald'); // Gen 3: brace available
+  const entry = store.catchPokemon(mon());
+  store.setMachoBrace(entry.uid, true);
+  store.logDefeat(entry.uid, opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 }));
+  assert.equal(entry.evs.atk, 2); // doubled while available
+
+  // The party gets edited to a Gen VII title where the brace was dropped.
+  store.updateParty(store.activeParty.id, { gameVersion: 'Sun' });
+  store.logDefeat(entry.uid, opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 }));
+  assert.equal(entry.evs.atk, 3); // +1 only — the stored brace no longer applies
+  assert.equal(entry.history[0].machoBrace, false); // and the record doesn't claim it did
+});
+
+test('a held power item stops applying when the game version predates power items', () => {
+  const entry = store.catchPokemon(mon());
+  store.setPowerItem(entry.uid, 'bracer');
+  store.updateParty(store.activeParty.id, { gameVersion: 'Red' }); // Gen 1: no power items
+  store.logDefeat(entry.uid, opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 }));
+  assert.equal(entry.evs.atk, 1); // no +8
+  assert.equal(entry.history[0].powerItem, null);
+});
+
+test('logDefeat records pokerus only when it actually doubled the yield', () => {
+  store.createParty('Scarlet run', '', 'Scarlet'); // Pokérus nonfunctional here
+  const entry = store.catchPokemon(mon());
+  store.setPokerus(entry.uid, true);
+  store.logDefeat(entry.uid, opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 }));
+  assert.equal(entry.history[0].pokerus, false); // no misleading "Pokérus ×2" tag
+});
+
+test('deleteHistoryEntry on the newest level record reverts to the previous level', () => {
+  const entry = store.catchPokemon(mon(), 10);
+  store.setLevel(entry.uid, 15);
+  store.deleteHistoryEntry(entry.uid, entry.history[0].id);
+  assert.equal(entry.level, 10);
+  assert.equal(entry.history.length, 1); // only the catch seed remains
+});
+
+test('deleting an older level record does not discard later level-ups', () => {
+  const entry = store.catchPokemon(mon(), 5);
+  store.setLevel(entry.uid, 10);
+  store.setLevel(entry.uid, 15);
+  const middle = entry.history.find((h) => h.kind === 'level' && h.toLevel === 10);
+
+  store.deleteHistoryEntry(entry.uid, middle.id);
+  assert.equal(entry.level, 15); // newest remaining record still says 15
+
+  const newest = entry.history.find((h) => h.kind === 'level');
+  store.deleteHistoryEntry(entry.uid, newest.id);
+  assert.equal(entry.level, 5); // back to the catch level once no level records remain
+});
+
+test('deleting an older pokerus record keeps the newest toggle in force', () => {
+  const entry = store.catchPokemon(mon());
+  store.setPokerus(entry.uid, true);
+  store.setPokerus(entry.uid, false);
+  const older = entry.history.find((h) => h.kind === 'pokerus' && h.active === true);
+
+  store.deleteHistoryEntry(entry.uid, older.id);
+  assert.equal(entry.pokerus, false); // the newer "cleared" record still wins
+
+  const newest = entry.history.find((h) => h.kind === 'pokerus');
+  store.deleteHistoryEntry(entry.uid, newest.id);
+  assert.equal(entry.pokerus, false); // no records left -> off
 });

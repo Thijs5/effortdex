@@ -1,11 +1,13 @@
-// Offline app shell. Bump CACHE_NAME — and version.json's "version" —
-// whenever a shell asset changes, so `activate` clears the stale cache
-// and lib/version-check.js can tell tabs that were left open across the
-// deploy to refresh. This worker only ever touches the app shell —
-// PokéAPI reads/writes go through PokeApiClient's own localStorage-backed
-// cache (lib/pokeapi-client.js), so cross-origin requests are deliberately
+// Offline app shell (see docs/adr/0004 for the full offline/update
+// design). The name below is never versioned by hand: on every release
+// the deploy workflow (.github/workflows/deploy.yml) stamps CACHE_NAME
+// from the release tag + commit SHA (and version.json from the tag),
+// which is what makes `activate` clear the previous release's cache.
+// This worker only ever touches the app shell — PokéAPI reads/writes go
+// through PokeApiClient's own localStorage-backed cache
+// (lib/pokeapi-client.js), so cross-origin requests are deliberately
 // left alone here (see docs/adr/0001).
-const CACHE_NAME = 'pokelogger-shell-v2';
+const CACHE_NAME = 'effortdex-shell';
 
 // Resolved relative to this file's own location so the same list works
 // whether the app is served from a domain root or a subpath (e.g. a
@@ -20,10 +22,13 @@ const SHELL_PATHS = [
   'version.json',
   'components/caught-pokemon-card.js',
   'components/ev-bar.js',
+  'components/ev-history-log.js',
   'components/ev-summary.js',
+  'components/evolution-chain.js',
   'components/game-cartridge.js',
   'components/game-version-picker.js',
   'components/pokemon-search.js',
+  'lib/combobox.js',
   'lib/constants.js',
   'lib/design-system.js',
   'lib/game-versions.js',
@@ -35,6 +40,7 @@ const SHELL_PATHS = [
   'lib/utils.js',
   'lib/version-check.js',
   'icons/icon-192.png',
+  'icons/icon-192-maskable.png',
   'icons/icon-512.png',
   'icons/icon-512-maskable.png',
   'icons/apple-touch-icon.png',

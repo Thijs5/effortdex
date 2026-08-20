@@ -1,4 +1,4 @@
-# Pokélogger
+# Effortdex
 
 A local-only Pokémon EV (Effort Value) training tracker. Catch Pokémon,
 log the battles you defeat while training them, and watch their EVs fill
@@ -84,7 +84,11 @@ secure context.)
   and history all carry over), with an undo for accidental clicks.
 - **Installable / offline** — a web app manifest and service worker let
   it be installed and used without a network connection; species data
-  already looked up stays available offline too.
+  already looked up stays available offline too. (Sprite images come
+  from a cross-origin CDN the service worker deliberately doesn't
+  cache, so offline they fall back to a local Poké Ball placeholder
+  unless the browser's own HTTP cache still has them — see
+  [`docs/adr/0004`](docs/adr/0004-offline-shell-and-update-flow.md).)
 - **Dark mode** — follows the system preference by default; the header
   toggle cycles auto → dark → light and remembers the choice. The whole
   theme lives in `tokens.css` custom properties, so both palettes share
@@ -114,10 +118,16 @@ for the reasoning.
 
 ## Architecture
 
-- `lib/` — framework-free domain logic: `store.js` (party/roster state),
+- `lib/` — framework-free domain logic: `store.js` (party/roster state;
+  each caught Pokémon is event-sourced — its event log is the single
+  source of truth and EVs/level/identity are pure folds over it, see
+  [`docs/adr/0006`](docs/adr/0006-event-sourced-roster-entries.md)),
   `pokeapi-client.js` (the only module that talks to PokéAPI),
-  `router.js` (hash-based routing), `services.js` (composition root),
-  `constants.js`/`utils.js`.
+  `router.js` (hash-based routing), `slug.js` (party name → URL
+  segment), `game-versions.js` (official titles and the generation each
+  belongs to), `version-check.js` (deploy/update detection),
+  `combobox.js` (shared suggestion-dropdown behavior),
+  `services.js` (composition root), `constants.js`/`utils.js`.
 - `components/` — one custom element per piece of UI, each owning its
   own shadow-DOM rendering.
 - `tokens.css` / `lib/design-system.js` — the shared design-token and

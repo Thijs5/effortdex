@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-Every UI piece in Pokélogger — page-level markup in `index.html` and
+Every UI piece in Effortdex — page-level markup in `index.html` and
 every Web Component's shadow DOM — needs the same colors, type scale,
 spacing, radii and motion values to look and feel like one app. Shadow
 DOM normally isolates styles per component, which is exactly what makes

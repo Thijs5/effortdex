@@ -1,11 +1,11 @@
-// Pokélogger — EV training tracker built with native Web Components.
+// Effortdex — EV training tracker built with native Web Components.
 // No frameworks, no build step: this file only wires up the page-level
 // DOM (party picker, catch panel, roster, party dialog) and the router;
 // all domain logic lives in lib/, and each custom element owns its own
 // rendering.
 
-import { STAT_CAP, TOTAL_CAP, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, MACHO_BRACE_MULTIPLIER, DEFAULT_LEVEL, FALLBACK_SPRITE } from './lib/constants.js';
-import { titleCase, totalEvs, natureLabel, sortedNatures, escapeHtml } from './lib/utils.js';
+import { STAT_CAP, TOTAL_CAP, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, MACHO_BRACE_MULTIPLIER, DEFAULT_LEVEL, FALLBACK_SPRITE, FALLBACK_ONERROR, NATURES } from './lib/constants.js';
+import { titleCase, totalEvs, natureOptionsHtml, escapeHtml } from './lib/utils.js';
 import { api, store } from './lib/services.js';
 import { attachDesignSystem } from './lib/design-system.js';
 import * as router from './lib/router.js';
@@ -55,14 +55,14 @@ const catchDialogNature = document.getElementById('catch-dialog-nature');
 const catchDialogSubmitBtn = document.getElementById('catch-dialog-submit-btn');
 const catchDialogCancelBtn = document.getElementById('catch-dialog-cancel-btn');
 
-// Populated once — the nature list doesn't depend on species or game version.
-// "Unknown" is already first in the markup; the rest sort A-Z after it.
-for (const nature of sortedNatures()) {
-  const opt = document.createElement('option');
-  opt.value = nature.id;
-  opt.textContent = natureLabel(nature);
-  catchDialogNature.appendChild(opt);
-}
+// Populated once — the nature list doesn't depend on species or game
+// version. Same shared markup the detail card's picker uses.
+catchDialogNature.innerHTML = natureOptionsHtml();
+
+// Remote sprite may be unreachable offline — swap in the local fallback.
+catchDialogSprite.addEventListener('error', () => {
+  if (catchDialogSprite.src !== FALLBACK_SPRITE) catchDialogSprite.src = FALLBACK_SPRITE;
+});
 
 const pokemonView = document.getElementById('pokemon-view');
 const backToRoster = document.getElementById('back-to-roster');
@@ -82,8 +82,10 @@ const partyDialogTitle = document.getElementById('party-dialog-title');
 const partyNameInput = document.getElementById('party-name-input');
 const partyGameVersion = document.getElementById('party-game-version');
 const dialogGameCart = document.getElementById('dialog-game-cart');
+const partyGameVersionError = document.getElementById('party-game-version-error');
 partyGameVersion.addEventListener('version-change', (e) => {
   dialogGameCart.name = e.detail.value.trim();
+  if (e.detail.value.trim()) partyGameVersionError.hidden = true;
 });
 const partyDescriptionInput = document.getElementById('party-description-input');
 const partyAdvancedRules = document.getElementById('party-advanced-rules');
@@ -186,6 +188,11 @@ pickerNewPartyBtn.addEventListener('click', openCreateDialog);
 editPartyBtn.addEventListener('click', () => openEditDialog(store.activeParty));
 partyCancelBtn.addEventListener('click', () => partyDialog.close());
 
+// The sticky dialog headers' ✕ buttons behave exactly like Cancel.
+for (const btn of document.querySelectorAll('.ds-dialog-close')) {
+  btn.addEventListener('click', () => btn.closest('dialog').close());
+}
+
 partyForm.addEventListener('submit', (e) => {
   e.preventDefault();
   const name = partyNameInput.value.trim();
@@ -195,6 +202,14 @@ partyForm.addEventListener('submit', (e) => {
   }
   const description = partyDescriptionInput.value.trim();
   const gameVersion = partyGameVersion.value.trim();
+  // Required: every EV rule (power items, vitamins, Pokérus, natures —
+  // and what the advanced overrides override) is derived from it. Free
+  // text is still fine; only empty is rejected.
+  partyGameVersionError.hidden = Boolean(gameVersion);
+  if (!gameVersion) {
+    partyGameVersion.focus();
+    return;
+  }
   const overrides = readOverridesFromDialog();
 
   if (dialogEditingId === null) {
@@ -232,9 +247,16 @@ partyDeleteBtn.addEventListener('click', () => {
 // isn't shown here: it doesn't matter until the Pokémon is trained.
 let pendingCatchMon = null;
 
+// Guards against a stale lookup: open the dialog for a slow-loading
+// species, cancel, open it for another — without the token check, the
+// first fetch resolving late would overwrite the second dialog's sprite
+// and pendingCatchMon, so submitting would catch the wrong species.
+let catchDialogToken = 0;
+
 catchSearch.addEventListener('pokemon-pick', (e) => openCatchDialog(e.detail.name));
 
 async function openCatchDialog(name) {
+  const token = ++catchDialogToken;
   pendingCatchMon = null;
   catchDialogTitle.textContent = `Catch ${titleCase(name)}`;
   catchDialogSprite.src = FALLBACK_SPRITE;
@@ -248,17 +270,30 @@ async function openCatchDialog(name) {
 
   try {
     const mon = await api.getPokemon(name);
+    if (token !== catchDialogToken) return; // a newer dialog owns the UI now
     pendingCatchMon = mon;
     catchDialogSprite.src = mon.sprite || FALLBACK_SPRITE;
+    catchDialogName.textContent = `#${String(mon.id).padStart(3, '0')} ${titleCase(mon.name)}`;
     catchDialogSubmitBtn.disabled = false;
     catchDialogLevel.focus();
     catchDialogLevel.select();
   } catch (err) {
+    if (token !== catchDialogToken) return;
     catchDialogEvYield.textContent = err.message || 'Could not look up that Pokémon.';
   }
 }
 
 catchDialogCancelBtn.addEventListener('click', () => catchDialog.close());
+
+// A <dialog> closing restores focus to whatever was focused when it
+// opened — here, catchSearch's input, since that's what the pick that
+// opened this dialog left focused. Left alone, that refocus re-opens
+// the suggestions dropdown (or the mobile full-screen sheet) right
+// after every catch. One 'close' listener covers every path this
+// dialog can close by: submit, Cancel, Esc, and backdrop click.
+catchDialog.addEventListener('close', () => catchSearch.blur());
+
+let catchStatusTimer = null;
 
 catchForm.addEventListener('submit', (e) => {
   e.preventDefault();
@@ -270,7 +305,10 @@ catchForm.addEventListener('submit', (e) => {
   // Warm the evolution-chain cache now, so its detail page's Evolve
   // button doesn't have to wait on (or be offline-blocked by) a fetch.
   api.getEvolutionOptions(mon.name).catch(() => {});
-  setTimeout(() => {
+  // Restart (not stack) the toast timer, so catching twice quickly
+  // doesn't let the first timer wipe the second message early.
+  clearTimeout(catchStatusTimer);
+  catchStatusTimer = setTimeout(() => {
     catchStatus.textContent = '';
   }, 3000);
 });
@@ -284,21 +322,27 @@ function renderRoster(party) {
   const entries = party.pokemon;
   emptyState.hidden = entries.length > 0;
   roster.innerHTML = '';
+  const natureAvailable = store.natureAvailable();
   for (const entry of entries) {
     const trained = totalEvs(entry.evs) >= TOTAL_CAP;
+    // "Adamant Fangs McGee" (nickname) or plain "Slowpoke" (no nickname)
+    // — same nature-prefix convention as the detail page's title, minus
+    // its Dex number (no room for it at this card's width).
+    const nature = natureAvailable ? NATURES.find((n) => n.id === entry.nature) : null;
     const displayName = entry.nickname || titleCase(entry.speciesName);
-    const speciesMeta = entry.nickname
-      ? titleCase(entry.speciesName)
-      : `#${String(entry.speciesId).padStart(3, '0')}`;
+    const namePrefix = nature ? `${escapeHtml(nature.label)} ` : '';
+    // The species name is only worth a second mention when a nickname
+    // is hiding it — same rule as the detail header.
+    const speciesAside = entry.nickname ? ` &middot; ${escapeHtml(titleCase(entry.speciesName))}` : '';
 
     const row = document.createElement('a');
     row.className = 'roster-card';
     row.href = router.pokemonPath(party.slug, entry.uid);
     row.innerHTML = `
-      <img class="roster-card-sprite" src="${entry.sprite || FALLBACK_SPRITE}" alt="" />
+      <img class="roster-card-sprite" src="${entry.sprite || FALLBACK_SPRITE}" alt="" ${FALLBACK_ONERROR} />
       <div class="roster-card-body">
-        <span class="roster-card-name">${escapeHtml(displayName)}</span>
-        <span class="roster-card-meta">Lv. ${entry.level} &middot; ${escapeHtml(speciesMeta)}</span>
+        <span class="roster-card-name">${namePrefix}${escapeHtml(displayName)}</span>
+        <span class="roster-card-meta">Lv. ${entry.level}${speciesAside}</span>
       </div>
       <ev-bar class="roster-card-evbar"></ev-bar>
       ${trained ? '<span class="roster-card-star ds-pill-badge" title="Fully trained">★</span>' : ''}
@@ -440,7 +484,7 @@ function render() {
   // append-ordered, so the party's own catch order is the recency order.
   catchSearch.recent = [...party.pokemon]
     .reverse()
-    .map((e) => ({ name: e.speciesName, sprite: e.sprite }));
+    .map((e) => ({ name: e.speciesName, sprite: e.sprite, id: e.speciesId }));
 }
 
 /* ------------------------------------------------------------------ */
@@ -511,15 +555,52 @@ store.addEventListener('change', render);
 render();
 
 /* ------------------------------------------------------------------ */
-/* Theme toggle — cycles auto → dark → light. "Auto" clears the        */
-/* data-theme attribute so CSS falls back to prefers-color-scheme;     */
-/* index.html re-applies a saved choice before first paint.            */
+/* Header menu — one bezel button opening Settings + theme choices.    */
+/* Theme: "Auto" clears the data-theme attribute so CSS falls back to  */
+/* prefers-color-scheme; index.html re-applies a saved choice before   */
+/* first paint. The storage key predates the Effortdex rename and is   */
+/* kept as-is so existing users don't lose their choice.               */
 /* ------------------------------------------------------------------ */
 
-const themeToggle = document.getElementById('theme-toggle');
-const THEME_KEY = 'pokelogger:theme';
-const THEME_ORDER = ['auto', 'dark', 'light'];
-const THEME_ICONS = { auto: '◐', dark: '☾', light: '☀' };
+const menuBtn = document.getElementById('menu-btn');
+const headerMenu = document.getElementById('header-menu');
+const menuItems = () => [...headerMenu.querySelectorAll('.header-menu-item')];
+
+function setMenuOpen(open) {
+  headerMenu.hidden = !open;
+  menuBtn.setAttribute('aria-expanded', String(open));
+  if (open) menuItems()[0].focus();
+}
+
+menuBtn.addEventListener('click', () => setMenuOpen(headerMenu.hidden));
+
+// Any item click performs its action (own listener) and closes the menu.
+headerMenu.addEventListener('click', (e) => {
+  if (e.target.closest('.header-menu-item')) setMenuOpen(false);
+});
+
+document.addEventListener('click', (e) => {
+  if (!headerMenu.hidden && !e.target.closest('.bezel-menu')) setMenuOpen(false);
+});
+
+document.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape' && !headerMenu.hidden) {
+    setMenuOpen(false);
+    menuBtn.focus();
+  }
+});
+
+headerMenu.addEventListener('keydown', (e) => {
+  if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+  e.preventDefault();
+  const items = menuItems();
+  const current = items.indexOf(document.activeElement);
+  const step = e.key === 'ArrowDown' ? 1 : -1;
+  items[(current + step + items.length) % items.length].focus();
+});
+
+const THEME_KEY = 'effortdex:theme';
+const themeChoices = [...headerMenu.querySelectorAll('[data-theme-choice]')];
 
 function applyTheme(theme) {
   if (theme === 'auto') {
@@ -529,17 +610,25 @@ function applyTheme(theme) {
     document.documentElement.dataset.theme = theme;
     localStorage.setItem(THEME_KEY, theme);
   }
-  themeToggle.textContent = THEME_ICONS[theme];
-  themeToggle.setAttribute('aria-label', `Theme: ${theme}`);
-  themeToggle.title = `Theme: ${theme} (click to change)`;
+  for (const choice of themeChoices) {
+    choice.setAttribute('aria-checked', String(choice.dataset.themeChoice === theme));
+  }
 }
 
 applyTheme(localStorage.getItem(THEME_KEY) || 'auto');
-themeToggle.addEventListener('click', () => {
-  const current = localStorage.getItem(THEME_KEY) || 'auto';
-  const next = THEME_ORDER[(THEME_ORDER.indexOf(current) + 1) % THEME_ORDER.length];
-  applyTheme(next);
-});
+for (const choice of themeChoices) {
+  choice.addEventListener('click', () => applyTheme(choice.dataset.themeChoice));
+}
+
+/* Power LED in the header: green while the browser reports a network
+   connection, amber when running offline from the cached shell. */
+const powerLed = document.querySelector('.power-led');
+function updatePowerLed() {
+  powerLed.classList.toggle('is-online', navigator.onLine);
+}
+window.addEventListener('online', updatePowerLed);
+window.addEventListener('offline', updatePowerLed);
+updatePowerLed();
 
 /* ------------------------------------------------------------------ */
 /* Offline app shell                                                   */
