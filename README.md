@@ -27,9 +27,13 @@ secure context.)
 - **Parties** — group caught Pokémon by save file or playthrough, each
   with its own name, description and game version (shown as a small
   cartridge icon matching that title's generation). The game version
-  isn't just cosmetic: it decides which era's vitamin, training item and
-  Pokérus mechanics apply (see below), so pick a real recognized title
-  when you can.
+  field has its own picker — tap it to browse every official title
+  grouped by generation with its cartridge color, type to filter, or
+  enter free text for ROM hacks (it works on mobile, unlike the native
+  datalist it replaced). The game version isn't just cosmetic: it
+  decides which era's vitamin, training item and Pokérus mechanics apply
+  (see below), and the catch panel shows a "This game's rules" legend
+  rendered from the same logic that applies them.
 - **EV tracking** — six stat bars per Pokémon plus a total, with a held
   training item and Pokérus (×2) support, correctly capped at 252/stat
   and 510/total. The training item dropdown only offers what actually
@@ -64,6 +68,10 @@ secure context.)
 - **Installable / offline** — a web app manifest and service worker let
   it be installed and used without a network connection; species data
   already looked up stays available offline too.
+- **Dark mode** — follows the system preference by default; the header
+  toggle cycles auto → dark → light and remembers the choice. The whole
+  theme lives in `tokens.css` custom properties, so both palettes share
+  one set of component styles.
 
 ## Testing
 

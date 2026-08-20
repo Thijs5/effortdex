@@ -1,31 +1,50 @@
 /* Design tokens — the single source of truth for color, type, spacing,
    radius and motion. Custom properties pierce shadow DOM boundaries, so
    every component (page-level CSS and Web Component shadow roots alike)
-   reads from here instead of redefining its own values. */
+   reads from here instead of redefining its own values.
+
+   Theming: the light palette lives on bare :root. The dark palette (a
+   backlit-handheld night look) is applied two ways so both entry points
+   win correctly: via prefers-color-scheme when the user hasn't chosen
+   (guarded by :not([data-theme="light"])), and via [data-theme="dark"]
+   when they picked dark with the header toggle. */
 
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
 :root {
+  color-scheme: light;
+
   /* Color */
-  --ink: #1b1f1c;
-  --ink-soft: #3a4238;
-  --paper: #eef1e4;
-  --paper-panel: #e5e9d8;
-  --lcd: #d7dfc8;
-  --lcd-deep: #c3cfae;
-  --lcd-line: rgba(27, 31, 28, 0.16);
+  --ink: #1b1f18;
+  --ink-soft: #4a5342;
+  --paper: #d8ddc6;        /* page ground — deeper than the device so it reads as an object */
+  --paper-panel: #f3f5e9;  /* device face */
+  --lcd: #dde4cb;          /* recessed "screen" wells */
+  --lcd-deep: #c0cba2;
+  --lcd-line: #b8c2a2;
+  --line: #c7ccb6;
+  --surface: #fdfdf7;
   --poke-red: #e3350d;
-  --poke-red-dark: #a8260a;
-  --gold: #eab429;
-  --gold-soft: #f6dfa0;
-  --teal: #2f6f62;
-  --teal-soft: #bcd8cf;
-  --line: rgba(27, 31, 28, 0.14);
-  --surface: #fff;
+  --poke-red-dark: #9c2408;
+  --on-red: #fff8ef;
+  --gold: #e9ae1e;
+  --gold-soft: #f4dc96;
+  --badge-ink: #7a5800;
+  --teal: #2b6a5c;
+  --teal-strong: #1f5346;
+  --on-teal: #fff;
+  --teal-soft: #c6ded4;
+  --danger-soft: #f8d9d0;
+  --sprite-bg: rgba(255, 255, 255, 0.55);
+  --scanline: rgba(27, 31, 24, 0.2);
+  --footer-bg: #171a13;
+  --footer-ink: rgba(238, 241, 228, 0.65);
+  --cart-shell: #eef1e4;
+  --cart-edge: rgba(27, 31, 24, 0.3);
 
   /* Elevation */
-  --shadow-panel: 0 10px 30px rgba(27, 31, 28, 0.18);
-  --shadow-suggestions: 0 8px 20px rgba(27, 31, 28, 0.18);
+  --shadow-panel: 0 2px 5px rgba(23, 26, 19, 0.1), 0 16px 32px -16px rgba(23, 26, 19, 0.3);
+  --shadow-suggestions: 0 12px 28px -8px rgba(23, 26, 19, 0.35);
   --shadow-trained: 0 0 0 2px var(--gold), 0 8px 18px rgba(234, 180, 41, 0.35);
 
   /* Type */
@@ -33,12 +52,12 @@
   --font-body: 'Inter', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
 
-  --font-size-2xs: 0.65rem;
-  --font-size-xs: 0.7rem;
-  --font-size-sm: 0.78rem;
-  --font-size-md: 0.85rem;
-  --font-size-lg: 0.95rem;
-  --font-size-xl: 1.05rem;
+  --font-size-2xs: 0.68rem;
+  --font-size-xs: 0.72rem;
+  --font-size-sm: 0.8rem;
+  --font-size-md: 0.88rem;
+  --font-size-lg: 1rem;
+  --font-size-xl: 1.15rem;
   --font-size-input: 16px; /* >=16px keeps mobile Safari from zooming on focus */
 
   /* Spacing scale */
@@ -58,6 +77,80 @@
   --transition-fast: 0.12s ease;
   --transition-med: 0.2s ease;
   --transition-bar: 0.35s ease;
+}
+
+/* Dark palette shared by both dark entry points below. Kept in sync by
+   hand — change one, change both. */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme='light']) {
+    color-scheme: dark;
+
+    --ink: #e4e8d6;
+    --ink-soft: #a6b096;
+    --paper: #12150c;
+    --paper-panel: #1c2014;
+    --lcd: #242a19;
+    --lcd-deep: #333c22;
+    --lcd-line: #414b2e;
+    --line: #3a4229;
+    --surface: #2a3120;
+    --poke-red: #ef4d26;
+    --poke-red-dark: #8f1f06;
+    --on-red: #fff4ec;
+    --gold: #f0b731;
+    --gold-soft: #453711;
+    --badge-ink: #f0cd76;
+    --teal: #6fbfa8;
+    --teal-strong: #8fd4bf;
+    --on-teal: #14201b;
+    --teal-soft: #23372f;
+    --danger-soft: #4a2018;
+    --sprite-bg: rgba(255, 255, 255, 0.08);
+    --scanline: rgba(0, 0, 0, 0.35);
+    --footer-bg: #0c0e07;
+    --footer-ink: rgba(228, 232, 214, 0.55);
+    --cart-shell: #333b26;
+    --cart-edge: rgba(228, 232, 214, 0.28);
+
+    --shadow-panel: 0 2px 5px rgba(0, 0, 0, 0.4), 0 16px 32px -16px rgba(0, 0, 0, 0.7);
+    --shadow-suggestions: 0 12px 28px -8px rgba(0, 0, 0, 0.6);
+    --shadow-trained: 0 0 0 2px var(--gold), 0 8px 18px rgba(240, 183, 49, 0.25);
+  }
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+
+  --ink: #e4e8d6;
+  --ink-soft: #a6b096;
+  --paper: #12150c;
+  --paper-panel: #1c2014;
+  --lcd: #242a19;
+  --lcd-deep: #333c22;
+  --lcd-line: #414b2e;
+  --line: #3a4229;
+  --surface: #2a3120;
+  --poke-red: #ef4d26;
+  --poke-red-dark: #8f1f06;
+  --on-red: #fff4ec;
+  --gold: #f0b731;
+  --gold-soft: #453711;
+  --badge-ink: #f0cd76;
+  --teal: #6fbfa8;
+  --teal-strong: #8fd4bf;
+  --on-teal: #14201b;
+  --teal-soft: #23372f;
+  --danger-soft: #4a2018;
+  --sprite-bg: rgba(255, 255, 255, 0.08);
+  --scanline: rgba(0, 0, 0, 0.35);
+  --footer-bg: #0c0e07;
+  --footer-ink: rgba(228, 232, 214, 0.55);
+  --cart-shell: #333b26;
+  --cart-edge: rgba(228, 232, 214, 0.28);
+
+  --shadow-panel: 0 2px 5px rgba(0, 0, 0, 0.4), 0 16px 32px -16px rgba(0, 0, 0, 0.7);
+  --shadow-suggestions: 0 12px 28px -8px rgba(0, 0, 0, 0.6);
+  --shadow-trained: 0 0 0 2px var(--gold), 0 8px 18px rgba(240, 183, 49, 0.25);
 }
 
 @media (prefers-reduced-motion: reduce) {
