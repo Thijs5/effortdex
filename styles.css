@@ -110,6 +110,11 @@ button, input, select {
 }
 .theme-toggle:hover { background: rgba(255, 248, 239, 0.15); }
 
+.settings-btn {
+  right: calc(clamp(1.2rem, 3vw, 2.2rem) + 46px);
+  font-size: 1.15rem;
+}
+
 /* ---------- layout ---------- */
 .layout {
   display: grid;
@@ -404,6 +409,48 @@ button, input, select {
   max-width: 980px;
 }
 
+/* ---------- Settings view ("/settings") ---------- */
+.settings-view {
+  padding: var(--space-4) clamp(1.2rem, 3vw, 2.2rem) var(--space-5);
+  max-width: 640px;
+}
+.settings-view h2 {
+  font-family: var(--font-display);
+  font-size: var(--font-size-xl);
+  margin: var(--space-3) 0 var(--space-4);
+  letter-spacing: -0.01em;
+}
+.settings-section {
+  background: var(--lcd);
+  border: 1px solid var(--lcd-line);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.settings-section:last-child { margin-bottom: 0; }
+.settings-section h3 {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-md);
+}
+.settings-section .hint { margin-bottom: var(--space-3); }
+.settings-section .hint:last-child { margin-bottom: 0; }
+.safe-data-note {
+  padding: var(--space-3);
+  border-left: 3px solid var(--teal);
+  background: var(--paper);
+}
+.safe-data-note strong { color: var(--ink); }
+/* Unlike other .status-line uses, this one only shows text for the
+   instant before a reload — reserving its usual min-height would just
+   be a permanent empty gap under the button. */
+#clear-cache-status {
+  min-height: 0;
+  margin-top: var(--space-2);
+}
+#settings-version {
+  font-family: var(--font-mono);
+}
+
 /* ---------- buttons ---------- */
 .btn {
   border: none;
@@ -450,15 +497,21 @@ button, input, select {
 }
 .party-dialog::backdrop { background: rgba(27, 31, 28, 0.75); }
 
-/* Below ~640px a native <dialog>'s UA-default centering fights the
-   on-screen keyboard: opening a text field can shove the dialog (or the
-   field itself) off the top of the shrunken visual viewport. Anchoring
-   near the top instead keeps every field reachable once the keyboard is up. */
+/* Below ~640px, go full-page instead of a centered card: a native
+   <dialog>'s UA-default centering fights the on-screen keyboard (opening
+   a text field can shove the dialog, or the field itself, off the top of
+   the shrunken visual viewport), and a small floating card wastes space
+   on a small screen anyway. Margin 0 + full viewport size pins it edge
+   to edge so every field stays reachable once the keyboard is up. */
 @media (max-width: 640px) {
   .party-dialog {
-    margin: 1rem auto auto;
-    max-height: calc(100vh - 2rem);
-    max-height: calc(100dvh - 2rem);
+    margin: 0;
+    width: 100vw;
+    max-width: 100vw;
+    height: 100vh;
+    height: 100dvh;
+    max-height: 100dvh;
+    border-radius: 0;
   }
 }
 .party-dialog h2 {
@@ -572,6 +625,13 @@ textarea.ds-field { resize: vertical; }
   font-size: var(--font-size-xs);
   letter-spacing: 0.04em;
 }
+.app-version {
+  opacity: 0.6;
+}
+.app-version::before {
+  content: '\00b7';
+  margin: 0 0.4em;
+}
 
 /* ---------- small screens ---------- */
 /* Below ~600px the outer body padding + .device border + each section's
@@ -593,8 +653,10 @@ textarea.ds-field { resize: vertical; }
   .picker,
   .pokemon-view,
   .party-view-header,
+  .settings-view,
   .bezel {
     padding-inline: 1rem;
   }
   .theme-toggle { right: 1rem; }
+  .settings-btn { right: calc(1rem + 46px); }
 }

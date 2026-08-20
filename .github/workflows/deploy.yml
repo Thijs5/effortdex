@@ -25,10 +25,12 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Stamp cache name with release tag
+      - name: Stamp cache name and app version with release tag
         run: |
           sed -i "s/const CACHE_NAME = '[^']*';/const CACHE_NAME = 'pokelogger-shell-${GITHUB_REF_NAME}-${GITHUB_SHA::7}';/" sw.js
           grep CACHE_NAME sw.js
+          printf '{\n  "version": "%s"\n}\n' "${GITHUB_REF_NAME#v}" > version.json
+          cat version.json
 
       - name: Upload site
         uses: actions/upload-pages-artifact@v3

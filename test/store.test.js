@@ -21,11 +21,13 @@ beforeEach(() => {
   store.createParty('Party 1');
 });
 
-test('catchPokemon starts with zeroed EVs and no history', () => {
+test('catchPokemon starts with zeroed EVs and a single catch history entry', () => {
   const entry = store.catchPokemon(mon());
   assert.equal(entry.speciesName, 'bulbasaur');
   assert.deepEqual(entry.evs, { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 });
-  assert.equal(entry.history.length, 0);
+  assert.equal(entry.history.length, 1);
+  assert.equal(entry.history[0].kind, 'catch');
+  assert.equal(entry.history[0].level, DEFAULT_LEVEL);
   assert.equal(entry.level, DEFAULT_LEVEL);
 });
 
@@ -42,7 +44,7 @@ test('logDefeat applies the opponent EV yield as-is with no modifiers', () => {
   const opp = opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 });
   store.logDefeat(entry.uid, opp);
   assert.equal(entry.evs.atk, 1);
-  assert.equal(entry.history.length, 1);
+  assert.equal(entry.history.length, 2); // battle + the catch seed entry
   assert.equal(entry.history[0].opponentName, 'rattata');
 });
 
@@ -88,11 +90,22 @@ test('previewDefeat reports the same yield as logDefeat but applies nothing', ()
 
   const preview = store.previewDefeat(entry.uid, opp);
   assert.deepEqual(entry.evs, { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 });
-  assert.equal(entry.history.length, 0);
+  assert.equal(entry.history.length, 2); // catch seed + pokerus toggle — preview logs nothing more
 
   const logged = store.logDefeat(entry.uid, opp);
   assert.deepEqual(preview.applied, logged.applied);
   assert.equal(entry.evs.spa, preview.applied.spa);
+});
+
+test('previewDefeat.applied is zeroed once the stat is already at the 252 cap', () => {
+  const entry = store.catchPokemon(mon());
+  const opp = opponent({ hp: 0, atk: 3, def: 0, spa: 0, spd: 0, spe: 0 });
+  for (let i = 0; i < 200; i++) store.logDefeat(entry.uid, opp); // maxes out atk
+  assert.equal(entry.evs.atk, STAT_CAP);
+
+  const preview = store.previewDefeat(entry.uid, opp);
+  assert.equal(preview.applied.atk, 0); // nothing left to gain — the "Capped" UI state
+  assert.notEqual(preview.base.atk, 0); // base yield itself is unaffected by the cap
 });
 
 test('evolvePokemon changes species identity but preserves EVs and history', () => {
@@ -116,7 +129,7 @@ test('revertEvolution undoes the most recent evolution without touching EVs or h
   assert.equal(entry.speciesName, 'bulbasaur');
   assert.equal(entry.evolutions.length, 0);
   assert.equal(entry.evs.atk, 1);
-  assert.equal(entry.history.length, 1);
+  assert.equal(entry.history.length, 2); // battle + the catch seed entry
 });
 
 test('useVitamin raises exactly its target stat by the vitamin bonus', () => {
@@ -329,17 +342,118 @@ test('deleteHistoryEntry removes the record and reverts the EVs it applied', () 
   const entry = store.catchPokemon(mon());
   store.logDefeat(entry.uid, opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 }));
   store.useVitamin(entry.uid, 'iron'); // def +10
-  assert.equal(entry.history.length, 2);
+  assert.equal(entry.history.length, 3); // vitamin + battle + the catch seed entry
 
   const [vitaminEntry, battleEntry] = entry.history;
   store.deleteHistoryEntry(entry.uid, vitaminEntry.id);
-  assert.equal(entry.history.length, 1);
+  assert.equal(entry.history.length, 2);
   assert.equal(entry.evs.def, 0);
   assert.equal(entry.evs.atk, 1); // battle log untouched
 
   store.deleteHistoryEntry(entry.uid, battleEntry.id);
-  assert.equal(entry.history.length, 0);
+  assert.equal(entry.history.length, 1); // the catch seed entry remains
   assert.equal(entry.evs.atk, 0);
+});
+
+test('setPokerus logs a history entry only when the status actually changes', () => {
+  const entry = store.catchPokemon(mon());
+  store.setPokerus(entry.uid, true);
+  assert.equal(entry.history.length, 2); // pokerus + the catch seed entry
+  assert.equal(entry.history[0].kind, 'pokerus');
+  assert.equal(entry.history[0].active, true);
+
+  store.setPokerus(entry.uid, true); // no-op, already on
+  assert.equal(entry.history.length, 2);
+
+  store.setPokerus(entry.uid, false);
+  assert.equal(entry.history.length, 3);
+  assert.equal(entry.history[0].kind, 'pokerus');
+  assert.equal(entry.history[0].active, false);
+});
+
+test('deleteHistoryEntry on a pokerus record reverts the pokerus flag', () => {
+  const entry = store.catchPokemon(mon());
+  store.setPokerus(entry.uid, true);
+  const [pokerusEntry] = entry.history;
+
+  store.deleteHistoryEntry(entry.uid, pokerusEntry.id);
+  assert.equal(entry.pokerus, false);
+  assert.equal(entry.history.length, 1); // the catch seed entry remains
+});
+
+test('renamePokemon sets the nickname', () => {
+  const entry = store.catchPokemon(mon());
+  store.renamePokemon(entry.uid, 'Buddy');
+  assert.equal(entry.nickname, 'Buddy');
+});
+
+test('releasePokemon removes the entry from the active party only', () => {
+  const keep = store.catchPokemon(mon());
+  const release = store.catchPokemon(mon({ id: 2, name: 'charmander' }));
+  store.releasePokemon(release.uid);
+  assert.equal(store.activeParty.pokemon.length, 1);
+  assert.equal(store.activeParty.pokemon[0].uid, keep.uid);
+});
+
+test('setLevel clamps to [MIN_LEVEL, MAX_LEVEL] and logs history only on an actual change', () => {
+  const entry = store.catchPokemon(mon(), 10);
+  store.setLevel(entry.uid, 15);
+  assert.equal(entry.level, 15);
+  assert.equal(entry.history.length, 2); // level + the catch seed entry
+  assert.equal(entry.history[0].kind, 'level');
+  assert.equal(entry.history[0].fromLevel, 10);
+  assert.equal(entry.history[0].toLevel, 15);
+
+  store.setLevel(entry.uid, 15); // no-op, unchanged
+  assert.equal(entry.history.length, 2);
+
+  store.setLevel(entry.uid, 9999);
+  assert.equal(entry.level, MAX_LEVEL);
+  store.setLevel(entry.uid, 0);
+  assert.equal(entry.level, MIN_LEVEL);
+
+  store.setLevel(entry.uid, 'not a number'); // ignored
+  assert.equal(entry.level, MIN_LEVEL);
+});
+
+test('createParty falls back to a numbered default name and becomes active', () => {
+  const party = store.createParty('');
+  assert.match(party.name, /^Party \d+$/);
+  assert.equal(store.activeParty.id, party.id);
+});
+
+test('updateParty only touches the fields given, and merges overrides per-key', () => {
+  const party = store.createParty('Original', 'desc', 'Red', { pokerus: false, nature: true });
+  const originalSlug = party.slug;
+
+  store.updateParty(party.id, { description: 'new desc' });
+  assert.equal(party.name, 'Original'); // untouched
+  assert.equal(party.description, 'new desc');
+  assert.equal(party.slug, originalSlug); // slug never changes
+
+  store.updateParty(party.id, { overrides: { pokerus: true } });
+  assert.equal(party.overrides.pokerus, true);
+  assert.equal(party.overrides.nature, true); // other override keys untouched
+
+  store.updateParty('missing-id', { name: 'Should not throw' }); // no matching party — no-op
+});
+
+test('getPartyBySlug finds a party by its slug, or returns null', () => {
+  const party = store.createParty('Findable');
+  assert.equal(store.getPartyBySlug(party.slug)?.id, party.id);
+  assert.equal(store.getPartyBySlug('does-not-exist'), null);
+});
+
+test('setActiveParty switches the active party, ignoring an unrecognized id', () => {
+  const first = store.activeParty;
+  const second = store.createParty('Second');
+  assert.equal(store.activeParty.id, second.id); // createParty activates it
+
+  store.setActiveParty(first.id);
+  assert.equal(store.activeParty.id, first.id);
+
+  store.setActiveParty('bogus-id');
+  assert.equal(store.activeParty.id, first.id); // unchanged
 });
 
 test('state persists across Store instances via localStorage', () => {

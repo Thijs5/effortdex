@@ -1,9 +1,11 @@
-// Offline app shell. Bump CACHE_NAME whenever a shell asset changes so
-// `activate` clears the stale cache. This worker only ever touches the
-// app shell — PokéAPI reads/writes go through PokeApiClient's own
-// localStorage-backed cache (lib/pokeapi-client.js), so cross-origin
-// requests are deliberately left alone here (see docs/adr/0001).
-const CACHE_NAME = 'pokelogger-shell-v1';
+// Offline app shell. Bump CACHE_NAME — and version.json's "version" —
+// whenever a shell asset changes, so `activate` clears the stale cache
+// and lib/version-check.js can tell tabs that were left open across the
+// deploy to refresh. This worker only ever touches the app shell —
+// PokéAPI reads/writes go through PokeApiClient's own localStorage-backed
+// cache (lib/pokeapi-client.js), so cross-origin requests are deliberately
+// left alone here (see docs/adr/0001).
+const CACHE_NAME = 'pokelogger-shell-v2';
 
 // Resolved relative to this file's own location so the same list works
 // whether the app is served from a domain root or a subpath (e.g. a
@@ -15,6 +17,7 @@ const SHELL_PATHS = [
   'styles.css',
   'tokens.css',
   'manifest.webmanifest',
+  'version.json',
   'components/caught-pokemon-card.js',
   'components/ev-bar.js',
   'components/ev-summary.js',
@@ -30,6 +33,7 @@ const SHELL_PATHS = [
   'lib/slug.js',
   'lib/store.js',
   'lib/utils.js',
+  'lib/version-check.js',
   'icons/icon-192.png',
   'icons/icon-512.png',
   'icons/icon-512-maskable.png',
@@ -62,6 +66,22 @@ self.addEventListener('fetch', (event) => {
   if (request.mode === 'navigate') {
     event.respondWith(
       fetch(request).catch(() => caches.match(new URL('index.html', self.location).toString()))
+    );
+    return;
+  }
+
+  // version.json is checked *for* updates, so it must go network-first —
+  // a cache-first read here would always echo back the version that was
+  // last cached, defeating the whole check.
+  if (url.pathname.endsWith('/version.json')) {
+    event.respondWith(
+      fetch(request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+          return response;
+        })
+        .catch(() => caches.match(request))
     );
     return;
   }
