@@ -218,6 +218,37 @@ test('trainingItemAvailability offers only what existed in that generation', () 
   assert.deepEqual(store.trainingItemAvailability(), { machoBrace: false, powerItems: true });
 });
 
+test('per-party overrides beat the game version-derived defaults', () => {
+  // Radical Red is a ROM hack (unrecognized -> modern defaults: no Macho
+  // Brace, power items available at +8, no vitamin cutoff, Pokerus on)
+  // but this particular hack plays like Gen III mechanics throughout.
+  store.createParty('Radical Red run', '', 'Radical Red', {
+    powerItemBonus: 4,
+    machoBrace: true,
+    vitaminCutoff: true,
+    pokerus: false,
+  });
+
+  assert.equal(store.powerItemBonus(), 4);
+  assert.deepEqual(store.trainingItemAvailability(), { machoBrace: true, powerItems: true });
+  assert.equal(store.vitaminCutoffApplies(), true);
+  assert.equal(store.pokerusAvailable(), false);
+});
+
+test('overrides only replace the keys given, and null clears back to auto', () => {
+  store.createParty('Sword run', '', 'Sword', { pokerus: false }); // Gen 8, would default to available
+  assert.equal(store.pokerusAvailable(), false);
+  assert.equal(store.powerItemBonus(), 8); // untouched key still follows the game version
+
+  store.updateParty(store.activeParty.id, { overrides: { pokerus: null } });
+  assert.equal(store.pokerusAvailable(), true); // back to Sword's real behavior
+});
+
+test('a false override is honored, not treated as unset', () => {
+  store.createParty('Emerald run', '', 'Emerald', { machoBrace: false }); // Gen 3 would default to true
+  assert.equal(store.trainingItemAvailability().machoBrace, false);
+});
+
 test('useVitamin stops at 100 EVs on a recognized Gen III-VII title', () => {
   store.createParty('Emerald run', '', 'Emerald'); // Gen 3
   const entry = store.catchPokemon(mon());

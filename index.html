@@ -109,6 +109,57 @@
         Description
         <textarea id="party-description-input" class="ds-field" rows="3" maxlength="240" placeholder="Optional notes: ruleset, save slot…"></textarea>
       </label>
+
+      <details class="advanced-rules" id="party-advanced-rules">
+        <summary>Advanced: override this game's rules</summary>
+        <p class="hint advanced-rules-hint">
+          Each rule follows the selected game version by default. Only
+          change one if this is a ROM hack or house rule that plays
+          differently &mdash; a real title's own mechanics are already
+          applied automatically.
+        </p>
+        <label class="field-label field-label--inline">
+          Power item bonus
+          <select id="override-power-item-bonus" class="ds-field">
+            <option value="">Auto (from game version)</option>
+            <option value="4">+4 EVs (Gen IV-VI)</option>
+            <option value="8">+8 EVs (Gen VII+)</option>
+          </select>
+        </label>
+        <label class="field-label field-label--inline">
+          Power items
+          <select id="override-power-items" class="ds-field">
+            <option value="">Auto (from game version)</option>
+            <option value="true">Available</option>
+            <option value="false">Unavailable</option>
+          </select>
+        </label>
+        <label class="field-label field-label--inline">
+          Macho Brace
+          <select id="override-macho-brace" class="ds-field">
+            <option value="">Auto (from game version)</option>
+            <option value="true">Available</option>
+            <option value="false">Unavailable</option>
+          </select>
+        </label>
+        <label class="field-label field-label--inline">
+          Vitamin 100-EV cutoff
+          <select id="override-vitamin-cutoff" class="ds-field">
+            <option value="">Auto (from game version)</option>
+            <option value="true">On (stops at 100 EVs)</option>
+            <option value="false">Off (works up to 252)</option>
+          </select>
+        </label>
+        <label class="field-label field-label--inline">
+          Pok&eacute;rus
+          <select id="override-pokerus" class="ds-field">
+            <option value="">Auto (from game version)</option>
+            <option value="true">Doubles EVs</option>
+            <option value="false">No effect on EVs</option>
+          </select>
+        </label>
+      </details>
+
       <div class="party-dialog-actions">
         <button type="button" id="party-delete-btn" class="btn btn--ghost btn--danger" hidden>Delete party</button>
         <span class="spacer"></span>
