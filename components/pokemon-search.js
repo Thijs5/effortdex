@@ -1,7 +1,8 @@
 import { api } from '../lib/services.js';
 import { titleCase, formatEvYield } from '../lib/utils.js';
-import { FALLBACK_SPRITE } from '../lib/constants.js';
+import { FALLBACK_SPRITE, FALLBACK_ONERROR } from '../lib/constants.js';
 import { attachDesignSystem } from '../lib/design-system.js';
+import { attachPointerSelection, syncActiveDescendant } from '../lib/combobox.js';
 
 // Narrow + coarse-pointer only, so a resized desktop window (narrow but
 // mouse-driven) keeps the inline dropdown, and a touch laptop at full
@@ -85,6 +86,12 @@ export class PokemonSearch extends HTMLElement {
           cursor: pointer;
         }
         li.option.active, li.option:hover { background: var(--lcd); }
+        .option-num {
+          flex: 0 0 auto;
+          font-family: var(--font-mono);
+          font-size: var(--font-size-2xs);
+          color: var(--ink-soft);
+        }
         .option-name {
           flex: 1 1 auto;
           min-width: 0;
@@ -185,9 +192,10 @@ export class PokemonSearch extends HTMLElement {
           <button type="button" class="sheet-close" aria-label="Close search">&#10005;</button>
         </div>
         <input class="ds-field" type="text" role="combobox" aria-expanded="false"
+               aria-controls="ps-list" aria-autocomplete="list"
                autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false"
                inputmode="search" enterkeyhint="go" />
-        <ul class="suggestions" hidden role="listbox"></ul>
+        <ul id="ps-list" class="suggestions" hidden role="listbox"></ul>
       </div>
     `;
     this.$wrap = shadow.querySelector('.wrap');
@@ -222,31 +230,10 @@ export class PokemonSearch extends HTMLElement {
       }, 120)
     );
     this.$sheetClose.addEventListener('click', () => this.$input.blur());
-    // Selection is resolved on pointerup rather than pointerdown, and only
-    // preventDefault()ed for mouse: calling preventDefault() on a touch's
-    // pointerdown cancels that touch's scroll gesture, which made the list
-    // unscrollable on iOS since nearly every touch starts on an option. A
-    // small movement threshold tells a tap from the start of a scroll drag.
-    let pointerDownLi = null;
-    let pointerDownX = 0;
-    let pointerDownY = 0;
-    this.$list.addEventListener('pointerdown', (e) => {
-      const li = e.target.closest('li.option');
-      if (!li) return;
-      pointerDownLi = li;
-      pointerDownX = e.clientX;
-      pointerDownY = e.clientY;
-      if (e.pointerType === 'mouse') e.preventDefault();
-    });
-    this.$list.addEventListener('pointerup', (e) => {
-      const li = pointerDownLi;
-      pointerDownLi = null;
-      if (!li) return;
-      const movedTooFar =
-        Math.hypot(e.clientX - pointerDownX, e.clientY - pointerDownY) > 10;
-      if (movedTooFar || e.target.closest('li.option') !== li) return;
-      this._pick(li.dataset.name);
-    });
+    // Selection on pointerup with a movement threshold (not pointerdown +
+    // preventDefault, which breaks touch scrolling on iOS) — shared with
+    // <game-version-picker> via lib/combobox.js.
+    attachPointerSelection(this.$list, (li) => this._pick(li.dataset.name));
     // Both the inline dropdown and the full-screen sheet anchor themselves
     // to the input's on-screen position / the visual viewport, so both
     // need repositioning whenever either can change (scroll, resize, or
@@ -283,7 +270,7 @@ export class PokemonSearch extends HTMLElement {
     this._recent = (list || [])
       .filter((r) => r && r.name && !seen.has(r.name) && seen.add(r.name))
       .slice(0, RECENT_LIMIT)
-      .map((r) => ({ name: r.name, sprite: r.sprite || null }));
+      .map((r) => ({ name: r.name, sprite: r.sprite || null, id: r.id || null }));
     // Already showing recents with nothing typed — refresh in place so
     // a newly-logged pick shows up without needing a re-focus. Checking
     // actual focus (not just the _showingRecent flag) matters: any
@@ -380,7 +367,13 @@ export class PokemonSearch extends HTMLElement {
       this._showLoading();
       return;
     }
-    this._matches = this._species.filter((s) => s.name.includes(q)).slice(0, 8);
+    // Matches by name, or by National Dex number as it's displayed —
+    // "79", "079" and "#79" all find Slowpoke.
+    const qNum = q.replace(/^#/, '').replace(/^0+(?=\d)/, '');
+    const byNumber = /^\d+$/.test(qNum);
+    this._matches = this._species
+      .filter((s) => s.name.includes(q) || (byNumber && String(s.id).startsWith(qNum)))
+      .slice(0, 8);
     this._renderList();
   }
 
@@ -396,7 +389,7 @@ export class PokemonSearch extends HTMLElement {
   }
 
   _showLoading() {
-    this.$list.innerHTML = '<li class="status">Loading species…</li>';
+    this.$list.innerHTML = '<li class="status" role="presentation">Loading species…</li>';
     this.$list.hidden = false;
     this.$input.setAttribute('aria-expanded', 'true');
     this._reposition();
@@ -404,20 +397,21 @@ export class PokemonSearch extends HTMLElement {
 
   _renderList() {
     if (!this._matches.length) {
-      this.$list.innerHTML = '<li class="status">No matching Pok&eacute;mon.</li>';
+      this.$list.innerHTML = '<li class="status" role="presentation">No matching Pok&eacute;mon.</li>';
       this.$list.hidden = false;
       this.$input.setAttribute('aria-expanded', 'true');
       this._reposition();
       return;
     }
     const showEv = this.hasAttribute('show-ev-yield');
-    const header = this._showingRecent ? '<li class="status">Recent</li>' : '';
+    const header = this._showingRecent ? '<li class="status" role="presentation">Recent</li>' : '';
     this.$list.innerHTML =
       header +
       this._matches
         .map(
           (s) => `<li class="option" role="option" data-name="${s.name}">
-            <img class="thumb" src="${s.sprite || FALLBACK_SPRITE}" alt="" loading="lazy" />
+            <img class="thumb" src="${s.sprite || FALLBACK_SPRITE}" alt="" loading="lazy" ${FALLBACK_ONERROR} />
+            ${s.id ? `<span class="option-num">#${String(s.id).padStart(3, '0')}</span>` : ''}
             <span class="option-name">${titleCase(s.name)}</span>
             ${showEv ? '<span class="option-ev-yield"></span>' : ''}
           </li>`
@@ -425,6 +419,7 @@ export class PokemonSearch extends HTMLElement {
         .join('');
     this.$list.hidden = false;
     this.$input.setAttribute('aria-expanded', 'true');
+    syncActiveDescendant(this.$input, [...this.$list.querySelectorAll('li.option')], -1, 'ps-opt');
     this._reposition();
     if (showEv) this._loadEvYields();
   }
@@ -459,6 +454,7 @@ export class PokemonSearch extends HTMLElement {
     this.$list.hidden = true;
     this.$list.innerHTML = '';
     this.$input.setAttribute('aria-expanded', 'false');
+    this.$input.removeAttribute('aria-activedescendant');
     this._showingRecent = false;
   }
 
@@ -482,6 +478,11 @@ export class PokemonSearch extends HTMLElement {
       if (this._activeIndex >= 0) this._pick(this._matches[this._activeIndex].name);
       else this._tryDirectPick();
     } else if (e.key === 'Escape') {
+      // Consume the key: with the list open, Escape means "close the
+      // list" — without preventDefault it would also cancel a
+      // surrounding <dialog> (the battle search lives inside the detail
+      // card's More dialog) in the same press.
+      e.preventDefault();
       this._hideList();
       if (this._sheetOpen) this.$input.blur();
     }
@@ -489,6 +490,7 @@ export class PokemonSearch extends HTMLElement {
 
   _highlight(items) {
     items.forEach((li, i) => li.classList.toggle('active', i === this._activeIndex));
+    syncActiveDescendant(this.$input, items, this._activeIndex, 'ps-opt');
     items[this._activeIndex]?.scrollIntoView({ block: 'nearest' });
   }
 
@@ -518,6 +520,16 @@ export class PokemonSearch extends HTMLElement {
   clear() {
     this.$input.value = '';
     this._hideList();
+  }
+
+  // Overrides HTMLElement's no-op blur() — the host itself is never the
+  // focused element, the shadow input is. Callers use this to defocus
+  // after e.g. a dialog closes, since a <dialog> closing restores focus
+  // to whatever was focused when it opened, which re-focuses this input
+  // and (via the 'focus' listener above) pops the suggestions/sheet
+  // straight back open.
+  blur() {
+    this.$input.blur();
   }
 }
 customElements.define('pokemon-search', PokemonSearch);

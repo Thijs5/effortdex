@@ -13,7 +13,18 @@ export class EvBar extends HTMLElement {
     shadow.innerHTML = `
       <style>
         :host { display: block; }
-        .row { display: grid; grid-template-columns: 34px auto 1fr auto 16px; align-items: center; gap: var(--space-3); }
+        /* No trailing badge column: the maxed badge overlays the track's
+           right end instead (see .badge), so the bar runs the full row
+           width with no dead space reserved on the right. */
+        .row { display: grid; grid-template-columns: 34px auto 1fr auto; align-items: center; gap: var(--space-3); }
+        /* Bare mode (no label, no base stat — e.g. the roster's total
+           bar): drop the empty label columns so the bar + value fit
+           narrow hosts instead of overflowing them. */
+        :host([bare]) .row { grid-template-columns: 1fr auto; }
+        :host([bare]) .label,
+        :host([bare]) .base-stat { display: none; }
+        :host([bare]) .track,
+        :host([bare]) .badge { grid-column: 1; }
         .label {
           font-family: var(--font-mono);
           font-size: var(--font-size-xs);
@@ -37,6 +48,11 @@ export class EvBar extends HTMLElement {
           text-align: right;
         }
         .track {
+          /* Explicit placement so the track and the badge share this
+             cell on purpose — an auto-placed track would get bumped to
+             the next free column whenever the badge shows. */
+          grid-column: 3;
+          grid-row: 1;
           position: relative;
           height: 9px;
           background: var(--lcd-deep);
@@ -67,8 +83,22 @@ export class EvBar extends HTMLElement {
           font-size: var(--font-size-2xs);
           color: var(--ink-soft);
           white-space: nowrap;
+          /* Widest value is "510/510" — fixing the column keeps every
+             row's track the same length regardless of the number shown. */
+          min-width: 7ch;
+          text-align: right;
         }
+        /* The Poké Ball's white half is a literal #fff on purpose (ADR
+           0003 exception): a Poké Ball is white in both themes — mapping
+           it to a theme token would tint the ball, not theme the UI. */
         .badge {
+          /* Shares the track's grid cell, capping the filled bar's right
+             end rather than costing its own column. */
+          grid-row: 1;
+          grid-column: 3;
+          justify-self: end;
+          z-index: 1;
+          margin-right: -2px;
           width: 14px;
           height: 14px;
           border-radius: 50%;
@@ -144,6 +174,7 @@ export class EvBar extends HTMLElement {
   }
 
   _render() {
+    this.toggleAttribute('bare', !this._label && this._baseStat == null);
     this.$label.textContent = this._label;
     this.$baseStat.textContent = this._baseStat != null ? String(this._baseStat) : '';
     this.$baseStat.title = this._baseStat != null ? `Base ${this._label}: ${this._baseStat}` : '';

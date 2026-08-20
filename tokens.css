@@ -29,6 +29,7 @@
   --on-red: #fff8ef;
   --gold: #e9ae1e;
   --gold-soft: #f4dc96;
+  --led-online: #52c15e;
   --badge-ink: #7a5800;
   --teal: #2b6a5c;
   --teal-strong: #1f5346;
@@ -40,6 +41,8 @@
   --on-pokerus: #fff;
   --sprite-bg: rgba(255, 255, 255, 0.55);
   --scanline: rgba(27, 31, 24, 0.2);
+  --lcd-grid: rgba(27, 31, 24, 0.055);
+  --shadow-lcd: inset 0 2px 6px rgba(27, 31, 24, 0.18), inset 0 -1px 0 rgba(255, 255, 255, 0.5);
   --footer-bg: #171a13;
   --footer-ink: rgba(238, 241, 228, 0.65);
   --cart-shell: #eef1e4;
@@ -102,6 +105,7 @@
     --on-red: #fff4ec;
     --gold: #f0b731;
     --gold-soft: #453711;
+    --led-online: #63d96f;
     --badge-ink: #f0cd76;
     --teal: #6fbfa8;
     --teal-strong: #8fd4bf;
@@ -113,6 +117,8 @@
     --on-pokerus: #1c1424;
     --sprite-bg: rgba(255, 255, 255, 0.08);
     --scanline: rgba(0, 0, 0, 0.35);
+    --lcd-grid: rgba(0, 0, 0, 0.3);
+    --shadow-lcd: inset 0 2px 8px rgba(0, 0, 0, 0.5), inset 0 -1px 0 rgba(255, 255, 255, 0.06);
     --footer-bg: #0c0e07;
     --footer-ink: rgba(228, 232, 214, 0.55);
     --cart-shell: #333b26;
@@ -141,6 +147,7 @@
   --on-red: #fff4ec;
   --gold: #f0b731;
   --gold-soft: #453711;
+  --led-online: #63d96f;
   --badge-ink: #f0cd76;
   --teal: #6fbfa8;
   --teal-strong: #8fd4bf;
@@ -152,6 +159,8 @@
   --on-pokerus: #1c1424;
   --sprite-bg: rgba(255, 255, 255, 0.08);
   --scanline: rgba(0, 0, 0, 0.35);
+  --lcd-grid: rgba(0, 0, 0, 0.3);
+  --shadow-lcd: inset 0 2px 8px rgba(0, 0, 0, 0.5), inset 0 -1px 0 rgba(255, 255, 255, 0.06);
   --footer-bg: #0c0e07;
   --footer-ink: rgba(228, 232, 214, 0.55);
   --cart-shell: #333b26;

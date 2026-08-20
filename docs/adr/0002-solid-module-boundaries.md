@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-Pokélogger has no framework and no build step (see `package.json`'s
+Effortdex has no framework and no build step (see `package.json`'s
 description and every module's own "no frameworks, no build step"
 comments). Without a framework imposing structure, module boundaries
 have to be chosen and held deliberately, or the codebase drifts into a
@@ -48,10 +48,14 @@ file.
    `.label`) rather than leaking their internal DOM structure; callers
    never reach into another component's shadow root.
 5. Components render their own shadow DOM directly against the state
-   layer's plain-object shapes — no virtual DOM, no framework — because
-   the app's state shape is small and stable enough that manual
-   DOM diffing (e.g. `app.js`'s `renderRoster`, which patches by `uid`
-   instead of rebuilding) stays cheap to write and easy to read.
+   layer's plain-object shapes — no virtual DOM, no framework. Views
+   rebuild from scratch on every store change (e.g. `app.js`'s
+   `renderRoster` and `renderPicker`) rather than diffing/patching:
+   the lists involved are small (a handful of parties, six roster
+   entries), so a rebuild is cheap, and it's far harder to get wrong
+   than incremental patching. If a list ever grows enough for rebuilds
+   to matter, that's the moment to introduce keyed patching — not
+   before.
 
 ## Consequences
 

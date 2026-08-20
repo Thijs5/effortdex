@@ -1,62 +1,24 @@
-import { POWER_ITEMS, MACHO_BRACE_SPRITE, VITAMINS, NATURES, STAT_LABEL, MACHO_BRACE_MULTIPLIER, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, TOTAL_CAP, FALLBACK_SPRITE, MIN_LEVEL, MAX_LEVEL } from '../lib/constants.js';
-import { titleCase, totalEvs, formatEvYield, natureLabel, natureEffectHint, sortedNatures, escapeHtml } from '../lib/utils.js';
+import { POWER_ITEMS, MACHO_BRACE_SPRITE, VITAMINS, NATURES, STAT_LABEL, MACHO_BRACE_MULTIPLIER, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, TOTAL_CAP, FALLBACK_SPRITE, FALLBACK_ONERROR, MIN_LEVEL, MAX_LEVEL } from '../lib/constants.js';
+import { titleCase, totalEvs, natureEffectHint, natureOptionsHtml, dayLabel, escapeHtml } from '../lib/utils.js';
 import { api, store } from '../lib/services.js';
 import { attachDesignSystem } from '../lib/design-system.js';
 import './ev-summary.js';
+import './ev-history-log.js';
+import './evolution-chain.js';
 import './pokemon-search.js';
 
 /**
  * <caught-pokemon-card> — a caught Pokémon's full detail page: identity,
- * EV bars, training aids (power item / Pokérus), evolution, a battle
- * search (picking a result logs the defeat immediately) and a history
- * log of every battle, vitamin dose and level-up, grouped by date with
- * the most recent day first. Set `.entry` to a Store roster entry; the
- * card re-renders on assignment. Meant to be mounted one at a time,
- * full width.
+ * EV bars, training aids (power item / Pokérus), evolution
+ * (<evolution-chain>), a battle search (picking a result logs the defeat
+ * immediately) and a history log (<ev-history-log>). Set `.entry` to a
+ * Store roster entry; the card re-renders on assignment. Meant to be
+ * mounted one at a time, full width.
  */
-
-// Groups consecutive same-day history entries under one date heading.
-// `history` is already newest-first (each store mutation unshifts), so
-// grouping in place — without re-sorting — keeps both the day order and
-// the entries within each day newest-first.
-// A small virus glyph for the Pokérus history row — there's no game
-// sprite for the status itself, so a molecule/spore icon stands in,
-// tinted via currentColor by the .hist-icon--pokerus class.
-const POKERUS_ICON_SVG = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-  <circle cx="12" cy="12" r="5" fill="currentColor" />
-  <circle cx="12" cy="3" r="2" fill="currentColor" />
-  <circle cx="12" cy="21" r="2" fill="currentColor" />
-  <circle cx="3" cy="12" r="2" fill="currentColor" />
-  <circle cx="21" cy="12" r="2" fill="currentColor" />
-  <circle cx="5.5" cy="5.5" r="1.6" fill="currentColor" />
-  <circle cx="18.5" cy="5.5" r="1.6" fill="currentColor" />
-  <circle cx="5.5" cy="18.5" r="1.6" fill="currentColor" />
-  <circle cx="18.5" cy="18.5" r="1.6" fill="currentColor" />
-</svg>`;
-
-function dayKey(timestamp) {
-  const d = new Date(timestamp);
-  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
-}
-
-function dayLabel(timestamp) {
-  const d = new Date(timestamp);
-  const now = new Date();
-  const startOfDay = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  const diffDays = Math.round((startOfDay(now) - startOfDay(d)) / 86400000);
-  if (diffDays === 0) return 'Today';
-  if (diffDays === 1) return 'Yesterday';
-  return d.toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
-  });
-}
 export class CaughtPokemonCard extends HTMLElement {
   constructor() {
     super();
     this._entry = null;
-    this._historyOpen = false;
 
     const shadow = this.attachShadow({ mode: 'open' });
     attachDesignSystem(shadow);
@@ -69,12 +31,16 @@ export class CaughtPokemonCard extends HTMLElement {
           position: relative;
         }
 
+        /* Sprite anchors the left edge across every row; all text and
+           badges share one column beside it, so the header has a single
+           left alignment line instead of three competing ones. Item/
+           Pokérus status now lives inline in .meta next to the level
+           button rather than owning its own row. */
         header {
           display: grid; grid-template-columns: 64px 1fr auto;
           grid-template-areas:
             "sprite titles more"
-            "nature status status"
-            "trained trained trained";
+            "sprite trained trained";
           align-items: center; column-gap: var(--space-4); row-gap: 0;
           padding-bottom: var(--space-4);
           border-bottom: 1px dashed var(--lcd-line);
@@ -92,17 +58,18 @@ export class CaughtPokemonCard extends HTMLElement {
           border-color: var(--pokerus-purple);
           box-shadow: 0 0 0 3px var(--pokerus-purple-soft);
         }
-        /* Same grid row as .status-row so the nature badge lines up with
-           the item/Pokérus badges instead of trailing behind them. Plain
-           text, not a colored pill — nature is informational, not a status. */
-        .nature-badge {
-          grid-area: nature; justify-self: center; align-self: start; margin-top: var(--space-2);
-          font-family: var(--font-mono); font-size: var(--font-size-2xs);
+        /* "#169 Adamant Slowpoke": Dex number, then nature (the games'
+           own phrasing), then the editable name — one line, one glance.
+           Both prefixes are softer weight/color than the editable name
+           so the three parts stay visually distinct. */
+        .name-row { display: flex; align-items: baseline; gap: 0.45em; min-width: 0; }
+        .species-num {
+          font-family: var(--font-mono); font-size: var(--font-size-xs);
           color: var(--ink-soft); white-space: nowrap;
-          /* Matches the status pill's own line-height (font-size-2xs line
-             plus its 0.3em vertical padding) so plain text and pill share
-             a top edge instead of centering on different box heights. */
-          line-height: calc(1em + 0.6em);
+        }
+        .nature-prefix {
+          font-family: var(--font-display); font-weight: 500; font-size: var(--font-size-input);
+          color: var(--ink-soft); white-space: nowrap;
         }
         /* Same height as the sprite and top-aligned with it, so the name
            sits level with the sprite's top edge instead of floating in a
@@ -112,7 +79,7 @@ export class CaughtPokemonCard extends HTMLElement {
           height: 64px; display: flex; flex-direction: column; justify-content: space-between;
         }
         .nickname {
-          display: block; width: 100%; border: none; background: transparent;
+          display: block; flex: 1 1 auto; min-width: 0; width: auto; border: none; background: transparent;
           font-family: var(--font-display); font-weight: 600; font-size: var(--font-size-input);
           padding: 0; color: var(--ink);
         }
@@ -130,14 +97,23 @@ export class CaughtPokemonCard extends HTMLElement {
         }
         .level-up-btn:hover:not(:disabled) { color: var(--teal); border-color: var(--teal); }
         .level-up-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-        .more-btn { grid-area: more; display: inline-flex; align-items: center; gap: 0.15em; white-space: nowrap; }
-        .more-btn .dots {
-          display: inline-block; font-size: 1.1em; line-height: 1;
-          width: 0.7em; text-align: center; margin-right: -0.1em;
+        .level-up-btn svg { width: 11px; height: 11px; color: var(--teal); }
+        .level-up-btn:disabled svg { color: inherit; }
+        .more-btn { grid-area: more; align-self: start; display: inline-flex; align-items: center; gap: 0.3em; white-space: nowrap; }
+        .more-btn svg { width: 14px; height: 14px; }
+        .trained-badge { grid-area: trained; justify-self: start; margin-top: var(--space-2); }
+        /* The number+nature prefix (added ahead of the editable name)
+           leaves less room for a long nickname on a phone-width card —
+           drop the "More" label and keep just its icon, freeing that
+           width back up. The dialog's own title still says "More
+           options" for anyone who lands there another way. */
+        @media (max-width: 420px) {
+          .more-btn-label { display: none; }
         }
-        .trained-badge { grid-area: trained; margin-top: var(--space-2); }
 
-        .status-row { grid-area: status; align-self: start; display: flex; gap: var(--space-2); flex-wrap: wrap; margin-top: var(--space-2); }
+        /* An inline item in .meta now, not its own row — flex-wrap here
+           lets its own pills wrap independently if they run out of room. */
+        .status-row { display: inline-flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
         .status-pill {
           display: inline-flex; align-items: center; gap: 0.35em;
           text-transform: none; letter-spacing: normal; padding: 0.3em 0.65em;
@@ -154,38 +130,15 @@ export class CaughtPokemonCard extends HTMLElement {
           border: 1px dashed var(--lcd-line);
         }
 
-        .more-dialog {
-          border: none; border-radius: var(--radius-md); padding: var(--space-5);
-          width: min(420px, calc(100vw - 2.4rem));
-          max-height: calc(100vh - 2.4rem); max-height: calc(100dvh - 2.4rem);
-          overflow-y: auto; background: var(--paper-panel); color: var(--ink);
-          box-shadow: var(--shadow-panel); gap: var(--space-5);
-        }
+        /* Dialog chrome comes from the shared .ds-dialog, its header
+           from .ds-dialog-header; only the grid layout of this dialog's
+           own sections lives here. The grid's gap already spaces the
+           header from the first section, so the shared bottom margin
+           would double up. */
+        .more-dialog { gap: var(--space-5); }
         .more-dialog:not([open]) { display: none; }
         .more-dialog[open] { display: grid; }
-        .more-dialog::backdrop { background: rgba(27, 31, 28, 0.75); }
-        /* Full-page below ~640px, same reasoning as .party-dialog in the
-           global stylesheet: a small floating card wastes space on a
-           small screen, and margin 0 + full viewport size sidesteps the
-           on-screen keyboard shoving a centered dialog around. */
-        @media (max-width: 640px) {
-          .more-dialog {
-            margin: 0; width: 100vw; max-width: 100vw;
-            height: 100vh; height: 100dvh; max-height: 100dvh;
-            border-radius: 0;
-          }
-        }
-        .more-dialog-header {
-          display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
-        }
-        .more-dialog-header h2 {
-          margin: 0; font-family: var(--font-display); font-size: var(--font-size-xl);
-        }
-        .more-dialog-close {
-          border: none; background: transparent; cursor: pointer; font-size: var(--font-size-lg);
-          color: var(--ink-soft); line-height: 1; padding: var(--space-1);
-        }
-        .more-dialog-close:hover { color: var(--ink); }
+        .more-dialog .ds-dialog-header { margin-bottom: 0; }
         .release {
           display: inline-flex; align-items: center; justify-content: center; gap: 0.35em;
           border: 1px solid var(--lcd-line); background: transparent; cursor: pointer; width: 100%;
@@ -210,9 +163,18 @@ export class CaughtPokemonCard extends HTMLElement {
           width: 15px; height: 15px; border-radius: 50%; border: 1px solid var(--lcd-line);
           background: var(--surface); color: var(--ink-soft); font-family: var(--font-mono);
           font-size: 10px; font-weight: 700; letter-spacing: 0; text-transform: none;
-          line-height: 1; padding: 0; flex: 0 0 auto; cursor: help;
+          line-height: 1; padding: 0; flex: 0 0 auto; cursor: pointer;
         }
         .help-btn:hover, .help-btn:focus-visible { border-color: var(--teal); color: var(--teal); }
+        /* Tap-to-toggle explanation under a section title — title-attribute
+           tooltips don't exist on touch devices, so the same text must be
+           reachable with a tap. */
+        .help-note {
+          margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs);
+          color: var(--ink-soft); background: var(--lcd);
+          border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3);
+          text-transform: none; letter-spacing: normal;
+        }
 
         .details-section { display: grid; gap: var(--space-3); }
         .details-section .field-inline {
@@ -229,19 +191,6 @@ export class CaughtPokemonCard extends HTMLElement {
 
         .aids { display: grid; gap: var(--space-2); }
         .item-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-2); }
-        .item-btn {
-          display: flex; align-items: center; gap: var(--space-2); width: 100%; text-align: left;
-          border: 1px solid var(--lcd-line); background: var(--surface); cursor: pointer;
-          border-radius: var(--radius-md); font-size: var(--font-size-2xs); font-weight: 600;
-          color: var(--ink-soft); padding: var(--space-2) var(--space-3); min-height: 38px;
-          touch-action: manipulation; transition: background var(--transition-fast), border-color var(--transition-fast);
-        }
-        .item-btn:hover { border-color: var(--teal); }
-        .item-btn--active { background: var(--teal-soft); border-color: var(--teal); color: var(--teal-strong); }
-        .item-icon { width: 22px; height: 22px; object-fit: contain; image-rendering: pixelated; flex: 0 0 auto; }
-        .item-btn-text { display: grid; gap: 0.1em; min-width: 0; }
-        .item-btn-boost { font-weight: 500; opacity: 0.75; }
-        .item-btn--active .item-btn-boost { opacity: 0.85; }
 
         .vitamins { display: grid; gap: var(--space-2); }
         .vitamin-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); }
@@ -263,83 +212,46 @@ export class CaughtPokemonCard extends HTMLElement {
         .pokerus-note { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--ink-soft); }
 
         .evolve-panel { display: grid; gap: var(--space-2); }
-        .evo-note { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--ink-soft); }
-        .evo-chain { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
-        .evo-stage { display: flex; flex-direction: column; gap: var(--space-2); }
-        .evo-arrow { color: var(--ink-soft); font-size: var(--font-size-md); }
-        .evo-node:disabled { cursor: default; opacity: 0.5; }
-        .evo-node--current { border-color: var(--teal); color: var(--teal-strong); background: var(--teal-soft); opacity: 1; }
-        .evo-node:not(:disabled):hover { border-color: var(--teal); color: var(--teal-strong); }
-        .evolve-status { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--teal); min-height: 1em; }
 
         .battle { display: grid; gap: var(--space-2); }
         .status { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--poke-red-dark); min-height: 1em; }
-
-        details.history summary {
-          cursor: pointer; font-size: var(--font-size-sm); font-weight: 600; color: var(--ink-soft);
-          list-style: none;
-        }
-        details.history summary::-webkit-details-marker { display: none; }
-        details.history summary::before { content: '▸ '; }
-        details.history[open] summary::before { content: '▾ '; }
-
-        ul.hist-list { list-style: none; margin: var(--space-3) 0 0; padding: 0; display: grid; gap: var(--space-3); max-height: 220px; overflow-y: auto; }
-        ul.hist-list li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); font-size: var(--font-size-xs); }
-        ul.hist-list li.empty { display: block; color: var(--ink-soft); }
-        ul.hist-list li.hist-date {
-          display: block;
-          margin-top: var(--space-2);
-          font-family: var(--font-mono);
-          font-size: var(--font-size-2xs);
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
-          color: var(--ink-soft);
-        }
-        ul.hist-list li.hist-date:first-child { margin-top: 0; }
-        ul.hist-list img { width: 24px; height: 24px; image-rendering: pixelated; flex: 0 0 auto; }
-        .hist-icon { width: 24px; height: 24px; flex: 0 0 auto; display: inline-flex; }
-        .hist-icon svg { width: 100%; height: 100%; }
-        .hist-icon--pokerus { color: var(--pokerus-purple); }
-        ul.hist-list li > div { flex: 1 1 140px; min-width: 0; }
-        ul.hist-list strong { display: block; text-transform: capitalize; }
-        ul.hist-list .gain { display: block; color: var(--teal); font-family: var(--font-mono); }
-        ul.hist-list .tags { display: block; color: var(--ink-soft); font-size: var(--font-size-2xs); }
-        .hist-actions { display: flex; gap: var(--space-2); flex: 0 0 auto; margin-left: auto; }
-        .delete-hist-btn {
-          border: none; background: transparent; cursor: pointer; font-size: var(--font-size-input);
-          color: var(--ink-soft); line-height: 1; padding: var(--space-2);
-        }
-        .delete-hist-btn:hover { color: var(--poke-red); }
       </style>
       <article class="card">
         <header>
           <img class="sprite" alt="" />
-          <span class="nature-badge" hidden></span>
           <div class="titles">
-            <input class="nickname" aria-label="Nickname" />
+            <div class="name-row">
+              <span class="species-num"></span>
+              <span class="nature-prefix" hidden></span>
+              <input class="nickname" aria-label="Nickname" />
+            </div>
             <div class="meta">
-              <span class="species"></span>
-              <button class="level-up-btn" type="button" title="Level up">
-                <span class="level-value"></span> <span aria-hidden="true">▲</span>
+              <span class="species" hidden></span>
+              <button class="level-up-btn" type="button" title="Level up (+1)">
+                <span class="level-value"></span>
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg>
               </button>
+              <div class="status-row" hidden></div>
             </div>
           </div>
-          <div class="status-row" hidden></div>
-          <button class="more-btn ds-btn ds-btn--outline ds-btn--sm" type="button" title="More options" aria-haspopup="dialog">
-            <span class="dots" aria-hidden="true">⋮</span> More
+          <button class="more-btn ds-btn ds-btn--outline ds-btn--sm" type="button" title="More options" aria-label="More options" aria-haspopup="dialog">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="17.5" r="1.7"/></svg>
+            <span class="more-btn-label">More</span>
           </button>
           <span class="trained-badge ds-pill-badge" hidden>★ Fully trained</span>
         </header>
 
-        <dialog class="more-dialog">
-          <div class="more-dialog-header">
+        <dialog class="more-dialog ds-dialog">
+          <header class="ds-dialog-header">
             <h2>More options</h2>
-            <button class="more-dialog-close" type="button" aria-label="Close">✕</button>
-          </div>
+            <button class="more-dialog-close ds-dialog-close" type="button" aria-label="Close">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
+          </header>
 
           <section class="details-section">
             <h3 class="section-title">Level &amp; nature
-              <button type="button" class="help-btn" aria-label="What is EV training?" title="EVs (Effort Values) are hidden bonus stat points earned mainly from battling — up to 252 per stat, 510 total. Nature is fixed when a Pokémon is caught or hatched: it boosts one stat by 10% and lowers another. Nature doesn't change EVs, but training the stat your nature already boosts gets the most out of your points.">?</button>
+              <button type="button" class="help-btn" aria-expanded="false" aria-label="What is EV training?" title="EVs (Effort Values) are hidden bonus stat points earned mainly from battling — up to 252 per stat, 510 total. Nature is fixed when a Pokémon is caught or hatched: it boosts one stat by 10% and lowers another. Nature doesn't change EVs, but training the stat your nature already boosts gets the most out of your points.">?</button>
             </h3>
             <label class="field-inline">Level
               <input type="number" class="level-input ds-field" min="${MIN_LEVEL}" max="${MAX_LEVEL}" aria-label="Level" />
@@ -352,19 +264,19 @@ export class CaughtPokemonCard extends HTMLElement {
 
           <section class="aids">
             <h3 class="section-title">Training item
-              <button type="button" class="help-btn" aria-label="What do training items do?" title="Held items that speed up EV gains from battling. The Macho Brace doubles every EV earned in battle for any stat. A Power item instead adds a flat bonus to one specific stat every battle, on top of whatever that battle normally gives.">?</button>
+              <button type="button" class="help-btn" aria-expanded="false" aria-label="What do training items do?" title="Held items that speed up EV gains from battling. The Macho Brace doubles every EV earned in battle for any stat. A Power item instead adds a flat bonus to one specific stat every battle, on top of whatever that battle normally gives.">?</button>
             </h3>
             <div class="item-grid"></div>
           </section>
 
           <section class="pokerus-section">
             <h3 class="section-title">Pokérus
-              <button type="button" class="help-btn" aria-label="What is Pokérus?" title="A rare, harmless in-game virus. While infected, every EV your Pokémon earns from battling is doubled — pure bonus, no downside. It can also spread to other party members over time. Once it cures (after a few days), the ×2 EV bonus stays forever — no need to toggle this off.">?</button>
+              <button type="button" class="help-btn" aria-expanded="false" aria-label="What is Pokérus?" title="A rare, harmless in-game virus. While infected, every EV your Pokémon earns from battling is doubled — pure bonus, no downside. It can also spread to other party members over time. Once it cures (after a few days), the ×2 EV bonus stays forever — no need to toggle this off.">?</button>
             </h3>
-            <button type="button" class="item-btn pokerus-toggle-btn" aria-pressed="false">
-              <span class="item-btn-text">
-                <span class="item-btn-label">Pokérus</span>
-                <span class="item-btn-boost">×2 EVs</span>
+            <button type="button" class="ds-item-btn pokerus-toggle-btn" aria-pressed="false">
+              <span class="ds-item-btn-text">
+                <span class="ds-item-btn-label">Pokérus</span>
+                <span class="ds-item-btn-boost">×2 EVs</span>
               </span>
             </button>
             <p class="pokerus-note" hidden>Pokérus doesn't double EVs in this game.</p>
@@ -372,7 +284,7 @@ export class CaughtPokemonCard extends HTMLElement {
 
           <section class="vitamins">
             <h3 class="section-title">Vitamins
-              <button type="button" class="help-btn" aria-label="What do vitamins do?" title="Vitamins (HP Up, Protein, Iron, Calcium, Zinc, Carbos) instantly add EVs to one stat without battling — a quick way to top off a stat. Each only works until that stat has 100 EVs from any source; after that, only battling, items, or Pokérus can push it further toward the 252 cap.">?</button>
+              <button type="button" class="help-btn" aria-expanded="false" aria-label="What do vitamins do?" title="Vitamins (HP Up, Protein, Iron, Calcium, Zinc, Carbos) instantly add EVs to one stat without battling — a quick way to top off a stat. Each only works until that stat has 100 EVs from any source; after that, only battling, items, or Pokérus can push it further toward the 252 cap.">?</button>
             </h3>
             <div class="vitamin-grid"></div>
             <p class="vitamin-status" aria-live="polite"></p>
@@ -380,9 +292,7 @@ export class CaughtPokemonCard extends HTMLElement {
 
           <div class="evolve-panel">
             <h3 class="section-title">Evolution</h3>
-            <p class="evo-note"></p>
-            <div class="evo-chain"></div>
-            <p class="evolve-status" aria-live="polite"></p>
+            <evolution-chain></evolution-chain>
           </div>
 
           <button class="release" title="Release this Pokémon" aria-label="Release this Pokémon">
@@ -403,16 +313,14 @@ export class CaughtPokemonCard extends HTMLElement {
               <p class="status" aria-live="polite"></p>
             </section>
 
-            <details class="history">
-              <summary>History (<span class="hist-count">0</span>)</summary>
-              <ul class="hist-list"></ul>
-            </details>
+            <ev-history-log></ev-history-log>
           </div>
         </div>
       </article>
     `;
 
     this.$sprite = shadow.querySelector('.sprite');
+    this.$speciesNum = shadow.querySelector('.species-num');
     this.$nickname = shadow.querySelector('.nickname');
     this.$species = shadow.querySelector('.species');
     this.$levelValue = shadow.querySelector('.level-value');
@@ -421,7 +329,7 @@ export class CaughtPokemonCard extends HTMLElement {
     this.$natureField = shadow.querySelector('.nature-field');
     this.$nature = shadow.querySelector('.nature-select');
     this.$natureHint = shadow.querySelector('.nature-hint');
-    this.$natureBadge = shadow.querySelector('.nature-badge');
+    this.$naturePrefix = shadow.querySelector('.nature-prefix');
     this.$statusRow = shadow.querySelector('.status-row');
     this.$moreBtn = shadow.querySelector('.more-btn');
     this.$moreDialog = shadow.querySelector('.more-dialog');
@@ -434,9 +342,7 @@ export class CaughtPokemonCard extends HTMLElement {
     this.$pokerusNote = shadow.querySelector('.pokerus-note');
     this.$vitaminGrid = shadow.querySelector('.vitamin-grid');
     this.$vitaminStatus = shadow.querySelector('.vitamin-status');
-    this.$evoNote = shadow.querySelector('.evo-note');
-    this.$evoChain = shadow.querySelector('.evo-chain');
-    this.$evolveStatus = shadow.querySelector('.evolve-status');
+    this.$evoChain = shadow.querySelector('evolution-chain');
     this.$search = shadow.querySelector('pokemon-search');
     // Shows what battling this opponent would actually add right now —
     // held item, Pokérus and the 252/510 caps folded in — rather than
@@ -446,12 +352,15 @@ export class CaughtPokemonCard extends HTMLElement {
     // (or its Pokérus/item state) changes without needing to be reset.
     this.$search.evModifier = (mon) => store.previewDefeat(this._entry.uid, mon)?.applied;
     this.$status = shadow.querySelector('.status');
-    this.$details = shadow.querySelector('.history');
-    this.$histCount = shadow.querySelector('.hist-count');
-    this.$histList = shadow.querySelector('.hist-list');
+    this.$histLog = shadow.querySelector('ev-history-log');
+
+    // Remote sprite may be unreachable offline — swap in the local fallback.
+    this.$sprite.addEventListener('error', () => {
+      if (this.$sprite.src !== FALLBACK_SPRITE) this.$sprite.src = FALLBACK_SPRITE;
+    });
 
     this._populateVitaminButtons();
-    this._populateNatureOptions();
+    this.$nature.innerHTML = natureOptionsHtml();
     this._wireEvents();
   }
 
@@ -488,13 +397,13 @@ export class CaughtPokemonCard extends HTMLElement {
     for (const item of offered) {
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'item-btn';
+      btn.className = 'ds-item-btn';
       btn.dataset.value = item.value;
       btn.title = `${item.label} — ${item.boost}`;
-      btn.innerHTML = `<img class="item-icon" src="${item.sprite}" alt="" />
-        <span class="item-btn-text">
-          <span class="item-btn-label">${item.label}</span>
-          <span class="item-btn-boost">${item.boost}</span>
+      btn.innerHTML = `<img class="ds-item-icon" src="${item.sprite}" alt="" ${FALLBACK_ONERROR} />
+        <span class="ds-item-btn-text">
+          <span class="ds-item-btn-label">${item.label}</span>
+          <span class="ds-item-btn-boost">${item.boost}</span>
         </span>`;
       this.$itemGrid.appendChild(btn);
     }
@@ -505,7 +414,7 @@ export class CaughtPokemonCard extends HTMLElement {
     const selected = this._entry.machoBrace ? 'macho-brace' : this._entry.powerItem || '';
     for (const btn of this.$itemGrid.children) {
       const active = btn.dataset.value === selected;
-      btn.classList.toggle('item-btn--active', active);
+      btn.classList.toggle('ds-item-btn--active', active);
       btn.setAttribute('aria-pressed', String(active));
     }
   }
@@ -519,29 +428,15 @@ export class CaughtPokemonCard extends HTMLElement {
       const boost = `+${VITAMIN_BONUS} ${STAT_LABEL[v.stat]}`;
       const btn = document.createElement('button');
       btn.type = 'button';
-      btn.className = 'item-btn vitamin-btn';
+      btn.className = 'ds-item-btn vitamin-btn';
       btn.dataset.vitamin = v.id;
       btn.title = `Feed ${v.label} — raises ${STAT_LABEL[v.stat]} EVs by up to ${VITAMIN_BONUS}`;
-      btn.innerHTML = `<img class="item-icon" src="${v.sprite}" alt="" />
-        <span class="item-btn-text">
-          <span class="item-btn-label">${v.label}</span>
-          <span class="item-btn-boost">${boost}</span>
+      btn.innerHTML = `<img class="ds-item-icon" src="${v.sprite}" alt="" ${FALLBACK_ONERROR} />
+        <span class="ds-item-btn-text">
+          <span class="ds-item-btn-label">${v.label}</span>
+          <span class="ds-item-btn-boost">${boost}</span>
         </span>`;
       this.$vitaminGrid.appendChild(btn);
-    }
-  }
-
-  // Populated once — the nature list doesn't depend on species or game version.
-  _populateNatureOptions() {
-    const noneOpt = document.createElement('option');
-    noneOpt.value = '';
-    noneOpt.textContent = 'Unknown';
-    this.$nature.appendChild(noneOpt);
-    for (const nature of sortedNatures()) {
-      const opt = document.createElement('option');
-      opt.value = nature.id;
-      opt.textContent = natureLabel(nature);
-      this.$nature.appendChild(opt);
     }
   }
 
@@ -561,11 +456,36 @@ export class CaughtPokemonCard extends HTMLElement {
     });
     this.$moreBtn.addEventListener('click', () => {
       this.$moreDialog.showModal();
-      this._loadEvolutionChain();
+      // styles.css's html:has(dialog[open]) scroll lock can't see into
+      // this shadow root, so flag the open state on <html> ourselves.
+      document.documentElement.dataset.modalOpen = '';
+      this.$evoChain.load();
+    });
+    // 'close' catches every path: the ✕, Esc, and backdrop clicks.
+    this.$moreDialog.addEventListener('close', () => {
+      delete document.documentElement.dataset.modalOpen;
     });
     this.$moreDialogClose.addEventListener('click', () => this.$moreDialog.close());
     this.$moreDialog.addEventListener('click', (e) => {
       if (e.target === this.$moreDialog) this.$moreDialog.close();
+    });
+    // The "?" buttons toggle their explanation inline: title tooltips are
+    // hover-only, which leaves them unreachable on touch devices.
+    this.$moreDialog.addEventListener('click', (e) => {
+      const btn = e.target.closest('.help-btn');
+      if (!btn) return;
+      const heading = btn.closest('.section-title');
+      const next = heading.nextElementSibling;
+      if (next?.classList.contains('help-note')) {
+        next.remove();
+        btn.setAttribute('aria-expanded', 'false');
+      } else {
+        const note = document.createElement('p');
+        note.className = 'help-note';
+        note.textContent = btn.title;
+        heading.after(note);
+        btn.setAttribute('aria-expanded', 'true');
+      }
     });
     this.$release.addEventListener('click', () => {
       const label = titleCase(this._entry.nickname || this._entry.speciesName);
@@ -575,7 +495,7 @@ export class CaughtPokemonCard extends HTMLElement {
       }
     });
     this.$itemGrid.addEventListener('click', (e) => {
-      const btn = e.target.closest('.item-btn');
+      const btn = e.target.closest('.ds-item-btn');
       if (!btn) return;
       const val = btn.dataset.value;
       const selected = this._entry.machoBrace ? 'macho-brace' : this._entry.powerItem || '';
@@ -595,28 +515,11 @@ export class CaughtPokemonCard extends HTMLElement {
       if (!btn) return;
       this._useVitamin(btn.dataset.vitamin);
     });
-    this.$evoChain.addEventListener('click', (e) => {
-      const btn = e.target.closest('button[data-action]');
-      if (!btn) return;
-      if (btn.dataset.action === 'evolve') this._evolveInto(btn.dataset.name);
-      else if (btn.dataset.action === 'undo') this._undoEvolve();
-    });
     this.$search.addEventListener('pokemon-pick', (e) => {
       this._battle(e.detail.name, 'Looking up battle data…');
     });
-    this.$details.addEventListener('toggle', () => {
-      this._historyOpen = this.$details.open;
-    });
-    this.$histList.addEventListener('click', (e) => {
-      const redefeatBtn = e.target.closest('.redefeat-btn');
-      if (redefeatBtn) {
-        this._redefeat(redefeatBtn.dataset.name);
-        return;
-      }
-      const deleteBtn = e.target.closest('.delete-hist-btn');
-      if (deleteBtn) {
-        this._deleteHistoryEntry(deleteBtn.dataset.id);
-      }
+    this.$histLog.addEventListener('redefeat', (e) => {
+      this._battle(e.detail.name, `Re-logging battle vs ${titleCase(e.detail.name)}…`);
     });
   }
 
@@ -626,17 +529,6 @@ export class CaughtPokemonCard extends HTMLElement {
   }
   get entry() {
     return this._entry;
-  }
-
-  async _redefeat(name) {
-    this._historyOpen = true;
-    await this._battle(name, `Re-logging battle vs ${titleCase(name)}…`);
-  }
-
-  /** Deletes a mislogged history record and reverts the EVs it applied. */
-  _deleteHistoryEntry(historyId) {
-    this._historyOpen = true;
-    store.deleteHistoryEntry(this._entry.uid, historyId);
   }
 
   async _battle(name, statusText) {
@@ -664,108 +556,17 @@ export class CaughtPokemonCard extends HTMLElement {
     }
   }
 
-  /**
-   * Loads the whole evolution family as soon as the More dialog opens
-   * and renders it as a clickable chain — no extra click to see it, and
-   * the previous stage (Undo) and next stage(s) (Evolve) are just
-   * buttons in that chain rather than a separate control.
-   */
-  async _loadEvolutionChain() {
-    this.$evoChain.innerHTML = '';
-    this.$evolveStatus.textContent = 'Loading evolution chain…';
-    try {
-      const nodes = await api.getEvolutionChain(this._entry.speciesName);
-      const mons = await Promise.all(
-        nodes.map((n) => api.getPokemon(n.name).catch(() => ({ name: n.name, sprite: null })))
-      );
-      const spriteByName = new Map(mons.map((m) => [m.name, m.sprite]));
-      this.$evolveStatus.textContent = '';
-      this._renderEvolutionChain(nodes, spriteByName);
-    } catch (err) {
-      this.$evolveStatus.textContent = err.message || 'Could not load the evolution chain.';
-    }
-  }
-
-  _renderEvolutionChain(nodes, spriteByName) {
-    const currentName = this._entry.speciesName.toLowerCase();
-    const currentNode = nodes.find((n) => n.name === currentName);
-    const nextNames = new Set(nodes.filter((n) => n.parent === currentName).map((n) => n.name));
-    const prevName = currentNode?.parent ?? null;
-    const maxDepth = Math.max(...nodes.map((n) => n.depth));
-
-    let html = '';
-    for (let depth = 0; depth <= maxDepth; depth++) {
-      if (depth > 0) html += `<span class="evo-arrow" aria-hidden="true">→</span>`;
-      const stage = nodes.filter((n) => n.depth === depth);
-      html += `<span class="evo-stage">${stage
-        .map((n) => this._evoNodeHtml(n, currentName, prevName, nextNames, spriteByName))
-        .join('')}</span>`;
-    }
-    this.$evoChain.innerHTML = html;
-  }
-
-  // Same sprite + name (+ a lighter line underneath) template as the
-  // training item and vitamin buttons. The lighter line is the level
-  // requirement for evolving into that node, when it evolves by
-  // level-up — root forms and trade/item/friendship evolutions have none.
-  _evoNodeHtml(node, currentName, prevName, nextNames, spriteByName) {
-    const label = titleCase(node.name);
-    const sprite = spriteByName.get(node.name) || FALLBACK_SPRITE;
-    const boost = node.minLevel ? `Lv. ${node.minLevel}` : '';
-    const inner = `<img class="item-icon" src="${sprite}" alt="" />
-      <span class="item-btn-text">
-        <span class="item-btn-label">${label}</span>
-        ${boost ? `<span class="item-btn-boost">${boost}</span>` : ''}
-      </span>`;
-
-    if (node.name === currentName) {
-      return `<button type="button" class="item-btn evo-node evo-node--current" disabled title="Current form">${inner}</button>`;
-    }
-    if (node.name === prevName) {
-      return `<button type="button" class="item-btn evo-node" data-action="undo" data-name="${escapeHtml(node.name)}" title="Undo evolution — revert to ${label}">${inner}</button>`;
-    }
-    if (nextNames.has(node.name)) {
-      return `<button type="button" class="item-btn evo-node" data-action="evolve" data-name="${escapeHtml(node.name)}" title="Evolve into ${label}">${inner}</button>`;
-    }
-    return `<button type="button" class="item-btn evo-node" disabled title="${label} — not directly reachable from here">${inner}</button>`;
-  }
-
-  async _evolveInto(name) {
-    const from = titleCase(this._entry.nickname || this._entry.speciesName);
-    if (!confirm(`Evolve ${from} into ${titleCase(name)}?`)) return;
-    this.$evolveStatus.textContent = `Evolving into ${titleCase(name)}…`;
-    try {
-      const mon = await api.getPokemon(name);
-      store.evolvePokemon(this._entry.uid, mon);
-      await this._loadEvolutionChain(); // species changed — the chain shown needs to move with it
-    } catch (err) {
-      this.$evolveStatus.textContent = err.message || 'Could not evolve.';
-    }
-  }
-
-  /** Undoes the most recent evolution — for an accidental click on the wrong option. */
-  async _undoEvolve() {
-    const last = this._entry.evolutions[0];
-    if (!last) return;
-    if (!confirm(`Undo evolution and revert to ${titleCase(last.fromName)}?`)) return;
-    this.$evolveStatus.textContent = `Reverting to ${titleCase(last.fromName)}…`;
-    try {
-      const mon = await api.getPokemon(last.fromName);
-      store.revertEvolution(this._entry.uid, mon);
-      await this._loadEvolutionChain();
-    } catch (err) {
-      this.$evolveStatus.textContent = err.message || 'Could not undo evolution.';
-    }
-  }
-
   _render() {
     const e = this._entry;
     if (!e) return;
     this.$sprite.src = e.sprite || FALLBACK_SPRITE;
     this.$nickname.value = e.nickname || titleCase(e.speciesName);
-    this.$species.textContent = e.nickname
-      ? titleCase(e.speciesName)
-      : `#${String(e.speciesId).padStart(3, '0')}`;
+    this.$speciesNum.textContent = `#${String(e.speciesId).padStart(3, '0')}`;
+    // The species name only earns a second mention when a nickname is
+    // hiding it — with no nickname the title already reads e.g. "#169
+    // Crobat", so repeating "Crobat" below it would say nothing new.
+    this.$species.hidden = !e.nickname;
+    this.$species.textContent = e.nickname ? titleCase(e.speciesName) : '';
     this.$levelValue.textContent = `Lv. ${e.level}`;
     this.$levelUpBtn.disabled = e.level >= MAX_LEVEL;
     this.$levelInput.value = e.level;
@@ -782,13 +583,6 @@ export class CaughtPokemonCard extends HTMLElement {
     this.$search.recent = e.history
       .filter((h) => h.kind === 'battle')
       .map((h) => ({ name: h.opponentName, sprite: h.sprite }));
-    if (e.evolutions.length) {
-      const last = e.evolutions[0];
-      this.$evoNote.hidden = false;
-      this.$evoNote.textContent = `Evolved from ${titleCase(last.fromName)} at Lv. ${last.level}`;
-    } else {
-      this.$evoNote.hidden = true;
-    }
     this.$evSummary.evs = e.evs;
     this.$evSummary.baseStats = e.baseStats;
     this.$evSummary.nature = nature;
@@ -798,13 +592,13 @@ export class CaughtPokemonCard extends HTMLElement {
     this.toggleAttribute('fully-trained', trained);
 
     this._populateItemButtons(store.powerItemBonus(), store.trainingItemAvailability());
+    const aids = store.effectiveAids(e);
     const pokerusActive = !!e.pokerus;
     this.$pokerusToggle.setAttribute('aria-pressed', String(pokerusActive));
-    this.$pokerusToggle.classList.toggle('item-btn--active', pokerusActive);
+    this.$pokerusToggle.classList.toggle('ds-item-btn--active', pokerusActive);
     const pokerusAvailable = store.pokerusAvailable();
-    const pokerusShown = pokerusActive && pokerusAvailable;
-    this.toggleAttribute('pokerus-infected', pokerusShown);
-    if (pokerusShown) {
+    this.toggleAttribute('pokerus-infected', aids.pokerus);
+    if (aids.pokerus) {
       const contracted = e.history.find((h) => h.kind === 'pokerus' && h.active);
       this.$sprite.title = contracted
         ? `Pokérus — contracted ${dayLabel(contracted.timestamp)} — every EV earned from battling is doubled, permanently`
@@ -816,25 +610,8 @@ export class CaughtPokemonCard extends HTMLElement {
     this.$pokerusNote.hidden = pokerusAvailable;
     this.$vitaminStatus.textContent = '';
     this._updateVitaminButtons(e);
-    this.$details.open = this._historyOpen;
-    this.$histCount.textContent = e.history.length;
-    this.$histList.innerHTML = e.history.length
-      ? this._historyListHtml(e.history)
-      : '<li class="empty">Nothing logged yet.</li>';
-  }
-
-  _historyListHtml(history) {
-    let html = '';
-    let lastKey = null;
-    for (const h of history) {
-      const key = dayKey(h.timestamp);
-      if (key !== lastKey) {
-        html += `<li class="hist-date">${dayLabel(h.timestamp)}</li>`;
-        lastKey = key;
-      }
-      html += this._historyItemHtml(h);
-    }
-    return html;
+    this.$evoChain.entry = e;
+    this.$histLog.entry = e;
   }
 
   // Shows the selected nature's stat effect right under the picker, so
@@ -846,31 +623,33 @@ export class CaughtPokemonCard extends HTMLElement {
 
   // The nature badge sits under the sprite, always visible (not tucked
   // in the More dialog) since it's a fixed trait worth seeing at a
-  // glance. Shown as "Unknown" rather than hidden when unset, so the
-  // absence of a nature reads as a fact about the Pokémon, not a gap
-  // in the UI.
+  // glance, phrased the way the games do: "Adamant Slowpoke". Unset
+  // natures show nothing here — the More dialog's Nature select is
+  // where absence reads as a fact rather than a mystery word.
   _renderNatureBadge(nature, natureAvailable) {
-    this.$natureBadge.hidden = !natureAvailable;
-    if (!natureAvailable) return;
-    this.$natureBadge.textContent = nature ? nature.label : 'Unknown';
-    this.$natureBadge.title = nature ? `${nature.label} — ${natureEffectHint(nature)}` : 'Nature not set';
+    const show = natureAvailable && Boolean(nature);
+    this.$naturePrefix.hidden = !show;
+    if (!show) return;
+    this.$naturePrefix.textContent = nature.label;
+    this.$naturePrefix.title = `${nature.label} nature — ${natureEffectHint(nature)}`;
   }
 
   // Badges next to the identity fields so the currently-held training
   // item and Pokérus status are visible on the page itself, not just
   // buried in the More dialog that hides them. Mirrors the modal's own
   // item-button style — a sprite plus which EV it's boosting — so the
-  // same item reads the same way in both places. Pokérus has no game
-  // sprite to show, so its badge stays text-only. When this game
-  // supports training items but none is held, an "Unknown" badge is
-  // shown instead of just omitting the row — same reasoning as the
-  // nature badge.
+  // same item reads the same way in both places. Reads through
+  // store.effectiveAids, so an item the party's rules don't support
+  // (e.g. a Macho Brace left over from before the game version was
+  // edited) shows as "No item" — matching the fact that it no longer
+  // applies — rather than claiming a bonus that isn't granted.
   _renderStatusBadges(e) {
+    const aids = store.effectiveAids(e);
     const badges = [];
-    if (e.machoBrace) {
+    if (aids.machoBrace) {
       badges.push({ sprite: MACHO_BRACE_SPRITE, label: `Macho Brace — ×${MACHO_BRACE_MULTIPLIER} EVs`, kind: 'item' });
-    } else if (e.powerItem) {
-      const item = POWER_ITEMS.find((p) => p.id === e.powerItem);
+    } else if (aids.powerItem) {
+      const item = POWER_ITEMS.find((p) => p.id === aids.powerItem);
       if (item) {
         const bonus = store.powerItemBonus();
         badges.push({ sprite: item.sprite, label: `${item.label} — +${bonus} ${STAT_LABEL[item.stat]}`, kind: 'item' });
@@ -885,8 +664,8 @@ export class CaughtPokemonCard extends HTMLElement {
     this.$statusRow.innerHTML = badges
       .map(
         (b) =>
-          `<span class="ds-pill-badge status-pill status-pill--${b.kind}"${b.title ? ` title="${escapeHtml(b.title)}"` : ''}>${
-            b.sprite ? `<img src="${b.sprite}" alt="" />` : ''
+          `<span class="ds-pill-badge status-pill status-pill--${b.kind}">${
+            b.sprite ? `<img src="${b.sprite}" alt="" ${FALLBACK_ONERROR} />` : ''
           }${escapeHtml(b.label)}</span>`
       )
       .join('');
@@ -918,81 +697,6 @@ export class CaughtPokemonCard extends HTMLElement {
         btn.title = `Feed ${vitamin.label} — raises ${STAT_LABEL[vitamin.stat]} EVs by up to ${VITAMIN_BONUS}` + fedNote;
       }
     }
-  }
-
-  _historyItemHtml(h) {
-    if (h.kind === 'catch') {
-      // No delete button: this is the origin record, not a mislogged
-      // event, and there's nothing for a delete to revert.
-      return `<li>
-        <img src="${this._entry.sprite || FALLBACK_SPRITE}" alt="" />
-        <div>
-          <strong>Caught</strong>
-          <span class="gain">Lv. ${h.level}</span>
-        </div>
-      </li>`;
-    }
-    if (h.kind === 'vitamin') {
-      const gained = h.applied
-        ? `+${h.applied} ${STAT_LABEL[h.stat]}`
-        : h.blockedByCutoff
-          ? `No EVs gained (${STAT_LABEL[h.stat]} ≥ ${VITAMIN_STAT_CUTOFF} EVs, this game's vitamin limit)`
-          : 'No EVs gained (capped)';
-      const vitaminSprite = VITAMINS.find((v) => v.id === h.vitaminId)?.sprite || FALLBACK_SPRITE;
-      return `<li>
-        <img src="${vitaminSprite}" alt="" />
-        <div>
-          <strong>${h.vitaminLabel}</strong>
-          <span class="gain">${gained}</span>
-        </div>
-        <span class="hist-actions">
-          <button class="delete-hist-btn" type="button" data-id="${h.id}" title="Delete this log entry" aria-label="Delete this log entry">✕</button>
-        </span>
-      </li>`;
-    }
-    if (h.kind === 'pokerus') {
-      return `<li>
-        <span class="hist-icon hist-icon--pokerus" aria-hidden="true">${POKERUS_ICON_SVG}</span>
-        <div>
-          <strong>${h.active ? 'Pokérus contracted' : 'Pokérus cleared'}</strong>
-          <span class="gain">${h.active ? 'Battle EVs now doubled' : 'Battle EVs no longer doubled'}</span>
-        </div>
-        <span class="hist-actions">
-          <button class="delete-hist-btn" type="button" data-id="${h.id}" title="Delete this log entry" aria-label="Delete this log entry">✕</button>
-        </span>
-      </li>`;
-    }
-    if (h.kind === 'level') {
-      return `<li>
-        <img src="${this._entry.sprite || FALLBACK_SPRITE}" alt="" />
-        <div>
-          <strong>${h.toLevel > h.fromLevel ? 'Level up' : 'Level correction'}</strong>
-          <span class="gain">Lv. ${h.fromLevel} &rarr; Lv. ${h.toLevel}</span>
-        </div>
-        <span class="hist-actions">
-          <button class="delete-hist-btn" type="button" data-id="${h.id}" title="Delete this log entry" aria-label="Delete this log entry">✕</button>
-        </span>
-      </li>`;
-    }
-    const gained = formatEvYield(h.applied);
-    const itemLabel = h.machoBrace
-      ? 'Macho Brace'
-      : h.powerItem
-        ? POWER_ITEMS.find((p) => p.id === h.powerItem)?.label
-        : null;
-    const tags = [itemLabel, h.pokerus ? 'Pokérus ×2' : null].filter(Boolean).join(' · ');
-    return `<li>
-      <img src="${h.sprite || FALLBACK_SPRITE}" alt="" />
-      <div>
-        <strong>Defeated ${escapeHtml(titleCase(h.opponentName))}</strong>
-        <span class="gain">${gained || 'No EVs gained (capped)'}</span>
-        ${tags ? `<span class="tags">${tags}</span>` : ''}
-      </div>
-      <span class="hist-actions">
-        <button class="redefeat-btn ds-btn ds-btn--outline ds-btn--sm" type="button" data-name="${escapeHtml(h.opponentName)}" title="Log another defeat against ${escapeHtml(titleCase(h.opponentName))}">↻ Again</button>
-        <button class="delete-hist-btn" type="button" data-id="${h.id}" title="Delete this log entry" aria-label="Delete this log entry">✕</button>
-      </span>
-    </li>`;
   }
 }
 customElements.define('caught-pokemon-card', CaughtPokemonCard);

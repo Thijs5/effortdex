@@ -1,11 +1,6 @@
-import { GAME_VERSIONS, GEN_ROMAN } from '../lib/game-versions.js';
+import { GAME_VERSIONS, GEN_ROMAN, normalizeGameName } from '../lib/game-versions.js';
 import { attachDesignSystem } from '../lib/design-system.js';
-
-// Normalized the same way game-versions.js matches titles, so filtering
-// here agrees with what matchGameVersion will later recognize.
-function normalize(s) {
-  return s.toLowerCase().replace(/[^a-z0-9]/g, '');
-}
+import { attachPointerSelection, syncActiveDescendant } from '../lib/combobox.js';
 
 /**
  * <game-version-picker> — a text input with its own suggestion dropdown
@@ -79,8 +74,9 @@ export class GameVersionPicker extends HTMLElement {
         }
       </style>
       <input class="ds-field" type="text" role="combobox" aria-expanded="false"
+             aria-controls="gvp-list" aria-autocomplete="list"
              autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" />
-      <ul role="listbox" hidden></ul>
+      <ul id="gvp-list" role="listbox" hidden></ul>
     `;
     this.$input = shadow.querySelector('input');
     this.$list = shadow.querySelector('ul');
@@ -96,15 +92,11 @@ export class GameVersionPicker extends HTMLElement {
       this._emit();
     });
     this.$input.addEventListener('keydown', (e) => this._onKeydown(e));
-    // pointerdown on an option fires before the input's blur, so picking
-    // by touch/mouse wins the race against this hide.
+    // The pick resolves before this blur-delayed hide fires, so touch and
+    // mouse picks both win the race against it (see lib/combobox.js for
+    // why selection is on pointerup, not pointerdown).
     this.$input.addEventListener('blur', () => setTimeout(() => this._hideList(), 120));
-    this.$list.addEventListener('pointerdown', (e) => {
-      const li = e.target.closest('li.option');
-      if (!li) return;
-      e.preventDefault();
-      this._pick(li.dataset.name);
-    });
+    attachPointerSelection(this.$list, (li) => this._pick(li.dataset.name));
   }
 
   get value() {
@@ -129,9 +121,9 @@ export class GameVersionPicker extends HTMLElement {
   }
 
   _showList() {
-    const q = normalize(this.$input.value);
+    const q = normalizeGameName(this.$input.value);
     const matches = q
-      ? GAME_VERSIONS.filter((g) => normalize(g.name).includes(q))
+      ? GAME_VERSIONS.filter((g) => normalizeGameName(g.name).includes(q))
       : GAME_VERSIONS;
 
     this._options = matches.map((g) => g.name);
@@ -139,7 +131,7 @@ export class GameVersionPicker extends HTMLElement {
 
     if (!matches.length) {
       this.$list.innerHTML =
-        '<li class="freetext-hint">No official title matches &mdash; free text (ROM hacks, fan games) is fine.</li>';
+        '<li class="freetext-hint" role="presentation">No official title matches &mdash; free text (ROM hacks, fan games) is fine.</li>';
       this.$list.hidden = false;
       this.$input.setAttribute('aria-expanded', 'true');
       return;
@@ -150,7 +142,7 @@ export class GameVersionPicker extends HTMLElement {
     for (const g of matches) {
       if (g.gen !== lastGen) {
         lastGen = g.gen;
-        html += `<li class="group" aria-hidden="true">Gen ${GEN_ROMAN[g.gen - 1]}</li>`;
+        html += `<li class="group" role="presentation">Gen ${GEN_ROMAN[g.gen - 1]}</li>`;
       }
       html += `<li class="option" role="option" data-name="${g.name}">
         <span class="swatch" style="background:${g.color}"></span>${g.name}
@@ -159,12 +151,14 @@ export class GameVersionPicker extends HTMLElement {
     this.$list.innerHTML = html;
     this.$list.hidden = false;
     this.$input.setAttribute('aria-expanded', 'true');
+    syncActiveDescendant(this.$input, [...this.$list.querySelectorAll('li.option')], -1, 'gvp-opt');
   }
 
   _hideList() {
     this.$list.hidden = true;
     this.$list.innerHTML = '';
     this.$input.setAttribute('aria-expanded', 'false');
+    this.$input.removeAttribute('aria-activedescendant');
   }
 
   _onKeydown(e) {
@@ -191,6 +185,10 @@ export class GameVersionPicker extends HTMLElement {
         this._hideList(); // let the surrounding form submit with the free text
       }
     } else if (e.key === 'Escape') {
+      // Consume the key: with the list open, Escape means "close the
+      // list" — without preventDefault it would also cancel the
+      // surrounding <dialog> (the party dialog) in the same press.
+      e.preventDefault();
       this._hideList();
     }
   }
@@ -198,6 +196,7 @@ export class GameVersionPicker extends HTMLElement {
   _highlight() {
     const items = [...this.$list.querySelectorAll('li.option')];
     items.forEach((li, i) => li.classList.toggle('active', i === this._activeIndex));
+    syncActiveDescendant(this.$input, items, this._activeIndex, 'gvp-opt');
     items[this._activeIndex]?.scrollIntoView({ block: 'nearest' });
   }
 
