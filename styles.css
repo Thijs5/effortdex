@@ -441,11 +441,26 @@ button, input, select {
   border-radius: var(--radius-md);
   padding: var(--space-5);
   width: min(420px, calc(100vw - 2.4rem));
+  max-height: calc(100vh - 2.4rem);
+  max-height: calc(100dvh - 2.4rem);
+  overflow-y: auto;
   background: var(--paper-panel);
   color: var(--ink);
   box-shadow: var(--shadow-panel);
 }
 .party-dialog::backdrop { background: rgba(27, 31, 28, 0.55); }
+
+/* Below ~640px a native <dialog>'s UA-default centering fights the
+   on-screen keyboard: opening a text field can shove the dialog (or the
+   field itself) off the top of the shrunken visual viewport. Anchoring
+   near the top instead keeps every field reachable once the keyboard is up. */
+@media (max-width: 640px) {
+  .party-dialog {
+    margin: 1rem auto auto;
+    max-height: calc(100vh - 2rem);
+    max-height: calc(100dvh - 2rem);
+  }
+}
 .party-dialog h2 {
   font-family: var(--font-display);
   font-size: var(--font-size-xl);
