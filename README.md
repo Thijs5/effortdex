@@ -33,7 +33,13 @@ secure context.)
   datalist it replaced). The game version isn't just cosmetic: it
   decides which era's vitamin, training item and Pokérus mechanics apply
   (see below), and the catch panel shows a "This game's rules" legend
-  rendered from the same logic that applies them.
+  rendered from the same logic that applies them. Every rule can be
+  overridden per party — the dialog's collapsed "Advanced" section lets
+  you force the power item bonus, power item/Macho Brace availability,
+  the vitamin 100-EV cutoff, or Pokérus's effect, independent of what
+  the game version would otherwise imply. Meant for ROM hacks and fan
+  games, which can (and do) change any of these mechanics; a recognized
+  official title needs no overrides.
 - **EV tracking** — six stat bars per Pokémon plus a total, with a held
   training item and Pokérus (×2) support, correctly capped at 252/stat
   and 510/total. The training item dropdown only offers what actually

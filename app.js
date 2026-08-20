@@ -59,9 +59,44 @@ partyGameVersion.addEventListener('version-change', (e) => {
   dialogGameCart.name = e.detail.value.trim();
 });
 const partyDescriptionInput = document.getElementById('party-description-input');
+const partyAdvancedRules = document.getElementById('party-advanced-rules');
 const partySubmitBtn = document.getElementById('party-submit-btn');
 const partyDeleteBtn = document.getElementById('party-delete-btn');
 const partyCancelBtn = document.getElementById('party-cancel-btn');
+
+// Each select's value round-trips through Store's override shape: '' <->
+// null (auto), 'true'/'false' <-> boolean, and (power item bonus only)
+// '4'/'8' <-> number. One declarative list drives both directions so
+// adding a new overridable rule only means adding one entry here plus
+// its <select> in index.html.
+const OVERRIDE_FIELDS = [
+  { key: 'powerItemBonus', el: document.getElementById('override-power-item-bonus'), type: 'number' },
+  { key: 'powerItems', el: document.getElementById('override-power-items'), type: 'bool' },
+  { key: 'machoBrace', el: document.getElementById('override-macho-brace'), type: 'bool' },
+  { key: 'vitaminCutoff', el: document.getElementById('override-vitamin-cutoff'), type: 'bool' },
+  { key: 'pokerus', el: document.getElementById('override-pokerus'), type: 'bool' },
+];
+
+function writeOverridesToDialog(overrides) {
+  let anySet = false;
+  for (const field of OVERRIDE_FIELDS) {
+    const value = overrides?.[field.key] ?? null;
+    field.el.value = value === null ? '' : String(value);
+    if (value !== null) anySet = true;
+  }
+  // Open the section automatically when editing a party that already has
+  // overrides set, so they're never silently hidden from view.
+  partyAdvancedRules.open = anySet;
+}
+
+function readOverridesFromDialog() {
+  const overrides = {};
+  for (const field of OVERRIDE_FIELDS) {
+    const raw = field.el.value;
+    overrides[field.key] = raw === '' ? null : field.type === 'number' ? Number(raw) : raw === 'true';
+  }
+  return overrides;
+}
 
 backToParties.href = router.partyPath(null);
 
@@ -96,6 +131,7 @@ function openCreateDialog() {
   partyGameVersion.value = '';
   dialogGameCart.name = '';
   partyDescriptionInput.value = '';
+  writeOverridesToDialog(null);
   partyDialog.showModal();
   partyNameInput.focus();
 }
@@ -109,6 +145,7 @@ function openEditDialog(party) {
   partyGameVersion.value = party.gameVersion;
   dialogGameCart.name = party.gameVersion;
   partyDescriptionInput.value = party.description;
+  writeOverridesToDialog(party.overrides);
   partyDialog.showModal();
   partyNameInput.focus();
 }
@@ -126,13 +163,14 @@ partyForm.addEventListener('submit', (e) => {
   }
   const description = partyDescriptionInput.value.trim();
   const gameVersion = partyGameVersion.value.trim();
+  const overrides = readOverridesFromDialog();
 
   if (dialogEditingId === null) {
-    const party = store.createParty(name, description, gameVersion);
+    const party = store.createParty(name, description, gameVersion, overrides);
     partyDialog.close();
     router.navigateToParty(party.slug);
   } else {
-    store.updateParty(dialogEditingId, { name, description, gameVersion });
+    store.updateParty(dialogEditingId, { name, description, gameVersion, overrides });
     partyDialog.close();
   }
 });

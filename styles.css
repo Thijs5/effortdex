@@ -466,6 +466,38 @@ button, input, select {
 }
 textarea.ds-field { resize: vertical; }
 
+.advanced-rules {
+  margin: 0 0 var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px dashed var(--lcd-line);
+}
+.advanced-rules summary {
+  cursor: pointer;
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  color: var(--ink-soft);
+  list-style: none;
+}
+.advanced-rules summary::-webkit-details-marker { display: none; }
+.advanced-rules summary::before { content: '▸ '; }
+.advanced-rules[open] summary::before { content: '▾ '; }
+.advanced-rules-hint {
+  margin: var(--space-3) 0 var(--space-4);
+  font-size: var(--font-size-xs);
+}
+.field-label--inline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.field-label--inline .ds-field {
+  width: auto;
+  margin-top: 0;
+  flex: 0 1 auto;
+}
+
 .party-dialog-actions {
   display: flex;
   align-items: center;
