@@ -7,16 +7,55 @@ import './pokemon-search.js';
 
 /**
  * <caught-pokemon-card> — a caught Pokémon's full detail page: identity,
- * EV bars, training aids (power item / Pokérus), evolution, a "log
- * defeat" form (with an EV-yield preview before logging) and battle
- * history. Set `.entry` to a Store roster entry; the card re-renders on
- * assignment. Meant to be mounted one at a time, full width.
+ * EV bars, training aids (power item / Pokérus), evolution, a battle
+ * search (picking a result logs the defeat immediately) and a history
+ * log of every battle, vitamin dose and level-up, grouped by date with
+ * the most recent day first. Set `.entry` to a Store roster entry; the
+ * card re-renders on assignment. Meant to be mounted one at a time,
+ * full width.
  */
+
+// Groups consecutive same-day history entries under one date heading.
+// `history` is already newest-first (each store mutation unshifts), so
+// grouping in place — without re-sorting — keeps both the day order and
+// the entries within each day newest-first.
+// A small virus glyph for the Pokérus history row — there's no game
+// sprite for the status itself, so a molecule/spore icon stands in,
+// tinted via currentColor by the .hist-icon--pokerus class.
+const POKERUS_ICON_SVG = `<svg viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <circle cx="12" cy="12" r="5" fill="currentColor" />
+  <circle cx="12" cy="3" r="2" fill="currentColor" />
+  <circle cx="12" cy="21" r="2" fill="currentColor" />
+  <circle cx="3" cy="12" r="2" fill="currentColor" />
+  <circle cx="21" cy="12" r="2" fill="currentColor" />
+  <circle cx="5.5" cy="5.5" r="1.6" fill="currentColor" />
+  <circle cx="18.5" cy="5.5" r="1.6" fill="currentColor" />
+  <circle cx="5.5" cy="18.5" r="1.6" fill="currentColor" />
+  <circle cx="18.5" cy="18.5" r="1.6" fill="currentColor" />
+</svg>`;
+
+function dayKey(timestamp) {
+  const d = new Date(timestamp);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
+function dayLabel(timestamp) {
+  const d = new Date(timestamp);
+  const now = new Date();
+  const startOfDay = (date) => new Date(date.getFullYear(), date.getMonth(), date.getDate());
+  const diffDays = Math.round((startOfDay(now) - startOfDay(d)) / 86400000);
+  if (diffDays === 0) return 'Today';
+  if (diffDays === 1) return 'Yesterday';
+  return d.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: d.getFullYear() !== now.getFullYear() ? 'numeric' : undefined,
+  });
+}
 export class CaughtPokemonCard extends HTMLElement {
   constructor() {
     super();
     this._entry = null;
-    this._pendingOpponent = null;
     this._historyOpen = false;
 
     const shadow = this.attachShadow({ mode: 'open' });
@@ -44,6 +83,14 @@ export class CaughtPokemonCard extends HTMLElement {
           grid-area: sprite; align-self: start;
           width: 64px; height: 64px; image-rendering: pixelated;
           background: var(--sprite-bg); border-radius: var(--radius-sm); object-fit: contain;
+          box-sizing: border-box; border: 2px solid transparent;
+        }
+        /* Ambient cue for the permanent ×2 EV bonus, visible even with the
+           status row scrolled out of view — mirrors the pill's own color
+           so both read as the same status. */
+        :host([pokerus-infected]) .sprite {
+          border-color: var(--pokerus-purple);
+          box-shadow: 0 0 0 3px var(--pokerus-purple-soft);
         }
         /* Same grid row as .status-row so the nature badge lines up with
            the item/Pokérus badges instead of trailing behind them. Plain
@@ -99,7 +146,6 @@ export class CaughtPokemonCard extends HTMLElement {
         /* Two classes (not one) so this reliably beats the shared
            .ds-pill-badge gold default at equal specificity. */
         .status-pill.status-pill--item { background: var(--teal-soft); color: var(--teal); }
-        .status-pill.status-pill--pokerus { background: var(--pokerus-purple-soft); color: var(--pokerus-purple); }
         /* No item held: a dashed outline instead of a filled pill, so
            "nothing selected" reads as visibly different from an actual
            status rather than just a quieter version of one. */
@@ -118,8 +164,16 @@ export class CaughtPokemonCard extends HTMLElement {
         .more-dialog:not([open]) { display: none; }
         .more-dialog[open] { display: grid; }
         .more-dialog::backdrop { background: rgba(27, 31, 28, 0.75); }
+        /* Full-page below ~640px, same reasoning as .party-dialog in the
+           global stylesheet: a small floating card wastes space on a
+           small screen, and margin 0 + full viewport size sidesteps the
+           on-screen keyboard shoving a centered dialog around. */
         @media (max-width: 640px) {
-          .more-dialog { margin: 1rem auto auto; max-height: calc(100vh - 2rem); max-height: calc(100dvh - 2rem); }
+          .more-dialog {
+            margin: 0; width: 100vw; max-width: 100vw;
+            height: 100vh; height: 100dvh; max-height: 100dvh;
+            border-radius: 0;
+          }
         }
         .more-dialog-header {
           display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
@@ -218,16 +272,8 @@ export class CaughtPokemonCard extends HTMLElement {
         .evo-node:not(:disabled):hover { border-color: var(--teal); color: var(--teal-strong); }
         .evolve-status { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--teal); min-height: 1em; }
 
-        .battle { display: flex; gap: var(--space-2); flex-wrap: wrap; }
-        .battle .section-title { flex-basis: 100%; margin: 0 0 var(--space-1); }
-        @media (max-width: 420px) {
-          .battle { flex-direction: column; align-items: stretch; }
-        }
-        .battle-preview {
-          flex-basis: 100%; margin: 0; font-family: var(--font-mono);
-          font-size: var(--font-size-xs); color: var(--teal); min-height: 1em;
-        }
-        .status { flex-basis: 100%; margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--poke-red-dark); min-height: 1em; }
+        .battle { display: grid; gap: var(--space-2); }
+        .status { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--poke-red-dark); min-height: 1em; }
 
         details.history summary {
           cursor: pointer; font-size: var(--font-size-sm); font-weight: 600; color: var(--ink-soft);
@@ -240,7 +286,20 @@ export class CaughtPokemonCard extends HTMLElement {
         ul.hist-list { list-style: none; margin: var(--space-3) 0 0; padding: 0; display: grid; gap: var(--space-3); max-height: 220px; overflow-y: auto; }
         ul.hist-list li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); font-size: var(--font-size-xs); }
         ul.hist-list li.empty { display: block; color: var(--ink-soft); }
+        ul.hist-list li.hist-date {
+          display: block;
+          margin-top: var(--space-2);
+          font-family: var(--font-mono);
+          font-size: var(--font-size-2xs);
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+          color: var(--ink-soft);
+        }
+        ul.hist-list li.hist-date:first-child { margin-top: 0; }
         ul.hist-list img { width: 24px; height: 24px; image-rendering: pixelated; flex: 0 0 auto; }
+        .hist-icon { width: 24px; height: 24px; flex: 0 0 auto; display: inline-flex; }
+        .hist-icon svg { width: 100%; height: 100%; }
+        .hist-icon--pokerus { color: var(--pokerus-purple); }
         ul.hist-list li > div { flex: 1 1 140px; min-width: 0; }
         ul.hist-list strong { display: block; text-transform: capitalize; }
         ul.hist-list .gain { display: block; color: var(--teal); font-family: var(--font-mono); }
@@ -300,7 +359,7 @@ export class CaughtPokemonCard extends HTMLElement {
 
           <section class="pokerus-section">
             <h3 class="section-title">Pokérus
-              <button type="button" class="help-btn" aria-label="What is Pokérus?" title="A rare, harmless in-game virus. While infected, every EV your Pokémon earns from battling is doubled — pure bonus, no downside. It can also spread to other party members over time.">?</button>
+              <button type="button" class="help-btn" aria-label="What is Pokérus?" title="A rare, harmless in-game virus. While infected, every EV your Pokémon earns from battling is doubled — pure bonus, no downside. It can also spread to other party members over time. Once it cures (after a few days), the ×2 EV bonus stays forever — no need to toggle this off.">?</button>
             </h3>
             <button type="button" class="item-btn pokerus-toggle-btn" aria-pressed="false">
               <span class="item-btn-text">
@@ -340,14 +399,12 @@ export class CaughtPokemonCard extends HTMLElement {
           <div class="card-col card-col--right">
             <section class="battle">
               <h3 class="section-title">Log a battle</h3>
-              <pokemon-search placeholder="Defeated Pokémon…"></pokemon-search>
-              <button class="log-defeat ds-btn ds-btn--solid" disabled>Log defeat</button>
-              <p class="battle-preview" aria-live="polite"></p>
+              <pokemon-search placeholder="Defeated Pokémon…" show-ev-yield></pokemon-search>
               <p class="status" aria-live="polite"></p>
             </section>
 
             <details class="history">
-              <summary>Battle history (<span class="hist-count">0</span>)</summary>
+              <summary>History (<span class="hist-count">0</span>)</summary>
               <ul class="hist-list"></ul>
             </details>
           </div>
@@ -381,8 +438,13 @@ export class CaughtPokemonCard extends HTMLElement {
     this.$evoChain = shadow.querySelector('.evo-chain');
     this.$evolveStatus = shadow.querySelector('.evolve-status');
     this.$search = shadow.querySelector('pokemon-search');
-    this.$logBtn = shadow.querySelector('.log-defeat');
-    this.$battlePreview = shadow.querySelector('.battle-preview');
+    // Shows what battling this opponent would actually add right now —
+    // held item, Pokérus and the 252/510 caps folded in — rather than
+    // the opponent's raw base yield, since those are what the player
+    // actually cares about when picking who to grind against. Reads
+    // `this._entry` live at call time, so it stays correct as the entry
+    // (or its Pokérus/item state) changes without needing to be reset.
+    this.$search.evModifier = (mon) => store.previewDefeat(this._entry.uid, mon)?.applied;
     this.$status = shadow.querySelector('.status');
     this.$details = shadow.querySelector('.history');
     this.$histCount = shadow.querySelector('.hist-count');
@@ -524,11 +586,9 @@ export class CaughtPokemonCard extends HTMLElement {
       } else {
         store.setPowerItem(this._entry.uid, val);
       }
-      if (this._pendingOpponent) this._previewBattle(this._pendingOpponent);
     });
     this.$pokerusToggle.addEventListener('click', () => {
       store.setPokerus(this._entry.uid, this.$pokerusToggle.getAttribute('aria-pressed') !== 'true');
-      if (this._pendingOpponent) this._previewBattle(this._pendingOpponent);
     });
     this.$vitaminGrid.addEventListener('click', (e) => {
       const btn = e.target.closest('.vitamin-btn');
@@ -542,12 +602,8 @@ export class CaughtPokemonCard extends HTMLElement {
       else if (btn.dataset.action === 'undo') this._undoEvolve();
     });
     this.$search.addEventListener('pokemon-pick', (e) => {
-      this._pendingOpponent = e.detail.name;
-      this.$logBtn.disabled = false;
-      this.$logBtn.textContent = `Log defeat: ${titleCase(e.detail.name)}`;
-      this._previewBattle(e.detail.name);
+      this._battle(e.detail.name, 'Looking up battle data…');
     });
-    this.$logBtn.addEventListener('click', () => this._logDefeat());
     this.$details.addEventListener('toggle', () => {
       this._historyOpen = this.$details.open;
     });
@@ -570,16 +626,6 @@ export class CaughtPokemonCard extends HTMLElement {
   }
   get entry() {
     return this._entry;
-  }
-
-  async _logDefeat() {
-    if (!this._pendingOpponent) return;
-    this.$logBtn.disabled = true;
-    await this._battle(this._pendingOpponent, 'Looking up battle data…');
-    this._pendingOpponent = null;
-    this.$logBtn.disabled = true;
-    this.$logBtn.textContent = 'Log defeat';
-    this.$battlePreview.textContent = '';
   }
 
   async _redefeat(name) {
@@ -615,22 +661,6 @@ export class CaughtPokemonCard extends HTMLElement {
       this.$vitaminStatus.textContent = `${vitamin.label}: no EVs gained — this game stops vitamins once ${STAT_LABEL[vitamin.stat]} has ${VITAMIN_STAT_CUTOFF}+ EVs`;
     } else {
       this.$vitaminStatus.textContent = `${vitamin.label}: no EVs gained — ${STAT_LABEL[vitamin.stat]} is already maxed out`;
-    }
-  }
-
-  /** Shows what defeating `name` would earn this Pokémon right now, before it's logged. */
-  async _previewBattle(name) {
-    this.$battlePreview.textContent = 'Checking EV yield…';
-    try {
-      const mon = await api.getPokemon(name);
-      if (this._pendingOpponent !== name) return; // user picked something else meanwhile
-      const { applied } = store.previewDefeat(this._entry.uid, mon);
-      const gained = formatEvYield(applied);
-      this.$battlePreview.textContent = gained
-        ? `Would gain: ${gained}`
-        : 'Would gain: nothing — already maxed out';
-    } catch {
-      if (this._pendingOpponent === name) this.$battlePreview.textContent = '';
     }
   }
 
@@ -702,7 +732,7 @@ export class CaughtPokemonCard extends HTMLElement {
 
   async _evolveInto(name) {
     const from = titleCase(this._entry.nickname || this._entry.speciesName);
-    if (!confirm(`Evolve ${from} into ${titleCase(name)}? This can't be undone.`)) return;
+    if (!confirm(`Evolve ${from} into ${titleCase(name)}?`)) return;
     this.$evolveStatus.textContent = `Evolving into ${titleCase(name)}…`;
     try {
       const mon = await api.getPokemon(name);
@@ -746,6 +776,12 @@ export class CaughtPokemonCard extends HTMLElement {
     const nature = natureAvailable ? NATURES.find((n) => n.id === e.nature) : null;
     this._renderNatureBadge(nature, natureAvailable);
     this._renderStatusBadges(e);
+    // Recently-defeated opponents, most recent first (history is
+    // unshift-ordered already) — lets a grinding session re-pick the
+    // same opponent without retyping it each time.
+    this.$search.recent = e.history
+      .filter((h) => h.kind === 'battle')
+      .map((h) => ({ name: h.opponentName, sprite: h.sprite }));
     if (e.evolutions.length) {
       const last = e.evolutions[0];
       this.$evoNote.hidden = false;
@@ -766,15 +802,39 @@ export class CaughtPokemonCard extends HTMLElement {
     this.$pokerusToggle.setAttribute('aria-pressed', String(pokerusActive));
     this.$pokerusToggle.classList.toggle('item-btn--active', pokerusActive);
     const pokerusAvailable = store.pokerusAvailable();
+    const pokerusShown = pokerusActive && pokerusAvailable;
+    this.toggleAttribute('pokerus-infected', pokerusShown);
+    if (pokerusShown) {
+      const contracted = e.history.find((h) => h.kind === 'pokerus' && h.active);
+      this.$sprite.title = contracted
+        ? `Pokérus — contracted ${dayLabel(contracted.timestamp)} — every EV earned from battling is doubled, permanently`
+        : 'Pokérus — every EV earned from battling is doubled, permanently';
+    } else {
+      this.$sprite.title = '';
+    }
     this.$pokerusToggle.disabled = !pokerusAvailable;
     this.$pokerusNote.hidden = pokerusAvailable;
     this.$vitaminStatus.textContent = '';
     this._updateVitaminButtons(e);
     this.$details.open = this._historyOpen;
     this.$histCount.textContent = e.history.length;
-    this.$histList.innerHTML =
-      e.history.map((h) => this._historyItemHtml(h)).join('') ||
-      '<li class="empty">No battles logged yet.</li>';
+    this.$histList.innerHTML = e.history.length
+      ? this._historyListHtml(e.history)
+      : '<li class="empty">Nothing logged yet.</li>';
+  }
+
+  _historyListHtml(history) {
+    let html = '';
+    let lastKey = null;
+    for (const h of history) {
+      const key = dayKey(h.timestamp);
+      if (key !== lastKey) {
+        html += `<li class="hist-date">${dayLabel(h.timestamp)}</li>`;
+        lastKey = key;
+      }
+      html += this._historyItemHtml(h);
+    }
+    return html;
   }
 
   // Shows the selected nature's stat effect right under the picker, so
@@ -821,12 +881,11 @@ export class CaughtPokemonCard extends HTMLElement {
         badges.push({ sprite: null, label: 'No item', kind: 'empty' });
       }
     }
-    if (e.pokerus && store.pokerusAvailable()) badges.push({ sprite: null, label: 'Pokérus', kind: 'pokerus' });
     this.$statusRow.hidden = badges.length === 0;
     this.$statusRow.innerHTML = badges
       .map(
         (b) =>
-          `<span class="ds-pill-badge status-pill status-pill--${b.kind}">${
+          `<span class="ds-pill-badge status-pill status-pill--${b.kind}"${b.title ? ` title="${escapeHtml(b.title)}"` : ''}>${
             b.sprite ? `<img src="${b.sprite}" alt="" />` : ''
           }${escapeHtml(b.label)}</span>`
       )
@@ -862,6 +921,17 @@ export class CaughtPokemonCard extends HTMLElement {
   }
 
   _historyItemHtml(h) {
+    if (h.kind === 'catch') {
+      // No delete button: this is the origin record, not a mislogged
+      // event, and there's nothing for a delete to revert.
+      return `<li>
+        <img src="${this._entry.sprite || FALLBACK_SPRITE}" alt="" />
+        <div>
+          <strong>Caught</strong>
+          <span class="gain">Lv. ${h.level}</span>
+        </div>
+      </li>`;
+    }
     if (h.kind === 'vitamin') {
       const gained = h.applied
         ? `+${h.applied} ${STAT_LABEL[h.stat]}`
@@ -880,6 +950,30 @@ export class CaughtPokemonCard extends HTMLElement {
         </span>
       </li>`;
     }
+    if (h.kind === 'pokerus') {
+      return `<li>
+        <span class="hist-icon hist-icon--pokerus" aria-hidden="true">${POKERUS_ICON_SVG}</span>
+        <div>
+          <strong>${h.active ? 'Pokérus contracted' : 'Pokérus cleared'}</strong>
+          <span class="gain">${h.active ? 'Battle EVs now doubled' : 'Battle EVs no longer doubled'}</span>
+        </div>
+        <span class="hist-actions">
+          <button class="delete-hist-btn" type="button" data-id="${h.id}" title="Delete this log entry" aria-label="Delete this log entry">✕</button>
+        </span>
+      </li>`;
+    }
+    if (h.kind === 'level') {
+      return `<li>
+        <img src="${this._entry.sprite || FALLBACK_SPRITE}" alt="" />
+        <div>
+          <strong>${h.toLevel > h.fromLevel ? 'Level up' : 'Level correction'}</strong>
+          <span class="gain">Lv. ${h.fromLevel} &rarr; Lv. ${h.toLevel}</span>
+        </div>
+        <span class="hist-actions">
+          <button class="delete-hist-btn" type="button" data-id="${h.id}" title="Delete this log entry" aria-label="Delete this log entry">✕</button>
+        </span>
+      </li>`;
+    }
     const gained = formatEvYield(h.applied);
     const itemLabel = h.machoBrace
       ? 'Macho Brace'
@@ -890,7 +984,7 @@ export class CaughtPokemonCard extends HTMLElement {
     return `<li>
       <img src="${h.sprite || FALLBACK_SPRITE}" alt="" />
       <div>
-        <strong>${escapeHtml(titleCase(h.opponentName))}</strong>
+        <strong>Defeated ${escapeHtml(titleCase(h.opponentName))}</strong>
         <span class="gain">${gained || 'No EVs gained (capped)'}</span>
         ${tags ? `<span class="tags">${tags}</span>` : ''}
       </div>
