@@ -25,11 +25,8 @@ export class PokemonSearch extends HTMLElement {
         :host { display: block; position: relative; min-width: 180px; flex: 1; }
         .wrap { position: relative; }
         ul {
-          position: absolute;
+          position: fixed;
           z-index: 20;
-          top: calc(100% + 4px);
-          left: 0;
-          right: 0;
           margin: 0;
           padding: var(--space-1);
           list-style: none;
@@ -94,6 +91,47 @@ export class PokemonSearch extends HTMLElement {
       e.preventDefault();
       this._pick(li.dataset.name);
     });
+    // The list is positioned in fixed coordinates (not relative to the
+    // input) so it can escape an ancestor <dialog>'s overflow clipping —
+    // otherwise, on iOS, the on-screen keyboard shrinks the visible area
+    // and the dropdown renders clipped out of view entirely. Reposition
+    // whenever the input's on-screen location can change.
+    this._reposition = () => this._positionList();
+    window.addEventListener('scroll', this._reposition, true);
+    window.addEventListener('resize', this._reposition);
+    window.visualViewport?.addEventListener('resize', this._reposition);
+    window.visualViewport?.addEventListener('scroll', this._reposition);
+  }
+
+  disconnectedCallback() {
+    window.removeEventListener('scroll', this._reposition, true);
+    window.removeEventListener('resize', this._reposition);
+    window.visualViewport?.removeEventListener('resize', this._reposition);
+    window.visualViewport?.removeEventListener('scroll', this._reposition);
+  }
+
+  _positionList() {
+    if (this.$list.hidden) return;
+    const vv = window.visualViewport;
+    const viewportH = vv?.height ?? window.innerHeight;
+    const viewportTop = vv?.offsetTop ?? 0;
+    const rect = this.$input.getBoundingClientRect();
+    const maxHeight = 260;
+    const gap = 4;
+    const spaceBelow = viewportTop + viewportH - rect.bottom;
+    const openAbove = spaceBelow < Math.min(maxHeight, 120) && rect.top - viewportTop > spaceBelow;
+
+    this.$list.style.left = `${rect.left}px`;
+    this.$list.style.width = `${rect.width}px`;
+    if (openAbove) {
+      this.$list.style.bottom = `${viewportTop + viewportH - rect.top + gap}px`;
+      this.$list.style.top = 'auto';
+      this.$list.style.maxHeight = `${Math.max(120, rect.top - viewportTop - gap)}px`;
+    } else {
+      this.$list.style.top = `${rect.bottom + gap}px`;
+      this.$list.style.bottom = 'auto';
+      this.$list.style.maxHeight = `${Math.max(120, Math.min(maxHeight, spaceBelow - gap))}px`;
+    }
   }
 
   async _ensureSpecies() {
@@ -127,6 +165,7 @@ export class PokemonSearch extends HTMLElement {
     this.$list.innerHTML = '<li class="status">Loading species…</li>';
     this.$list.hidden = false;
     this.$input.setAttribute('aria-expanded', 'true');
+    this._positionList();
   }
 
   _renderList() {
@@ -134,6 +173,7 @@ export class PokemonSearch extends HTMLElement {
       this.$list.innerHTML = '<li class="status">No matching Pok&eacute;mon.</li>';
       this.$list.hidden = false;
       this.$input.setAttribute('aria-expanded', 'true');
+      this._positionList();
       return;
     }
     this.$list.innerHTML = this._matches
@@ -146,6 +186,7 @@ export class PokemonSearch extends HTMLElement {
       .join('');
     this.$list.hidden = false;
     this.$input.setAttribute('aria-expanded', 'true');
+    this._positionList();
   }
 
   _hideList() {
