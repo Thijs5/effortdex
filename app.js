@@ -4,9 +4,10 @@
 // all domain logic lives in lib/, and each custom element owns its own
 // rendering.
 
-import { STAT_CAP, TOTAL_CAP, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, MACHO_BRACE_MULTIPLIER, DEFAULT_LEVEL, FALLBACK_SPRITE, FALLBACK_ONERROR, NATURES } from './lib/constants.js';
+import { STAT_CAP, TOTAL_CAP, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, MACHO_BRACE_MULTIPLIER, DEFAULT_LEVEL, FALLBACK_SPRITE, FALLBACK_ONERROR, versionedSpriteOnError, NATURES } from './lib/constants.js';
 import { titleCase, totalEvs, natureOptionsHtml, escapeHtml } from './lib/utils.js';
 import { api, store } from './lib/services.js';
+import { versionedSpriteUrl } from './lib/pokeapi-client.js';
 import { attachDesignSystem } from './lib/design-system.js';
 import * as router from './lib/router.js';
 import { getRunningVersion, fetchLatestVersion, clearAppCache } from './lib/version-check.js';
@@ -15,6 +16,8 @@ import './components/caught-pokemon-card.js';
 import './components/game-cartridge.js';
 import './components/game-version-picker.js';
 import './components/ev-bar.js';
+import './components/transfer-panel.js';
+import './components/import-review.js';
 
 // Let light-DOM markup (the party dialog) use the same .ds-field/.ds-btn
 // primitives every shadow-DOM component uses — one shared stylesheet.
@@ -24,10 +27,13 @@ attachDesignSystem(document);
 /* DOM refs                                                             */
 /* ------------------------------------------------------------------ */
 
+const headerHomeLink = document.getElementById('header-home-link');
+
 const pickerView = document.getElementById('picker-view');
 const partyList = document.getElementById('party-list');
 const pickerEmpty = document.getElementById('picker-empty');
 const pickerNewPartyBtn = document.getElementById('picker-new-party-btn');
+const pickerImportBtn = document.getElementById('picker-import-btn');
 
 const partyView = document.getElementById('party-view');
 const backToParties = document.getElementById('back-to-parties');
@@ -59,9 +65,19 @@ const catchDialogCancelBtn = document.getElementById('catch-dialog-cancel-btn');
 // version. Same shared markup the detail card's picker uses.
 catchDialogNature.innerHTML = natureOptionsHtml();
 
-// Remote sprite may be unreachable offline — swap in the local fallback.
+// Two-hop fallback: openCatchDialog's game-specific sprite attempt can
+// itself 404 (a species that didn't exist yet in that title) before the
+// remote CDN is unreachable at all (offline) — retry the modern default
+// sprite openCatchDialog stashed, then finally the local placeholder.
+let catchDialogSpriteModernFallback = null;
 catchDialogSprite.addEventListener('error', () => {
-  if (catchDialogSprite.src !== FALLBACK_SPRITE) catchDialogSprite.src = FALLBACK_SPRITE;
+  if (catchDialogSpriteModernFallback && catchDialogSprite.src !== catchDialogSpriteModernFallback) {
+    const modern = catchDialogSpriteModernFallback;
+    catchDialogSpriteModernFallback = null;
+    catchDialogSprite.src = modern;
+  } else if (catchDialogSprite.src !== FALLBACK_SPRITE) {
+    catchDialogSprite.src = FALLBACK_SPRITE;
+  }
 });
 
 const pokemonView = document.getElementById('pokemon-view');
@@ -75,17 +91,26 @@ const backFromSettings = document.getElementById('back-from-settings');
 const settingsVersion = document.getElementById('settings-version');
 const clearCacheBtn = document.getElementById('clear-cache-btn');
 const clearCacheStatus = document.getElementById('clear-cache-status');
+const transferBtn = document.getElementById('transfer-btn');
+
+const transferView = document.getElementById('transfer-view');
+const backFromTransfer = document.getElementById('back-from-transfer');
+const transferPanel = transferView.querySelector('transfer-panel');
+
+const importView = document.getElementById('import-view');
+const backFromImport = document.getElementById('back-from-import');
+const importReview = importView.querySelector('import-review');
 
 const partyDialog = document.getElementById('party-dialog');
 const partyForm = document.getElementById('party-form');
 const partyDialogTitle = document.getElementById('party-dialog-title');
 const partyNameInput = document.getElementById('party-name-input');
-const partyGameVersion = document.getElementById('party-game-version');
+const partyBaseGame = document.getElementById('party-base-game');
 const dialogGameCart = document.getElementById('dialog-game-cart');
-const partyGameVersionError = document.getElementById('party-game-version-error');
-partyGameVersion.addEventListener('version-change', (e) => {
+const partyBaseGameError = document.getElementById('party-base-game-error');
+partyBaseGame.addEventListener('version-change', (e) => {
   dialogGameCart.name = e.detail.value.trim();
-  if (e.detail.value.trim()) partyGameVersionError.hidden = true;
+  if (e.detail.value.trim()) partyBaseGameError.hidden = true;
 });
 const partyDescriptionInput = document.getElementById('party-description-input');
 const partyAdvancedRules = document.getElementById('party-advanced-rules');
@@ -93,11 +118,12 @@ const partySubmitBtn = document.getElementById('party-submit-btn');
 const partyDeleteBtn = document.getElementById('party-delete-btn');
 const partyCancelBtn = document.getElementById('party-cancel-btn');
 
-// Each select's value round-trips through Store's override shape: '' <->
-// null (auto), 'true'/'false' <-> boolean, and (power item bonus only)
-// '4'/'8' <-> number. One declarative list drives both directions so
-// adding a new overridable rule only means adding one entry here plus
-// its <select> in index.html.
+// Each field's value round-trips through Store's override shape: '' <->
+// null (auto), 'true'/'false' <-> boolean, (power item bonus only)
+// '4'/'8' <-> number, and (sprite style only) a GAME_VERSIONS name <->
+// itself. One declarative list drives both directions so adding a new
+// overridable rule only means adding one entry here plus its field in
+// index.html.
 const OVERRIDE_FIELDS = [
   { key: 'powerItemBonus', el: document.getElementById('override-power-item-bonus'), type: 'number' },
   { key: 'powerItems', el: document.getElementById('override-power-items'), type: 'bool' },
@@ -105,6 +131,7 @@ const OVERRIDE_FIELDS = [
   { key: 'vitaminCutoff', el: document.getElementById('override-vitamin-cutoff'), type: 'bool' },
   { key: 'pokerus', el: document.getElementById('override-pokerus'), type: 'bool' },
   { key: 'nature', el: document.getElementById('override-nature'), type: 'bool' },
+  { key: 'spriteVersion', el: document.getElementById('override-sprite-version'), type: 'string' },
 ];
 
 function writeOverridesToDialog(overrides) {
@@ -123,7 +150,8 @@ function readOverridesFromDialog() {
   const overrides = {};
   for (const field of OVERRIDE_FIELDS) {
     const raw = field.el.value;
-    overrides[field.key] = raw === '' ? null : field.type === 'number' ? Number(raw) : raw === 'true';
+    overrides[field.key] =
+      raw === '' ? null : field.type === 'number' ? Number(raw) : field.type === 'string' ? raw : raw === 'true';
   }
   return overrides;
 }
@@ -142,13 +170,41 @@ function interceptLinkClick(el, onNavigate) {
 }
 
 interceptLinkClick(backToParties, () => router.navigateHome());
+interceptLinkClick(headerHomeLink, () => router.navigateHome());
 
 let backToRosterSlug = null;
 interceptLinkClick(backToRoster, () => router.navigateToParty(backToRosterSlug));
 
+// Settings/Transfer/Import are utility pages reachable from anywhere (a
+// specific Pokémon's page, a party's roster, the picker, or each other —
+// Settings links to Transfer, for instance). Every `goTo()` hash change
+// is a real browser-history entry, so "← Back" is genuine history.back():
+// one step, correctly unwinding a Party → Settings → Transfer chain back
+// through Settings rather than jumping straight to Party. The one thing
+// history.back() can't do is know whether there's anything *in this app*
+// to go back to — landing straight on a utility page (e.g. a shared
+// transfer link opened fresh, nothing navigated yet this session) would
+// make it a dead button, or worse, leave the app entirely. render() keeps
+// `lastContentPath` pointed at the most recent picker/party/pokemon
+// route; still null means nothing to go back to, so fall back to home
+// instead. lastContentPath also drives these links' static `href`, for
+// right-click/middle-click, where "back" isn't a meaningful action.
+let lastContentPath = null;
+function goBackFromUtilityPage() {
+  if (lastContentPath !== null) window.history.back();
+  else router.navigateHome();
+}
+
 backFromSettings.href = router.partyPath(null);
-interceptLinkClick(backFromSettings, () => router.navigateHome());
+interceptLinkClick(backFromSettings, goBackFromUtilityPage);
 settingsBtn.addEventListener('click', () => router.navigateToSettings());
+
+backFromTransfer.href = router.partyPath(null);
+interceptLinkClick(backFromTransfer, goBackFromUtilityPage);
+transferBtn.addEventListener('click', () => router.navigateToTransfer());
+
+backFromImport.href = router.partyPath(null);
+interceptLinkClick(backFromImport, goBackFromUtilityPage);
 
 /* ------------------------------------------------------------------ */
 /* Party create/edit dialog                                            */
@@ -162,7 +218,7 @@ function openCreateDialog() {
   partySubmitBtn.textContent = 'Create party';
   partyDeleteBtn.hidden = true;
   partyNameInput.value = '';
-  partyGameVersion.value = '';
+  partyBaseGame.value = '';
   dialogGameCart.name = '';
   partyDescriptionInput.value = '';
   writeOverridesToDialog(null);
@@ -176,8 +232,8 @@ function openEditDialog(party) {
   partySubmitBtn.textContent = 'Save changes';
   partyDeleteBtn.hidden = false;
   partyNameInput.value = party.name;
-  partyGameVersion.value = party.gameVersion;
-  dialogGameCart.name = party.gameVersion;
+  partyBaseGame.value = party.baseGame;
+  dialogGameCart.name = party.baseGame;
   partyDescriptionInput.value = party.description;
   writeOverridesToDialog(party.overrides);
   partyDialog.showModal();
@@ -185,6 +241,7 @@ function openEditDialog(party) {
 }
 
 pickerNewPartyBtn.addEventListener('click', openCreateDialog);
+pickerImportBtn.addEventListener('click', () => router.navigateToImport());
 editPartyBtn.addEventListener('click', () => openEditDialog(store.activeParty));
 partyCancelBtn.addEventListener('click', () => partyDialog.close());
 
@@ -201,23 +258,24 @@ partyForm.addEventListener('submit', (e) => {
     return;
   }
   const description = partyDescriptionInput.value.trim();
-  const gameVersion = partyGameVersion.value.trim();
+  const baseGame = partyBaseGame.value.trim();
   // Required: every EV rule (power items, vitamins, Pokérus, natures —
-  // and what the advanced overrides override) is derived from it. Free
-  // text is still fine; only empty is rejected.
-  partyGameVersionError.hidden = Boolean(gameVersion);
-  if (!gameVersion) {
-    partyGameVersion.focus();
+  // and what the advanced overrides override) is derived from it. The
+  // picker itself only ever commits an exact title or '', so an empty
+  // value here really does mean "nothing picked", not a rejected typo.
+  partyBaseGameError.hidden = Boolean(baseGame);
+  if (!baseGame) {
+    partyBaseGame.focus();
     return;
   }
   const overrides = readOverridesFromDialog();
 
   if (dialogEditingId === null) {
-    const party = store.createParty(name, description, gameVersion, overrides);
+    const party = store.createParty(name, description, baseGame, overrides);
     partyDialog.close();
     router.navigateToParty(party.slug);
   } else {
-    store.updateParty(dialogEditingId, { name, description, gameVersion, overrides });
+    store.updateParty(dialogEditingId, { name, description, baseGame, overrides });
     partyDialog.close();
   }
 });
@@ -260,6 +318,7 @@ async function openCatchDialog(name) {
   pendingCatchMon = null;
   catchDialogTitle.textContent = `Catch ${titleCase(name)}`;
   catchDialogSprite.src = FALLBACK_SPRITE;
+  catchDialogSpriteModernFallback = null;
   catchDialogName.textContent = titleCase(name);
   catchDialogEvYield.textContent = '';
   catchDialogLevel.value = DEFAULT_LEVEL;
@@ -272,7 +331,10 @@ async function openCatchDialog(name) {
     const mon = await api.getPokemon(name);
     if (token !== catchDialogToken) return; // a newer dialog owns the UI now
     pendingCatchMon = mon;
-    catchDialogSprite.src = mon.sprite || FALLBACK_SPRITE;
+    const modernSprite = mon.sprite || FALLBACK_SPRITE;
+    const versioned = versionedSpriteUrl(store.spriteBaseGame(), mon.id);
+    catchDialogSpriteModernFallback = versioned ? modernSprite : null;
+    catchDialogSprite.src = versioned || modernSprite;
     catchDialogName.textContent = `#${String(mon.id).padStart(3, '0')} ${titleCase(mon.name)}`;
     catchDialogSubmitBtn.disabled = false;
     catchDialogLevel.focus();
@@ -323,6 +385,7 @@ function renderRoster(party) {
   emptyState.hidden = entries.length > 0;
   roster.innerHTML = '';
   const natureAvailable = store.natureAvailable();
+  const spriteGame = store.spriteBaseGame();
   for (const entry of entries) {
     const trained = totalEvs(entry.evs) >= TOTAL_CAP;
     // "Adamant Fangs McGee" (nickname) or plain "Slowpoke" (no nickname)
@@ -334,12 +397,16 @@ function renderRoster(party) {
     // The species name is only worth a second mention when a nickname
     // is hiding it — same rule as the detail header.
     const speciesAside = entry.nickname ? ` &middot; ${escapeHtml(titleCase(entry.speciesName))}` : '';
+    const modernSprite = entry.sprite || FALLBACK_SPRITE;
+    const versionedSprite = versionedSpriteUrl(spriteGame, entry.speciesId);
+    const spriteSrc = versionedSprite || modernSprite;
+    const spriteOnError = versionedSprite ? versionedSpriteOnError(modernSprite) : FALLBACK_ONERROR;
 
     const row = document.createElement('a');
     row.className = 'roster-card';
     row.href = router.pokemonPath(party.slug, entry.uid);
     row.innerHTML = `
-      <img class="roster-card-sprite" src="${entry.sprite || FALLBACK_SPRITE}" alt="" ${FALLBACK_ONERROR} />
+      <img class="roster-card-sprite" src="${spriteSrc}" alt="" ${spriteOnError} />
       <div class="roster-card-body">
         <span class="roster-card-name">${namePrefix}${escapeHtml(displayName)}</span>
         <span class="roster-card-meta">Lv. ${entry.level}${speciesAside}</span>
@@ -372,7 +439,7 @@ function renderPicker() {
       <div class="party-card-cart"><game-cartridge></game-cartridge></div>
       <div class="party-card-body">
         <span class="party-card-name">${escapeHtml(party.name)}</span>
-        ${party.gameVersion ? `<span class="game-name-label">${escapeHtml(party.gameVersion)}</span>` : ''}
+        ${party.baseGame ? `<span class="game-name-label">${escapeHtml(party.baseGame)}</span>` : ''}
         ${party.description ? `<p class="party-card-description">${escapeHtml(party.description)}</p>` : ''}
         <div class="party-card-stats">
           <span>${party.pokemon.length} caught</span>
@@ -380,7 +447,7 @@ function renderPicker() {
         </div>
       </div>
     `;
-    card.querySelector('game-cartridge').name = party.gameVersion;
+    card.querySelector('game-cartridge').name = party.baseGame;
     interceptLinkClick(card, () => router.navigateToParty(party.slug));
     partyList.appendChild(card);
   }
@@ -427,21 +494,37 @@ function renderLegend() {
 /* Router <-> view                                                     */
 /* ------------------------------------------------------------------ */
 
-const VIEWS = [pickerView, partyView, pokemonView, settingsView];
+const VIEWS = [pickerView, partyView, pokemonView, settingsView, transferView, importView];
 function showView(view) {
   for (const v of VIEWS) v.hidden = v !== view;
 }
 
 function render() {
-  const { page, partySlug, pokemonUid } = router.currentRoute();
+  const { page, partySlug, pokemonUid, payload } = router.currentRoute();
 
   if (page === 'settings') {
+    backFromSettings.href = lastContentPath ?? router.partyPath(null);
     showView(settingsView);
     renderSettings();
     return;
   }
 
+  if (page === 'transfer') {
+    backFromTransfer.href = lastContentPath ?? router.partyPath(null);
+    showView(transferView);
+    transferPanel.refresh();
+    return;
+  }
+
+  if (page === 'import') {
+    backFromImport.href = lastContentPath ?? router.partyPath(null);
+    showView(importView);
+    importReview.payload = payload;
+    return;
+  }
+
   if (!partySlug) {
+    lastContentPath = router.partyPath(null);
     showView(pickerView);
     renderPicker();
     return;
@@ -463,6 +546,7 @@ function render() {
       router.navigateToParty(party.slug); // stale link, or this Pokémon was just released
       return;
     }
+    lastContentPath = router.pokemonPath(party.slug, pokemonUid);
     showView(pokemonView);
     backToRosterSlug = party.slug;
     backToRoster.href = router.partyPath(party.slug);
@@ -471,11 +555,12 @@ function render() {
     return;
   }
 
+  lastContentPath = router.partyPath(party.slug);
   showView(partyView);
   activePartyName.textContent = party.name;
-  activePartyGame.hidden = !party.gameVersion;
-  activePartyGameCart.name = party.gameVersion;
-  activePartyGameLabel.textContent = party.gameVersion;
+  activePartyGame.hidden = !party.baseGame;
+  activePartyGameCart.name = party.baseGame;
+  activePartyGameLabel.textContent = party.baseGame;
   activePartyDescription.hidden = !party.description;
   activePartyDescription.textContent = party.description;
   renderLegend();

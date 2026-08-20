@@ -2,7 +2,7 @@ import './support/localstorage-polyfill.js';
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { PokeApiClient } from '../lib/pokeapi-client.js';
+import { PokeApiClient, versionedSpriteUrl } from '../lib/pokeapi-client.js';
 
 // A tiny programmable fetch: routes by substring match on the URL, counts
 // calls, and can be told to fail. Exercises ADR 0001's cache guarantees
@@ -172,4 +172,21 @@ test('sibling species share one evolution-chain fetch (keyed by chain URL)', asy
   await client.getEvolutionChain('vaporeon');
   const chainFetches = fetchCalls.filter((u) => u.includes('/evolution-chain/'));
   assert.equal(chainFetches.length, 1);
+});
+
+test('versionedSpriteUrl builds a URL for a title with its own sprite folder', () => {
+  assert.equal(
+    versionedSpriteUrl('Emerald', 1),
+    'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iii/emerald/1.png'
+  );
+  assert.equal(
+    versionedSpriteUrl('FireRed', 6),
+    'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/versions/generation-iii/firered-leafgreen/6.png'
+  );
+});
+
+test('versionedSpriteUrl returns null for a title with no distinct sprite, or a missing id', () => {
+  assert.equal(versionedSpriteUrl('Sword', 1), null); // 3D-only title, never got a sprite rip
+  assert.equal(versionedSpriteUrl('', 1), null); // no base game / override set
+  assert.equal(versionedSpriteUrl('Emerald', null), null);
 });

@@ -1,6 +1,7 @@
 import { POWER_ITEMS, MACHO_BRACE_SPRITE, VITAMINS, NATURES, STAT_LABEL, MACHO_BRACE_MULTIPLIER, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, TOTAL_CAP, FALLBACK_SPRITE, FALLBACK_ONERROR, MIN_LEVEL, MAX_LEVEL } from '../lib/constants.js';
 import { titleCase, totalEvs, natureEffectHint, natureOptionsHtml, dayLabel, escapeHtml } from '../lib/utils.js';
 import { api, store } from '../lib/services.js';
+import { versionedSpriteUrl } from '../lib/pokeapi-client.js';
 import { attachDesignSystem } from '../lib/design-system.js';
 import './ev-summary.js';
 import './ev-history-log.js';
@@ -354,9 +355,20 @@ export class CaughtPokemonCard extends HTMLElement {
     this.$status = shadow.querySelector('.status');
     this.$histLog = shadow.querySelector('ev-history-log');
 
-    // Remote sprite may be unreachable offline — swap in the local fallback.
+    // Two-hop fallback: the game-specific sprite _render sets can itself
+    // 404 (a species that didn't exist yet in that title) before the
+    // remote CDN is unreachable at all (offline) — retry the modern
+    // default sprite _render also stashed, then finally the local
+    // placeholder.
+    this._spriteModernFallback = null;
     this.$sprite.addEventListener('error', () => {
-      if (this.$sprite.src !== FALLBACK_SPRITE) this.$sprite.src = FALLBACK_SPRITE;
+      if (this._spriteModernFallback && this.$sprite.src !== this._spriteModernFallback) {
+        const modern = this._spriteModernFallback;
+        this._spriteModernFallback = null;
+        this.$sprite.src = modern;
+      } else if (this.$sprite.src !== FALLBACK_SPRITE) {
+        this.$sprite.src = FALLBACK_SPRITE;
+      }
     });
 
     this._populateVitaminButtons();
@@ -559,7 +571,10 @@ export class CaughtPokemonCard extends HTMLElement {
   _render() {
     const e = this._entry;
     if (!e) return;
-    this.$sprite.src = e.sprite || FALLBACK_SPRITE;
+    const modernSprite = e.sprite || FALLBACK_SPRITE;
+    const versioned = versionedSpriteUrl(store.spriteBaseGame(), e.speciesId);
+    this._spriteModernFallback = versioned ? modernSprite : null;
+    this.$sprite.src = versioned || modernSprite;
     this.$nickname.value = e.nickname || titleCase(e.speciesName);
     this.$speciesNum.textContent = `#${String(e.speciesId).padStart(3, '0')}`;
     // The species name only earns a second mention when a nickname is

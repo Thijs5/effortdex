@@ -7,16 +7,17 @@ const CY = 20;
 const BUTTON_R = 6;
 
 /**
- * <game-cartridge> — a small pokéball icon for a party's game version. Set
- * `.name` to the free-typed version text. Recognized official titles get
- * the top half filled with that title's own color and the bottom half
- * filled with a color for its generation, so two titles that happen to
- * share a color (or two generations that happen to share a title) still
- * read apart at a glance. The button carries the generation's roman
- * numeral. Anything else (ROM hacks, fan games, typos) still renders — a
+ * <game-cartridge> — a small pokéball icon for a party's base game. Set
+ * `.name` to a party.baseGame value (a GAME_VERSIONS title, or empty).
+ * The top half fills with that title's own color and the bottom half
+ * with a color for its generation, so two titles that happen to share a
+ * color (or two generations that happen to share a title) still read
+ * apart at a glance. The button carries the generation's roman numeral.
+ * Empty name renders an empty dashed outline (used for the live preview
+ * in the dialog); an unrecognized non-empty name (only possible from
+ * stale/imported data predating the strict picker) still renders — a
  * plain grey ball with a small "fan game" mark in the button, never a
- * blocked state. Empty name renders an empty dashed outline (used for the
- * live preview in the dialog).
+ * blocked state.
  */
 export class GameCartridge extends HTMLElement {
   constructor() {

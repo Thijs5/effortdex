@@ -503,14 +503,14 @@ test('migrates a v1 (pre-event-sourcing) save: identity, level, EVs and Pokérus
     history: [{ id: 'x', kind: 'battle', opponentName: 'rattata' }], // dropped by design
     evolutions: [{ fromName: 'bulbasaur', toName: 'ivysaur' }], // dropped by design
   };
-  const v1Party = { id: 'p1', name: 'Old party', pokemon: [v1Entry] }; // also missing description/gameVersion/overrides/slug
+  const v1Party = { id: 'p1', name: 'Old party', pokemon: [v1Entry] }; // also missing description/baseGame/overrides/slug
   localStorage.setItem('effortdex:state', JSON.stringify({ parties: [v1Party], activePartyId: 'p1' }));
 
   const loaded = new Store();
   const party = loaded.state.parties[0];
   assert.equal(party.description, ''); // party backfills still apply post-migration
   assert.equal(party.slug, 'old-party');
-  assert.deepEqual(party.overrides, { powerItemBonus: null, powerItems: null, machoBrace: null, vitaminCutoff: null, pokerus: null, nature: null });
+  assert.deepEqual(party.overrides, { powerItemBonus: null, powerItems: null, machoBrace: null, vitaminCutoff: null, pokerus: null, nature: null, spriteVersion: null });
 
   const entry = party.pokemon[0];
   assert.equal(entry.uid, 'old-1');
@@ -525,6 +525,27 @@ test('migrates a v1 (pre-event-sourcing) save: identity, level, EVs and Pokérus
   // Old per-record history is not converted — only the synthesized events remain.
   const kinds = entry.events.map((e) => e.kind);
   assert.deepEqual(kinds, ['catch', 'imported', 'pokerus']);
+});
+
+test('baseGame migrates from the old free-text gameVersion field: a matching title survives, an unmatched ROM hack name does not', () => {
+  localStorage.setItem(
+    'effortdex:state',
+    JSON.stringify({
+      schema: 2,
+      activePartyId: 'p1',
+      parties: [
+        { id: 'p1', name: 'Official title', gameVersion: 'emerald', pokemon: [] }, // recognized regardless of case
+        { id: 'p2', name: 'ROM hack', gameVersion: 'Radical Red', pokemon: [] }, // no base game to migrate to
+      ],
+    })
+  );
+
+  const loaded = new Store();
+  const [official, romHack] = loaded.state.parties;
+  assert.equal(official.baseGame, 'Emerald'); // snapped to canonical casing
+  assert.equal(official.gameVersion, undefined);
+  assert.equal(romHack.baseGame, '');
+  assert.equal(romHack.gameVersion, undefined);
 });
 
 test('a migrated save persists as schema 2 and round-trips', () => {
@@ -577,7 +598,7 @@ test('a held Macho Brace stops applying when the game version no longer offers i
   assert.equal(entry.evs.atk, 2); // doubled while available
 
   // The party gets edited to a Gen VII title where the brace was dropped.
-  store.updateParty(store.activeParty.id, { gameVersion: 'Sun' });
+  store.updateParty(store.activeParty.id, { baseGame: 'Sun' });
   store.logDefeat(entry.uid, opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 }));
   assert.equal(entry.evs.atk, 3); // +1 only — the stored brace no longer applies
   assert.equal(entry.history[0].machoBrace, false); // and the record doesn't claim it did
@@ -586,10 +607,21 @@ test('a held Macho Brace stops applying when the game version no longer offers i
 test('a held power item stops applying when the game version predates power items', () => {
   const entry = store.catchPokemon(mon());
   store.setPowerItem(entry.uid, 'bracer');
-  store.updateParty(store.activeParty.id, { gameVersion: 'Red' }); // Gen 1: no power items
+  store.updateParty(store.activeParty.id, { baseGame: 'Red' }); // Gen 1: no power items
   store.logDefeat(entry.uid, opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 }));
   assert.equal(entry.evs.atk, 1); // no +8
   assert.equal(entry.history[0].powerItem, null);
+});
+
+test('spriteBaseGame falls back from the sprite override to the base game to empty', () => {
+  store.updateParty(store.activeParty.id, { baseGame: 'Emerald' });
+  assert.equal(store.spriteBaseGame(), 'Emerald'); // no override set — follows the base game
+
+  store.updateParty(store.activeParty.id, { overrides: { spriteVersion: 'Crystal' } });
+  assert.equal(store.spriteBaseGame(), 'Crystal'); // override wins over the base game
+
+  store.updateParty(store.activeParty.id, { baseGame: '', overrides: { spriteVersion: null } });
+  assert.equal(store.spriteBaseGame(), ''); // neither set
 });
 
 test('logDefeat records pokerus only when it actually doubled the yield', () => {
@@ -634,4 +666,226 @@ test('deleting an older pokerus record keeps the newest toggle in force', () => 
   const newest = entry.history.find((h) => h.kind === 'pokerus');
   store.deleteHistoryEntry(entry.uid, newest.id);
   assert.equal(entry.pokerus, false); // no records left -> off
+});
+
+/* ---------------- device-to-device transfer ---------------- */
+
+test('exportPayload returns only source-of-truth fields, matching what _save persists', () => {
+  const entry = store.catchPokemon(mon());
+  store.logDefeat(entry.uid, opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 }));
+
+  const exported = store.exportPayload();
+  assert.equal(exported.length, 1);
+  const [party] = exported;
+  assert.equal(party.id, store.activeParty.id);
+  assert.equal(party.pokemon[0].uid, entry.uid);
+  assert.equal(party.pokemon[0].evs, undefined); // no derived fields
+  assert.ok(Array.isArray(party.pokemon[0].events));
+});
+
+test('previewImport reports isNew and newEventCount relative to local state, without mutating it', () => {
+  const entry = store.catchPokemon(mon());
+  const localCatchEvent = entry.events[0];
+
+  const imported = [
+    {
+      id: store.activeParty.id,
+      name: store.activeParty.name,
+      description: '',
+      baseGame: '',
+      overrides: {},
+      slug: store.activeParty.slug,
+      pokemon: [
+        {
+          uid: entry.uid,
+          nickname: '',
+          nature: null,
+          powerItem: null,
+          machoBrace: false,
+          events: [localCatchEvent, { id: 'new-ev', kind: 'vitamin', timestamp: 2, vitaminId: 'protein', stat: 'atk', applied: 10, blockedByCutoff: false }],
+        },
+        {
+          uid: 'brand-new-uid',
+          nickname: '',
+          nature: null,
+          powerItem: null,
+          machoBrace: false,
+          events: [{ id: 'ev-x', kind: 'catch', timestamp: 3, speciesName: 'charmander', speciesId: 4, sprite: null, baseStats: null, level: 5 }],
+        },
+      ],
+    },
+  ];
+
+  const preview = store.previewImport(imported);
+  assert.equal(preview.length, 1);
+  assert.equal(preview[0].isNew, false); // the party already exists locally
+
+  const [existingMon, newMon] = preview[0].pokemon;
+  assert.equal(existingMon.isNew, false);
+  assert.equal(existingMon.newEventCount, 1); // only the vitamin event is new
+  assert.equal(newMon.isNew, true);
+  assert.equal(newMon.newEventCount, 1);
+
+  // Read-only — the local roster is unaffected by previewing.
+  assert.equal(entry.history.length, 1);
+  assert.equal(store.state.parties[0].pokemon.length, 1);
+});
+
+test('applyImport adds a brand-new party and Pokémon wholesale', () => {
+  const imported = [
+    {
+      id: 'remote-party-1',
+      name: 'Remote Party',
+      description: '',
+      baseGame: 'Emerald',
+      overrides: {},
+      slug: 'remote-party',
+      pokemon: [
+        {
+          uid: 'remote-mon-1',
+          nickname: 'Sparky',
+          nature: 'jolly',
+          powerItem: null,
+          machoBrace: false,
+          events: [{ id: 'ev-1', kind: 'catch', timestamp: 1, speciesName: 'pikachu', speciesId: 25, sprite: null, baseStats: null, level: 10 }],
+        },
+      ],
+    },
+  ];
+
+  store.applyImport(imported, new Set(['remote-mon-1']));
+
+  const party = store.state.parties.find((p) => p.id === 'remote-party-1');
+  assert.ok(party);
+  assert.equal(party.name, 'Remote Party');
+  assert.equal(party.pokemon.length, 1);
+  assert.equal(party.pokemon[0].nickname, 'Sparky');
+  assert.equal(party.pokemon[0].speciesName, 'pikachu');
+  assert.equal(party.pokemon[0].level, 10);
+});
+
+test('applyImport skips Pokémon not in the selected set entirely', () => {
+  const imported = [
+    {
+      id: 'remote-party-2',
+      name: 'Skip Party',
+      description: '',
+      baseGame: '',
+      overrides: {},
+      slug: 'skip-party',
+      pokemon: [
+        {
+          uid: 'skip-mon',
+          nickname: '',
+          nature: null,
+          powerItem: null,
+          machoBrace: false,
+          events: [{ id: 'e1', kind: 'catch', timestamp: 1, speciesName: 'eevee', speciesId: 133, sprite: null, baseStats: null, level: 5 }],
+        },
+      ],
+    },
+  ];
+
+  store.applyImport(imported, new Set()); // nothing selected
+  assert.equal(store.state.parties.find((p) => p.id === 'remote-party-2'), undefined);
+});
+
+test('applyImport merges an existing Pokémon\'s events by id without duplicating either side\'s history', () => {
+  const entry = store.catchPokemon(mon());
+  store.logDefeat(entry.uid, opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 })); // local-only battle
+  assert.equal(entry.history.length, 2);
+
+  const remoteOnlyEvent = { id: 'remote-vitamin', kind: 'vitamin', timestamp: Date.now() + 1000, vitaminId: 'iron', stat: 'def', applied: 10, blockedByCutoff: false };
+  const imported = [
+    {
+      id: store.activeParty.id,
+      name: store.activeParty.name,
+      description: '',
+      baseGame: '',
+      overrides: {},
+      slug: store.activeParty.slug,
+      pokemon: [
+        {
+          uid: entry.uid,
+          nickname: entry.nickname,
+          nature: entry.nature,
+          powerItem: entry.powerItem,
+          machoBrace: entry.machoBrace,
+          events: [...entry.events, remoteOnlyEvent], // its own events, plus one new
+        },
+      ],
+    },
+  ];
+
+  store.applyImport(imported, new Set([entry.uid]));
+
+  assert.equal(entry.history.length, 3); // catch + battle + the merged-in vitamin, no duplicates
+  assert.equal(entry.evs.atk, 1); // untouched by the merge
+  assert.equal(entry.evs.def, 10); // the merged-in vitamin's effect
+});
+
+test('applyImport on a Pokémon with fully overlapping events is a no-op', () => {
+  const entry = store.catchPokemon(mon());
+  store.logDefeat(entry.uid, opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 }));
+  const beforeLength = entry.history.length;
+  const beforeAtk = entry.evs.atk;
+
+  const imported = [
+    {
+      id: store.activeParty.id,
+      name: store.activeParty.name,
+      description: '',
+      baseGame: '',
+      overrides: {},
+      slug: store.activeParty.slug,
+      pokemon: [
+        {
+          uid: entry.uid,
+          nickname: entry.nickname,
+          nature: entry.nature,
+          powerItem: entry.powerItem,
+          machoBrace: entry.machoBrace,
+          events: entry.events, // identical to what's already local
+        },
+      ],
+    },
+  ];
+
+  store.applyImport(imported, new Set([entry.uid]));
+  assert.equal(entry.history.length, beforeLength);
+  assert.equal(entry.evs.atk, beforeAtk);
+});
+
+test('applyImport leaves an existing entry\'s nickname/nature/held item untouched, even when the import differs', () => {
+  const entry = store.catchPokemon(mon());
+  store.renamePokemon(entry.uid, 'LocalNick');
+  store.setNature(entry.uid, 'timid');
+  store.setPowerItem(entry.uid, 'lens');
+
+  const imported = [
+    {
+      id: store.activeParty.id,
+      name: store.activeParty.name,
+      description: '',
+      baseGame: '',
+      overrides: {},
+      slug: store.activeParty.slug,
+      pokemon: [
+        {
+          uid: entry.uid,
+          nickname: 'RemoteNick',
+          nature: 'adamant',
+          powerItem: 'bracer',
+          machoBrace: true,
+          events: entry.events,
+        },
+      ],
+    },
+  ];
+
+  store.applyImport(imported, new Set([entry.uid]));
+  assert.equal(entry.nickname, 'LocalNick');
+  assert.equal(entry.nature, 'timid');
+  assert.equal(entry.powerItem, 'lens');
+  assert.equal(entry.machoBrace, false);
 });

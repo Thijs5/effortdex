@@ -21,7 +21,10 @@ test('uniqueSlug disambiguates against existing slugs with a numeric suffix', ()
 });
 
 test('uniqueSlug never hands out a reserved app-page slug', () => {
-  // "settings" is a router page (lib/router.js) — a party named
-  // "Settings" must get a different slug or its URL would be unreachable.
+  // "settings"/"transfer"/"import" are router pages (lib/router.js) — a
+  // party with one of these names must get a different slug or its URL
+  // would be unreachable.
   assert.equal(uniqueSlug('Settings', new Set()), 'settings-2');
+  assert.equal(uniqueSlug('Transfer', new Set()), 'transfer-2');
+  assert.equal(uniqueSlug('Import', new Set()), 'import-2');
 });

@@ -28,7 +28,7 @@
 <body>
   <div class="device">
     <header class="bezel">
-      <h1><span class="power-led" aria-hidden="true"></span>Effort<span class="e-accent">dex</span></h1>
+      <h1><a id="header-home-link" href="#/"><span class="power-led" aria-hidden="true"></span>Effort<span class="e-accent">dex</span></a></h1>
       <div class="bezel-menu">
         <button id="menu-btn" class="bezel-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Menu" title="Menu">
           <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="17.5" r="1.7"/></svg>
@@ -64,7 +64,14 @@
       <p class="hint">Keep a separate party per save file or playthrough you're running at once.</p>
       <div id="party-list" class="party-list"></div>
       <p id="picker-empty" class="empty-state" hidden>No parties yet &mdash; create one to start tracking EVs.</p>
-      <button id="picker-new-party-btn" class="ds-btn ds-btn--primary">+ New party</button>
+      <div class="picker-actions">
+        <button id="picker-new-party-btn" class="ds-btn ds-btn--primary">+ New party</button>
+        <button id="picker-import-btn" class="ds-btn ds-btn--ghost">Have a transfer file or link? Import it</button>
+      </div>
+      <p class="hint picker-import-hint">
+        Moving from another device? Open <strong>Settings &rarr; Transfer to another device</strong>
+        on that device first to get a link or file, then use the button above here.
+      </p>
     </main>
 
     <!-- "/<party-slug>" — that party's catch panel + roster -->
@@ -139,6 +146,29 @@
         <button id="clear-cache-btn" class="ds-btn ds-btn--ghost">Clear cache</button>
         <p id="clear-cache-status" class="status-line" aria-live="polite"></p>
       </section>
+
+      <section class="settings-section">
+        <h3>Transfer</h3>
+        <p class="hint">Move your parties and roster to another device via a shareable link.</p>
+        <button id="transfer-btn" class="ds-btn ds-btn--outline icon-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/></svg>
+          <span>Transfer to another device</span>
+        </button>
+      </section>
+    </main>
+
+    <!-- "/transfer" — export this device's roster as a shareable link -->
+    <main id="transfer-view" class="settings-view" hidden>
+      <a id="back-from-transfer" class="back-link" href="#/">&larr; Back</a>
+      <h2>Transfer to another device</h2>
+      <transfer-panel></transfer-panel>
+    </main>
+
+    <!-- "/import/<payload>" — review screen a shared transfer link opens to -->
+    <main id="import-view" class="settings-view" hidden>
+      <a id="back-from-import" class="back-link" href="#/">&larr; Back</a>
+      <h2>Import</h2>
+      <import-review></import-review>
     </main>
 
     <footer class="bezel-footer">
@@ -160,12 +190,12 @@
         <input type="text" id="party-name-input" class="ds-field" required maxlength="60" placeholder="e.g. Emerald Nuzlocke" />
       </label>
       <label class="field-label">
-        Game version
+        Base game
         <div class="game-version-row">
-          <game-version-picker id="party-game-version" maxlength="40"></game-version-picker>
+          <game-version-picker id="party-base-game" maxlength="40"></game-version-picker>
           <game-cartridge id="dialog-game-cart"></game-cartridge>
         </div>
-        <span class="field-error" id="party-game-version-error" hidden>Choose a game version &mdash; it sets this party's EV rules. ROM hacks and fan games count too.</span>
+        <span class="field-error" id="party-base-game-error" hidden>Choose a base game &mdash; it sets this party's EV rules and default sprite style. Playing a ROM hack or fan game? Pick whichever official title it's a hack of.</span>
       </label>
       <label class="field-label">
         Description
@@ -175,15 +205,14 @@
       <details class="advanced-rules ds-disclosure" id="party-advanced-rules">
         <summary>Advanced: override this game's rules</summary>
         <p class="hint advanced-rules-hint">
-          Each rule follows the selected game version by default. Only
-          change one if this is a ROM hack or house rule that plays
-          differently &mdash; a real title's own mechanics are already
-          applied automatically.
+          Each rule follows the base game by default. Only change one if
+          this is a ROM hack or house rule that plays differently &mdash;
+          a real title's own mechanics are already applied automatically.
         </p>
         <label class="field-label field-label--inline">
           Power item bonus
           <select id="override-power-item-bonus" class="ds-field">
-            <option value="">Auto (from game version)</option>
+            <option value="">Auto (from base game)</option>
             <option value="4">+4 EVs (Gen IV-VI)</option>
             <option value="8">+8 EVs (Gen VII+)</option>
           </select>
@@ -191,7 +220,7 @@
         <label class="field-label field-label--inline">
           Power items
           <select id="override-power-items" class="ds-field">
-            <option value="">Auto (from game version)</option>
+            <option value="">Auto (from base game)</option>
             <option value="true">Available</option>
             <option value="false">Unavailable</option>
           </select>
@@ -199,7 +228,7 @@
         <label class="field-label field-label--inline">
           Macho Brace
           <select id="override-macho-brace" class="ds-field">
-            <option value="">Auto (from game version)</option>
+            <option value="">Auto (from base game)</option>
             <option value="true">Available</option>
             <option value="false">Unavailable</option>
           </select>
@@ -207,7 +236,7 @@
         <label class="field-label field-label--inline">
           Vitamin 100-EV cutoff
           <select id="override-vitamin-cutoff" class="ds-field">
-            <option value="">Auto (from game version)</option>
+            <option value="">Auto (from base game)</option>
             <option value="true">On (stops at 100 EVs)</option>
             <option value="false">Off (works up to 252)</option>
           </select>
@@ -215,7 +244,7 @@
         <label class="field-label field-label--inline">
           Pok&eacute;rus
           <select id="override-pokerus" class="ds-field">
-            <option value="">Auto (from game version)</option>
+            <option value="">Auto (from base game)</option>
             <option value="true">Doubles EVs</option>
             <option value="false">No effect on EVs</option>
           </select>
@@ -223,11 +252,16 @@
         <label class="field-label field-label--inline">
           Natures
           <select id="override-nature" class="ds-field">
-            <option value="">Auto (from game version)</option>
+            <option value="">Auto (from base game)</option>
             <option value="true">Available (Gen III+)</option>
             <option value="false">Unavailable</option>
           </select>
         </label>
+        <label class="field-label field-label--inline">
+          Sprite style
+          <game-version-picker id="override-sprite-version" maxlength="40" placeholder="Auto (from base game)"></game-version-picker>
+        </label>
+        <p class="hint sprite-style-hint">Shows this title's sprites for the roster instead of the base game's &mdash; e.g. play a Ruby ROM hack but see Emerald's sprites. Any species missing from that title's sprites falls back to the modern default.</p>
       </details>
 
       <div class="party-dialog-actions">
