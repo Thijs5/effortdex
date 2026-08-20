@@ -1,14 +1,44 @@
 import { api } from '../lib/services.js';
-import { titleCase } from '../lib/utils.js';
+import { titleCase, formatEvYield } from '../lib/utils.js';
 import { FALLBACK_SPRITE } from '../lib/constants.js';
 import { attachDesignSystem } from '../lib/design-system.js';
 
+// Narrow + coarse-pointer only, so a resized desktop window (narrow but
+// mouse-driven) keeps the inline dropdown, and a touch laptop at full
+// width doesn't get forced into the full-screen sheet.
+const MOBILE_QUERY = '(max-width: 640px) and (pointer: coarse)';
+
+// How many recently-picked species (via the `recent` property) show up
+// when the field is focused with nothing typed yet.
+const RECENT_LIMIT = 5;
+
 /**
- * <pokemon-search placeholder="…">
+ * <pokemon-search placeholder="…" show-ev-yield>
  * Autocomplete text input over the full PokeAPI species list, styled to
  * match <game-version-picker> (sprite/swatch + label rows, same tap
  * targets and dropdown chrome). Dispatches a `pokemon-pick` CustomEvent
  * (detail: { name }) when a species is chosen.
+ *
+ * On narrow touch viewports, focusing the input opens a full-screen
+ * sheet instead of an inline dropdown: results fill the space above the
+ * input, which sticks to the top of the keyboard. A dropdown anchored
+ * to the input doesn't work well there — the keyboard eats most of the
+ * screen, and anchoring is fighting the viewport instead of using it.
+ *
+ * `show-ev-yield` shows each result's EV yield (fetched lazily, per
+ * visible row — cached, so repeat lookups anywhere are free). Set only
+ * where that number matters to the choice (battle logging), not where a
+ * species is picked to catch it.
+ *
+ * `evModifier` (a settable property, function or null) — when set, each
+ * row's shown yield is `evModifier(mon)` instead of `mon.evYield`, so a
+ * caller can fold in whatever the actual applied gain would be (held
+ * item, Pokérus, EV caps already reached) rather than the opponent's raw
+ * base yield. Falls back to the raw yield when unset.
+ *
+ * `recent` (a settable property, not an attribute — it's data, not a
+ * string) is a `{ name, sprite }[]`, most-recent-first. Assign it to
+ * offer quick reselection of recently-picked species before typing.
  */
 export class PokemonSearch extends HTMLElement {
   constructor() {
@@ -17,6 +47,10 @@ export class PokemonSearch extends HTMLElement {
     this._loadingSpecies = null; // in-flight load promise, so a fast typist isn't lost
     this._matches = [];
     this._activeIndex = -1;
+    this._sheetOpen = false;
+    this._recent = [];
+    this._showingRecent = false;
+    this._evModifier = null;
 
     const shadow = this.attachShadow({ mode: 'open' });
     attachDesignSystem(shadow);
@@ -51,6 +85,20 @@ export class PokemonSearch extends HTMLElement {
           cursor: pointer;
         }
         li.option.active, li.option:hover { background: var(--lcd); }
+        .option-name {
+          flex: 1 1 auto;
+          min-width: 0;
+          overflow: hidden;
+          text-overflow: ellipsis;
+          white-space: nowrap;
+        }
+        .option-ev-yield {
+          flex: 0 0 auto;
+          font-family: var(--font-mono);
+          font-size: var(--font-size-2xs);
+          color: var(--teal);
+          white-space: nowrap;
+        }
         .thumb {
           flex: 0 0 auto;
           width: 28px;
@@ -67,26 +115,113 @@ export class PokemonSearch extends HTMLElement {
           color: var(--ink-soft);
           cursor: default;
         }
+
+        .sheet-header { display: none; }
+        .wrap.sheet {
+          position: fixed;
+          left: 0;
+          right: 0;
+          z-index: 1000;
+          display: flex;
+          flex-direction: column;
+          background: var(--surface);
+          padding-bottom: env(safe-area-inset-bottom, 0px);
+        }
+        .wrap.sheet .sheet-header {
+          display: flex;
+          align-items: center;
+          justify-content: space-between;
+          order: 0;
+          flex: 0 0 auto;
+          padding: var(--space-3);
+          border-bottom: 1px solid var(--lcd-line);
+          font-family: var(--font-mono);
+          font-size: var(--font-size-2xs);
+          text-transform: uppercase;
+          letter-spacing: 0.06em;
+          color: var(--ink-soft);
+        }
+        .sheet-close {
+          border: none; background: transparent; cursor: pointer;
+          font-size: var(--font-size-lg); line-height: 1;
+          color: var(--ink-soft); padding: var(--space-1);
+        }
+        .sheet-close:hover { color: var(--ink); }
+        .wrap.sheet input.ds-field {
+          order: 2;
+          flex: 0 0 auto;
+          /* .ds-field's shared width: 100% is relative to the flex
+             container, same as the margin below — combined they'd
+             overflow past the sheet's edges. width: auto instead
+             stretches to fill the space the margin leaves. */
+          width: auto;
+          margin: var(--space-2) var(--space-3);
+        }
+        .wrap.sheet ul.suggestions {
+          order: 1;
+          position: static;
+          flex: 1 1 auto;
+          min-height: 0;
+          width: auto;
+          max-height: none;
+          margin: 0;
+          border: none;
+          border-radius: 0;
+          box-shadow: none;
+        }
+        /* An empty (not-yet-typed-into) list still needs to occupy the
+           flexible space, or nothing pushes the input down to the
+           keyboard and it ends up stranded under the header instead.
+           !important to beat the design system's [hidden] reset, which
+           is itself !important and would otherwise win regardless of
+           this rule's higher specificity. */
+        .wrap.sheet ul.suggestions[hidden] {
+          display: block !important;
+        }
       </style>
       <div class="wrap">
+        <div class="sheet-header">
+          <span class="sheet-title"></span>
+          <button type="button" class="sheet-close" aria-label="Close search">&#10005;</button>
+        </div>
         <input class="ds-field" type="text" role="combobox" aria-expanded="false"
                autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false"
                inputmode="search" enterkeyhint="go" />
         <ul class="suggestions" hidden role="listbox"></ul>
       </div>
     `;
+    this.$wrap = shadow.querySelector('.wrap');
     this.$input = shadow.querySelector('input');
     this.$list = shadow.querySelector('.suggestions');
+    this.$sheetTitle = shadow.querySelector('.sheet-title');
+    this.$sheetClose = shadow.querySelector('.sheet-close');
   }
 
   connectedCallback() {
     this.$input.placeholder = this.getAttribute('placeholder') || 'Search Pokémon…';
-    this.$input.addEventListener('focus', () => this._ensureSpecies());
+    this.$sheetTitle.textContent = 'Search Pokémon';
+    this.$input.addEventListener('focus', () => {
+      this._ensureSpecies();
+      if (this._isMobile() && !this._sheetOpen) this._openSheet();
+      if (!this.$input.value.trim()) this._showRecentOrHide();
+    });
     this.$input.addEventListener('input', () => this._onInput());
     this.$input.addEventListener('keydown', (e) => this._onKeydown(e));
     // pointerdown on a suggestion fires before this blur, so picking by
     // mouse wins the race against the hide.
-    this.$input.addEventListener('blur', () => setTimeout(() => this._hideList(), 120));
+    this.$input.addEventListener('blur', () =>
+      setTimeout(() => {
+        // A blur can be immediately followed by a refocus — e.g. the
+        // catch dialog opening (blurs this input) then closing (a
+        // native <dialog> restores focus to whatever was focused when
+        // it opened). Without this check, that stale timeout fires
+        // after the refocus and wrongly hides the list it just showed.
+        if (this.shadowRoot.activeElement === this.$input) return;
+        this._hideList();
+        this._closeSheet();
+      }, 120)
+    );
+    this.$sheetClose.addEventListener('click', () => this.$input.blur());
     // Selection is resolved on pointerup rather than pointerdown, and only
     // preventDefault()ed for mouse: calling preventDefault() on a touch's
     // pointerdown cancels that touch's scroll gesture, which made the list
@@ -112,26 +247,92 @@ export class PokemonSearch extends HTMLElement {
       if (movedTooFar || e.target.closest('li.option') !== li) return;
       this._pick(li.dataset.name);
     });
-    // The list is positioned in fixed coordinates (not relative to the
-    // input) so it can escape an ancestor <dialog>'s overflow clipping —
-    // otherwise, on iOS, the on-screen keyboard shrinks the visible area
-    // and the dropdown renders clipped out of view entirely. Reposition
-    // whenever the input's on-screen location can change.
-    this._reposition = () => this._positionList();
-    window.addEventListener('scroll', this._reposition, true);
-    window.addEventListener('resize', this._reposition);
-    window.visualViewport?.addEventListener('resize', this._reposition);
-    window.visualViewport?.addEventListener('scroll', this._reposition);
+    // Both the inline dropdown and the full-screen sheet anchor themselves
+    // to the input's on-screen position / the visual viewport, so both
+    // need repositioning whenever either can change (scroll, resize, or
+    // the on-screen keyboard opening/closing).
+    this._onViewportChange = () => this._reposition();
+    window.addEventListener('scroll', this._onViewportChange, true);
+    window.addEventListener('resize', this._onViewportChange);
+    window.visualViewport?.addEventListener('resize', this._onViewportChange);
+    window.visualViewport?.addEventListener('scroll', this._onViewportChange);
   }
 
   disconnectedCallback() {
-    window.removeEventListener('scroll', this._reposition, true);
-    window.removeEventListener('resize', this._reposition);
-    window.visualViewport?.removeEventListener('resize', this._reposition);
-    window.visualViewport?.removeEventListener('scroll', this._reposition);
+    this._closeSheet();
+    window.removeEventListener('scroll', this._onViewportChange, true);
+    window.removeEventListener('resize', this._onViewportChange);
+    window.visualViewport?.removeEventListener('resize', this._onViewportChange);
+    window.visualViewport?.removeEventListener('scroll', this._onViewportChange);
   }
 
-  _positionList() {
+  get recent() {
+    return this._recent;
+  }
+
+  get evModifier() {
+    return this._evModifier;
+  }
+
+  set evModifier(fn) {
+    this._evModifier = typeof fn === 'function' ? fn : null;
+  }
+
+  set recent(list) {
+    const seen = new Set();
+    this._recent = (list || [])
+      .filter((r) => r && r.name && !seen.has(r.name) && seen.add(r.name))
+      .slice(0, RECENT_LIMIT)
+      .map((r) => ({ name: r.name, sprite: r.sprite || null }));
+    // Already showing recents with nothing typed — refresh in place so
+    // a newly-logged pick shows up without needing a re-focus. Checking
+    // actual focus (not just the _showingRecent flag) matters: any
+    // store-driven re-render calls this setter, including ones from
+    // totally unrelated UI the user clicked after last leaving this
+    // field — without the focus check, the recent list could pop back
+    // open on its own while the input sits unfocused.
+    if (
+      this._showingRecent &&
+      !this.$input.value.trim() &&
+      this.shadowRoot.activeElement === this.$input
+    ) {
+      this._showRecentOrHide();
+    }
+  }
+
+  _isMobile() {
+    return window.matchMedia(MOBILE_QUERY).matches;
+  }
+
+  _openSheet() {
+    this._sheetOpen = true;
+    this.$wrap.classList.add('sheet');
+    this._prevBodyOverflow = document.body.style.overflow;
+    document.body.style.overflow = 'hidden';
+    this._reposition();
+  }
+
+  _closeSheet() {
+    if (!this._sheetOpen) return;
+    this._sheetOpen = false;
+    this.$wrap.classList.remove('sheet');
+    this.$wrap.style.top = '';
+    this.$wrap.style.height = '';
+    document.body.style.overflow = this._prevBodyOverflow || '';
+  }
+
+  _reposition() {
+    if (this._sheetOpen) this._positionSheet();
+    else this._positionDropdown();
+  }
+
+  _positionSheet() {
+    const vv = window.visualViewport;
+    this.$wrap.style.top = `${vv?.offsetTop ?? 0}px`;
+    this.$wrap.style.height = `${vv?.height ?? window.innerHeight}px`;
+  }
+
+  _positionDropdown() {
     if (this.$list.hidden) return;
     const vv = window.visualViewport;
     const viewportH = vv?.height ?? window.innerHeight;
@@ -170,8 +371,9 @@ export class PokemonSearch extends HTMLElement {
   _onInput() {
     const q = this.$input.value.trim().toLowerCase();
     this._activeIndex = -1;
+    this._showingRecent = false;
     if (!q) {
-      this._hideList();
+      this._showRecentOrHide();
       return;
     }
     if (!this._species) {
@@ -182,11 +384,22 @@ export class PokemonSearch extends HTMLElement {
     this._renderList();
   }
 
+  /** With nothing typed, offer recently-picked species instead of an empty field. */
+  _showRecentOrHide() {
+    if (!this._recent.length) {
+      this._hideList();
+      return;
+    }
+    this._matches = this._recent;
+    this._showingRecent = true;
+    this._renderList();
+  }
+
   _showLoading() {
     this.$list.innerHTML = '<li class="status">Loading species…</li>';
     this.$list.hidden = false;
     this.$input.setAttribute('aria-expanded', 'true');
-    this._positionList();
+    this._reposition();
   }
 
   _renderList() {
@@ -194,31 +407,65 @@ export class PokemonSearch extends HTMLElement {
       this.$list.innerHTML = '<li class="status">No matching Pok&eacute;mon.</li>';
       this.$list.hidden = false;
       this.$input.setAttribute('aria-expanded', 'true');
-      this._positionList();
+      this._reposition();
       return;
     }
-    this.$list.innerHTML = this._matches
-      .map(
-        (s) => `<li class="option" role="option" data-name="${s.name}">
-          <img class="thumb" src="${s.sprite || FALLBACK_SPRITE}" alt="" loading="lazy" />
-          ${titleCase(s.name)}
-        </li>`
-      )
-      .join('');
+    const showEv = this.hasAttribute('show-ev-yield');
+    const header = this._showingRecent ? '<li class="status">Recent</li>' : '';
+    this.$list.innerHTML =
+      header +
+      this._matches
+        .map(
+          (s) => `<li class="option" role="option" data-name="${s.name}">
+            <img class="thumb" src="${s.sprite || FALLBACK_SPRITE}" alt="" loading="lazy" />
+            <span class="option-name">${titleCase(s.name)}</span>
+            ${showEv ? '<span class="option-ev-yield"></span>' : ''}
+          </li>`
+        )
+        .join('');
     this.$list.hidden = false;
     this.$input.setAttribute('aria-expanded', 'true');
-    this._positionList();
+    this._reposition();
+    if (showEv) this._loadEvYields();
+  }
+
+  /**
+   * Fills in each visible row's EV yield once its full data resolves —
+   * cached, so cheap after the first lookup anywhere. With `evModifier`
+   * set, shows what would actually be applied (item/Pokérus/caps folded
+   * in) rather than the opponent's raw base yield; if that comes out to
+   * nothing while the base yield wasn't zero, that's the EV caps already
+   * being maxed out, not a data gap, so it's labeled "Capped" instead of
+   * left blank.
+   */
+  _loadEvYields() {
+    for (const li of this.$list.querySelectorAll('li.option')) {
+      const name = li.dataset.name;
+      api
+        .getPokemon(name)
+        .then((mon) => {
+          const span = li.querySelector('.option-ev-yield');
+          if (!span) return;
+          const evs = this._evModifier ? this._evModifier(mon) : mon.evYield;
+          const formatted = formatEvYield(evs);
+          const baseHadYield = formatEvYield(mon.evYield) !== '';
+          span.textContent = formatted || (this._evModifier && baseHadYield ? 'Capped' : '');
+        })
+        .catch(() => {});
+    }
   }
 
   _hideList() {
     this.$list.hidden = true;
     this.$list.innerHTML = '';
     this.$input.setAttribute('aria-expanded', 'false');
+    this._showingRecent = false;
   }
 
   _onKeydown(e) {
     if (this.$list.hidden) {
       if (e.key === 'Enter') this._tryDirectPick();
+      else if (e.key === 'Escape' && this._sheetOpen) this.$input.blur();
       return;
     }
     const items = [...this.$list.querySelectorAll('li.option')];
@@ -236,6 +483,7 @@ export class PokemonSearch extends HTMLElement {
       else this._tryDirectPick();
     } else if (e.key === 'Escape') {
       this._hideList();
+      if (this._sheetOpen) this.$input.blur();
     }
   }
 
@@ -252,9 +500,19 @@ export class PokemonSearch extends HTMLElement {
   _pick(name) {
     this.$input.value = '';
     this._hideList();
+    const wasSheet = this._sheetOpen;
     this.dispatchEvent(
       new CustomEvent('pokemon-pick', { detail: { name }, bubbles: true, composed: true })
     );
+    if (wasSheet) {
+      this.$input.blur();
+    } else if (this.shadowRoot.activeElement === this.$input) {
+      // The input stays focused after a mouse pick (see the pointerdown
+      // handler above) — without this, re-picking another recent option
+      // needs a full blur-then-refocus, since clicking an already-focused
+      // input doesn't fire a new 'focus' event to bring the list back.
+      this._showRecentOrHide();
+    }
   }
 
   clear() {

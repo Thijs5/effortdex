@@ -5,10 +5,11 @@
 // rendering.
 
 import { STAT_CAP, TOTAL_CAP, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, MACHO_BRACE_MULTIPLIER, DEFAULT_LEVEL, FALLBACK_SPRITE } from './lib/constants.js';
-import { titleCase, totalEvs, formatEvYield, natureLabel, sortedNatures, escapeHtml } from './lib/utils.js';
+import { titleCase, totalEvs, natureLabel, sortedNatures, escapeHtml } from './lib/utils.js';
 import { api, store } from './lib/services.js';
 import { attachDesignSystem } from './lib/design-system.js';
 import * as router from './lib/router.js';
+import { getRunningVersion, fetchLatestVersion, clearAppCache } from './lib/version-check.js';
 import './components/pokemon-search.js';
 import './components/caught-pokemon-card.js';
 import './components/game-cartridge.js';
@@ -67,6 +68,13 @@ const pokemonView = document.getElementById('pokemon-view');
 const backToRoster = document.getElementById('back-to-roster');
 const pokemonCard = document.createElement('caught-pokemon-card');
 pokemonView.appendChild(pokemonCard);
+
+const settingsView = document.getElementById('settings-view');
+const settingsBtn = document.getElementById('settings-btn');
+const backFromSettings = document.getElementById('back-from-settings');
+const settingsVersion = document.getElementById('settings-version');
+const clearCacheBtn = document.getElementById('clear-cache-btn');
+const clearCacheStatus = document.getElementById('clear-cache-status');
 
 const partyDialog = document.getElementById('party-dialog');
 const partyForm = document.getElementById('party-form');
@@ -135,6 +143,10 @@ interceptLinkClick(backToParties, () => router.navigateHome());
 
 let backToRosterSlug = null;
 interceptLinkClick(backToRoster, () => router.navigateToParty(backToRosterSlug));
+
+backFromSettings.href = router.partyPath(null);
+interceptLinkClick(backFromSettings, () => router.navigateHome());
+settingsBtn.addEventListener('click', () => router.navigateToSettings());
 
 /* ------------------------------------------------------------------ */
 /* Party create/edit dialog                                            */
@@ -214,9 +226,10 @@ partyDeleteBtn.addEventListener('click', () => {
 /* Catch panel                                                         */
 /* ------------------------------------------------------------------ */
 
-// Picking a species opens a modal (sprite, EV yield, a level field) rather
-// than catching immediately — level is decided at catch time, not fixed
-// to DEFAULT_LEVEL, since that's when the user actually knows it.
+// Picking a species opens a modal (sprite, a level field) rather than
+// catching immediately — level is decided at catch time, not fixed to
+// DEFAULT_LEVEL, since that's when the user actually knows it. EV yield
+// isn't shown here: it doesn't matter until the Pokémon is trained.
 let pendingCatchMon = null;
 
 catchSearch.addEventListener('pokemon-pick', (e) => openCatchDialog(e.detail.name));
@@ -226,7 +239,7 @@ async function openCatchDialog(name) {
   catchDialogTitle.textContent = `Catch ${titleCase(name)}`;
   catchDialogSprite.src = FALLBACK_SPRITE;
   catchDialogName.textContent = titleCase(name);
-  catchDialogEvYield.textContent = 'Checking EV yield…';
+  catchDialogEvYield.textContent = '';
   catchDialogLevel.value = DEFAULT_LEVEL;
   catchDialogNature.value = '';
   catchDialogNatureField.hidden = !store.natureAvailable();
@@ -237,8 +250,6 @@ async function openCatchDialog(name) {
     const mon = await api.getPokemon(name);
     pendingCatchMon = mon;
     catchDialogSprite.src = mon.sprite || FALLBACK_SPRITE;
-    const gained = formatEvYield(mon.evYield);
-    catchDialogEvYield.textContent = gained ? `Base EV yield: ${gained}` : 'Base EV yield: none';
     catchDialogSubmitBtn.disabled = false;
     catchDialogLevel.focus();
     catchDialogLevel.select();
@@ -372,13 +383,22 @@ function renderLegend() {
 /* Router <-> view                                                     */
 /* ------------------------------------------------------------------ */
 
+const VIEWS = [pickerView, partyView, pokemonView, settingsView];
+function showView(view) {
+  for (const v of VIEWS) v.hidden = v !== view;
+}
+
 function render() {
-  const { partySlug, pokemonUid } = router.currentRoute();
+  const { page, partySlug, pokemonUid } = router.currentRoute();
+
+  if (page === 'settings') {
+    showView(settingsView);
+    renderSettings();
+    return;
+  }
 
   if (!partySlug) {
-    pickerView.hidden = false;
-    partyView.hidden = true;
-    pokemonView.hidden = true;
+    showView(pickerView);
     renderPicker();
     return;
   }
@@ -399,9 +419,7 @@ function render() {
       router.navigateToParty(party.slug); // stale link, or this Pokémon was just released
       return;
     }
-    pickerView.hidden = true;
-    partyView.hidden = true;
-    pokemonView.hidden = false;
+    showView(pokemonView);
     backToRosterSlug = party.slug;
     backToRoster.href = router.partyPath(party.slug);
     backToRoster.textContent = `← ${party.name}`;
@@ -409,9 +427,7 @@ function render() {
     return;
   }
 
-  pickerView.hidden = true;
-  partyView.hidden = false;
-  pokemonView.hidden = true;
+  showView(partyView);
   activePartyName.textContent = party.name;
   activePartyGame.hidden = !party.gameVersion;
   activePartyGameCart.name = party.gameVersion;
@@ -420,7 +436,75 @@ function render() {
   activePartyDescription.textContent = party.description;
   renderLegend();
   renderRoster(party);
+  // Most-recently-caught species first, deduped — `party.pokemon` is
+  // append-ordered, so the party's own catch order is the recency order.
+  catchSearch.recent = [...party.pokemon]
+    .reverse()
+    .map((e) => ({ name: e.speciesName, sprite: e.sprite }));
 }
+
+/* ------------------------------------------------------------------ */
+/* Version display + update check                                      */
+/* ------------------------------------------------------------------ */
+
+const appVersionLabel = document.getElementById('app-version');
+
+// The version baked into the shell that's actually running right now —
+// not necessarily the latest one on the server (see checkForUpdate).
+let runningVersion = null;
+
+getRunningVersion().then((version) => {
+  runningVersion = version;
+  if (version) {
+    appVersionLabel.textContent = `v${version}`;
+    appVersionLabel.hidden = false;
+  }
+  if (settingsVersion) settingsVersion.textContent = version ? `v${version}` : 'unknown';
+});
+
+// Polls version.json bypassing every cache (see sw.js). A mismatch means
+// this tab has been open since before the last deploy, so its cached app
+// shell — and any stale localStorage-cached PokeAPI data shaped by old
+// code — could be out of date; wipe it and reload to pick up the new one.
+let checkingForUpdate = false;
+async function checkForUpdate() {
+  if (checkingForUpdate || !runningVersion) return;
+  checkingForUpdate = true;
+  try {
+    const latest = await fetchLatestVersion();
+    if (!latest || latest === runningVersion) return;
+    await clearAppCache();
+    window.location.reload();
+  } finally {
+    checkingForUpdate = false;
+  }
+}
+
+window.addEventListener('load', checkForUpdate);
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') checkForUpdate();
+});
+// Belt-and-suspenders for a tab/installed app left open for a long
+// stretch without ever being backgrounded or reloaded.
+setInterval(checkForUpdate, 15 * 60 * 1000);
+
+/* ------------------------------------------------------------------ */
+/* Settings ("/settings") — manual cache clear, mainly for someone     */
+/* stuck on a stale shell despite the automatic check above.           */
+/* ------------------------------------------------------------------ */
+
+function renderSettings() {
+  settingsVersion.textContent = runningVersion ? `v${runningVersion}` : '…';
+  clearCacheStatus.textContent = '';
+}
+
+clearCacheBtn.addEventListener('click', async () => {
+  clearCacheBtn.disabled = true;
+  clearCacheStatus.textContent = 'Clearing cache… your parties and roster are untouched.';
+  await clearAppCache();
+  clearCacheStatus.textContent = 'Cache cleared — your data is safe. Reloading…';
+  window.location.reload();
+});
 
 router.onRouteChange(render);
 store.addEventListener('change', render);
@@ -461,7 +545,15 @@ themeToggle.addEventListener('click', () => {
 /* Offline app shell                                                   */
 /* ------------------------------------------------------------------ */
 
-if ('serviceWorker' in navigator) {
+// Caching (the service worker's offline shell, and version.json's own
+// cache entry) is deliberately off on localhost/127.0.0.1 — while
+// developing, every reload should hit the files on disk, not a cached
+// copy from three edits ago. Anyone who *does* want to test the
+// installed/offline behavior locally should serve over a LAN IP or
+// tunnel instead of localhost.
+const isLocalDev = ['localhost', '127.0.0.1', '[::1]'].includes(location.hostname);
+
+if ('serviceWorker' in navigator && !isLocalDev) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('sw.js');
   });
@@ -475,4 +567,11 @@ if ('serviceWorker' in navigator) {
     refreshing = true;
     window.location.reload();
   });
+} else if ('serviceWorker' in navigator && isLocalDev) {
+  // Belt-and-suspenders cleanup for a dev profile that had the app
+  // installed/tested against a non-localhost server before: get rid of
+  // any worker and cache still hanging around so it can't shadow local
+  // edits.
+  navigator.serviceWorker.getRegistrations().then((regs) => regs.forEach((r) => r.unregister()));
+  if ('caches' in window) caches.keys().then((keys) => keys.forEach((k) => caches.delete(k)));
 }

@@ -25,6 +25,7 @@
     <header class="bezel">
       <h1>Pok<span class="e-accent">é</span>logger</h1>
       <p class="tagline">Effort value field log</p>
+      <button id="settings-btn" class="theme-toggle settings-btn" type="button" aria-label="Settings" title="Settings">⚙</button>
       <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Theme: auto">◐</button>
     </header>
 
@@ -84,8 +85,36 @@
       <a id="back-to-roster" class="back-link" href="#/">&larr; Roster</a>
     </main>
 
+    <!-- "/settings" — app-wide settings, reachable from any party -->
+    <main id="settings-view" class="settings-view" hidden>
+      <a id="back-from-settings" class="back-link" href="#/">&larr; Back</a>
+      <h2>Settings</h2>
+
+      <section class="settings-section">
+        <h3>App info</h3>
+        <p class="hint">Version <span id="settings-version"></span></p>
+      </section>
+
+      <section class="settings-section">
+        <h3>Storage</h3>
+        <p class="hint">
+          Pok&eacute;logger caches its own files (and PokéAPI lookups)
+          so it keeps working offline. "Clear cache" only wipes that
+          offline copy &mdash; it gets rebuilt fresh on the next load.
+        </p>
+        <p class="hint safe-data-note">
+          <strong>Your parties, roster and battle history are safe.</strong>
+          They live separately in this browser's storage and are never
+          touched by this button.
+        </p>
+        <button id="clear-cache-btn" class="btn btn--ghost">Clear cache</button>
+        <p id="clear-cache-status" class="status-line" aria-live="polite"></p>
+      </section>
+    </main>
+
     <footer class="bezel-footer">
       <span>Data via PokéAPI &middot; stored locally in this browser</span>
+      <span id="app-version" class="app-version" hidden></span>
     </footer>
   </div>
 
