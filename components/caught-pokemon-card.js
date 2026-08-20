@@ -1,8 +1,9 @@
-import { POWER_ITEMS, MACHO_BRACE_SPRITE, VITAMINS, NATURES, STAT_LABEL, MACHO_BRACE_MULTIPLIER, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, TOTAL_CAP, FALLBACK_SPRITE, FALLBACK_ONERROR, MIN_LEVEL, MAX_LEVEL } from '../lib/constants.js';
+import { POWER_ITEMS, MACHO_BRACE_SPRITE, EXP_SHARE_SPRITE, VITAMINS, FEATHERS, FEATHER_BONUS, EV_BERRIES, EV_BERRY_REDUCTION, NATURES, STAT_LABEL, MACHO_BRACE_MULTIPLIER, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, TOTAL_CAP, FALLBACK_SPRITE, FALLBACK_ONERROR, MIN_LEVEL, MAX_LEVEL } from '../lib/constants.js';
 import { titleCase, totalEvs, natureEffectHint, natureOptionsHtml, dayLabel, escapeHtml } from '../lib/utils.js';
 import { api, store } from '../lib/services.js';
 import { versionedSpriteUrl } from '../lib/pokeapi-client.js';
 import { attachDesignSystem } from '../lib/design-system.js';
+import { POKERUS_ICON_SVG } from '../lib/icons.js';
 import './ev-summary.js';
 import './ev-history-log.js';
 import './evolution-chain.js';
@@ -39,9 +40,7 @@ export class CaughtPokemonCard extends HTMLElement {
            button rather than owning its own row. */
         header {
           display: grid; grid-template-columns: 64px 1fr auto;
-          grid-template-areas:
-            "sprite titles more"
-            "sprite trained trained";
+          grid-template-areas: "sprite titles more";
           align-items: center; column-gap: var(--space-4); row-gap: 0;
           padding-bottom: var(--space-4);
           border-bottom: 1px dashed var(--lcd-line);
@@ -58,6 +57,37 @@ export class CaughtPokemonCard extends HTMLElement {
         :host([pokerus-infected]) .sprite {
           border-color: var(--pokerus-purple);
           box-shadow: 0 0 0 3px var(--pokerus-purple-soft);
+        }
+        /* A Pokémon at the 510 EV cap gets a gold shimmer instead of a
+           text badge — the achievement reads at a glance without taking
+           up header space. Backgrounds paint fine on <img> (unlike
+           ::after, which replaced elements like <img> don't support), so
+           the shimmer is just an animated gradient behind the sprite's
+           transparent PNG edges. The border/ring still goes to Pokérus
+           when both apply (next rule, higher specificity) — trained is a
+           one-time achievement the background alone already communicates,
+           while the ring is this Pokémon's one ongoing status worth not
+           burying. */
+        :host([fully-trained]) .sprite {
+          border-color: #caa53d;
+          box-shadow: 0 0 0 3px rgba(202, 165, 61, 0.35), 0 0 8px rgba(255, 215, 0, 0.3);
+          background-image: linear-gradient(120deg, #c9a227 0%, #ffe9a8 30%, #fff6d5 50%, #ffe9a8 70%, #c9a227 100%);
+          background-size: 180% 180%;
+          animation: fully-trained-shimmer 5.5s linear infinite;
+        }
+        /* Both apply: keep the Pokérus ring (a fact about the Pokémon)
+           visible rather than letting the gold fully-trained treatment
+           hide it, while still layering the gold glow around it. */
+        :host([fully-trained][pokerus-infected]) .sprite {
+          border-color: var(--pokerus-purple);
+          box-shadow: 0 0 0 3px var(--pokerus-purple-soft), 0 0 8px rgba(255, 215, 0, 0.3);
+        }
+        @keyframes fully-trained-shimmer {
+          0% { background-position: 0% 50%; }
+          100% { background-position: 100% 50%; }
+        }
+        @media (prefers-reduced-motion: reduce) {
+          :host([fully-trained]) .sprite { animation: none; background-position: 40% 50%; }
         }
         /* "#169 Adamant Slowpoke": Dex number, then nature (the games'
            own phrasing), then the editable name — one line, one glance.
@@ -102,7 +132,6 @@ export class CaughtPokemonCard extends HTMLElement {
         .level-up-btn:disabled svg { color: inherit; }
         .more-btn { grid-area: more; align-self: start; display: inline-flex; align-items: center; gap: 0.3em; white-space: nowrap; }
         .more-btn svg { width: 14px; height: 14px; }
-        .trained-badge { grid-area: trained; justify-self: start; margin-top: var(--space-2); }
         /* The number+nature prefix (added ahead of the editable name)
            leaves less room for a long nickname on a phone-width card —
            drop the "More" label and keep just its icon, freeing that
@@ -140,6 +169,24 @@ export class CaughtPokemonCard extends HTMLElement {
         .more-dialog:not([open]) { display: none; }
         .more-dialog[open] { display: grid; }
         .more-dialog .ds-dialog-header { margin-bottom: 0; }
+        /* The dialog grew a lot (Wings/Berries/Exp. Share on top of the
+           original sections) — on screens with room to spare, widen it
+           and flow its sections into two columns instead of one long
+           single-column scroll. The header, evolution chain (its own
+           variable-width content) and release button stay full-width. */
+        @media (min-width: 760px) {
+          /* Compound selector (not just .more-dialog), so this reliably
+             beats the shared .ds-dialog width at equal specificity
+             regardless of adoptedStyleSheets vs. shadow-tree <style>
+             ordering — same reasoning as .status-pill--item elsewhere. */
+          .more-dialog.ds-dialog { width: min(720px, calc(100vw - 2.4rem)); }
+          .more-dialog[open] { grid-template-columns: 1fr 1fr; column-gap: var(--space-5); }
+          .more-dialog .ds-dialog-header,
+          .more-dialog .evolve-panel,
+          .more-dialog .release {
+            grid-column: 1 / -1;
+          }
+        }
         .release {
           display: inline-flex; align-items: center; justify-content: center; gap: 0.35em;
           border: 1px solid var(--lcd-line); background: transparent; cursor: pointer; width: 100%;
@@ -193,12 +240,14 @@ export class CaughtPokemonCard extends HTMLElement {
         .aids { display: grid; gap: var(--space-2); }
         .item-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-2); }
 
-        .vitamins { display: grid; gap: var(--space-2); }
-        .vitamin-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); }
-        .vitamin-status { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--teal); min-height: 1em; }
-        .vitamin-btn { position: relative; }
-        .vitamin-btn[data-capped] { opacity: 0.55; }
-        .vitamin-btn[data-count]:not([data-count="0"])::after {
+        .vitamins, .wings, .berries { display: grid; gap: var(--space-2); }
+        .vitamin-grid, .wing-grid, .berry-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); }
+        .vitamin-status, .wing-status, .berry-status { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--teal); min-height: 1em; }
+        .vitamin-btn, .wing-btn, .berry-btn { position: relative; }
+        .vitamin-btn[data-capped], .wing-btn[data-capped], .berry-btn[data-capped] { opacity: 0.55; }
+        .vitamin-btn[data-count]:not([data-count="0"])::after,
+        .wing-btn[data-count]:not([data-count="0"])::after,
+        .berry-btn[data-count]:not([data-count="0"])::after {
           content: '×' attr(data-count);
           position: absolute; top: -8px; right: -8px;
           background: var(--teal); color: var(--on-teal);
@@ -210,6 +259,11 @@ export class CaughtPokemonCard extends HTMLElement {
         .pokerus-section { display: grid; gap: var(--space-2); justify-items: start; }
         .pokerus-toggle-btn { width: auto; }
         .pokerus-toggle-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .pokerus-icon { width: 22px; height: 22px; flex: 0 0 auto; display: inline-flex; color: var(--pokerus-purple); }
+        .pokerus-icon svg { width: 100%; height: 100%; }
+
+        .exp-share-section { display: grid; gap: var(--space-2); justify-items: start; }
+        .exp-share-toggle-btn { width: auto; }
         .pokerus-note { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--ink-soft); }
 
         .evolve-panel { display: grid; gap: var(--space-2); }
@@ -239,7 +293,6 @@ export class CaughtPokemonCard extends HTMLElement {
             <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="17.5" r="1.7"/></svg>
             <span class="more-btn-label">More</span>
           </button>
-          <span class="trained-badge ds-pill-badge" hidden>★ Fully trained</span>
         </header>
 
         <dialog class="more-dialog ds-dialog">
@@ -250,6 +303,18 @@ export class CaughtPokemonCard extends HTMLElement {
             </button>
           </header>
 
+          <!--
+            Level & nature always leads — it's the one section that's
+            identity, not a training mechanic, so it isn't part of the
+            generation ordering below. Everything after it is ordered by
+            the generation each mechanic was introduced in (Vitamins/
+            Exp. Share Gen I, Pokérus Gen II, Macho Brace/EV-reducing
+            berries Gen III, Power items Gen IV, Wings Gen V), not by
+            feature-add order — a fixed, predictable position beats a
+            "newest at the bottom" list once there are this many.
+            Evolution isn't generation-gated, so it stays last, ahead of
+            Release.
+          -->
           <section class="details-section">
             <h3 class="section-title">Level &amp; nature
               <button type="button" class="help-btn" aria-expanded="false" aria-label="What is EV training?" title="EVs (Effort Values) are hidden bonus stat points earned mainly from battling — up to 252 per stat, 510 total. Nature is fixed when a Pokémon is caught or hatched: it boosts one stat by 10% and lowers another. Nature doesn't change EVs, but training the stat your nature already boosts gets the most out of your points.">?</button>
@@ -263,11 +328,25 @@ export class CaughtPokemonCard extends HTMLElement {
             <p class="nature-hint" aria-live="polite"></p>
           </section>
 
-          <section class="aids">
-            <h3 class="section-title">Training item
-              <button type="button" class="help-btn" aria-expanded="false" aria-label="What do training items do?" title="Held items that speed up EV gains from battling. The Macho Brace doubles every EV earned in battle for any stat. A Power item instead adds a flat bonus to one specific stat every battle, on top of whatever that battle normally gives.">?</button>
+          <section class="vitamins">
+            <h3 class="section-title">Vitamins
+              <button type="button" class="help-btn" aria-expanded="false" aria-label="What do vitamins do?" title="Vitamins (HP Up, Protein, Iron, Calcium, Zinc, Carbos) instantly add EVs to one stat without battling — a quick way to top off a stat. Each only works until that stat has 100 EVs from any source; after that, only battling, items, or Pokérus can push it further toward the 252 cap.">?</button>
             </h3>
-            <div class="item-grid"></div>
+            <div class="vitamin-grid"></div>
+            <p class="vitamin-status" aria-live="polite"></p>
+          </section>
+
+          <section class="exp-share-section">
+            <h3 class="section-title">Exp. Share
+              <button type="button" class="help-btn" aria-expanded="false" aria-label="What does Exp. Share do?" title="While holding an Exp. Share, this Pokémon also earns EVs whenever any other Pokémon in this party has a battle logged — the same base amount that Pokémon got, doubled by this Pokémon's own Pokérus if it has any. It never inherits the other Pokémon's held item bonus.">?</button>
+            </h3>
+            <button type="button" class="ds-item-btn exp-share-toggle-btn" aria-pressed="false">
+              <img class="ds-item-icon" src="${EXP_SHARE_SPRITE}" alt="" ${FALLBACK_ONERROR} />
+              <span class="ds-item-btn-text">
+                <span class="ds-item-btn-label">Exp. Share</span>
+                <span class="ds-item-btn-boost">Gets EVs from other battles</span>
+              </span>
+            </button>
           </section>
 
           <section class="pokerus-section">
@@ -275,6 +354,7 @@ export class CaughtPokemonCard extends HTMLElement {
               <button type="button" class="help-btn" aria-expanded="false" aria-label="What is Pokérus?" title="A rare, harmless in-game virus. While infected, every EV your Pokémon earns from battling is doubled — pure bonus, no downside. It can also spread to other party members over time. Once it cures (after a few days), the ×2 EV bonus stays forever — no need to toggle this off.">?</button>
             </h3>
             <button type="button" class="ds-item-btn pokerus-toggle-btn" aria-pressed="false">
+              <span class="pokerus-icon" aria-hidden="true">${POKERUS_ICON_SVG}</span>
               <span class="ds-item-btn-text">
                 <span class="ds-item-btn-label">Pokérus</span>
                 <span class="ds-item-btn-boost">×2 EVs</span>
@@ -283,12 +363,27 @@ export class CaughtPokemonCard extends HTMLElement {
             <p class="pokerus-note" hidden>Pokérus doesn't double EVs in this game.</p>
           </section>
 
-          <section class="vitamins">
-            <h3 class="section-title">Vitamins
-              <button type="button" class="help-btn" aria-expanded="false" aria-label="What do vitamins do?" title="Vitamins (HP Up, Protein, Iron, Calcium, Zinc, Carbos) instantly add EVs to one stat without battling — a quick way to top off a stat. Each only works until that stat has 100 EVs from any source; after that, only battling, items, or Pokérus can push it further toward the 252 cap.">?</button>
+          <section class="aids">
+            <h3 class="section-title">Training item
+              <button type="button" class="help-btn" aria-expanded="false" aria-label="What do training items do?" title="Held items that speed up EV gains from battling. The Macho Brace doubles every EV earned in battle for any stat. A Power item instead adds a flat bonus to one specific stat every battle, on top of whatever that battle normally gives.">?</button>
             </h3>
-            <div class="vitamin-grid"></div>
-            <p class="vitamin-status" aria-live="polite"></p>
+            <div class="item-grid"></div>
+          </section>
+
+          <section class="berries">
+            <h3 class="section-title">EV-reducing berries
+              <button type="button" class="help-btn" aria-expanded="false" aria-label="What do EV-reducing berries do?" title="Pomeg, Kelpsy, Qualot, Hondew, Grepa and Tamato berries remove 10 EVs from one stat — useful for undoing a mis-trained stat. Floors at 0.">?</button>
+            </h3>
+            <div class="berry-grid"></div>
+            <p class="berry-status" aria-live="polite"></p>
+          </section>
+
+          <section class="wings">
+            <h3 class="section-title">Wings
+              <button type="button" class="help-btn" aria-expanded="false" aria-label="What do Wings do?" title="Wings (Health, Muscle, Resist, Genius, Clever, Swift) instantly add 1 EV to one stat without battling. Unlike vitamins, there's no 100-EV cutoff — they work all the way to the 252 cap.">?</button>
+            </h3>
+            <div class="wing-grid"></div>
+            <p class="wing-status" aria-live="polite"></p>
           </section>
 
           <div class="evolve-panel">
@@ -309,7 +404,9 @@ export class CaughtPokemonCard extends HTMLElement {
 
           <div class="card-col card-col--right">
             <section class="battle">
-              <h3 class="section-title">Log a battle</h3>
+              <h3 class="section-title">Log a battle
+                <button type="button" class="help-btn" aria-expanded="false" aria-label="What about Exp. Share?" title="Holding an Exp. Share doesn't change how EVs work here — a Pokémon that gets EVs via Exp. Share earns exactly what it would from fighting directly. Just log the defeat here for this Pokémon too, whether or not it was the one that actually battled.">?</button>
+              </h3>
               <pokemon-search placeholder="Defeated Pokémon…" show-ev-yield></pokemon-search>
               <p class="status" aria-live="polite"></p>
             </section>
@@ -336,13 +433,19 @@ export class CaughtPokemonCard extends HTMLElement {
     this.$moreDialog = shadow.querySelector('.more-dialog');
     this.$moreDialogClose = shadow.querySelector('.more-dialog-close');
     this.$release = shadow.querySelector('.release');
-    this.$trainedBadge = shadow.querySelector('.trained-badge');
     this.$evSummary = shadow.querySelector('ev-summary');
     this.$itemGrid = shadow.querySelector('.item-grid');
     this.$pokerusToggle = shadow.querySelector('.pokerus-toggle-btn');
     this.$pokerusNote = shadow.querySelector('.pokerus-note');
+    this.$expShareToggle = shadow.querySelector('.exp-share-toggle-btn');
     this.$vitaminGrid = shadow.querySelector('.vitamin-grid');
     this.$vitaminStatus = shadow.querySelector('.vitamin-status');
+    this.$wingsSection = shadow.querySelector('.wings');
+    this.$wingGrid = shadow.querySelector('.wing-grid');
+    this.$wingStatus = shadow.querySelector('.wing-status');
+    this.$berriesSection = shadow.querySelector('.berries');
+    this.$berryGrid = shadow.querySelector('.berry-grid');
+    this.$berryStatus = shadow.querySelector('.berry-status');
     this.$evoChain = shadow.querySelector('evolution-chain');
     this.$search = shadow.querySelector('pokemon-search');
     // Shows what battling this opponent would actually add right now —
@@ -372,6 +475,8 @@ export class CaughtPokemonCard extends HTMLElement {
     });
 
     this._populateVitaminButtons();
+    this._populateWingButtons();
+    this._populateBerryButtons();
     this.$nature.innerHTML = natureOptionsHtml();
     this._wireEvents();
   }
@@ -452,6 +557,46 @@ export class CaughtPokemonCard extends HTMLElement {
     }
   }
 
+  // Same template as vitamins, minus the 100-EV-cutoff framing — Wings
+  // never have one.
+  _populateWingButtons() {
+    const sorted = [...FEATHERS].sort((a, b) => a.label.localeCompare(b.label));
+    for (const f of sorted) {
+      const boost = `+${FEATHER_BONUS} ${STAT_LABEL[f.stat]}`;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'ds-item-btn wing-btn';
+      btn.dataset.feather = f.id;
+      btn.title = `Feed ${f.label} — raises ${STAT_LABEL[f.stat]} EVs by ${FEATHER_BONUS}`;
+      btn.innerHTML = `<img class="ds-item-icon" src="${f.sprite}" alt="" ${FALLBACK_ONERROR} />
+        <span class="ds-item-btn-text">
+          <span class="ds-item-btn-label">${f.label}</span>
+          <span class="ds-item-btn-boost">${boost}</span>
+        </span>`;
+      this.$wingGrid.appendChild(btn);
+    }
+  }
+
+  // Same template again, but the boost reads as a reduction — these
+  // subtract EVs rather than add them.
+  _populateBerryButtons() {
+    const sorted = [...EV_BERRIES].sort((a, b) => a.label.localeCompare(b.label));
+    for (const b of sorted) {
+      const boost = `−${EV_BERRY_REDUCTION} ${STAT_LABEL[b.stat]}`;
+      const btn = document.createElement('button');
+      btn.type = 'button';
+      btn.className = 'ds-item-btn berry-btn';
+      btn.dataset.berry = b.id;
+      btn.title = `Feed ${b.label} — removes up to ${EV_BERRY_REDUCTION} ${STAT_LABEL[b.stat]} EVs`;
+      btn.innerHTML = `<img class="ds-item-icon" src="${b.sprite}" alt="" ${FALLBACK_ONERROR} />
+        <span class="ds-item-btn-text">
+          <span class="ds-item-btn-label">${b.label}</span>
+          <span class="ds-item-btn-boost">${boost}</span>
+        </span>`;
+      this.$berryGrid.appendChild(btn);
+    }
+  }
+
   _wireEvents() {
     this.$nickname.addEventListener('change', () => {
       store.renamePokemon(this._entry.uid, this.$nickname.value.trim());
@@ -482,8 +627,10 @@ export class CaughtPokemonCard extends HTMLElement {
       if (e.target === this.$moreDialog) this.$moreDialog.close();
     });
     // The "?" buttons toggle their explanation inline: title tooltips are
-    // hover-only, which leaves them unreachable on touch devices.
-    this.$moreDialog.addEventListener('click', (e) => {
+    // hover-only, which leaves them unreachable on touch devices. Listens
+    // on the shadow root, not just $moreDialog, since the battle
+    // section's own help button (Exp. Share) lives outside that dialog.
+    this.shadowRoot.addEventListener('click', (e) => {
       const btn = e.target.closest('.help-btn');
       if (!btn) return;
       const heading = btn.closest('.section-title');
@@ -522,10 +669,23 @@ export class CaughtPokemonCard extends HTMLElement {
     this.$pokerusToggle.addEventListener('click', () => {
       store.setPokerus(this._entry.uid, this.$pokerusToggle.getAttribute('aria-pressed') !== 'true');
     });
+    this.$expShareToggle.addEventListener('click', () => {
+      store.setExpShare(this._entry.uid, this.$expShareToggle.getAttribute('aria-pressed') !== 'true');
+    });
     this.$vitaminGrid.addEventListener('click', (e) => {
       const btn = e.target.closest('.vitamin-btn');
       if (!btn) return;
       this._useVitamin(btn.dataset.vitamin);
+    });
+    this.$wingGrid.addEventListener('click', (e) => {
+      const btn = e.target.closest('.wing-btn');
+      if (!btn) return;
+      this._useFeather(btn.dataset.feather);
+    });
+    this.$berryGrid.addEventListener('click', (e) => {
+      const btn = e.target.closest('.berry-btn');
+      if (!btn) return;
+      this._useBerry(btn.dataset.berry);
     });
     this.$search.addEventListener('pokemon-pick', (e) => {
       this._battle(e.detail.name, 'Looking up battle data…');
@@ -568,6 +728,26 @@ export class CaughtPokemonCard extends HTMLElement {
     }
   }
 
+  /** Feeds one Wing and reports exactly which stat moved and by how much. */
+  _useFeather(featherId) {
+    const feather = FEATHERS.find((f) => f.id === featherId);
+    const result = store.useFeather(this._entry.uid, featherId);
+    if (!result || !feather) return;
+    this.$wingStatus.textContent = result.applied
+      ? `${feather.label}: +${result.applied} ${STAT_LABEL[feather.stat]}`
+      : `${feather.label}: no EVs gained — ${STAT_LABEL[feather.stat]} is already maxed out`;
+  }
+
+  /** Feeds one EV-reducing berry and reports exactly which stat moved and by how much. */
+  _useBerry(berryId) {
+    const berry = EV_BERRIES.find((b) => b.id === berryId);
+    const result = store.useBerry(this._entry.uid, berryId);
+    if (!result || !berry) return;
+    this.$berryStatus.textContent = result.applied
+      ? `${berry.label}: −${result.applied} ${STAT_LABEL[berry.stat]}`
+      : `${berry.label}: no EVs removed — ${STAT_LABEL[berry.stat]} is already at 0`;
+  }
+
   _render() {
     const e = this._entry;
     if (!e) return;
@@ -603,7 +783,6 @@ export class CaughtPokemonCard extends HTMLElement {
     this.$evSummary.nature = nature;
 
     const trained = totalEvs(e.evs) >= TOTAL_CAP;
-    this.$trainedBadge.hidden = !trained;
     this.toggleAttribute('fully-trained', trained);
 
     this._populateItemButtons(store.powerItemBonus(), store.trainingItemAvailability());
@@ -623,8 +802,19 @@ export class CaughtPokemonCard extends HTMLElement {
     }
     this.$pokerusToggle.disabled = !pokerusAvailable;
     this.$pokerusNote.hidden = pokerusAvailable;
+    const expShareActive = !!e.expShare;
+    this.$expShareToggle.setAttribute('aria-pressed', String(expShareActive));
+    this.$expShareToggle.classList.toggle('ds-item-btn--active', expShareActive);
     this.$vitaminStatus.textContent = '';
     this._updateVitaminButtons(e);
+    const wingsAvailable = store.wingsAvailable();
+    this.$wingsSection.hidden = !wingsAvailable;
+    this.$wingStatus.textContent = '';
+    if (wingsAvailable) this._updateWingButtons(e);
+    const berriesAvailable = store.berriesAvailable();
+    this.$berriesSection.hidden = !berriesAvailable;
+    this.$berryStatus.textContent = '';
+    if (berriesAvailable) this._updateBerryButtons(e);
     this.$evoChain.entry = e;
     this.$histLog.entry = e;
   }
@@ -675,6 +865,11 @@ export class CaughtPokemonCard extends HTMLElement {
         badges.push({ sprite: null, label: 'No item', kind: 'empty' });
       }
     }
+    // Not mutually exclusive with the item badge above — a Pokémon can
+    // hold a power item and also passively earn EVs from other battles.
+    if (e.expShare) {
+      badges.push({ sprite: EXP_SHARE_SPRITE, label: 'Exp. Share', kind: 'item' });
+    }
     this.$statusRow.hidden = badges.length === 0;
     this.$statusRow.innerHTML = badges
       .map(
@@ -710,6 +905,46 @@ export class CaughtPokemonCard extends HTMLElement {
       } else {
         delete btn.dataset.capped;
         btn.title = `Feed ${vitamin.label} — raises ${STAT_LABEL[vitamin.stat]} EVs by up to ${VITAMIN_BONUS}` + fedNote;
+      }
+    }
+  }
+
+  // Same idea as _updateVitaminButtons but simpler — Wings have no
+  // cutoff, only the 252 stat cap.
+  _updateWingButtons(e) {
+    for (const btn of this.$wingGrid.children) {
+      const feather = FEATHERS.find((f) => f.id === btn.dataset.feather);
+      const stat = e.evs[feather.stat];
+      const capped = stat >= 252;
+      const count = e.history.filter((h) => h.kind === 'feather' && h.featherId === feather.id).length;
+      btn.dataset.count = count;
+      const fedNote = count ? ` — fed ${count}×` : '';
+      if (capped) {
+        btn.dataset.capped = '';
+        btn.title = `${STAT_LABEL[feather.stat]} is already at the 252 cap` + fedNote;
+      } else {
+        delete btn.dataset.capped;
+        btn.title = `Feed ${feather.label} — raises ${STAT_LABEL[feather.stat]} EVs by ${FEATHER_BONUS}` + fedNote;
+      }
+    }
+  }
+
+  // Mirrors _updateWingButtons, but "capped" here means nothing left to
+  // remove (the stat is already at 0) rather than at the ceiling.
+  _updateBerryButtons(e) {
+    for (const btn of this.$berryGrid.children) {
+      const berry = EV_BERRIES.find((b) => b.id === btn.dataset.berry);
+      const stat = e.evs[berry.stat];
+      const capped = stat <= 0;
+      const count = e.history.filter((h) => h.kind === 'berry' && h.berryId === berry.id).length;
+      btn.dataset.count = count;
+      const fedNote = count ? ` — fed ${count}×` : '';
+      if (capped) {
+        btn.dataset.capped = '';
+        btn.title = `${STAT_LABEL[berry.stat]} is already at 0` + fedNote;
+      } else {
+        delete btn.dataset.capped;
+        btn.title = `Feed ${berry.label} — removes up to ${EV_BERRY_REDUCTION} ${STAT_LABEL[berry.stat]} EVs` + fedNote;
       }
     }
   }

@@ -476,6 +476,8 @@ html[data-modal-open] body {
   background: var(--sprite-bg);
   border-radius: var(--radius-sm);
   object-fit: contain;
+  box-sizing: border-box;
+  border: 2px solid transparent;
 }
 
 .roster-card-body {
@@ -493,6 +495,9 @@ html[data-modal-open] body {
   white-space: nowrap;
 }
 .roster-card-meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35em;
   font-family: var(--font-mono);
   font-size: var(--font-size-2xs);
   color: var(--ink-soft);
@@ -505,8 +510,45 @@ html[data-modal-open] body {
   min-width: 84px;
 }
 
-.roster-card-star {
+/* Same purple ring as the detail page's sprite for an active Pokérus
+   infection (see caught-pokemon-card.js's :host([pokerus-infected])). */
+.roster-card-sprite--pokerus {
+  border-color: var(--pokerus-purple);
+  box-shadow: 0 0 0 3px var(--pokerus-purple-soft);
+}
+
+/* Same gold-shimmer treatment as the detail page's sprite (see
+   caught-pokemon-card.js) — a class here instead of an attribute
+   selector, since this markup is plain light-DOM HTML, not a component
+   with its own :host. */
+.roster-card-sprite--trained {
+  border-color: #caa53d;
+  box-shadow: 0 0 0 3px rgba(202, 165, 61, 0.35), 0 0 8px rgba(255, 215, 0, 0.3);
+  background-image: linear-gradient(120deg, #c9a227 0%, #ffe9a8 30%, #fff6d5 50%, #ffe9a8 70%, #c9a227 100%);
+  background-size: 180% 180%;
+  animation: fully-trained-shimmer 5.5s linear infinite;
+}
+/* Both apply: keep the Pokérus ring visible (higher specificity — two
+   classes — wins over the single-class rules above) rather than letting
+   gold hide it, while still layering the gold glow around it. */
+.roster-card-sprite--trained.roster-card-sprite--pokerus {
+  border-color: var(--pokerus-purple);
+  box-shadow: 0 0 0 3px var(--pokerus-purple-soft), 0 0 8px rgba(255, 215, 0, 0.3);
+}
+@keyframes fully-trained-shimmer {
+  0% { background-position: 0% 50%; }
+  100% { background-position: 100% 50%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .roster-card-sprite--trained { animation: none; background-position: 40% 50%; }
+}
+
+.roster-card-exp-share {
   flex: 0 0 auto;
+  width: 14px;
+  height: 14px;
+  object-fit: contain;
+  image-rendering: pixelated;
 }
 
 /* ---------- Pokémon detail view ("/<slug>/<uid>") ---------- */
