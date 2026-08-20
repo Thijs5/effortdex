@@ -27,6 +27,17 @@ button, input, select {
   outline-offset: 2px;
 }
 
+/* Lock background scrolling while a modal dialog is open. :has() covers
+   the light-DOM dialogs; the data attribute is set by components whose
+   dialogs live in shadow DOM, where :has() can't see. Applied to html
+   AND body — iOS Safari ignores the lock unless both are hidden. */
+html:has(dialog[open]),
+html:has(dialog[open]) body,
+html[data-modal-open],
+html[data-modal-open] body {
+  overflow: hidden;
+}
+
 .device {
   width: 100%;
   max-width: 1180px;
@@ -38,81 +49,153 @@ button, input, select {
 }
 
 /* ---------- header ---------- */
+/* A slim toolbar-height bezel: the device's top edge, not a billboard.
+   The identity work is done by the power stripe, the LED, and the red
+   band itself — all of it fits in ~52px so content starts immediately. */
 .bezel {
   position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
   background: var(--poke-red);
   color: var(--on-red);
-  padding: var(--space-5) clamp(1.2rem, 3vw, 2.2rem) 1.7rem;
+  padding: var(--space-2) clamp(1.2rem, 3vw, 2.2rem) calc(var(--space-2) + 4px);
 }
 
-/* Chassis "power stripe" — the tri-band seam along the bezel's bottom
-   edge, the one loud retro-hardware detail this design is remembered by. */
+/* Pokéball seam — the red bezel is the ball's top half: a dark seam
+   along its bottom edge with the white center button straddling it.
+   This is the one signature detail the design is remembered by. */
 .bezel::after {
   content: '';
   position: absolute;
   left: 0;
   right: 0;
   bottom: 0;
-  height: 6px;
-  background: linear-gradient(
-    to bottom,
-    var(--gold) 0 2px,
-    var(--poke-red-dark) 2px 4px,
-    var(--footer-bg) 4px 6px
-  );
+  height: 4px;
+  background: var(--footer-bg);
+}
+.bezel::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 2px;
+  transform: translate(-50%, 50%);
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: #fff;
+  border: 4px solid var(--footer-bg);
+  z-index: 1;
 }
 
 .bezel h1 {
   font-family: var(--font-display);
-  font-size: clamp(1.8rem, 4vw, 2.5rem);
+  font-size: clamp(1.05rem, 2.5vw, 1.25rem);
   font-weight: 700;
   margin: 0;
   letter-spacing: -0.01em;
+  white-space: nowrap;
 }
 .e-accent { color: var(--gold-soft); }
 
-.tagline {
-  margin: 0.15rem 0 0;
-  font-family: var(--font-mono);
-  font-size: var(--font-size-sm);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  opacity: 0.8;
-}
-/* Power LED next to the tagline. */
-.tagline::before {
-  content: '';
+/* Power LED — amber while running from the offline cache, green when
+   the network is reachable (app.js toggles .is-online). */
+.power-led {
   display: inline-block;
   width: 7px;
   height: 7px;
   border-radius: 50%;
   background: var(--gold);
   box-shadow: 0 0 6px var(--gold);
-  margin-right: 0.55em;
-  vertical-align: 1px;
+  margin-right: 0.6em;
+  vertical-align: 2px;
+  transition: background var(--transition-med), box-shadow var(--transition-med);
+}
+.power-led.is-online {
+  background: var(--led-online);
+  box-shadow: 0 0 6px var(--led-online);
 }
 
-.theme-toggle {
-  position: absolute;
-  top: var(--space-4);
-  right: clamp(1.2rem, 3vw, 2.2rem);
-  width: 38px;
-  height: 38px;
+.bezel-btn {
+  display: grid;
+  place-items: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
   border: 1px solid rgba(255, 248, 239, 0.45);
   border-radius: 50%;
   background: transparent;
   color: var(--on-red);
-  font-size: 1.05rem;
-  line-height: 1;
   cursor: pointer;
   touch-action: manipulation;
   transition: background var(--transition-fast);
 }
-.theme-toggle:hover { background: rgba(255, 248, 239, 0.15); }
+.bezel-btn:hover { background: rgba(255, 248, 239, 0.15); }
+.bezel-btn svg { width: 17px; height: 17px; }
 
-.settings-btn {
-  right: calc(clamp(1.2rem, 3vw, 2.2rem) + 46px);
-  font-size: 1.15rem;
+/* ---------- header dropdown menu ---------- */
+.bezel-menu { position: relative; }
+
+.header-menu {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 50;
+  min-width: 180px;
+  display: grid;
+  gap: 2px;
+  padding: var(--space-2);
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-suggestions);
+}
+.header-menu[hidden] { display: none; }
+
+.header-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  text-align: left;
+  font-size: var(--font-size-md);
+  cursor: pointer;
+}
+.header-menu-item:hover { background: var(--lcd); }
+.header-menu-item svg {
+  flex: 0 0 auto;
+  width: 16px;
+  height: 16px;
+  color: var(--ink-soft);
+}
+.header-menu-item[aria-checked='true'] {
+  background: var(--teal-soft);
+  font-weight: 600;
+}
+.header-menu-item[aria-checked='true'] svg { color: var(--teal); }
+
+.header-menu-sep {
+  height: 1px;
+  margin: var(--space-2) 0;
+  background: var(--line);
+}
+.header-menu-label {
+  margin: 0 var(--space-3) var(--space-1);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-2xs);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+}
+.header-menu [role='group'] {
+  display: grid;
+  gap: 2px;
 }
 
 /* ---------- layout ---------- */
@@ -141,8 +224,22 @@ button, input, select {
   color: var(--ink-soft);
 }
 
+/* The stationary "screen wells" (not the interactive cards, which read
+   as plastic buttons and lift on hover) get the LCD treatment: a faint
+   dot-matrix pixel grid plus an inset under-glass shadow — the texture
+   and depth that make the green read as a display, not a tint. */
+.catch-panel,
+.empty-state,
+.settings-section,
+.catch-dialog-identity {
+  background-image:
+    repeating-linear-gradient(0deg, var(--lcd-grid) 0 1px, transparent 1px 4px),
+    repeating-linear-gradient(90deg, var(--lcd-grid) 0 1px, transparent 1px 4px);
+  box-shadow: var(--shadow-lcd);
+}
+
 .catch-panel {
-  background: var(--lcd);
+  background-color: var(--lcd);
   border: 1px solid var(--lcd-line);
   border-radius: var(--radius-md);
   padding: var(--space-4);
@@ -169,20 +266,15 @@ button, input, select {
   color: var(--teal);
 }
 
+/* Collapsed by default — a cheat sheet on demand, not a permanent
+   tenant of the catch panel. */
 .legend {
-  margin-top: var(--space-5);
-  padding-top: var(--space-4);
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
   border-top: 1px dashed var(--lcd-line);
 }
-.legend h3 {
-  margin: 0 0 var(--space-3);
-  font-size: var(--font-size-xs);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-}
 .legend ul {
-  margin: 0;
+  margin: var(--space-3) 0 0;
   padding-left: 1.1rem;
   font-size: var(--font-size-sm);
   color: var(--ink-soft);
@@ -293,12 +385,20 @@ button, input, select {
 
 .back-link {
   grid-row: 1;
+  align-self: center;
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
   color: var(--teal);
   text-decoration: none;
 }
 .back-link:hover { text-decoration: underline; }
+
+/* On narrow screens the back link and edit button share row 1 so the
+   header costs two rows, not three; ≥640px pulls the identity up too. */
+#edit-party-btn {
+  grid-column: 3;
+  grid-row: 1;
+}
 
 .party-identity {
   grid-column: 1 / -1;
@@ -318,16 +418,14 @@ button, input, select {
 .party-identity .hint { margin: var(--space-1) 0 0; }
 
 @media (min-width: 640px) {
-  .party-view-header { grid-template-columns: auto 1fr auto; }
   .back-link { grid-column: 1; grid-row: 1; }
   .party-identity { grid-column: 2; grid-row: 1; }
-  #edit-party-btn { grid-column: 3; grid-row: 1; }
 }
 
 .empty-state {
   font-size: var(--font-size-lg);
   color: var(--ink-soft);
-  background: var(--lcd);
+  background-color: var(--lcd);
   border: 1px dashed var(--lcd-line);
   border-radius: var(--radius-md);
   padding: var(--space-5);
@@ -390,9 +488,9 @@ button, input, select {
 }
 
 .roster-card-evbar {
-  flex: 1 1 80px;
-  max-width: 96px;
-  min-width: 60px;
+  flex: 1 1 100px;
+  max-width: 140px;
+  min-width: 84px;
 }
 
 .roster-card-star {
@@ -421,7 +519,7 @@ button, input, select {
   letter-spacing: -0.01em;
 }
 .settings-section {
-  background: var(--lcd);
+  background-color: var(--lcd);
   border: 1px solid var(--lcd-line);
   border-radius: var(--radius-md);
   padding: var(--space-4);
@@ -451,74 +549,13 @@ button, input, select {
   font-family: var(--font-mono);
 }
 
-/* ---------- buttons ---------- */
-.btn {
-  border: none;
-  border-radius: var(--radius-pill);
-  padding: var(--space-3) var(--space-4);
-  font-weight: 600;
-  font-size: var(--font-size-md);
-  cursor: pointer;
-  min-height: 38px;
-  touch-action: manipulation;
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast), opacity var(--transition-fast);
-}
-.btn:disabled { opacity: 0.5; cursor: not-allowed; }
-
-.btn--primary {
-  background: var(--poke-red);
-  color: var(--on-red);
-  box-shadow: 0 3px 0 var(--poke-red-dark);
-}
-.btn--primary:not(:disabled):hover { transform: translateY(-1px); }
-.btn--primary:not(:disabled):active { transform: translateY(1px); box-shadow: 0 1px 0 var(--poke-red-dark); }
-
-.btn--ghost {
-  background: transparent;
-  border: 1px solid var(--line);
-  color: var(--ink-soft);
-  min-height: 34px;
-}
-.btn--ghost:hover { background: var(--lcd); color: var(--ink); }
-.btn--danger:hover { background: var(--danger-soft); color: var(--poke-red); border-color: var(--poke-red); }
+/* Buttons and dialog chrome are shared design-system primitives
+   (.ds-btn--primary/--ghost/--danger, .ds-dialog — lib/design-system.js,
+   adopted into the document by app.js); only page-specific styling for
+   the dialogs' contents lives below. */
 
 /* ---------- party dialog ---------- */
-.party-dialog {
-  border: none;
-  border-radius: var(--radius-md);
-  padding: var(--space-5);
-  width: min(420px, calc(100vw - 2.4rem));
-  max-height: calc(100vh - 2.4rem);
-  max-height: calc(100dvh - 2.4rem);
-  overflow-y: auto;
-  background: var(--paper-panel);
-  color: var(--ink);
-  box-shadow: var(--shadow-panel);
-}
-.party-dialog::backdrop { background: rgba(27, 31, 28, 0.75); }
-
-/* Below ~640px, go full-page instead of a centered card: a native
-   <dialog>'s UA-default centering fights the on-screen keyboard (opening
-   a text field can shove the dialog, or the field itself, off the top of
-   the shrunken visual viewport), and a small floating card wastes space
-   on a small screen anyway. Margin 0 + full viewport size pins it edge
-   to edge so every field stays reachable once the keyboard is up. */
-@media (max-width: 640px) {
-  .party-dialog {
-    margin: 0;
-    width: 100vw;
-    max-width: 100vw;
-    height: 100vh;
-    height: 100dvh;
-    max-height: 100dvh;
-    border-radius: 0;
-  }
-}
-.party-dialog h2 {
-  font-family: var(--font-display);
-  font-size: var(--font-size-xl);
-  margin: 0 0 var(--space-4);
-}
+/* Titles/close chrome come from the shared .ds-dialog-header. */
 
 .catch-dialog-identity {
   display: flex;
@@ -526,7 +563,7 @@ button, input, select {
   gap: var(--space-3);
   margin-bottom: var(--space-4);
   padding: var(--space-3);
-  background: var(--lcd);
+  background-color: var(--lcd);
   border: 1px solid var(--lcd-line);
   border-radius: var(--radius-md);
 }
@@ -567,6 +604,13 @@ button, input, select {
   margin-top: var(--space-2);
   font-family: var(--font-body);
 }
+.field-error {
+  display: block;
+  margin-top: var(--space-2);
+  font-size: var(--font-size-xs);
+  color: var(--poke-red);
+}
+
 .field-optional {
   font-weight: 400;
   font-size: var(--font-size-xs);
@@ -575,21 +619,12 @@ button, input, select {
 }
 textarea.ds-field { resize: vertical; }
 
+/* Summary chevron/typography comes from the shared .ds-disclosure. */
 .advanced-rules {
   margin: 0 0 var(--space-4);
   padding-top: var(--space-3);
   border-top: 1px dashed var(--lcd-line);
 }
-.advanced-rules summary {
-  cursor: pointer;
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-  color: var(--ink-soft);
-  list-style: none;
-}
-.advanced-rules summary::-webkit-details-marker { display: none; }
-.advanced-rules summary::before { content: '▸ '; }
-.advanced-rules[open] summary::before { content: '▾ '; }
 .advanced-rules-hint {
   margin: var(--space-3) 0 var(--space-4);
   font-size: var(--font-size-xs);
@@ -617,6 +652,8 @@ textarea.ds-field { resize: vertical; }
 
 /* ---------- footer ---------- */
 .bezel-footer {
+  display: grid;
+  gap: 2px;
   background: var(--footer-bg);
   color: var(--footer-ink);
   text-align: center;
@@ -626,11 +663,8 @@ textarea.ds-field { resize: vertical; }
   letter-spacing: 0.04em;
 }
 .app-version {
+  font-size: var(--font-size-2xs);
   opacity: 0.6;
-}
-.app-version::before {
-  content: '\00b7';
-  margin: 0 0.4em;
 }
 
 /* ---------- small screens ---------- */
@@ -648,7 +682,12 @@ textarea.ds-field { resize: vertical; }
     border-right: none;
     min-height: 100vh;
     min-height: 100dvh;
+    /* Flex column so the footer sits at the viewport bottom instead of
+       floating mid-screen when a view is shorter than the display. */
+    display: flex;
+    flex-direction: column;
   }
+  .bezel-footer { margin-top: auto; }
   .layout,
   .picker,
   .pokemon-view,
@@ -657,6 +696,12 @@ textarea.ds-field { resize: vertical; }
   .bezel {
     padding-inline: 1rem;
   }
-  .theme-toggle { right: 1rem; }
-  .settings-btn { right: calc(1rem + 46px); }
+  /* Tighter vertical rhythm on phones: the big --space-5 block gaps are
+     a desktop luxury; here every row of chrome delays the content. */
+  .layout,
+  .picker {
+    padding-block: var(--space-4);
+  }
+  .layout { gap: var(--space-4); }
+  .party-view-header { padding-top: var(--space-3); }
 }

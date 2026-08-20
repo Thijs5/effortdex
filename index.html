@@ -3,30 +3,59 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Pokélogger</title>
+  <meta name="description" content="Local-only Pokémon EV training tracker: log battles and vitamins, track effort values per stat across parties, works offline." />
+  <title>Effortdex</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><circle cx=%2216%22 cy=%2216%22 r=%2214%22 fill=%22%23e3350d%22/><path d=%22M2 16h28%22 stroke=%22%231b1f1c%22 stroke-width=%223%22/><circle cx=%2216%22 cy=%2216%22 r=%226%22 fill=%22%23fff%22 stroke=%22%231b1f1c%22 stroke-width=%223%22/></svg>" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
   <meta name="theme-color" content="#e3350d" media="(prefers-color-scheme: light)" />
   <meta name="theme-color" content="#15180f" media="(prefers-color-scheme: dark)" />
+  <!-- mobile-web-app-capable is the standard replacement for the older
+       apple- variant; both are kept so older iOS versions still honor it. -->
+  <meta name="mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
-  <meta name="apple-mobile-web-app-title" content="Pokélogger" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+  <meta name="apple-mobile-web-app-title" content="Effortdex" />
   <link rel="stylesheet" href="tokens.css" />
   <link rel="stylesheet" href="styles.css" />
   <script>
     // Apply a saved manual theme before first paint to avoid a flash;
     // without a saved choice the CSS follows prefers-color-scheme.
-    const savedTheme = localStorage.getItem('pokelogger:theme');
+    const savedTheme = localStorage.getItem('effortdex:theme');
     if (savedTheme === 'dark' || savedTheme === 'light') document.documentElement.dataset.theme = savedTheme;
   </script>
 </head>
 <body>
   <div class="device">
     <header class="bezel">
-      <h1>Pok<span class="e-accent">é</span>logger</h1>
-      <p class="tagline">Effort value field log</p>
-      <button id="settings-btn" class="theme-toggle settings-btn" type="button" aria-label="Settings" title="Settings">⚙</button>
-      <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Theme: auto">◐</button>
+      <h1><span class="power-led" aria-hidden="true"></span>Effort<span class="e-accent">dex</span></h1>
+      <div class="bezel-menu">
+        <button id="menu-btn" class="bezel-btn" type="button" aria-haspopup="true" aria-expanded="false" aria-label="Menu" title="Menu">
+          <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="17.5" r="1.7"/></svg>
+        </button>
+        <div id="header-menu" class="header-menu" role="menu" aria-label="App menu" hidden>
+          <button id="settings-btn" class="header-menu-item" type="button" role="menuitem">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            <span>Settings</span>
+          </button>
+          <div class="header-menu-sep" role="separator"></div>
+          <p class="header-menu-label" id="theme-group-label">Theme</p>
+          <div role="group" aria-labelledby="theme-group-label">
+            <button class="header-menu-item" type="button" role="menuitemradio" aria-checked="false" data-theme-choice="auto">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"/></svg>
+              <span>Auto</span>
+            </button>
+            <button class="header-menu-item" type="button" role="menuitemradio" aria-checked="false" data-theme-choice="dark">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
+              <span>Dark</span>
+            </button>
+            <button class="header-menu-item" type="button" role="menuitemradio" aria-checked="false" data-theme-choice="light">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+              <span>Light</span>
+            </button>
+          </div>
+        </div>
+      </div>
     </header>
 
     <!-- "/" — choose which party (save file / playthrough) to open -->
@@ -35,7 +64,7 @@
       <p class="hint">Keep a separate party per save file or playthrough you're running at once.</p>
       <div id="party-list" class="party-list"></div>
       <p id="picker-empty" class="empty-state" hidden>No parties yet &mdash; create one to start tracking EVs.</p>
-      <button id="picker-new-party-btn" class="btn btn--primary">+ New party</button>
+      <button id="picker-new-party-btn" class="ds-btn ds-btn--primary">+ New party</button>
     </main>
 
     <!-- "/<party-slug>" — that party's catch panel + roster -->
@@ -52,7 +81,7 @@
           </div>
           <p id="active-party-description" class="hint" hidden></p>
         </div>
-        <button id="edit-party-btn" class="btn btn--ghost">Edit party</button>
+        <button id="edit-party-btn" class="ds-btn ds-btn--ghost">Edit party</button>
       </div>
 
       <div class="layout">
@@ -64,10 +93,10 @@
           </div>
           <p id="catch-status" class="status-line" aria-live="polite"></p>
 
-          <div class="legend">
-            <h3>This game's rules</h3>
+          <details class="legend ds-disclosure">
+            <summary>This game's rules</summary>
             <ul id="training-legend"></ul>
-          </div>
+          </details>
         </section>
 
         <section class="panel roster-panel" aria-labelledby="roster-heading">
@@ -98,7 +127,7 @@
       <section class="settings-section">
         <h3>Storage</h3>
         <p class="hint">
-          Pok&eacute;logger caches its own files (and PokéAPI lookups)
+          Effortdex caches its own files (and PokéAPI lookups)
           so it keeps working offline. "Clear cache" only wipes that
           offline copy &mdash; it gets rebuilt fresh on the next load.
         </p>
@@ -107,7 +136,7 @@
           They live separately in this browser's storage and are never
           touched by this button.
         </p>
-        <button id="clear-cache-btn" class="btn btn--ghost">Clear cache</button>
+        <button id="clear-cache-btn" class="ds-btn ds-btn--ghost">Clear cache</button>
         <p id="clear-cache-status" class="status-line" aria-live="polite"></p>
       </section>
     </main>
@@ -118,9 +147,14 @@
     </footer>
   </div>
 
-  <dialog id="party-dialog" class="party-dialog">
+  <dialog id="party-dialog" class="party-dialog ds-dialog">
     <form id="party-form">
-      <h2 id="party-dialog-title">New party</h2>
+      <header class="ds-dialog-header">
+        <h2 id="party-dialog-title">New party</h2>
+        <button type="button" class="ds-dialog-close" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </header>
       <label class="field-label">
         Name
         <input type="text" id="party-name-input" class="ds-field" required maxlength="60" placeholder="e.g. Emerald Nuzlocke" />
@@ -131,13 +165,14 @@
           <game-version-picker id="party-game-version" maxlength="40"></game-version-picker>
           <game-cartridge id="dialog-game-cart"></game-cartridge>
         </div>
+        <span class="field-error" id="party-game-version-error" hidden>Choose a game version &mdash; it sets this party's EV rules. ROM hacks and fan games count too.</span>
       </label>
       <label class="field-label">
         Description
         <textarea id="party-description-input" class="ds-field" rows="3" maxlength="240" placeholder="Optional notes: ruleset, save slot…"></textarea>
       </label>
 
-      <details class="advanced-rules" id="party-advanced-rules">
+      <details class="advanced-rules ds-disclosure" id="party-advanced-rules">
         <summary>Advanced: override this game's rules</summary>
         <p class="hint advanced-rules-hint">
           Each rule follows the selected game version by default. Only
@@ -196,17 +231,22 @@
       </details>
 
       <div class="party-dialog-actions">
-        <button type="button" id="party-delete-btn" class="btn btn--ghost btn--danger" hidden>Delete party</button>
+        <button type="button" id="party-delete-btn" class="ds-btn ds-btn--ghost ds-btn--danger" hidden>Delete party</button>
         <span class="spacer"></span>
-        <button type="button" id="party-cancel-btn" class="btn btn--ghost">Cancel</button>
-        <button type="submit" id="party-submit-btn" class="btn btn--primary">Create party</button>
+        <button type="button" id="party-cancel-btn" class="ds-btn ds-btn--ghost">Cancel</button>
+        <button type="submit" id="party-submit-btn" class="ds-btn ds-btn--primary">Create party</button>
       </div>
     </form>
   </dialog>
 
-  <dialog id="catch-dialog" class="party-dialog catch-dialog">
+  <dialog id="catch-dialog" class="party-dialog catch-dialog ds-dialog">
     <form id="catch-form">
-      <h2 id="catch-dialog-title">Catch Pok&eacute;mon</h2>
+      <header class="ds-dialog-header">
+        <h2 id="catch-dialog-title">Catch Pok&eacute;mon</h2>
+        <button type="button" class="ds-dialog-close" aria-label="Close">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+        </button>
+      </header>
       <div class="catch-dialog-identity">
         <img id="catch-dialog-sprite" class="catch-dialog-sprite" alt="" />
         <div class="catch-dialog-identity-text">
@@ -220,14 +260,12 @@
       </label>
       <label class="field-label" id="catch-dialog-nature-field">
         Nature <span class="field-optional">(optional)</span>
-        <select id="catch-dialog-nature" class="ds-field">
-          <option value="">Unknown</option>
-        </select>
+        <select id="catch-dialog-nature" class="ds-field"></select>
       </label>
       <div class="party-dialog-actions">
         <span class="spacer"></span>
-        <button type="button" id="catch-dialog-cancel-btn" class="btn btn--ghost">Cancel</button>
-        <button type="submit" id="catch-dialog-submit-btn" class="btn btn--primary" disabled>Catch!</button>
+        <button type="button" id="catch-dialog-cancel-btn" class="ds-btn ds-btn--ghost">Cancel</button>
+        <button type="submit" id="catch-dialog-submit-btn" class="ds-btn ds-btn--primary" disabled>Catch!</button>
       </div>
     </form>
   </dialog>
