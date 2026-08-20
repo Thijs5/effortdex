@@ -46,7 +46,7 @@ pattern](https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sou
    resolved) plus which aids actually applied; an `evolve` event
    snapshots both species identities, so undoing an evolution needs no
    network fetch. Replay never re-evaluates game rules: editing a
-   party's game version changes future events, not recorded ones, and
+   party's base game changes future events, not recorded ones, and
    deleting an event does not counterfactually recompute what other
    events "would have" applied. What happened, happened.
 4. **Only source data is persisted.** `localStorage` holds each entry's

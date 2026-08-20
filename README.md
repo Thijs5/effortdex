@@ -25,21 +25,29 @@ secure context.)
 ## Features
 
 - **Parties** — group caught Pokémon by save file or playthrough, each
-  with its own name, description and game version (shown as a small
-  cartridge icon matching that title's generation). The game version
-  field has its own picker — tap it to browse every official title
-  grouped by generation with its cartridge color, type to filter, or
-  enter free text for ROM hacks (it works on mobile, unlike the native
-  datalist it replaced). The game version isn't just cosmetic: it
-  decides which era's vitamin, training item and Pokérus mechanics apply
-  (see below), and the catch panel shows a "This game's rules" legend
-  rendered from the same logic that applies them. Every rule can be
+  with its own name, description and base game (shown as a small
+  cartridge icon matching that title's generation). The base game field
+  has its own picker — tap it to browse every official title grouped by
+  generation with its cartridge color, or type to filter (it works on
+  mobile, unlike the native datalist it replaced). It's strict: only an
+  official title commits, so a ROM hack or fan game is entered by
+  picking whichever title it's a hack *of*. The base game isn't just
+  cosmetic: it decides which era's vitamin, training item and Pokérus
+  mechanics apply (see below) and, by default, which title's sprites the
+  roster shows, and the catch panel shows a "This game's rules" legend
+  rendered from the same logic that applies them. Every mechanic can be
   overridden per party — the dialog's collapsed "Advanced" section lets
   you force the power item bonus, power item/Macho Brace availability,
-  the vitamin 100-EV cutoff, or Pokérus's effect, independent of what
-  the game version would otherwise imply. Meant for ROM hacks and fan
-  games, which can (and do) change any of these mechanics; a recognized
-  official title needs no overrides.
+  the vitamin 100-EV cutoff, or Pokérus's effect, independent of what the
+  base game would otherwise imply. Meant for ROM hacks and house rules,
+  which can (and do) change any of these mechanics; a recognized official
+  title needs no overrides. The same section also has a **sprite style**
+  override — an independent title whose sprites replace the base game's
+  for display only (e.g. a Ruby ROM hack shown with Emerald's sprites).
+  Whichever title supplies the sprite, a species missing from its sprite
+  set (introduced in a later generation, or a title with no distinct
+  sprite rip at all — Let's Go, Sword/Shield, Legends: Arceus) falls back
+  to the modern default sprite, so the roster never shows a broken image.
 - **EV tracking** — six stat bars per Pokémon plus a total, with a held
   training item and Pokérus (×2) support, correctly capped at 252/stat
   and 510/total. The training item dropdown only offers what actually
@@ -48,8 +56,8 @@ secure context.)
   +4 EVs on their stat through Gen VI, +8 from Gen VII on) — a Gen I-II
   party gets neither, Gen III gets only the Macho Brace, Gen IV-VI gets
   both (pick one — same held-item slot), and Gen VII+ gets only Power
-  items. An unset or unrecognized game version falls back to modern
-  behavior: Power items only, at +8. Pokérus is disabled (and its stored
+  items. An unset base game falls back to modern behavior: Power items
+  only, at +8. Pokérus is disabled (and its stored
   value ignored even if set beforehand) for the specific titles where it
   doesn't provide its usual EV-doubling effect: Let's Go Pikachu/Eevee,
   Legends: Arceus, and Scarlet/Violet
@@ -63,7 +71,7 @@ secure context.)
   once it already has 100+ EVs, matching those games' real mechanic
   ([Bulbapedia](https://bulbapedia.bulbagarden.net/wiki/Vitamin)). Gen
   I-II (no such rule ever existed) and Gen VIII+ (rule removed) have no
-  cutoff, and neither does an unset or unrecognized game version.
+  cutoff, and neither does an unset base game.
 - **EV-yield previews** — before catching a Pokémon or logging a battle,
   see what EVs it would actually yield, so you can decide if it's worth
   it. Catching opens a modal with the sprite, base EV yield, and a level
@@ -75,7 +83,7 @@ secure context.)
   flagged right on the EV bars (▲/▼) as a reminder of which stat is
   worth prioritizing or not bothering with
   ([Bulbapedia](https://bulbapedia.bulbagarden.net/wiki/Nature)). Hidden
-  entirely on a party whose game version predates Gen III, where natures
+  entirely on a party whose base game predates Gen III, where natures
   didn't exist yet (overridable per-party, like every other rule above).
 - **Battle history** — every logged defeat (or vitamin dose) is kept,
   with a one-click "log it again" for repeat grinding and a delete
