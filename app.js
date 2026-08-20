@@ -4,8 +4,8 @@
 // all domain logic lives in lib/, and each custom element owns its own
 // rendering.
 
-import { STAT_CAP, TOTAL_CAP, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, MACHO_BRACE_MULTIPLIER, FALLBACK_SPRITE } from './lib/constants.js';
-import { titleCase, totalEvs, formatEvYield, escapeHtml } from './lib/utils.js';
+import { STAT_CAP, TOTAL_CAP, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, MACHO_BRACE_MULTIPLIER, DEFAULT_LEVEL, FALLBACK_SPRITE } from './lib/constants.js';
+import { titleCase, totalEvs, formatEvYield, natureLabel, sortedNatures, escapeHtml } from './lib/utils.js';
 import { api, store } from './lib/services.js';
 import { attachDesignSystem } from './lib/design-system.js';
 import * as router from './lib/router.js';
@@ -38,11 +38,30 @@ const activePartyDescription = document.getElementById('active-party-description
 const editPartyBtn = document.getElementById('edit-party-btn');
 
 const catchSearch = document.getElementById('catch-search');
-const catchBtn = document.getElementById('catch-btn');
-const catchEvPreview = document.getElementById('catch-ev-preview');
 const catchStatus = document.getElementById('catch-status');
 const roster = document.getElementById('roster');
 const emptyState = document.getElementById('empty-state');
+
+const catchDialog = document.getElementById('catch-dialog');
+const catchForm = document.getElementById('catch-form');
+const catchDialogTitle = document.getElementById('catch-dialog-title');
+const catchDialogSprite = document.getElementById('catch-dialog-sprite');
+const catchDialogName = document.getElementById('catch-dialog-name');
+const catchDialogEvYield = document.getElementById('catch-dialog-ev-yield');
+const catchDialogLevel = document.getElementById('catch-dialog-level');
+const catchDialogNatureField = document.getElementById('catch-dialog-nature-field');
+const catchDialogNature = document.getElementById('catch-dialog-nature');
+const catchDialogSubmitBtn = document.getElementById('catch-dialog-submit-btn');
+const catchDialogCancelBtn = document.getElementById('catch-dialog-cancel-btn');
+
+// Populated once — the nature list doesn't depend on species or game version.
+// "Unknown" is already first in the markup; the rest sort A-Z after it.
+for (const nature of sortedNatures()) {
+  const opt = document.createElement('option');
+  opt.value = nature.id;
+  opt.textContent = natureLabel(nature);
+  catchDialogNature.appendChild(opt);
+}
 
 const pokemonView = document.getElementById('pokemon-view');
 const backToRoster = document.getElementById('back-to-roster');
@@ -75,6 +94,7 @@ const OVERRIDE_FIELDS = [
   { key: 'machoBrace', el: document.getElementById('override-macho-brace'), type: 'bool' },
   { key: 'vitaminCutoff', el: document.getElementById('override-vitamin-cutoff'), type: 'bool' },
   { key: 'pokerus', el: document.getElementById('override-pokerus'), type: 'bool' },
+  { key: 'nature', el: document.getElementById('override-nature'), type: 'bool' },
 ];
 
 function writeOverridesToDialog(overrides) {
@@ -194,44 +214,51 @@ partyDeleteBtn.addEventListener('click', () => {
 /* Catch panel                                                         */
 /* ------------------------------------------------------------------ */
 
-let pendingCatch = null;
-catchSearch.addEventListener('pokemon-pick', (e) => {
-  pendingCatch = e.detail.name;
-  catchBtn.disabled = false;
-  catchBtn.textContent = `Catch ${titleCase(e.detail.name)}!`;
-  previewCatchYield(e.detail.name);
-});
+// Picking a species opens a modal (sprite, EV yield, a level field) rather
+// than catching immediately — level is decided at catch time, not fixed
+// to DEFAULT_LEVEL, since that's when the user actually knows it.
+let pendingCatchMon = null;
 
-async function previewCatchYield(name) {
-  catchEvPreview.textContent = 'Checking EV yield…';
+catchSearch.addEventListener('pokemon-pick', (e) => openCatchDialog(e.detail.name));
+
+async function openCatchDialog(name) {
+  pendingCatchMon = null;
+  catchDialogTitle.textContent = `Catch ${titleCase(name)}`;
+  catchDialogSprite.src = FALLBACK_SPRITE;
+  catchDialogName.textContent = titleCase(name);
+  catchDialogEvYield.textContent = 'Checking EV yield…';
+  catchDialogLevel.value = DEFAULT_LEVEL;
+  catchDialogNature.value = '';
+  catchDialogNatureField.hidden = !store.natureAvailable();
+  catchDialogSubmitBtn.disabled = true;
+  catchDialog.showModal();
+
   try {
     const mon = await api.getPokemon(name);
-    if (pendingCatch !== name) return; // user picked something else meanwhile
+    pendingCatchMon = mon;
+    catchDialogSprite.src = mon.sprite || FALLBACK_SPRITE;
     const gained = formatEvYield(mon.evYield);
-    catchEvPreview.textContent = gained ? `Base EV yield: ${gained}` : 'Base EV yield: none';
-  } catch {
-    if (pendingCatch === name) catchEvPreview.textContent = '';
+    catchDialogEvYield.textContent = gained ? `Base EV yield: ${gained}` : 'Base EV yield: none';
+    catchDialogSubmitBtn.disabled = false;
+    catchDialogLevel.focus();
+    catchDialogLevel.select();
+  } catch (err) {
+    catchDialogEvYield.textContent = err.message || 'Could not look up that Pokémon.';
   }
 }
 
-catchBtn.addEventListener('click', async () => {
-  if (!pendingCatch) return;
-  catchBtn.disabled = true;
-  catchStatus.textContent = 'Throwing Poké Ball…';
-  try {
-    const mon = await api.getPokemon(pendingCatch);
-    store.catchPokemon(mon);
-    catchStatus.textContent = `Caught ${titleCase(mon.name)}!`;
-    // Warm the evolution-chain cache now, so its detail page's Evolve
-    // button doesn't have to wait on (or be offline-blocked by) a fetch.
-    api.getEvolutionOptions(mon.name).catch(() => {});
-  } catch (err) {
-    catchStatus.textContent = err.message || 'Could not catch that Pokémon.';
-  }
-  pendingCatch = null;
-  catchBtn.disabled = true;
-  catchBtn.textContent = 'Catch!';
-  catchEvPreview.textContent = '';
+catchDialogCancelBtn.addEventListener('click', () => catchDialog.close());
+
+catchForm.addEventListener('submit', (e) => {
+  e.preventDefault();
+  if (!pendingCatchMon) return;
+  const mon = pendingCatchMon;
+  store.catchPokemon(mon, catchDialogLevel.value, catchDialogNature.value || null);
+  catchDialog.close();
+  catchStatus.textContent = `Caught ${titleCase(mon.name)}!`;
+  // Warm the evolution-chain cache now, so its detail page's Evolve
+  // button doesn't have to wait on (or be offline-blocked by) a fetch.
+  api.getEvolutionOptions(mon.name).catch(() => {});
   setTimeout(() => {
     catchStatus.textContent = '';
   }, 3000);
@@ -335,6 +362,9 @@ function renderLegend() {
       : `<strong>Vitamins</strong> add +${VITAMIN_BONUS} EVs to their stat.`
   );
   items.push(`Every stat caps at ${STAT_CAP}; the total caps at ${TOTAL_CAP}.`);
+  if (store.natureAvailable()) {
+    items.push('<strong>Nature</strong> gives one stat +10%, another -10% (shown on the EV bars).');
+  }
   trainingLegend.innerHTML = items.map((i) => `<li>${i}</li>`).join('');
 }
 
