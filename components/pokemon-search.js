@@ -36,6 +36,8 @@ export class PokemonSearch extends HTMLElement {
           box-shadow: var(--shadow-suggestions);
           max-height: 260px;
           overflow-y: auto;
+          -webkit-overflow-scrolling: touch;
+          overscroll-behavior: contain;
         }
         li.option {
           display: flex;
@@ -83,12 +85,31 @@ export class PokemonSearch extends HTMLElement {
     this.$input.addEventListener('input', () => this._onInput());
     this.$input.addEventListener('keydown', (e) => this._onKeydown(e));
     // pointerdown on a suggestion fires before this blur, so picking by
-    // touch/mouse wins the race against the hide.
+    // mouse wins the race against the hide.
     this.$input.addEventListener('blur', () => setTimeout(() => this._hideList(), 120));
+    // Selection is resolved on pointerup rather than pointerdown, and only
+    // preventDefault()ed for mouse: calling preventDefault() on a touch's
+    // pointerdown cancels that touch's scroll gesture, which made the list
+    // unscrollable on iOS since nearly every touch starts on an option. A
+    // small movement threshold tells a tap from the start of a scroll drag.
+    let pointerDownLi = null;
+    let pointerDownX = 0;
+    let pointerDownY = 0;
     this.$list.addEventListener('pointerdown', (e) => {
       const li = e.target.closest('li.option');
       if (!li) return;
-      e.preventDefault();
+      pointerDownLi = li;
+      pointerDownX = e.clientX;
+      pointerDownY = e.clientY;
+      if (e.pointerType === 'mouse') e.preventDefault();
+    });
+    this.$list.addEventListener('pointerup', (e) => {
+      const li = pointerDownLi;
+      pointerDownLi = null;
+      if (!li) return;
+      const movedTooFar =
+        Math.hypot(e.clientX - pointerDownX, e.clientY - pointerDownY) > 10;
+      if (movedTooFar || e.target.closest('li.option') !== li) return;
       this._pick(li.dataset.name);
     });
     // The list is positioned in fixed coordinates (not relative to the
