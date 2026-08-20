@@ -731,6 +731,11 @@ textarea.ds-field { resize: vertical; }
   font-size: var(--font-size-xs);
   letter-spacing: 0.04em;
 }
+.footer-link {
+  color: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
 .app-version {
   font-size: var(--font-size-2xs);
   opacity: 0.6;
