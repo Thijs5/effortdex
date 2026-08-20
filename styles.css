@@ -97,6 +97,11 @@ html[data-modal-open] body {
   letter-spacing: -0.01em;
   white-space: nowrap;
 }
+.bezel h1 a {
+  color: inherit;
+  text-decoration: none;
+}
+.bezel h1 a:hover { text-decoration: underline; }
 .e-accent { color: var(--gold-soft); }
 
 /* Power LED — amber while running from the offline cache, green when
@@ -230,7 +235,6 @@ html[data-modal-open] body {
    and depth that make the green read as a display, not a tint. */
 .catch-panel,
 .empty-state,
-.settings-section,
 .catch-dialog-identity {
   background-image:
     repeating-linear-gradient(0deg, var(--lcd-grid) 0 1px, transparent 1px 4px),
@@ -298,6 +302,14 @@ html[data-modal-open] body {
   gap: var(--space-4);
   margin: var(--space-4) 0;
 }
+
+.picker-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+}
+.picker-import-hint { margin: var(--space-3) 0 0; max-width: 480px; }
 
 .party-card {
   display: flex;
@@ -519,19 +531,27 @@ html[data-modal-open] body {
   letter-spacing: -0.01em;
 }
 .settings-section {
-  background-color: var(--lcd);
-  border: 1px solid var(--lcd-line);
-  border-radius: var(--radius-md);
-  padding: var(--space-4);
+  padding-bottom: var(--space-4);
   margin-bottom: var(--space-4);
+  border-bottom: 1px solid var(--line);
 }
-.settings-section:last-child { margin-bottom: 0; }
+.settings-section:last-child {
+  padding-bottom: 0;
+  margin-bottom: 0;
+  border-bottom: none;
+}
 .settings-section h3 {
   margin: 0 0 var(--space-2);
   font-size: var(--font-size-md);
 }
 .settings-section .hint { margin-bottom: var(--space-3); }
 .settings-section .hint:last-child { margin-bottom: 0; }
+
+/* A .ds-btn with a leading icon (Settings' "Transfer to another device",
+   for now) — the shared design system's buttons are icon-agnostic, so
+   this is app-level layout, not a design-system primitive. */
+.icon-btn { display: inline-flex; align-items: center; gap: var(--space-2); }
+.icon-btn svg { flex: 0 0 auto; width: 16px; height: 16px; }
 .safe-data-note {
   padding: var(--space-3);
   border-left: 3px solid var(--teal);
@@ -556,6 +576,21 @@ html[data-modal-open] body {
 
 /* ---------- party dialog ---------- */
 /* Titles/close chrome come from the shared .ds-dialog-header. */
+
+/* Wider than the shared .ds-dialog default (420px): the advanced-rules
+   section packs a label plus a fairly wide control (the sprite-style
+   picker, "Auto (from base game)" selects) on one row each, and 420px
+   left them cramped against each other. Scoped by id, not the
+   `.party-dialog` class — that class is shared with #catch-dialog,
+   which is short-content and fine at the shared default width. Gated to
+   above .ds-dialog's own mobile breakpoint (640px, design-system.js) —
+   an id selector's specificity would otherwise beat that media query's
+   width:100vw rule and break the full-page phone layout. */
+@media (min-width: 641px) {
+  #party-dialog {
+    width: min(480px, calc(100vw - 2.4rem));
+  }
+}
 
 .catch-dialog-identity {
   display: flex;
@@ -636,10 +671,44 @@ textarea.ds-field { resize: vertical; }
   gap: var(--space-3);
   margin-bottom: var(--space-3);
 }
+/* A fixed width, not auto, on purpose: a <select>'s auto width follows
+   its own longest option text, so left to itself each of these six
+   would size slightly differently (and the sprite-style picker below,
+   not a <select> at all, wouldn't match any of them). One shared width
+   is what actually makes the row's controls line up. */
 .field-label--inline .ds-field {
-  width: auto;
+  width: 230px;
   margin-top: 0;
   flex: 0 1 auto;
+}
+/* The sprite-style picker isn't a .ds-field (its input lives in shadow
+   DOM), so it doesn't pick up the rule above — match it by hand to the
+   same fixed width (its own :host default is flex:1, which would
+   otherwise stretch it to fill the row). */
+.field-label--inline game-version-picker {
+  width: 230px;
+  flex: 0 1 auto;
+}
+.sprite-style-hint {
+  margin-top: calc(-1 * var(--space-2));
+  font-size: var(--font-size-xs);
+}
+@media (max-width: 640px) {
+  /* Label-beside-control only works while both fit on one line; below
+     that a long label and "Auto (from base game)" together wrap
+     awkwardly. Stack instead, full width, with a small gap standing in
+     for the row's own margin-bottom on the (now taller) row. */
+  .field-label--inline {
+    flex-direction: column;
+    align-items: stretch;
+    gap: var(--space-2);
+    margin-bottom: var(--space-4);
+  }
+  .field-label--inline .ds-field,
+  .field-label--inline game-version-picker {
+    width: 100%;
+    flex: 1 1 auto;
+  }
 }
 
 .party-dialog-actions {

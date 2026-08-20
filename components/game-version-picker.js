@@ -7,17 +7,22 @@ import { attachPointerSelection, syncActiveDescendant } from '../lib/combobox.js
  * over the known official titles, replacing the native <datalist> that
  * mobile browsers render poorly or not at all. Focusing shows the full
  * list grouped by generation (each title with its cartridge color);
- * typing filters it. The field stays free text — ROM hacks and fan games
- * are always valid input, exactly like the old datalist version.
+ * typing filters it. Strict: only an exact (normalized) title match can
+ * be committed — a ROM hack is entered by picking the title it's a hack
+ * *of*, not by its own name (see lib/game-versions.js). Uncommitted free
+ * text reverts to the last valid value on blur or a plain Enter.
  *
- * `.value` gets/sets the current text. Dispatches a composed
- * `version-change` CustomEvent (detail: { value }) on every input or pick.
+ * `.value` gets/sets the current text — the setter trusts its input (for
+ * wiring up already-valid stored data) without revalidating it.
+ * Dispatches a composed `version-change` CustomEvent (detail: { value })
+ * on every input or pick.
  */
 export class GameVersionPicker extends HTMLElement {
   constructor() {
     super();
     this._activeIndex = -1;
     this._options = []; // flat list of currently shown pickable names
+    this._lastValid = ''; // last committed value; what an invalid entry reverts to
 
     const shadow = this.attachShadow({ mode: 'open' });
     attachDesignSystem(shadow);
@@ -66,7 +71,7 @@ export class GameVersionPicker extends HTMLElement {
           text-transform: uppercase;
           color: var(--ink-soft);
         }
-        li.freetext-hint {
+        li.no-match-hint {
           padding: var(--space-2) var(--space-3);
           font-family: var(--font-mono);
           font-size: var(--font-size-2xs);
@@ -83,8 +88,9 @@ export class GameVersionPicker extends HTMLElement {
   }
 
   connectedCallback() {
-    this.$input.placeholder = this.getAttribute('placeholder') || 'e.g. Emerald, or a ROM hack name';
+    this.$input.placeholder = this.getAttribute('placeholder') || 'e.g. Emerald';
     if (this.hasAttribute('maxlength')) this.$input.maxLength = Number(this.getAttribute('maxlength'));
+    this._lastValid = this.$input.value;
 
     this.$input.addEventListener('focus', () => this._showList());
     this.$input.addEventListener('input', () => {
@@ -94,8 +100,15 @@ export class GameVersionPicker extends HTMLElement {
     this.$input.addEventListener('keydown', (e) => this._onKeydown(e));
     // The pick resolves before this blur-delayed hide fires, so touch and
     // mouse picks both win the race against it (see lib/combobox.js for
-    // why selection is on pointerup, not pointerdown).
-    this.$input.addEventListener('blur', () => setTimeout(() => this._hideList(), 120));
+    // why selection is on pointerup, not pointerdown). Committing here
+    // too (not just on Enter) catches every other way focus can leave —
+    // tabbing away, clicking elsewhere.
+    this.$input.addEventListener('blur', () =>
+      setTimeout(() => {
+        this._commitOrRevert();
+        this._hideList();
+      }, 120)
+    );
     attachPointerSelection(this.$list, (li) => this._pick(li.dataset.name));
   }
 
@@ -104,6 +117,26 @@ export class GameVersionPicker extends HTMLElement {
   }
   set value(v) {
     this.$input.value = v || '';
+    this._lastValid = this.$input.value; // trust external assignment (e.g. loading a stored party) as already valid
+  }
+
+  /**
+   * Snaps the current text to its matching title's canonical casing, or
+   * (no exact match) reverts to the last committed value. Blank always
+   * commits — this field's "required" enforcement is the caller's job
+   * (it means Auto on an optional override, unset on a required one).
+   */
+  _commitOrRevert() {
+    const typed = this.$input.value.trim();
+    if (typed === '') {
+      this._lastValid = '';
+      this._emit();
+      return;
+    }
+    const match = GAME_VERSIONS.find((g) => normalizeGameName(g.name) === normalizeGameName(typed));
+    this.$input.value = match ? match.name : this._lastValid;
+    this._lastValid = this.$input.value;
+    this._emit();
   }
 
   focus() {
@@ -131,7 +164,7 @@ export class GameVersionPicker extends HTMLElement {
 
     if (!matches.length) {
       this.$list.innerHTML =
-        '<li class="freetext-hint" role="presentation">No official title matches &mdash; free text (ROM hacks, fan games) is fine.</li>';
+        '<li class="no-match-hint" role="presentation">No matching title. For a ROM hack, pick the game it\'s a hack of.</li>';
       this.$list.hidden = false;
       this.$input.setAttribute('aria-expanded', 'true');
       return;
@@ -182,7 +215,12 @@ export class GameVersionPicker extends HTMLElement {
         e.preventDefault();
         this._pick(this._options[this._activeIndex]);
       } else {
-        this._hideList(); // let the surrounding form submit with the free text
+        // No highlighted option: commit synchronously (before the form's
+        // own submit handler reads .value) instead of waiting on blur,
+        // since Enter in a text input can submit the form without ever
+        // blurring it.
+        this._commitOrRevert();
+        this._hideList();
       }
     } else if (e.key === 'Escape') {
       // Consume the key: with the list open, Escape means "close the
@@ -202,6 +240,7 @@ export class GameVersionPicker extends HTMLElement {
 
   _pick(name) {
     this.$input.value = name;
+    this._lastValid = name;
     this._hideList();
     this._emit();
   }
