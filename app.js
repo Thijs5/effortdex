@@ -4,7 +4,7 @@
 // all domain logic lives in lib/, and each custom element owns its own
 // rendering.
 
-import { STAT_CAP, TOTAL_CAP, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, MACHO_BRACE_MULTIPLIER, DEFAULT_LEVEL, FALLBACK_SPRITE, FALLBACK_ONERROR, versionedSpriteOnError, NATURES } from './lib/constants.js';
+import { STAT_CAP, TOTAL_CAP, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, MACHO_BRACE_MULTIPLIER, DEFAULT_LEVEL, FALLBACK_SPRITE, FALLBACK_ONERROR, EXP_SHARE_SPRITE, versionedSpriteOnError, NATURES } from './lib/constants.js';
 import { titleCase, totalEvs, natureOptionsHtml, escapeHtml } from './lib/utils.js';
 import { api, store } from './lib/services.js';
 import { versionedSpriteUrl } from './lib/pokeapi-client.js';
@@ -130,6 +130,8 @@ const OVERRIDE_FIELDS = [
   { key: 'machoBrace', el: document.getElementById('override-macho-brace'), type: 'bool' },
   { key: 'vitaminCutoff', el: document.getElementById('override-vitamin-cutoff'), type: 'bool' },
   { key: 'pokerus', el: document.getElementById('override-pokerus'), type: 'bool' },
+  { key: 'wings', el: document.getElementById('override-wings'), type: 'bool' },
+  { key: 'evBerries', el: document.getElementById('override-ev-berries'), type: 'bool' },
   { key: 'nature', el: document.getElementById('override-nature'), type: 'bool' },
   { key: 'spriteVersion', el: document.getElementById('override-sprite-version'), type: 'string' },
 ];
@@ -388,6 +390,7 @@ function renderRoster(party) {
   const spriteGame = store.spriteBaseGame();
   for (const entry of entries) {
     const trained = totalEvs(entry.evs) >= TOTAL_CAP;
+    const pokerusActive = store.effectiveAids(entry).pokerus;
     // "Adamant Fangs McGee" (nickname) or plain "Slowpoke" (no nickname)
     // — same nature-prefix convention as the detail page's title, minus
     // its Dex number (no room for it at this card's width).
@@ -406,13 +409,15 @@ function renderRoster(party) {
     row.className = 'roster-card';
     row.href = router.pokemonPath(party.slug, entry.uid);
     row.innerHTML = `
-      <img class="roster-card-sprite" src="${spriteSrc}" alt="" ${spriteOnError} />
+      <img class="roster-card-sprite${trained ? ' roster-card-sprite--trained' : ''}${pokerusActive ? ' roster-card-sprite--pokerus' : ''}" src="${spriteSrc}" alt="" title="${trained ? 'Fully trained' : pokerusActive ? 'Pokérus — every EV earned from battling is doubled, permanently' : ''}" ${spriteOnError} />
       <div class="roster-card-body">
         <span class="roster-card-name">${namePrefix}${escapeHtml(displayName)}</span>
-        <span class="roster-card-meta">Lv. ${entry.level}${speciesAside}</span>
+        <span class="roster-card-meta">
+          Lv. ${entry.level}${speciesAside}
+          ${entry.expShare ? `<img class="roster-card-exp-share" src="${EXP_SHARE_SPRITE}" alt="" title="Exp. Share — earns EVs from other battles" ${FALLBACK_ONERROR} />` : ''}
+        </span>
       </div>
       <ev-bar class="roster-card-evbar"></ev-bar>
-      ${trained ? '<span class="roster-card-star ds-pill-badge" title="Fully trained">★</span>' : ''}
     `;
     const evBar = row.querySelector('ev-bar');
     evBar.max = TOTAL_CAP;

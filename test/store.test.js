@@ -324,6 +324,103 @@ test('useVitamin has no cutoff when the game version is unset or unrecognized', 
   assert.equal(entry.evs.atk, 110);
 });
 
+test('useFeather raises exactly its target stat by FEATHER_BONUS, with no 100-EV cutoff', () => {
+  store.createParty('Emerald run', '', 'Emerald'); // Gen 3: would cut vitamins off at 100, feathers unaffected
+  const entry = store.catchPokemon(mon());
+  for (let i = 0; i < 105; i++) store.useFeather(entry.uid, 'muscle-wing'); // targets atk
+  assert.equal(entry.evs.atk, 105); // sailed past the 100-EV vitamin cutoff untouched
+  assert.equal(entry.evs.hp, 0);
+  assert.equal(entry.history[0].kind, 'feather');
+});
+
+test('useFeather is clamped by the same 252/510 caps as battling', () => {
+  const entry = store.catchPokemon(mon());
+  for (let i = 0; i < 260; i++) store.useFeather(entry.uid, 'muscle-wing');
+  assert.equal(entry.evs.atk, STAT_CAP);
+
+  const last = store.useFeather(entry.uid, 'muscle-wing');
+  assert.equal(last.applied, 0);
+});
+
+test('wingsAvailable follows the game version\'s generation, with an override', () => {
+  store.createParty('Emerald run', '', 'Emerald'); // Gen 3: Wings didn't exist yet
+  assert.equal(store.wingsAvailable(), false);
+
+  store.createParty('Black run', '', 'Black'); // Gen 5: introduced
+  assert.equal(store.wingsAvailable(), true);
+
+  store.createParty('ROM hack run', '', 'Radical Red'); // unrecognized -> available
+  assert.equal(store.wingsAvailable(), true);
+
+  store.createParty('Emerald run 2', '', 'Emerald', { wings: true }); // override forces it on
+  assert.equal(store.wingsAvailable(), true);
+});
+
+test('useBerry removes EV_BERRY_REDUCTION EVs from its target stat, floored at 0', () => {
+  const entry = store.catchPokemon(mon());
+  store.logDefeat(entry.uid, opponent({ hp: 0, atk: 6, def: 0, spa: 0, spd: 0, spe: 0 }));
+
+  const result = store.useBerry(entry.uid, 'kelpsy'); // targets atk
+  assert.equal(result.applied, 6); // only 6 were there to remove
+  assert.equal(result.stat, 'atk');
+  assert.equal(entry.evs.atk, 0);
+  assert.equal(entry.history[0].kind, 'berry');
+
+  const empty = store.useBerry(entry.uid, 'kelpsy');
+  assert.equal(empty.applied, 0); // nothing left to remove
+});
+
+test('berriesAvailable follows the game version\'s generation, with Ruby/Sapphire excluded and an override', () => {
+  store.createParty('Red run', '', 'Red'); // Gen 1: didn't exist yet
+  assert.equal(store.berriesAvailable(), false);
+
+  store.createParty('Ruby run', '', 'Ruby'); // Gen 3, but Pokéblock ingredient only
+  assert.equal(store.berriesAvailable(), false);
+
+  store.createParty('Emerald run', '', 'Emerald'); // Gen 3, directly usable
+  assert.equal(store.berriesAvailable(), true);
+
+  store.createParty('Ruby run 2', '', 'Ruby', { evBerries: true }); // override forces it on
+  assert.equal(store.berriesAvailable(), true);
+});
+
+test('berrySnapApplies is true only for Diamond/Pearl/Platinum, fixed as of HeartGold/SoulSilver', () => {
+  store.createParty('Diamond run', '', 'Diamond');
+  assert.equal(store.berrySnapApplies(), true);
+
+  store.createParty('HeartGold run', '', 'HeartGold');
+  assert.equal(store.berrySnapApplies(), false);
+
+  store.createParty('Emerald run', '', 'Emerald');
+  assert.equal(store.berrySnapApplies(), false);
+});
+
+test('on Diamond/Pearl/Platinum, a berry snaps a stat above 110 EVs straight to 100 instead of -10', () => {
+  store.createParty('Platinum run', '', 'Platinum');
+  const entry = store.catchPokemon(mon());
+  store.logDefeat(entry.uid, opponent({ hp: 0, atk: 150, def: 0, spa: 0, spd: 0, spe: 0 }));
+
+  const result = store.useBerry(entry.uid, 'kelpsy');
+  assert.equal(entry.evs.atk, 100); // snapped, not 140
+  assert.equal(result.applied, 50);
+
+  const again = store.useBerry(entry.uid, 'kelpsy'); // 100 is not above the 110 threshold
+  assert.equal(entry.evs.atk, 90); // ordinary -10 now
+  assert.equal(again.applied, 10);
+});
+
+test('deleteHistoryEntry removes a feather/berry record and reverts the EVs it applied', () => {
+  const entry = store.catchPokemon(mon());
+  store.useFeather(entry.uid, 'muscle-wing'); // atk +1
+  store.logDefeat(entry.uid, opponent({ hp: 0, atk: 10, def: 0, spa: 0, spd: 0, spe: 0 }));
+  store.useBerry(entry.uid, 'kelpsy'); // atk -10
+  assert.equal(entry.evs.atk, 1); // 1 + 10 - 10
+
+  const [berryRecord] = entry.history;
+  store.deleteHistoryEntry(entry.uid, berryRecord.id);
+  assert.equal(entry.evs.atk, 11); // the -10 berry reverted
+});
+
 test('deleting the active party falls back to another remaining party', () => {
   const second = store.createParty('Party 2');
   assert.equal(store.activeParty.id, second.id);
@@ -510,7 +607,7 @@ test('migrates a v1 (pre-event-sourcing) save: identity, level, EVs and Pokérus
   const party = loaded.state.parties[0];
   assert.equal(party.description, ''); // party backfills still apply post-migration
   assert.equal(party.slug, 'old-party');
-  assert.deepEqual(party.overrides, { powerItemBonus: null, powerItems: null, machoBrace: null, vitaminCutoff: null, pokerus: null, nature: null, spriteVersion: null });
+  assert.deepEqual(party.overrides, { powerItemBonus: null, powerItems: null, machoBrace: null, vitaminCutoff: null, pokerus: null, wings: null, evBerries: null, nature: null, spriteVersion: null });
 
   const entry = party.pokemon[0];
   assert.equal(entry.uid, 'old-1');
@@ -666,6 +763,110 @@ test('deleting an older pokerus record keeps the newest toggle in force', () => 
   const newest = entry.history.find((h) => h.kind === 'pokerus');
   store.deleteHistoryEntry(entry.uid, newest.id);
   assert.equal(entry.pokerus, false); // no records left -> off
+});
+
+test('setExpShare logs a history entry only when the status actually changes', () => {
+  const entry = store.catchPokemon(mon());
+  store.setExpShare(entry.uid, true);
+  assert.equal(entry.history.length, 2); // exp-share + the catch seed entry
+  assert.equal(entry.history[0].kind, 'exp-share');
+  assert.equal(entry.history[0].active, true);
+  assert.equal(entry.expShare, true);
+
+  store.setExpShare(entry.uid, true); // no-op, already on
+  assert.equal(entry.history.length, 2);
+
+  store.setExpShare(entry.uid, false);
+  assert.equal(entry.history.length, 3);
+  assert.equal(entry.expShare, false);
+});
+
+test('deleteHistoryEntry on an exp-share record reverts the flag', () => {
+  const entry = store.catchPokemon(mon());
+  store.setExpShare(entry.uid, true);
+  const [record] = entry.history;
+
+  store.deleteHistoryEntry(entry.uid, record.id);
+  assert.equal(entry.expShare, false);
+  assert.equal(entry.history.length, 1); // the catch seed entry remains
+});
+
+test('logDefeat also grants every other Exp.-Share-holding Pokémon the same base EV yield', () => {
+  const battler = store.catchPokemon(mon());
+  const holder = store.catchPokemon(mon({ id: 2, name: 'charmander' }));
+  store.setExpShare(holder.uid, true);
+
+  store.logDefeat(battler.uid, opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 }));
+  assert.equal(battler.evs.atk, 1);
+  assert.equal(holder.evs.atk, 1); // holder also earned EVs from the battler's defeat
+  assert.equal(holder.history[0].kind, 'battle');
+  assert.equal(holder.history[0].viaExpShare, true);
+  assert.equal(holder.history[0].opponentName, 'rattata');
+});
+
+test("a battling Pokémon's held item bonus does not transfer to an Exp.-Share recipient", () => {
+  const battler = store.catchPokemon(mon());
+  store.setPowerItem(battler.uid, 'bracer'); // +8 atk, but only on the battler's own battles
+  const holder = store.catchPokemon(mon({ id: 2, name: 'charmander' }));
+  store.setExpShare(holder.uid, true);
+
+  store.logDefeat(battler.uid, opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 }));
+  assert.equal(battler.evs.atk, 9); // 1 base + 8 power item bonus
+  assert.equal(holder.evs.atk, 1); // holder gets only the unmodified base yield
+  assert.equal(holder.history[0].powerItem, null);
+});
+
+test("an Exp.-Share recipient's own held item never applies to the EVs it receives passively", () => {
+  const battler = store.catchPokemon(mon());
+  const holder = store.catchPokemon(mon({ id: 2, name: 'charmander' }));
+  store.setExpShare(holder.uid, true);
+  store.setPowerItem(holder.uid, 'bracer'); // the holder's own item — irrelevant to passive EVs
+
+  store.logDefeat(battler.uid, opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 }));
+  assert.equal(holder.evs.atk, 1); // no +8 — a held item never boosts passively-received EVs
+});
+
+test("an Exp.-Share recipient's own Pokérus doubles the EVs it receives passively", () => {
+  const battler = store.catchPokemon(mon());
+  const holder = store.catchPokemon(mon({ id: 2, name: 'charmander' }));
+  store.setExpShare(holder.uid, true);
+  store.setPokerus(holder.uid, true);
+
+  store.logDefeat(battler.uid, opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 }));
+  assert.equal(holder.evs.atk, 2); // 1 base, doubled by the holder's own Pokérus
+  assert.equal(holder.history[0].pokerus, true);
+});
+
+test("Exp.-Share EVs are clamped to the recipient's own 252 cap, independent of the battler", () => {
+  const battler = store.catchPokemon(mon());
+  const holder = store.catchPokemon(mon({ id: 2, name: 'charmander' }));
+  store.setExpShare(holder.uid, true);
+  const opp = opponent({ hp: 0, atk: 3, def: 0, spa: 0, spd: 0, spe: 0 });
+  for (let i = 0; i < 200; i++) store.logDefeat(battler.uid, opp);
+  assert.equal(holder.evs.atk, STAT_CAP);
+  assert.equal(battler.evs.atk, STAT_CAP);
+});
+
+test('a Pokémon holding its own Exp. Share does not double-apply EVs when it battled directly', () => {
+  const entry = store.catchPokemon(mon());
+  store.setExpShare(entry.uid, true);
+  store.logDefeat(entry.uid, opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 }));
+  assert.equal(entry.evs.atk, 1); // not 2 — _applyExpShare skips the battler itself
+  assert.equal(entry.history.length, 3); // battle + exp-share toggle + catch seed — only one battle event
+  assert.equal(entry.history.filter((h) => h.kind === 'battle').length, 1);
+});
+
+test('migrates a legacy expShare flag on a v1 save into an exp-share event', () => {
+  const v1Entry = { uid: 'old-2', speciesName: 'eevee', speciesId: 133, level: 10, expShare: true, evs: {}, history: [] };
+  localStorage.setItem(
+    'effortdex:state',
+    JSON.stringify({ parties: [{ id: 'p2', name: 'Old party 2', pokemon: [v1Entry] }], activePartyId: 'p2' })
+  );
+
+  const loaded = new Store();
+  const entry = loaded.state.parties[0].pokemon[0];
+  assert.equal(entry.expShare, true);
+  assert.ok(entry.events.some((e) => e.kind === 'exp-share' && e.active === true));
 });
 
 /* ---------------- device-to-device transfer ---------------- */
