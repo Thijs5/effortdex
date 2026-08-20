@@ -44,7 +44,7 @@ export class EvBar extends HTMLElement {
           background-image: repeating-linear-gradient(
             90deg,
             transparent 0 5px,
-            rgba(27, 31, 28, 0.22) 5px 6px
+            var(--scanline) 5px 6px
           );
         }
         .value {

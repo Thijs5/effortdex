@@ -7,17 +7,25 @@
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><circle cx=%2216%22 cy=%2216%22 r=%2214%22 fill=%22%23e3350d%22/><path d=%22M2 16h28%22 stroke=%22%231b1f1c%22 stroke-width=%223%22/><circle cx=%2216%22 cy=%2216%22 r=%226%22 fill=%22%23fff%22 stroke=%22%231b1f1c%22 stroke-width=%223%22/></svg>" />
   <link rel="manifest" href="manifest.webmanifest" />
   <link rel="apple-touch-icon" href="icons/apple-touch-icon.png" />
-  <meta name="theme-color" content="#e3350d" />
+  <meta name="theme-color" content="#e3350d" media="(prefers-color-scheme: light)" />
+  <meta name="theme-color" content="#15180f" media="(prefers-color-scheme: dark)" />
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-title" content="Pokélogger" />
   <link rel="stylesheet" href="tokens.css" />
   <link rel="stylesheet" href="styles.css" />
+  <script>
+    // Apply a saved manual theme before first paint to avoid a flash;
+    // without a saved choice the CSS follows prefers-color-scheme.
+    const savedTheme = localStorage.getItem('pokelogger:theme');
+    if (savedTheme === 'dark' || savedTheme === 'light') document.documentElement.dataset.theme = savedTheme;
+  </script>
 </head>
 <body>
   <div class="device">
     <header class="bezel">
       <h1>Pok<span class="e-accent">é</span>logger</h1>
       <p class="tagline">Effort value field log</p>
+      <button id="theme-toggle" class="theme-toggle" type="button" aria-label="Theme: auto">◐</button>
     </header>
 
     <!-- "/" — choose which party (save file / playthrough) to open -->
@@ -58,12 +66,8 @@
           <p id="catch-status" class="status-line" aria-live="polite"></p>
 
           <div class="legend">
-            <h3>Training aids</h3>
-            <ul>
-              <li><strong>Power items</strong> add a flat +8 EVs to one stat every battle.</li>
-              <li><strong>Pok&eacute;rus</strong> doubles all EVs earned in a battle.</li>
-              <li>Every stat caps at 252; the total caps at 510.</li>
-            </ul>
+            <h3>This game's rules</h3>
+            <ul id="training-legend"></ul>
           </div>
         </section>
 
@@ -97,11 +101,10 @@
       <label class="field-label">
         Game version
         <div class="game-version-row">
-          <input type="text" id="party-game-version-input" class="ds-field" list="game-version-options" maxlength="40" placeholder="e.g. Emerald, or a ROM hack name" />
+          <game-version-picker id="party-game-version" maxlength="40"></game-version-picker>
           <game-cartridge id="dialog-game-cart"></game-cartridge>
         </div>
       </label>
-      <datalist id="game-version-options"></datalist>
       <label class="field-label">
         Description
         <textarea id="party-description-input" class="ds-field" rows="3" maxlength="240" placeholder="Optional notes: ruleset, save slot…"></textarea>
