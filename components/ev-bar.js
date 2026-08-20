@@ -13,13 +13,28 @@ export class EvBar extends HTMLElement {
     shadow.innerHTML = `
       <style>
         :host { display: block; }
-        .row { display: grid; grid-template-columns: 34px 1fr auto 16px; align-items: center; gap: var(--space-3); }
+        .row { display: grid; grid-template-columns: 34px auto 1fr auto 16px; align-items: center; gap: var(--space-3); }
         .label {
           font-family: var(--font-mono);
           font-size: var(--font-size-xs);
           font-weight: 600;
           color: var(--ink-soft);
           letter-spacing: 0.03em;
+        }
+        /* Nature's stat effect, when set: boosted stat in teal (this
+           app's positive/gain color everywhere else — EV gains, maxed
+           bars), hindered stat in red. Red is reserved for the hindered
+           stat only, so it never reads as "this is the good one". */
+        :host([nature-effect="boost"]) .label { color: var(--teal); }
+        :host([nature-effect="hinder"]) .label { color: var(--poke-red-dark); }
+        .base-stat {
+          font-family: var(--font-mono);
+          font-size: var(--font-size-2xs);
+          color: var(--ink-soft);
+          opacity: 0.7;
+          white-space: nowrap;
+          min-width: 3ch;
+          text-align: right;
         }
         .track {
           position: relative;
@@ -71,17 +86,21 @@ export class EvBar extends HTMLElement {
         }
       </style>
       <div class="row">
-        <span class="label"></span>
+        <span class="label"><span class="label-text"></span></span>
+        <span class="base-stat"></span>
         <div class="track"><div class="fill"></div></div>
         <span class="value"></span>
         <span class="badge" hidden title="Maxed out"></span>
       </div>
     `;
-    this.$label = shadow.querySelector('.label');
+    this.$label = shadow.querySelector('.label-text');
+    this.$baseStat = shadow.querySelector('.base-stat');
     this.$fill = shadow.querySelector('.fill');
     this.$value = shadow.querySelector('.value');
     this.$badge = shadow.querySelector('.badge');
     this._label = '';
+    this._baseStat = null;
+    this._natureEffect = null;
     this._value = 0;
     this._max = 252;
   }
@@ -92,6 +111,22 @@ export class EvBar extends HTMLElement {
   }
   get label() {
     return this._label;
+  }
+  /** The species' base stat for this row, shown as a small hint next to the label. Null hides it. */
+  set baseStat(v) {
+    this._baseStat = v;
+    this._render();
+  }
+  get baseStat() {
+    return this._baseStat;
+  }
+  /** This stat's nature effect: 'boost', 'hinder', or null. Colors the label accordingly. */
+  set natureEffect(v) {
+    this._natureEffect = v || null;
+    this._render();
+  }
+  get natureEffect() {
+    return this._natureEffect;
   }
   set value(v) {
     this._value = v;
@@ -110,6 +145,10 @@ export class EvBar extends HTMLElement {
 
   _render() {
     this.$label.textContent = this._label;
+    this.$baseStat.textContent = this._baseStat != null ? String(this._baseStat) : '';
+    this.$baseStat.title = this._baseStat != null ? `Base ${this._label}: ${this._baseStat}` : '';
+    if (this._natureEffect) this.setAttribute('nature-effect', this._natureEffect);
+    else this.removeAttribute('nature-effect');
     const pct = Math.max(0, Math.min(100, (this._value / this._max) * 100));
     this.$fill.style.width = pct + '%';
     this.$value.textContent = `${this._value}/${this._max}`;

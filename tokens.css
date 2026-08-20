@@ -35,6 +35,9 @@
   --on-teal: #fff;
   --teal-soft: #c6ded4;
   --danger-soft: #f8d9d0;
+  --pokerus-purple: #8e3fb0;   /* the purple the games themselves use for the Pokérus status */
+  --pokerus-purple-soft: #e8d7f0;
+  --on-pokerus: #fff;
   --sprite-bg: rgba(255, 255, 255, 0.55);
   --scanline: rgba(27, 31, 24, 0.2);
   --footer-bg: #171a13;
@@ -105,6 +108,9 @@
     --on-teal: #14201b;
     --teal-soft: #23372f;
     --danger-soft: #4a2018;
+    --pokerus-purple: #c98ee8;
+    --pokerus-purple-soft: #3a2748;
+    --on-pokerus: #1c1424;
     --sprite-bg: rgba(255, 255, 255, 0.08);
     --scanline: rgba(0, 0, 0, 0.35);
     --footer-bg: #0c0e07;
@@ -141,6 +147,9 @@
   --on-teal: #14201b;
   --teal-soft: #23372f;
   --danger-soft: #4a2018;
+  --pokerus-purple: #c98ee8;
+  --pokerus-purple-soft: #3a2748;
+  --on-pokerus: #1c1424;
   --sprite-bg: rgba(255, 255, 255, 0.08);
   --scanline: rgba(0, 0, 0, 0.35);
   --footer-bg: #0c0e07;

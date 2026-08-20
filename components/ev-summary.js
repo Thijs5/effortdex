@@ -23,6 +23,8 @@ export class EvSummary extends HTMLElement {
     `;
     this.$bars = shadow.querySelector('.bars');
     this._evs = emptyEvs();
+    this._baseStats = null;
+    this._nature = null;
     for (const { key, label } of STATS) {
       const bar = document.createElement('ev-bar');
       bar.dataset.key = key;
@@ -44,12 +46,32 @@ export class EvSummary extends HTMLElement {
   get evs() {
     return this._evs;
   }
+  /** The caught Pokémon's species base stats, `{ hp, atk, def, spa, spd, spe }`. Null hides the hint. */
+  set baseStats(v) {
+    this._baseStats = v || null;
+    this._render();
+  }
+  get baseStats() {
+    return this._baseStats;
+  }
+  /** The caught Pokémon's nature, `{ boost, hinder }` (either may be null). Null/unset colors nothing. */
+  set nature(v) {
+    this._nature = v || null;
+    this._render();
+  }
+  get nature() {
+    return this._nature;
+  }
 
   _render() {
     let total = 0;
     for (const bar of this.$bars.children) {
-      const val = this._evs[bar.dataset.key] || 0;
+      const key = bar.dataset.key;
+      const val = this._evs[key] || 0;
       bar.value = val;
+      bar.baseStat = this._baseStats ? this._baseStats[key] : null;
+      bar.natureEffect =
+        this._nature?.boost === key ? 'boost' : this._nature?.hinder === key ? 'hinder' : null;
       total += val;
     }
     this.$total.value = total;

@@ -60,9 +60,7 @@
           <p class="hint">Search a species to add it to your roster and start logging its EVs.</p>
           <div class="catch-form">
             <pokemon-search id="catch-search" placeholder="e.g. Bulbasaur"></pokemon-search>
-            <button id="catch-btn" class="btn btn--primary" disabled>Catch!</button>
           </div>
-          <p id="catch-ev-preview" class="status-line" aria-live="polite"></p>
           <p id="catch-status" class="status-line" aria-live="polite"></p>
 
           <div class="legend">
@@ -158,6 +156,14 @@
             <option value="false">No effect on EVs</option>
           </select>
         </label>
+        <label class="field-label field-label--inline">
+          Natures
+          <select id="override-nature" class="ds-field">
+            <option value="">Auto (from game version)</option>
+            <option value="true">Available (Gen III+)</option>
+            <option value="false">Unavailable</option>
+          </select>
+        </label>
       </details>
 
       <div class="party-dialog-actions">
@@ -165,6 +171,34 @@
         <span class="spacer"></span>
         <button type="button" id="party-cancel-btn" class="btn btn--ghost">Cancel</button>
         <button type="submit" id="party-submit-btn" class="btn btn--primary">Create party</button>
+      </div>
+    </form>
+  </dialog>
+
+  <dialog id="catch-dialog" class="party-dialog catch-dialog">
+    <form id="catch-form">
+      <h2 id="catch-dialog-title">Catch Pok&eacute;mon</h2>
+      <div class="catch-dialog-identity">
+        <img id="catch-dialog-sprite" class="catch-dialog-sprite" alt="" />
+        <div class="catch-dialog-identity-text">
+          <span id="catch-dialog-name" class="catch-dialog-name"></span>
+          <p id="catch-dialog-ev-yield" class="catch-dialog-ev-yield" aria-live="polite"></p>
+        </div>
+      </div>
+      <label class="field-label">
+        Level
+        <input type="number" id="catch-dialog-level" class="ds-field" min="1" max="100" required />
+      </label>
+      <label class="field-label" id="catch-dialog-nature-field">
+        Nature <span class="field-optional">(optional)</span>
+        <select id="catch-dialog-nature" class="ds-field">
+          <option value="">Unknown</option>
+        </select>
+      </label>
+      <div class="party-dialog-actions">
+        <span class="spacer"></span>
+        <button type="button" id="catch-dialog-cancel-btn" class="btn btn--ghost">Cancel</button>
+        <button type="submit" id="catch-dialog-submit-btn" class="btn btn--primary" disabled>Catch!</button>
       </div>
     </form>
   </dialog>

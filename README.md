@@ -66,9 +66,20 @@ secure context.)
   cutoff, and neither does an unset or unrecognized game version.
 - **EV-yield previews** — before catching a Pokémon or logging a battle,
   see what EVs it would actually yield, so you can decide if it's worth
-  it.
-- **Battle history** — every logged defeat is kept, with a one-click
-  "log it again" for repeat grinding.
+  it. Catching opens a modal with the sprite, base EV yield, and a level
+  field, so the level is set at catch time instead of defaulting to 5.
+  On a Gen III+ party, the modal also offers an optional nature.
+- **Natures** — set (or change later, from the roster card) one of the
+  25 natures. Natures don't affect EVs themselves — they're a ±10% stat
+  multiplier applied on top — but the boosted and hindered stat are
+  flagged right on the EV bars (▲/▼) as a reminder of which stat is
+  worth prioritizing or not bothering with
+  ([Bulbapedia](https://bulbapedia.bulbagarden.net/wiki/Nature)). Hidden
+  entirely on a party whose game version predates Gen III, where natures
+  didn't exist yet (overridable per-party, like every other rule above).
+- **Battle history** — every logged defeat (or vitamin dose) is kept,
+  with a one-click "log it again" for repeat grinding and a delete
+  button for a mislogged entry, which reverts the EVs it applied.
 - **Evolutions** — evolve a caught Pokémon (EVs, nickname, training aids
   and history all carry over), with an undo for accidental clicks.
 - **Installable / offline** — a web app manifest and service worker let
