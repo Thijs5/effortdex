@@ -1,4 +1,4 @@
-import { POWER_ITEMS, MACHO_BRACE_SPRITE, EXP_SHARE_SPRITE, VITAMINS, FEATHERS, FEATHER_BONUS, EV_BERRIES, EV_BERRY_REDUCTION, NATURES, STAT_LABEL, MACHO_BRACE_MULTIPLIER, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, TOTAL_CAP, FALLBACK_SPRITE, FALLBACK_ONERROR, MIN_LEVEL, MAX_LEVEL } from '../lib/constants.js';
+import { POWER_ITEMS, MACHO_BRACE_SPRITE, EXP_SHARE_SPRITE, VITAMINS, FEATHERS, FEATHER_BONUS, EV_BERRIES, EV_BERRY_REDUCTION, NATURES, STAT_LABEL, MACHO_BRACE_MULTIPLIER, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, STAT_EXP_VITAMIN_BONUS, STAT_EXP_VITAMIN_MAX_USES, FALLBACK_SPRITE, FALLBACK_ONERROR, MIN_LEVEL, MAX_LEVEL } from '../lib/constants.js';
 import { titleCase, totalEvs, natureEffectHint, natureOptionsHtml, dayLabel, escapeHtml } from '../lib/utils.js';
 import { api, store } from '../lib/services.js';
 import { versionedSpriteUrl } from '../lib/pokeapi-client.js';
@@ -440,6 +440,8 @@ export class CaughtPokemonCard extends HTMLElement {
     this.$expShareToggle = shadow.querySelector('.exp-share-toggle-btn');
     this.$vitaminGrid = shadow.querySelector('.vitamin-grid');
     this.$vitaminStatus = shadow.querySelector('.vitamin-status');
+    this.$evHelpBtn = shadow.querySelector('.details-section .help-btn');
+    this.$vitaminHelpBtn = shadow.querySelector('.vitamins .help-btn');
     this.$wingsSection = shadow.querySelector('.wings');
     this.$wingGrid = shadow.querySelector('.wing-grid');
     this.$wingStatus = shadow.querySelector('.wing-status');
@@ -719,12 +721,16 @@ export class CaughtPokemonCard extends HTMLElement {
     const vitamin = VITAMINS.find((v) => v.id === vitaminId);
     const result = store.useVitamin(this._entry.uid, vitaminId);
     if (!result || !vitamin) return;
+    const statLabel = result.linkedStat ? 'SPC' : STAT_LABEL[vitamin.stat];
+    const noun = store.usesStatExpSystem() ? 'Stat Experience' : 'EVs';
     if (result.applied) {
-      this.$vitaminStatus.textContent = `${vitamin.label}: +${result.applied} ${STAT_LABEL[vitamin.stat]}`;
+      this.$vitaminStatus.textContent = `${vitamin.label}: +${result.applied} ${statLabel}`;
     } else if (result.blockedByCutoff) {
-      this.$vitaminStatus.textContent = `${vitamin.label}: no EVs gained — this game stops vitamins once ${STAT_LABEL[vitamin.stat]} has ${VITAMIN_STAT_CUTOFF}+ EVs`;
+      this.$vitaminStatus.textContent = `${vitamin.label}: no ${noun} gained — this game stops vitamins once ${statLabel} has ${VITAMIN_STAT_CUTOFF}+ EVs`;
+    } else if (result.blockedByUseLimit) {
+      this.$vitaminStatus.textContent = `${vitamin.label}: no ${noun} gained — this game only counts a vitamin's first ${STAT_EXP_VITAMIN_MAX_USES} uses`;
     } else {
-      this.$vitaminStatus.textContent = `${vitamin.label}: no EVs gained — ${STAT_LABEL[vitamin.stat]} is already maxed out`;
+      this.$vitaminStatus.textContent = `${vitamin.label}: no ${noun} gained — ${statLabel} is already maxed out`;
     }
   }
 
@@ -778,11 +784,22 @@ export class CaughtPokemonCard extends HTMLElement {
     this.$search.recent = e.history
       .filter((h) => h.kind === 'battle')
       .map((h) => ({ name: h.opponentName, sprite: h.sprite }));
+    const statExp = store.usesStatExpSystem();
+    const totalCap = store.totalCap();
     this.$evSummary.evs = e.evs;
     this.$evSummary.baseStats = e.baseStats;
     this.$evSummary.nature = nature;
+    this.$evSummary.statCap = store.statCap();
+    this.$evSummary.totalCap = totalCap;
+    this.$evSummary.mergedSpecial = store.specialStatMerged();
+    this.$evHelpBtn.title = statExp
+      ? "Stat Experience is this game's hidden bonus stat pool — up to 65,535 per stat, gained mainly from battling (equal to the defeated Pokémon's own base stat). Nature is fixed when a Pokémon is caught or hatched: it boosts one stat by 10% and lowers another. Nature doesn't change Stat Experience, but training the stat your nature already boosts gets the most out of your points."
+      : "EVs (Effort Values) are hidden bonus stat points earned mainly from battling — up to 252 per stat, 510 total. Nature is fixed when a Pokémon is caught or hatched: it boosts one stat by 10% and lowers another. Nature doesn't change EVs, but training the stat your nature already boosts gets the most out of your points.";
+    this.$vitaminHelpBtn.title = statExp
+      ? `Vitamins (HP Up, Protein, Iron, Calcium, Carbos) instantly add Stat Experience to one stat without battling. Each only counts for its first ${STAT_EXP_VITAMIN_MAX_USES} uses per stat — after that, only battling can push it further toward the 65,535 cap.`
+      : 'Vitamins (HP Up, Protein, Iron, Calcium, Zinc, Carbos) instantly add EVs to one stat without battling — a quick way to top off a stat. Each only works until that stat has 100 EVs from any source; after that, only battling, items, or Pokérus can push it further toward the 252 cap.';
 
-    const trained = totalEvs(e.evs) >= TOTAL_CAP;
+    const trained = totalCap != null && totalEvs(e.evs) >= totalCap;
     this.toggleAttribute('fully-trained', trained);
 
     this._populateItemButtons(store.powerItemBonus(), store.trainingItemAvailability());
@@ -883,28 +900,39 @@ export class CaughtPokemonCard extends HTMLElement {
 
   // Marks a button dim before it's even clicked when this game's rules
   // mean it wouldn't gain anything — the Gen III-VII 100-EV vitamin
-  // cutoff, or the stat already sitting at the 252 cap. Also badges each
-  // button with how many times it's already been fed, since that's
-  // otherwise invisible once EVs from vitamins mix in with battle EVs.
+  // cutoff, the Gen I-II 10-use limit, or the stat already sitting at its
+  // cap. Also badges each button with how many times it's already been
+  // fed, since that's otherwise invisible once EVs mix in with battle EVs.
   _updateVitaminButtons(e) {
-    const cutoffApplies = store.vitaminCutoffApplies();
+    const statExp = store.usesStatExpSystem();
+    const mergedSpecial = store.specialStatMerged();
+    const cutoffApplies = !statExp && store.vitaminCutoffApplies();
+    const bonus = statExp ? STAT_EXP_VITAMIN_BONUS : VITAMIN_BONUS;
+    const statCap = store.statCap();
     for (const btn of this.$vitaminGrid.children) {
       const vitamin = VITAMINS.find((v) => v.id === btn.dataset.vitamin);
+      btn.hidden = mergedSpecial && vitamin.id === 'zinc';
+      if (btn.hidden) continue;
+      const statLabel = mergedSpecial && vitamin.stat === 'spa' ? 'SPC' : STAT_LABEL[vitamin.stat];
       const stat = e.evs[vitamin.stat];
       const cappedByCutoff = cutoffApplies && stat >= VITAMIN_STAT_CUTOFF;
-      const cappedByStatCap = stat >= 252;
+      const cappedByStatCap = stat >= statCap;
       const count = e.history.filter((h) => h.kind === 'vitamin' && h.vitaminId === vitamin.id).length;
+      const cappedByUseLimit = statExp && count >= STAT_EXP_VITAMIN_MAX_USES;
       btn.dataset.count = count;
+      btn.querySelector('.ds-item-btn-boost').textContent = `+${bonus} ${statLabel}`;
       const fedNote = count ? ` — fed ${count}×` : '';
-      if (cappedByCutoff || cappedByStatCap) {
+      if (cappedByCutoff || cappedByUseLimit || cappedByStatCap) {
         btn.dataset.capped = '';
         btn.title =
           (cappedByCutoff
-            ? `This game stops vitamins once ${STAT_LABEL[vitamin.stat]} has ${VITAMIN_STAT_CUTOFF}+ EVs`
-            : `${STAT_LABEL[vitamin.stat]} is already at the 252 cap`) + fedNote;
+            ? `This game stops vitamins once ${statLabel} has ${VITAMIN_STAT_CUTOFF}+ EVs`
+            : cappedByUseLimit
+              ? `This game only counts a vitamin's first ${STAT_EXP_VITAMIN_MAX_USES} uses`
+              : `${statLabel} is already at the ${statCap} cap`) + fedNote;
       } else {
         delete btn.dataset.capped;
-        btn.title = `Feed ${vitamin.label} — raises ${STAT_LABEL[vitamin.stat]} EVs by up to ${VITAMIN_BONUS}` + fedNote;
+        btn.title = `Feed ${vitamin.label} — raises ${statLabel} by up to ${bonus}` + fedNote;
       }
     }
   }

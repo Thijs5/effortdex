@@ -4,7 +4,7 @@
 // all domain logic lives in lib/, and each custom element owns its own
 // rendering.
 
-import { STAT_CAP, TOTAL_CAP, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, MACHO_BRACE_MULTIPLIER, DEFAULT_LEVEL, FALLBACK_SPRITE, FALLBACK_ONERROR, EXP_SHARE_SPRITE, versionedSpriteOnError, NATURES } from './lib/constants.js';
+import { STAT_CAP, TOTAL_CAP, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, STAT_EXP_VITAMIN_BONUS, STAT_EXP_VITAMIN_MAX_USES, MACHO_BRACE_MULTIPLIER, DEFAULT_LEVEL, FALLBACK_SPRITE, FALLBACK_ONERROR, EXP_SHARE_SPRITE, versionedSpriteOnError, NATURES } from './lib/constants.js';
 import { titleCase, totalEvs, natureOptionsHtml, escapeHtml } from './lib/utils.js';
 import { api, store } from './lib/services.js';
 import { versionedSpriteUrl } from './lib/pokeapi-client.js';
@@ -130,6 +130,7 @@ const OVERRIDE_FIELDS = [
   { key: 'machoBrace', el: document.getElementById('override-macho-brace'), type: 'bool' },
   { key: 'vitaminCutoff', el: document.getElementById('override-vitamin-cutoff'), type: 'bool' },
   { key: 'pokerus', el: document.getElementById('override-pokerus'), type: 'bool' },
+  { key: 'statExpSystem', el: document.getElementById('override-stat-exp-system'), type: 'bool' },
   { key: 'wings', el: document.getElementById('override-wings'), type: 'bool' },
   { key: 'evBerries', el: document.getElementById('override-ev-berries'), type: 'bool' },
   { key: 'nature', el: document.getElementById('override-nature'), type: 'bool' },
@@ -388,8 +389,9 @@ function renderRoster(party) {
   roster.innerHTML = '';
   const natureAvailable = store.natureAvailable();
   const spriteGame = store.spriteBaseGame();
+  const totalCap = store.totalCap();
   for (const entry of entries) {
-    const trained = totalEvs(entry.evs) >= TOTAL_CAP;
+    const trained = totalCap != null && totalEvs(entry.evs) >= totalCap;
     const pokerusActive = store.effectiveAids(entry).pokerus;
     // "Adamant Fangs McGee" (nickname) or plain "Slowpoke" (no nickname)
     // — same nature-prefix convention as the detail page's title, minus
@@ -420,8 +422,14 @@ function renderRoster(party) {
       <ev-bar class="roster-card-evbar"></ev-bar>
     `;
     const evBar = row.querySelector('ev-bar');
-    evBar.max = TOTAL_CAP;
-    evBar.value = totalEvs(entry.evs);
+    // No combined total under the Stat Experience system (Gen I-II) — a
+    // 510-max bar would misrepresent it, so the roster card just omits
+    // this glance-total rather than show a meaningless fraction.
+    evBar.hidden = totalCap == null;
+    if (totalCap != null) {
+      evBar.max = totalCap;
+      evBar.value = totalEvs(entry.evs);
+    }
     interceptLinkClick(row, () => router.navigateToPokemon(party.slug, entry.uid));
     roster.appendChild(row);
   }
@@ -436,7 +444,8 @@ function renderPicker() {
   pickerEmpty.hidden = parties.length > 0;
   partyList.innerHTML = '';
   for (const party of parties) {
-    const trained = party.pokemon.filter((e) => totalEvs(e.evs) >= TOTAL_CAP).length;
+    const partyTotalCap = store.totalCap(party);
+    const trained = partyTotalCap != null && party.pokemon.filter((e) => totalEvs(e.evs) >= partyTotalCap).length;
     const card = document.createElement('a');
     card.className = 'party-card';
     card.href = router.partyPath(party.slug);
@@ -478,17 +487,28 @@ function renderLegend() {
   if (!powerItems && !machoBrace) {
     items.push('No EV-boosting held items exist in this generation.');
   }
+  const statExp = store.usesStatExpSystem();
   items.push(
     store.pokerusAvailable()
-      ? '<strong>Pok&eacute;rus</strong> doubles all EVs earned in a battle.'
-      : "<strong>Pok&eacute;rus</strong> doesn't boost EVs in this game."
+      ? `<strong>Pok&eacute;rus</strong> doubles all ${statExp ? 'Stat Experience' : 'EVs'} earned in a battle.`
+      : `<strong>Pok&eacute;rus</strong> doesn't boost ${statExp ? 'Stat Experience' : 'EVs'} in this game.`
   );
-  items.push(
-    store.vitaminCutoffApplies()
-      ? `<strong>Vitamins</strong> add +${VITAMIN_BONUS} EVs, but stop once a stat has ${VITAMIN_STAT_CUTOFF}+.`
-      : `<strong>Vitamins</strong> add +${VITAMIN_BONUS} EVs to their stat.`
-  );
-  items.push(`Every stat caps at ${STAT_CAP}; the total caps at ${TOTAL_CAP}.`);
+  if (statExp) {
+    items.push(
+      `<strong>Vitamins</strong> add +${STAT_EXP_VITAMIN_BONUS} Stat Experience, but only their first ${STAT_EXP_VITAMIN_MAX_USES} uses count.`
+    );
+    items.push(`Every stat caps at ${store.statCap()}, with no combined total cap.`);
+  } else {
+    items.push(
+      store.vitaminCutoffApplies()
+        ? `<strong>Vitamins</strong> add +${VITAMIN_BONUS} EVs, but stop once a stat has ${VITAMIN_STAT_CUTOFF}+.`
+        : `<strong>Vitamins</strong> add +${VITAMIN_BONUS} EVs to their stat.`
+    );
+    items.push(`Every stat caps at ${STAT_CAP}; the total caps at ${TOTAL_CAP}.`);
+  }
+  if (store.specialStatMerged()) {
+    items.push("Special hasn't split into Sp. Atk/Sp. Def yet — one stat feeds both.");
+  }
   if (store.natureAvailable()) {
     items.push('<strong>Nature</strong> gives one stat +10%, another -10% (shown on the EV bars).');
   }
