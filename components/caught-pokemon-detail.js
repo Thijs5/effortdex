@@ -250,14 +250,17 @@ export class CaughtPokemonDetail extends HTMLElement {
         .vitamins, .wings, .berries { display: grid; gap: var(--space-2); }
         .vitamin-status, .wing-status, .berry-status { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--teal); min-height: 1em; }
 
-        .pokerus-section { display: grid; gap: var(--space-2); justify-items: start; }
-        .pokerus-toggle-btn { width: auto; }
+        /* Exp. Share and Pokérus are both a single toggle button plus a
+           title — light enough to sit side by side at any dialog width,
+           not just once the dialog itself goes two-column. */
+        .exp-pokerus-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); align-items: start; }
+
+        .pokerus-section { display: grid; gap: var(--space-2); justify-items: stretch; min-width: 0; }
         .pokerus-toggle-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .pokerus-icon { width: 22px; height: 22px; flex: 0 0 auto; display: inline-flex; color: var(--pokerus-purple); }
         .pokerus-icon svg { width: 100%; height: 100%; }
 
-        .exp-share-section { display: grid; gap: var(--space-2); justify-items: start; }
-        .exp-share-toggle-btn { width: auto; }
+        .exp-share-section { display: grid; gap: var(--space-2); justify-items: stretch; min-width: 0; }
         .pokerus-note { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--ink-soft); }
 
         .evolve-panel { display: grid; gap: var(--space-2); }
@@ -330,32 +333,34 @@ export class CaughtPokemonDetail extends HTMLElement {
             <p class="vitamin-status" aria-live="polite"></p>
           </section>
 
-          <section class="exp-share-section">
-            <h3 class="section-title">Exp. Share
-              <button type="button" class="help-btn" aria-expanded="false" aria-label="What does Exp. Share do?" title="While holding an Exp. Share, this Pokémon also earns EVs whenever any other Pokémon in this party has a battle logged — the same base amount that Pokémon got, doubled by this Pokémon's own Pokérus if it has any. It never inherits the other Pokémon's held item bonus.">?</button>
-            </h3>
-            <button type="button" class="ds-item-btn exp-share-toggle-btn" aria-pressed="false">
-              <img class="ds-item-icon" src="${EXP_SHARE_SPRITE}" alt="" ${FALLBACK_ONERROR} />
-              <span class="ds-item-btn-text">
-                <span class="ds-item-btn-label">Exp. Share</span>
-                <span class="ds-item-btn-boost">Gets EVs from other battles</span>
-              </span>
-            </button>
-          </section>
+          <div class="exp-pokerus-row">
+            <section class="exp-share-section">
+              <h3 class="section-title">Exp. Share
+                <button type="button" class="help-btn" aria-expanded="false" aria-label="What does Exp. Share do?" title="While holding an Exp. Share, this Pokémon also earns EVs whenever any other Pokémon in this party has a battle logged — the same base amount that Pokémon got, doubled by this Pokémon's own Pokérus if it has any. It never inherits the other Pokémon's held item bonus.">?</button>
+              </h3>
+              <button type="button" class="ds-item-btn exp-share-toggle-btn" aria-pressed="false">
+                <img class="ds-item-icon" src="${EXP_SHARE_SPRITE}" alt="" ${FALLBACK_ONERROR} />
+                <span class="ds-item-btn-text">
+                  <span class="ds-item-btn-label">Exp. Share</span>
+                  <span class="ds-item-btn-boost">Shares other EVs</span>
+                </span>
+              </button>
+            </section>
 
-          <section class="pokerus-section">
-            <h3 class="section-title">Pokérus
-              <button type="button" class="help-btn" aria-expanded="false" aria-label="What is Pokérus?" title="A rare, harmless in-game virus. While infected, every EV your Pokémon earns from battling is doubled — pure bonus, no downside. It can also spread to other party members over time. Once it cures (after a few days), the ×2 EV bonus stays forever — no need to toggle this off.">?</button>
-            </h3>
-            <button type="button" class="ds-item-btn pokerus-toggle-btn" aria-pressed="false">
-              <span class="pokerus-icon" aria-hidden="true">${POKERUS_ICON_SVG}</span>
-              <span class="ds-item-btn-text">
-                <span class="ds-item-btn-label">Pokérus</span>
-                <span class="ds-item-btn-boost">×2 EVs</span>
-              </span>
-            </button>
-            <p class="pokerus-note" hidden>Pokérus doesn't double EVs in this game.</p>
-          </section>
+            <section class="pokerus-section">
+              <h3 class="section-title">Pokérus
+                <button type="button" class="help-btn" aria-expanded="false" aria-label="What is Pokérus?" title="A rare, harmless in-game virus. While infected, every EV your Pokémon earns from battling is doubled — pure bonus, no downside. It can also spread to other party members over time. Once it cures (after a few days), the ×2 EV bonus stays forever — no need to toggle this off.">?</button>
+              </h3>
+              <button type="button" class="ds-item-btn pokerus-toggle-btn" aria-pressed="false">
+                <span class="pokerus-icon" aria-hidden="true">${POKERUS_ICON_SVG}</span>
+                <span class="ds-item-btn-text">
+                  <span class="ds-item-btn-label">Pokérus</span>
+                  <span class="ds-item-btn-boost">×2 EVs</span>
+                </span>
+              </button>
+              <p class="pokerus-note" hidden>Pokérus doesn't double EVs in this game.</p>
+            </section>
+          </div>
 
           <section class="aids">
             <h3 class="section-title">Training item
