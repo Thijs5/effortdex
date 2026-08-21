@@ -33,7 +33,7 @@ test.describe('EV training', () => {
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openMoreOptions(card);
 
-    await dialog.locator('button.vitamin-btn[data-vitamin="protein"]').click();
+    await dialog.locator('button[data-id="protein"]').click();
 
     await expect(card.locator('ev-summary ev-bar[data-key="atk"]').locator('.value')).toHaveText('10/252');
   });
@@ -46,11 +46,11 @@ test.describe('EV training', () => {
     const dialog = await openMoreOptions(card);
 
     // 10 Proteins reach exactly 100 Atk EVs — the cutoff threshold.
-    for (let i = 0; i < 10; i++) await dialog.locator('button.vitamin-btn[data-vitamin="protein"]').click();
+    for (let i = 0; i < 10; i++) await dialog.locator('button[data-id="protein"]').click();
     await expect(card.locator('ev-summary ev-bar[data-key="atk"]').locator('.value')).toHaveText('100/252');
 
     // An 11th does nothing more — the cutoff, not the 252 cap, stops it.
-    await dialog.locator('button.vitamin-btn[data-vitamin="protein"]').click();
+    await dialog.locator('button[data-id="protein"]').click();
     await expect(card.locator('ev-summary ev-bar[data-key="atk"]').locator('.value')).toHaveText('100/252');
   });
 
@@ -61,7 +61,7 @@ test.describe('EV training', () => {
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openMoreOptions(card);
 
-    for (let i = 0; i < 11; i++) await dialog.locator('button.vitamin-btn[data-vitamin="protein"]').click();
+    for (let i = 0; i < 11; i++) await dialog.locator('button[data-id="protein"]').click();
 
     await expect(card.locator('ev-summary ev-bar[data-key="atk"]').locator('.value')).toHaveText('110/252');
   });
@@ -73,7 +73,7 @@ test.describe('EV training', () => {
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openMoreOptions(card);
 
-    await dialog.locator('.item-grid button[data-value="macho-brace"]').click();
+    await dialog.locator('.item-grid button[data-id="macho-brace"]').click();
     await dialog.getByRole('button', { name: 'Close' }).click();
     await logBattle(card, 'Caterpie'); // base +1 HP, doubled to +2
 
@@ -87,10 +87,10 @@ test.describe('EV training', () => {
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openMoreOptions(card);
 
-    await dialog.locator('button.vitamin-btn[data-vitamin="protein"]').click();
+    await dialog.locator('button[data-id="protein"]').click();
     await expect(card.locator('ev-summary ev-bar[data-key="atk"]').locator('.value')).toHaveText('10/252');
 
-    await dialog.locator('button.berry-btn[data-berry="kelpsy"]').click();
+    await dialog.locator('button[data-id="kelpsy"]').click();
     await expect(card.locator('ev-summary ev-bar[data-key="atk"]').locator('.value')).toHaveText('0/252');
   });
 
@@ -101,7 +101,7 @@ test.describe('EV training', () => {
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openMoreOptions(card);
 
-    for (let i = 0; i < 3; i++) await dialog.locator('button.wing-btn[data-feather="genius-wing"]').click();
+    for (let i = 0; i < 3; i++) await dialog.locator('button[data-id="genius-wing"]').click();
 
     await expect(card.locator('ev-summary ev-bar[data-key="spa"]').locator('.value')).toHaveText('3/252');
   });

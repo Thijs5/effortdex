@@ -16,7 +16,7 @@ test.describe('Evolution', () => {
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openMoreOptions(card);
 
-    await dialog.locator('button.vitamin-btn[data-vitamin="protein"]').click();
+    await dialog.locator('button[data-id="protein"]').click();
     page.once('dialog', (d) => d.accept());
     await dialog.locator('evolution-chain button[data-action="evolve"]').first().click();
 

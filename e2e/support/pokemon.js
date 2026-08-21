@@ -1,8 +1,9 @@
 // @ts-check
 // Shared flows for catching a Pokémon and driving its detail page. There is
-// exactly one <caught-pokemon-card> element in the whole app (app.js
-// creates it once and re-renders it for whichever Pokémon's detail page is
-// open) — the roster list itself only shows compact link rows. So every
+// exactly one <caught-pokemon-detail> element in the whole app (pages/
+// pokemon.js creates it once and re-renders it for whichever Pokémon's
+// detail page is open) — the roster list itself only shows compact link
+// rows. So every
 // spec that needs vitamins/training items/evolution/battle-logging must
 // first navigate into a specific Pokémon's detail page via `openDetail`.
 
@@ -47,15 +48,15 @@ export function rosterRow(page, species) {
 
 /**
  * Clicks a caught Pokémon's roster row and returns the (single, reused)
- * `<caught-pokemon-card>` once its detail page has loaded.
+ * `<caught-pokemon-detail>` once its detail page has loaded.
  * @param {import('@playwright/test').Page} page
  * @param {string} species
  */
 export async function openDetail(page, species) {
   await rosterRow(page, species).click();
-  const card = page.locator('caught-pokemon-card');
-  await card.waitFor({ state: 'visible' });
-  return card;
+  const detail = page.locator('caught-pokemon-detail');
+  await detail.waitFor({ state: 'visible' });
+  return detail;
 }
 
 /**
