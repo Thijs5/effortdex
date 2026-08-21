@@ -3,6 +3,7 @@
 [![Automated tests](https://github.com/Thijs5/effortdex/actions/workflows/test.yml/badge.svg)](https://github.com/Thijs5/effortdex/actions/workflows/test.yml)
 [![Latest release](https://img.shields.io/github/v/release/Thijs5/effortdex)](https://github.com/Thijs5/effortdex/releases/latest)
 [![Open the app](https://img.shields.io/badge/Open-the%20app-teal)](https://thijs5.github.io/effortdex/)
+[![Changelog](https://img.shields.io/badge/Changelog-releases-blue)](https://github.com/Thijs5/effortdex/releases)
 
 A local-only Pokémon EV (Effort Value) training tracker. Catch Pokémon,
 log the battles you defeat while training them, and watch their EVs fill
@@ -11,8 +12,7 @@ up, across as many parties (save files / playthroughs) as you're juggling at onc
 **[Open the app](https://thijs5.github.io/effortdex/)**. No account
 creation is needed: it runs entirely in your browser, works offline
 once loaded, and keeps everything on your device (see
-[Data & privacy](#data--privacy) below). See what's new in the
-[changelog](https://github.com/Thijs5/effortdex/releases).
+[Data & privacy](#data--privacy) below).
 
 ## Features
 
