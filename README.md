@@ -111,8 +111,23 @@ built-in test runner — no dependencies:
 npm test
 ```
 
-CI (`.github/workflows/test.yml`) runs this on every push to `main`
-and every pull request.
+An end-to-end suite (`e2e/`, Playwright) drives the actual app through a
+real browser, organized one file per feature (party management, catching,
+EV training, Pokérus/Exp. Share, evolution, transfer, settings) — run
+`npx playwright test --list` for a feature-by-feature tour of what
+Effortdex does, or run it with:
+
+```sh
+npm run test:e2e
+```
+
+See [`docs/adr/0007`](docs/adr/0007-e2e-testing-strategy.md) for why it's
+organized this way and what it deliberately doesn't cover yet (Gen I/II).
+
+CI (`.github/workflows/test.yml`) runs both suites plus a JSDoc-based
+typecheck (`npm run typecheck` — `tsc --noEmit` over `lib/` and `e2e/`,
+no build step; see `tsconfig.json`) on every push to `main` and every
+pull request.
 
 ## Data & privacy
 
