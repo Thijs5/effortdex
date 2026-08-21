@@ -4,6 +4,10 @@
   "type": "module",
   "description": "Local-only Pokémon EV training tracker built with native Web Components.",
   "scripts": {
-    "test": "node --test \"test/**/*.test.js\""
+    "test": "node --test \"test/**/*.test.js\"",
+    "typecheck": "tsc"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3"
   }
 }
