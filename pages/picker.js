@@ -30,8 +30,10 @@ export function render() {
     card.innerHTML = `
       <div class="party-card-cart"><game-ball></game-ball></div>
       <div class="party-card-body">
-        <span class="party-card-name">${escapeHtml(party.name)}</span>
-        ${party.baseGame ? `<span class="game-name-label">${escapeHtml(party.baseGame)}</span>` : ''}
+        <div class="party-card-name-row">
+          <span class="party-card-name">${escapeHtml(party.name)}</span>
+          ${party.baseGame ? `<span class="game-name-label">${escapeHtml(party.baseGame)}</span>` : ''}
+        </div>
         ${party.description ? `<p class="party-card-description">${escapeHtml(party.description)}</p>` : ''}
         <div class="party-card-stats">
           <span>${party.pokemon.length} caught</span>
