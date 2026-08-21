@@ -22,12 +22,17 @@ export class EvSummary extends HTMLElement {
       <div class="total"></div>
     `;
     this.$bars = shadow.querySelector('.bars');
+    this.$totalRow = shadow.querySelector('.total');
     this._evs = emptyEvs();
     this._baseStats = null;
     this._nature = null;
+    this._statCap = STAT_CAP;
+    this._totalCap = TOTAL_CAP;
+    this._mergedSpecial = false;
     for (const { key, label } of STATS) {
       const bar = document.createElement('ev-bar');
       bar.dataset.key = key;
+      bar.dataset.baseLabel = label;
       bar.label = label;
       bar.max = STAT_CAP;
       bar.value = 0;
@@ -36,7 +41,7 @@ export class EvSummary extends HTMLElement {
     this.$total = document.createElement('ev-bar');
     this.$total.label = 'TOT';
     this.$total.max = TOTAL_CAP;
-    shadow.querySelector('.total').appendChild(this.$total);
+    this.$totalRow.appendChild(this.$total);
   }
 
   set evs(v) {
@@ -62,20 +67,49 @@ export class EvSummary extends HTMLElement {
   get nature() {
     return this._nature;
   }
+  /** The per-stat cap each bar's `.max` reflects. Defaults to STAT_CAP (252). */
+  set statCap(v) {
+    this._statCap = v || STAT_CAP;
+    this._render();
+  }
+  get statCap() {
+    return this._statCap;
+  }
+  /** The combined-total cap the `TOT` bar reflects, or `null` to hide that row entirely (uncapped). */
+  set totalCap(v) {
+    this._totalCap = v ?? null;
+    this._render();
+  }
+  get totalCap() {
+    return this._totalCap;
+  }
+  /** Gen I only: Special hasn't split into SpA/SpD yet — hide the `spd` bar and relabel `spa` as `SPC`. */
+  set mergedSpecial(v) {
+    this._mergedSpecial = !!v;
+    this._render();
+  }
+  get mergedSpecial() {
+    return this._mergedSpecial;
+  }
 
   _render() {
     let total = 0;
     for (const bar of this.$bars.children) {
       const key = bar.dataset.key;
+      bar.hidden = this._mergedSpecial && key === 'spd';
+      bar.label = this._mergedSpecial && key === 'spa' ? 'SPC' : bar.dataset.baseLabel;
       const val = this._evs[key] || 0;
+      bar.max = this._statCap;
       bar.value = val;
       bar.baseStat = this._baseStats ? this._baseStats[key] : null;
       bar.natureEffect =
         this._nature?.boost === key ? 'boost' : this._nature?.hinder === key ? 'hinder' : null;
-      total += val;
+      if (!bar.hidden) total += val;
     }
+    this.$totalRow.hidden = this._totalCap == null;
+    this.$total.max = this._totalCap ?? this._statCap;
     this.$total.value = total;
-    this.toggleAttribute('fully-trained', total >= TOTAL_CAP);
+    this.toggleAttribute('fully-trained', this._totalCap != null && total >= this._totalCap);
   }
 }
 customElements.define('ev-summary', EvSummary);

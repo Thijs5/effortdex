@@ -37,6 +37,7 @@ const OVERRIDE_FIELDS = [
   { key: 'machoBrace', el: document.getElementById('override-macho-brace'), type: 'bool' },
   { key: 'vitaminCutoff', el: document.getElementById('override-vitamin-cutoff'), type: 'bool' },
   { key: 'pokerus', el: document.getElementById('override-pokerus'), type: 'bool' },
+  { key: 'statExpSystem', el: document.getElementById('override-stat-exp-system'), type: 'bool' },
   { key: 'wings', el: document.getElementById('override-wings'), type: 'bool' },
   { key: 'evBerries', el: document.getElementById('override-ev-berries'), type: 'bool' },
   { key: 'nature', el: document.getElementById('override-nature'), type: 'bool' },
