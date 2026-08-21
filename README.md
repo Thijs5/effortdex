@@ -1,5 +1,9 @@
 # Effortdex
 
+[![Test](https://github.com/Thijs5/effortdex/actions/workflows/test.yml/badge.svg)](https://github.com/Thijs5/effortdex/actions/workflows/test.yml)
+[![Latest release](https://img.shields.io/github/v/release/Thijs5/effortdex)](https://github.com/Thijs5/effortdex/releases/latest)
+[![Open the app](https://img.shields.io/badge/Open-the%20app-teal)](https://thijs5.github.io/effortdex/)
+
 A local-only Pokémon EV (Effort Value) training tracker. Catch Pokémon,
 log the battles you defeat while training them, and watch their EVs fill
 up toward the 252-per-stat / 510-total caps — across as many parties
