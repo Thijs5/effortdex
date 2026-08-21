@@ -8,6 +8,7 @@
     "typecheck": "tsc"
   },
   "devDependencies": {
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "uuidv7": "^1.2.1"
   }
 }
