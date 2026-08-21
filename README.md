@@ -10,7 +10,8 @@ up, across as many parties (save files / playthroughs) as you're juggling at onc
 
 **[Open the app](https://thijs5.github.io/effortdex/)**. It runs entirely
 in your browser, works offline once loaded, and keeps everything on your
-device (see [Data & privacy](#data--privacy) below).
+device (see [Data & privacy](#data--privacy) below). See what's new in
+the [changelog](https://github.com/Thijs5/effortdex/releases).
 
 ## Features
 
