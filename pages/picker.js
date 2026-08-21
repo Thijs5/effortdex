@@ -1,7 +1,6 @@
 // @ts-check
 // Party picker ("/") — every saved party as a card linking to its roster.
 
-import { TOTAL_CAP } from '../lib/constants.js';
 import { totalEvs, escapeHtml } from '../lib/utils.js';
 import { store } from '../lib/services.js';
 import * as router from '../lib/router.js';
@@ -23,7 +22,8 @@ export function render() {
   pickerEmpty.hidden = parties.length > 0;
   partyList.innerHTML = '';
   for (const party of parties) {
-    const trained = party.pokemon.filter((e) => totalEvs(e.evs) >= TOTAL_CAP).length;
+    const partyTotalCap = store.totalCap(party);
+    const trained = partyTotalCap == null ? 0 : party.pokemon.filter((e) => totalEvs(e.evs) >= partyTotalCap).length;
     const card = document.createElement('a');
     card.className = 'party-card';
     card.href = router.partyPath(party.slug);

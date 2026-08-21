@@ -11,8 +11,12 @@ function mon(overrides = {}) {
   return { id: 1, name: 'bulbasaur', sprite: null, ...overrides };
 }
 
+// `baseStats` defaults to the same values as `evYield` so every existing
+// call site behaves identically whether the active party reads the modern
+// EV yield or (Gen I-II) the Stat Experience base-stat yield — pass an
+// explicit `baseStats` override to exercise a case where they differ.
 function opponent(evYield, overrides = {}) {
-  return { name: 'rattata', sprite: null, evYield, ...overrides };
+  return { name: 'rattata', sprite: null, evYield, baseStats: evYield, ...overrides };
 }
 
 let store;
@@ -307,16 +311,11 @@ test('useVitamin stops at 100 EVs on a recognized Gen III-VII title', () => {
   assert.equal(entry.evs.atk, 100);
 });
 
-test('useVitamin has no 100-EV cutoff on Gen VIII+ (removed) or Gen I-II (never existed)', () => {
+test('useVitamin has no 100-EV cutoff on Gen VIII+ (removed) — see the Stat Experience tests below for Gen I-II', () => {
   store.createParty('Sword run', '', 'Sword'); // Gen 8
   const swordEntry = store.catchPokemon(mon());
   for (let i = 0; i < 11; i++) store.useVitamin(swordEntry.uid, 'protein');
   assert.equal(swordEntry.evs.atk, 110);
-
-  store.createParty('Red run', '', 'Red'); // Gen 1
-  const redEntry = store.catchPokemon(mon({ id: 2, name: 'charmander' }));
-  for (let i = 0; i < 11; i++) store.useVitamin(redEntry.uid, 'protein');
-  assert.equal(redEntry.evs.atk, 110);
 });
 
 test('useVitamin has no cutoff when the game version is unset or unrecognized', () => {
@@ -457,6 +456,107 @@ test('natureAvailable follows the game version\'s generation, with an override',
 
   store.createParty('Red run 2', '', 'Red', { nature: true }); // override forces it on
   assert.equal(store.natureAvailable(), true);
+});
+
+test('usesStatExpSystem follows the game version\'s generation, with an override', () => {
+  store.createParty('Red run', '', 'Red'); // Gen 1
+  assert.equal(store.usesStatExpSystem(), true);
+
+  store.createParty('Crystal run', '', 'Crystal'); // Gen 2
+  assert.equal(store.usesStatExpSystem(), true);
+
+  store.createParty('Emerald run', '', 'Emerald'); // Gen 3: modern EVs
+  assert.equal(store.usesStatExpSystem(), false);
+
+  store.createParty('ROM hack run', '', 'Radical Red'); // unrecognized -> modern fallback
+  assert.equal(store.usesStatExpSystem(), false);
+
+  store.createParty('Emerald run 2', '', 'Emerald', { statExpSystem: true }); // override forces it on
+  assert.equal(store.usesStatExpSystem(), true);
+});
+
+test('statCap/totalCap are 65,535/uncapped under Stat Experience, 252/510 otherwise', () => {
+  store.createParty('Red run', '', 'Red'); // Gen 1
+  assert.equal(store.statCap(), 65535);
+  assert.equal(store.totalCap(), null);
+
+  store.createParty('Emerald run', '', 'Emerald'); // Gen 3
+  assert.equal(store.statCap(), STAT_CAP);
+  assert.equal(store.totalCap(), TOTAL_CAP);
+});
+
+test('logDefeat under Stat Experience adds the opponent\'s own base stat per stat, not the modern EV yield', () => {
+  store.createParty('Red run', '', 'Red'); // Gen 1
+  const entry = store.catchPokemon(mon());
+  const opp = opponent(
+    { hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 }, // modern EV yield — must be ignored here
+    { baseStats: { hp: 45, atk: 49, def: 49, spa: 65, spd: 65, spe: 45 } } // e.g. Bulbasaur
+  );
+  store.logDefeat(entry.uid, opp);
+  assert.deepEqual(entry.evs, { hp: 45, atk: 49, def: 49, spa: 65, spd: 65, spe: 45 });
+});
+
+test('a single stat under Stat Experience is capped at 65,535 with no combined total cap', () => {
+  store.createParty('Red run', '', 'Red'); // Gen 1
+  const entry = store.catchPokemon(mon());
+  const opp = opponent({}, { baseStats: { hp: 0, atk: 60000, def: 0, spa: 0, spd: 0, spe: 0 } });
+  store.logDefeat(entry.uid, opp);
+  store.logDefeat(entry.uid, opp);
+  assert.equal(entry.evs.atk, 65535); // clamped, not 120000
+});
+
+test('useVitamin under Stat Experience adds STAT_EXP_VITAMIN_BONUS and only counts its first 10 uses', () => {
+  store.createParty('Crystal run', '', 'Crystal'); // Gen 2
+  const entry = store.catchPokemon(mon());
+  for (let i = 0; i < 10; i++) store.useVitamin(entry.uid, 'protein');
+  assert.equal(entry.evs.atk, 25600); // 10 * 2560, still within the 65,535 cap
+
+  const blocked = store.useVitamin(entry.uid, 'protein');
+  assert.equal(blocked.applied, 0);
+  assert.equal(blocked.blockedByUseLimit, true);
+  assert.equal(entry.evs.atk, 25600); // 11th use does nothing
+});
+
+test('pokerusAvailable is false for Gen I (didn\'t exist yet) and true for Gen II', () => {
+  store.createParty('Red run', '', 'Red'); // Gen 1
+  assert.equal(store.pokerusAvailable(), false);
+
+  store.createParty('Gold run', '', 'Gold'); // Gen 2: introduced here
+  assert.equal(store.pokerusAvailable(), true);
+
+  store.createParty('Red run 2', '', 'Red', { pokerus: true }); // override forces it on
+  assert.equal(store.pokerusAvailable(), true);
+});
+
+test('specialStatMerged is true only for Gen I, not overridable, and Calcium feeds both spa and spd', () => {
+  store.createParty('Red run', '', 'Red'); // Gen 1
+  assert.equal(store.specialStatMerged(), true);
+  const entry = store.catchPokemon(mon());
+  const result = store.useVitamin(entry.uid, 'calcium');
+  assert.equal(result.applied, 2560);
+  assert.equal(result.linkedStat, 'spd');
+  assert.equal(entry.evs.spa, 2560);
+  assert.equal(entry.evs.spd, 2560);
+
+  store.createParty('Crystal run', '', 'Crystal'); // Gen 2: Special already split
+  assert.equal(store.specialStatMerged(), false);
+  const crystalEntry = store.catchPokemon(mon({ id: 2, name: 'charmander' }));
+  const crystalResult = store.useVitamin(crystalEntry.uid, 'calcium');
+  assert.equal(crystalResult.linkedStat, null);
+  assert.equal(crystalEntry.evs.spa, 2560);
+  assert.equal(crystalEntry.evs.spd, 0);
+});
+
+test('deleteHistoryEntry on a merged-Special vitamin event reverts both spa and spd', () => {
+  store.createParty('Red run', '', 'Red'); // Gen 1
+  const entry = store.catchPokemon(mon());
+  const result = store.useVitamin(entry.uid, 'calcium');
+  assert.equal(entry.evs.spa, 2560);
+  assert.equal(entry.evs.spd, 2560);
+
+  store.deleteHistoryEntry(entry.uid, result.id);
+  assert.equal(entry.evs.spa, 0);
+  assert.equal(entry.evs.spd, 0);
 });
 
 test('deleteHistoryEntry removes the record and reverts the EVs it applied', () => {
@@ -609,7 +709,7 @@ test('migrates a v1 (pre-event-sourcing) save: identity, level, EVs and Pokérus
   const party = loaded.state.parties[0];
   assert.equal(party.description, ''); // party backfills still apply post-migration
   assert.equal(party.slug, 'old-party');
-  assert.deepEqual(party.overrides, { powerItemBonus: null, powerItems: null, machoBrace: null, vitaminCutoff: null, pokerus: null, wings: null, evBerries: null, nature: null, spriteVersion: null });
+  assert.deepEqual(party.overrides, { powerItemBonus: null, powerItems: null, machoBrace: null, vitaminCutoff: null, pokerus: null, wings: null, evBerries: null, nature: null, statExpSystem: null, spriteVersion: null });
 
   const entry = party.pokemon[0];
   assert.equal(entry.uid, 'old-1');

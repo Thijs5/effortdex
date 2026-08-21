@@ -1,4 +1,4 @@
-import { POWER_ITEMS, VITAMINS, FEATHERS, EV_BERRIES, EXP_SHARE_SPRITE, STAT_LABEL, VITAMIN_STAT_CUTOFF, FALLBACK_SPRITE, FALLBACK_ONERROR } from '../lib/constants.js';
+import { POWER_ITEMS, VITAMINS, FEATHERS, EV_BERRIES, EXP_SHARE_SPRITE, STAT_LABEL, VITAMIN_STAT_CUTOFF, STAT_EXP_VITAMIN_MAX_USES, FALLBACK_SPRITE, FALLBACK_ONERROR } from '../lib/constants.js';
 import { titleCase, formatEvYield, escapeHtml, dayKey, dayLabel } from '../lib/utils.js';
 import { store } from '../lib/services.js';
 import { attachDesignSystem } from '../lib/design-system.js';
@@ -143,11 +143,15 @@ export class EvHistoryLog extends HTMLElement {
       // Label and sprite come from static data by id — events store only
       // the facts (ADR 0006).
       const vitamin = VITAMINS.find((v) => v.id === h.vitaminId);
+      const statLabel = h.linkedStat ? 'SPC' : STAT_LABEL[h.stat];
+      const noun = store.usesStatExpSystem() ? 'Stat Experience' : 'EVs';
       const gained = h.applied
-        ? `+${h.applied} ${STAT_LABEL[h.stat]}`
+        ? `+${h.applied} ${statLabel}`
         : h.blockedByCutoff
-          ? `No EVs gained (${STAT_LABEL[h.stat]} ≥ ${VITAMIN_STAT_CUTOFF} EVs, this game's vitamin limit)`
-          : 'No EVs gained (capped)';
+          ? `No ${noun} gained (${statLabel} ≥ ${VITAMIN_STAT_CUTOFF} EVs, this game's vitamin limit)`
+          : h.blockedByUseLimit
+            ? `No ${noun} gained (this game only counts a vitamin's first ${STAT_EXP_VITAMIN_MAX_USES} uses)`
+            : `No ${noun} gained (capped)`;
       return `<li>
         <img src="${vitamin?.sprite || FALLBACK_SPRITE}" alt="" ${FALLBACK_ONERROR} />
         <div>
