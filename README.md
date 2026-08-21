@@ -1,6 +1,6 @@
 # Effortdex
 
-[![Test](https://github.com/Thijs5/effortdex/actions/workflows/test.yml/badge.svg)](https://github.com/Thijs5/effortdex/actions/workflows/test.yml)
+[![Automated tests](https://github.com/Thijs5/effortdex/actions/workflows/test.yml/badge.svg)](https://github.com/Thijs5/effortdex/actions/workflows/test.yml)
 [![Latest release](https://img.shields.io/github/v/release/Thijs5/effortdex)](https://github.com/Thijs5/effortdex/releases/latest)
 [![Open the app](https://img.shields.io/badge/Open-the%20app-teal)](https://thijs5.github.io/effortdex/)
 
