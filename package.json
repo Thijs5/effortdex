@@ -5,9 +5,12 @@
   "description": "Local-only Pokémon EV training tracker built with native Web Components.",
   "scripts": {
     "test": "node --test \"test/**/*.test.js\"",
+    "test:e2e": "playwright test",
     "typecheck": "tsc"
   },
   "devDependencies": {
+    "@playwright/test": "^1.62.1",
+    "@types/node": "^26.2.0",
     "typescript": "^5.9.3",
     "uuidv7": "^1.2.1"
   }
