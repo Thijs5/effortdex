@@ -314,7 +314,7 @@ export class CaughtPokemonDetail extends HTMLElement {
               <button type="button" class="help-btn" aria-expanded="false" aria-label="What is EV training?" title="EVs (Effort Values) are hidden bonus stat points earned mainly from battling — up to 252 per stat, 510 total. Nature is fixed when a Pokémon is caught or hatched: it boosts one stat by 10% and lowers another. Nature doesn't change EVs, but training the stat your nature already boosts gets the most out of your points.">?</button>
             </h3>
             <label class="field-inline">Level
-              <input type="number" class="level-input ds-field" min="${MIN_LEVEL}" max="${MAX_LEVEL}" aria-label="Level" />
+              <input type="number" inputmode="numeric" pattern="[0-9]*" class="level-input ds-field" min="${MIN_LEVEL}" max="${MAX_LEVEL}" aria-label="Level" />
             </label>
             <label class="field-inline nature-field" hidden>Nature
               <select class="nature-select ds-field" aria-label="Nature"></select>
