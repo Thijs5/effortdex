@@ -7,7 +7,7 @@ const CY = 20;
 const BUTTON_R = 6;
 
 /**
- * <game-cartridge> — a small pokéball icon for a party's base game. Set
+ * <game-ball> — a small pokéball icon for a party's base game. Set
  * `.name` to a party.baseGame value (a GAME_VERSIONS title, or empty).
  * The top half fills with that title's own color and the bottom half
  * with a color for its generation, so two titles that happen to share a
@@ -19,7 +19,7 @@ const BUTTON_R = 6;
  * plain grey ball with a small "fan game" mark in the button, never a
  * blocked state.
  */
-export class GameCartridge extends HTMLElement {
+export class GameBall extends HTMLElement {
   constructor() {
     super();
     this._name = '';
@@ -113,4 +113,4 @@ export class GameCartridge extends HTMLElement {
     }
   }
 }
-customElements.define('game-cartridge', GameCartridge);
+customElements.define('game-ball', GameBall);

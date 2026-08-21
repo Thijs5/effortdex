@@ -384,7 +384,7 @@ html[data-modal-open] body {
   gap: var(--space-3);
 }
 .game-version-row .ds-field { flex: 1; }
-.game-version-row game-cartridge { flex: 0 0 auto; --cart-w: 34px; }
+.game-version-row game-ball { flex: 0 0 auto; --cart-w: 34px; }
 
 /* ---------- party view header ("/<slug>") ---------- */
 .party-view-header {
@@ -511,14 +511,14 @@ html[data-modal-open] body {
 }
 
 /* Same purple ring as the detail page's sprite for an active Pokérus
-   infection (see caught-pokemon-card.js's :host([pokerus-infected])). */
+   infection (see caught-pokemon-detail.js's :host([pokerus-infected])). */
 .roster-card-sprite--pokerus {
   border-color: var(--pokerus-purple);
   box-shadow: 0 0 0 3px var(--pokerus-purple-soft);
 }
 
 /* Same gold-shimmer treatment as the detail page's sprite (see
-   caught-pokemon-card.js) — a class here instead of an attribute
+   caught-pokemon-detail.js) — a class here instead of an attribute
    selector, since this markup is plain light-DOM HTML, not a component
    with its own :host. */
 .roster-card-sprite--trained {
@@ -557,7 +557,7 @@ html[data-modal-open] body {
   display: grid;
   gap: var(--space-4);
 }
-.pokemon-view caught-pokemon-card {
+.pokemon-view caught-pokemon-detail {
   max-width: 980px;
 }
 

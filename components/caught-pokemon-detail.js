@@ -1,23 +1,31 @@
 import { POWER_ITEMS, MACHO_BRACE_SPRITE, EXP_SHARE_SPRITE, VITAMINS, FEATHERS, FEATHER_BONUS, EV_BERRIES, EV_BERRY_REDUCTION, NATURES, STAT_LABEL, MACHO_BRACE_MULTIPLIER, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, TOTAL_CAP, FALLBACK_SPRITE, FALLBACK_ONERROR, MIN_LEVEL, MAX_LEVEL } from '../lib/constants.js';
-import { titleCase, totalEvs, natureEffectHint, natureOptionsHtml, dayLabel, escapeHtml } from '../lib/utils.js';
+import { titleCase, totalEvs, natureEffectHint, natureOptionsHtml, dayLabel, escapeHtml, sortByLabel } from '../lib/utils.js';
 import { api, store } from '../lib/services.js';
 import { versionedSpriteUrl } from '../lib/pokeapi-client.js';
 import { attachDesignSystem } from '../lib/design-system.js';
+import { wireSpriteFallback } from '../lib/sprite-fallback.js';
 import { POKERUS_ICON_SVG } from '../lib/icons.js';
 import './ev-summary.js';
 import './ev-history-log.js';
 import './evolution-chain.js';
 import './pokemon-search.js';
+import './item-button-grid.js';
+
+// Sorted once — these tables are static, so re-sorting them on every
+// render (this card's entire point) would be pure waste.
+const SORTED_VITAMINS = sortByLabel(VITAMINS);
+const SORTED_FEATHERS = sortByLabel(FEATHERS);
+const SORTED_EV_BERRIES = sortByLabel(EV_BERRIES);
 
 /**
- * <caught-pokemon-card> — a caught Pokémon's full detail page: identity,
+ * <caught-pokemon-detail> — a caught Pokémon's full detail page: identity,
  * EV bars, training aids (power item / Pokérus), evolution
  * (<evolution-chain>), a battle search (picking a result logs the defeat
  * immediately) and a history log (<ev-history-log>). Set `.entry` to a
- * Store roster entry; the card re-renders on assignment. Meant to be
- * mounted one at a time, full width.
+ * Store roster entry; it re-renders on assignment. Meant to be mounted
+ * one at a time, full width.
  */
-export class CaughtPokemonCard extends HTMLElement {
+export class CaughtPokemonDetail extends HTMLElement {
   constructor() {
     super();
     this._entry = null;
@@ -238,23 +246,9 @@ export class CaughtPokemonCard extends HTMLElement {
         .nature-hint:empty { display: none; }
 
         .aids { display: grid; gap: var(--space-2); }
-        .item-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: var(--space-2); }
 
         .vitamins, .wings, .berries { display: grid; gap: var(--space-2); }
-        .vitamin-grid, .wing-grid, .berry-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: var(--space-2); }
         .vitamin-status, .wing-status, .berry-status { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--teal); min-height: 1em; }
-        .vitamin-btn, .wing-btn, .berry-btn { position: relative; }
-        .vitamin-btn[data-capped], .wing-btn[data-capped], .berry-btn[data-capped] { opacity: 0.55; }
-        .vitamin-btn[data-count]:not([data-count="0"])::after,
-        .wing-btn[data-count]:not([data-count="0"])::after,
-        .berry-btn[data-count]:not([data-count="0"])::after {
-          content: '×' attr(data-count);
-          position: absolute; top: -8px; right: -8px;
-          background: var(--teal); color: var(--on-teal);
-          border-radius: var(--radius-pill); font-family: var(--font-mono);
-          font-size: var(--font-size-2xs); line-height: 1.5; padding: 0 0.4em;
-          box-shadow: 0 0 0 2px var(--paper-panel);
-        }
 
         .pokerus-section { display: grid; gap: var(--space-2); justify-items: start; }
         .pokerus-toggle-btn { width: auto; }
@@ -332,7 +326,7 @@ export class CaughtPokemonCard extends HTMLElement {
             <h3 class="section-title">Vitamins
               <button type="button" class="help-btn" aria-expanded="false" aria-label="What do vitamins do?" title="Vitamins (HP Up, Protein, Iron, Calcium, Zinc, Carbos) instantly add EVs to one stat without battling — a quick way to top off a stat. Each only works until that stat has 100 EVs from any source; after that, only battling, items, or Pokérus can push it further toward the 252 cap.">?</button>
             </h3>
-            <div class="vitamin-grid"></div>
+            <item-button-grid class="vitamin-grid"></item-button-grid>
             <p class="vitamin-status" aria-live="polite"></p>
           </section>
 
@@ -367,14 +361,14 @@ export class CaughtPokemonCard extends HTMLElement {
             <h3 class="section-title">Training item
               <button type="button" class="help-btn" aria-expanded="false" aria-label="What do training items do?" title="Held items that speed up EV gains from battling. The Macho Brace doubles every EV earned in battle for any stat. A Power item instead adds a flat bonus to one specific stat every battle, on top of whatever that battle normally gives.">?</button>
             </h3>
-            <div class="item-grid"></div>
+            <item-button-grid class="item-grid" columns="2"></item-button-grid>
           </section>
 
           <section class="berries">
             <h3 class="section-title">EV-reducing berries
               <button type="button" class="help-btn" aria-expanded="false" aria-label="What do EV-reducing berries do?" title="Pomeg, Kelpsy, Qualot, Hondew, Grepa and Tamato berries remove 10 EVs from one stat — useful for undoing a mis-trained stat. Floors at 0.">?</button>
             </h3>
-            <div class="berry-grid"></div>
+            <item-button-grid class="berry-grid"></item-button-grid>
             <p class="berry-status" aria-live="polite"></p>
           </section>
 
@@ -382,7 +376,7 @@ export class CaughtPokemonCard extends HTMLElement {
             <h3 class="section-title">Wings
               <button type="button" class="help-btn" aria-expanded="false" aria-label="What do Wings do?" title="Wings (Health, Muscle, Resist, Genius, Clever, Swift) instantly add 1 EV to one stat without battling. Unlike vitamins, there's no 100-EV cutoff — they work all the way to the 252 cap.">?</button>
             </h3>
-            <div class="wing-grid"></div>
+            <item-button-grid class="wing-grid"></item-button-grid>
             <p class="wing-status" aria-live="polite"></p>
           </section>
 
@@ -458,25 +452,8 @@ export class CaughtPokemonCard extends HTMLElement {
     this.$status = shadow.querySelector('.status');
     this.$histLog = shadow.querySelector('ev-history-log');
 
-    // Two-hop fallback: the game-specific sprite _render sets can itself
-    // 404 (a species that didn't exist yet in that title) before the
-    // remote CDN is unreachable at all (offline) — retry the modern
-    // default sprite _render also stashed, then finally the local
-    // placeholder.
-    this._spriteModernFallback = null;
-    this.$sprite.addEventListener('error', () => {
-      if (this._spriteModernFallback && this.$sprite.src !== this._spriteModernFallback) {
-        const modern = this._spriteModernFallback;
-        this._spriteModernFallback = null;
-        this.$sprite.src = modern;
-      } else if (this.$sprite.src !== FALLBACK_SPRITE) {
-        this.$sprite.src = FALLBACK_SPRITE;
-      }
-    });
+    this._spriteFallback = wireSpriteFallback(this.$sprite);
 
-    this._populateVitaminButtons();
-    this._populateWingButtons();
-    this._populateBerryButtons();
     this.$nature.innerHTML = natureOptionsHtml();
     this._wireEvents();
   }
@@ -487,13 +464,15 @@ export class CaughtPokemonCard extends HTMLElement {
   // across different parties as the user navigates. Each button applies
   // its item immediately on click (clicking the active one again clears
   // it) — there's no separate "None" option or save step.
-  _populateItemButtons(bonus, availability) {
-    this.$itemGrid.innerHTML = '';
+  _updateItemGrid() {
+    const bonus = store.powerItemBonus();
+    const availability = store.trainingItemAvailability();
+    const selected = this._entry.machoBrace ? 'macho-brace' : this._entry.powerItem || '';
 
     const offered = [];
     if (availability.machoBrace) {
       offered.push({
-        value: 'macho-brace',
+        id: 'macho-brace',
         label: 'Macho Brace',
         boost: `×${MACHO_BRACE_MULTIPLIER} all EVs`,
         sprite: MACHO_BRACE_SPRITE,
@@ -502,99 +481,18 @@ export class CaughtPokemonCard extends HTMLElement {
     if (availability.powerItems) {
       for (const p of POWER_ITEMS) {
         offered.push({
-          value: p.id,
+          id: p.id,
           label: p.label,
           boost: `+${bonus} ${STAT_LABEL[p.stat]}`,
           sprite: p.sprite,
         });
       }
     }
-    offered.sort((a, b) => a.label.localeCompare(b.label));
-
-    for (const item of offered) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'ds-item-btn';
-      btn.dataset.value = item.value;
-      btn.title = `${item.label} — ${item.boost}`;
-      btn.innerHTML = `<img class="ds-item-icon" src="${item.sprite}" alt="" ${FALLBACK_ONERROR} />
-        <span class="ds-item-btn-text">
-          <span class="ds-item-btn-label">${item.label}</span>
-          <span class="ds-item-btn-boost">${item.boost}</span>
-        </span>`;
-      this.$itemGrid.appendChild(btn);
-    }
-    this._syncItemButtons();
-  }
-
-  _syncItemButtons() {
-    const selected = this._entry.machoBrace ? 'macho-brace' : this._entry.powerItem || '';
-    for (const btn of this.$itemGrid.children) {
-      const active = btn.dataset.value === selected;
-      btn.classList.toggle('ds-item-btn--active', active);
-      btn.setAttribute('aria-pressed', String(active));
-    }
-  }
-
-  // Same template as the training item buttons — sprite, name, and the
-  // stat it feeds in a lighter line underneath — so there's no need to
-  // remember which vitamin maps to which stat.
-  _populateVitaminButtons() {
-    const sorted = [...VITAMINS].sort((a, b) => a.label.localeCompare(b.label));
-    for (const v of sorted) {
-      const boost = `+${VITAMIN_BONUS} ${STAT_LABEL[v.stat]}`;
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'ds-item-btn vitamin-btn';
-      btn.dataset.vitamin = v.id;
-      btn.title = `Feed ${v.label} — raises ${STAT_LABEL[v.stat]} EVs by up to ${VITAMIN_BONUS}`;
-      btn.innerHTML = `<img class="ds-item-icon" src="${v.sprite}" alt="" ${FALLBACK_ONERROR} />
-        <span class="ds-item-btn-text">
-          <span class="ds-item-btn-label">${v.label}</span>
-          <span class="ds-item-btn-boost">${boost}</span>
-        </span>`;
-      this.$vitaminGrid.appendChild(btn);
-    }
-  }
-
-  // Same template as vitamins, minus the 100-EV-cutoff framing — Wings
-  // never have one.
-  _populateWingButtons() {
-    const sorted = [...FEATHERS].sort((a, b) => a.label.localeCompare(b.label));
-    for (const f of sorted) {
-      const boost = `+${FEATHER_BONUS} ${STAT_LABEL[f.stat]}`;
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'ds-item-btn wing-btn';
-      btn.dataset.feather = f.id;
-      btn.title = `Feed ${f.label} — raises ${STAT_LABEL[f.stat]} EVs by ${FEATHER_BONUS}`;
-      btn.innerHTML = `<img class="ds-item-icon" src="${f.sprite}" alt="" ${FALLBACK_ONERROR} />
-        <span class="ds-item-btn-text">
-          <span class="ds-item-btn-label">${f.label}</span>
-          <span class="ds-item-btn-boost">${boost}</span>
-        </span>`;
-      this.$wingGrid.appendChild(btn);
-    }
-  }
-
-  // Same template again, but the boost reads as a reduction — these
-  // subtract EVs rather than add them.
-  _populateBerryButtons() {
-    const sorted = [...EV_BERRIES].sort((a, b) => a.label.localeCompare(b.label));
-    for (const b of sorted) {
-      const boost = `−${EV_BERRY_REDUCTION} ${STAT_LABEL[b.stat]}`;
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'ds-item-btn berry-btn';
-      btn.dataset.berry = b.id;
-      btn.title = `Feed ${b.label} — removes up to ${EV_BERRY_REDUCTION} ${STAT_LABEL[b.stat]} EVs`;
-      btn.innerHTML = `<img class="ds-item-icon" src="${b.sprite}" alt="" ${FALLBACK_ONERROR} />
-        <span class="ds-item-btn-text">
-          <span class="ds-item-btn-label">${b.label}</span>
-          <span class="ds-item-btn-boost">${boost}</span>
-        </span>`;
-      this.$berryGrid.appendChild(btn);
-    }
+    this.$itemGrid.items = sortByLabel(offered).map((item) => ({
+      ...item,
+      title: `${item.label} — ${item.boost}`,
+      active: item.id === selected,
+    }));
   }
 
   _wireEvents() {
@@ -653,10 +551,8 @@ export class CaughtPokemonCard extends HTMLElement {
         store.releasePokemon(this._entry.uid);
       }
     });
-    this.$itemGrid.addEventListener('click', (e) => {
-      const btn = e.target.closest('.ds-item-btn');
-      if (!btn) return;
-      const val = btn.dataset.value;
+    this.$itemGrid.addEventListener('item-pick', (e) => {
+      const val = e.detail.id;
       const selected = this._entry.machoBrace ? 'macho-brace' : this._entry.powerItem || '';
       if (val === selected) {
         store.setPowerItem(this._entry.uid, null); // clicking the active item again clears it
@@ -672,21 +568,9 @@ export class CaughtPokemonCard extends HTMLElement {
     this.$expShareToggle.addEventListener('click', () => {
       store.setExpShare(this._entry.uid, this.$expShareToggle.getAttribute('aria-pressed') !== 'true');
     });
-    this.$vitaminGrid.addEventListener('click', (e) => {
-      const btn = e.target.closest('.vitamin-btn');
-      if (!btn) return;
-      this._useVitamin(btn.dataset.vitamin);
-    });
-    this.$wingGrid.addEventListener('click', (e) => {
-      const btn = e.target.closest('.wing-btn');
-      if (!btn) return;
-      this._useFeather(btn.dataset.feather);
-    });
-    this.$berryGrid.addEventListener('click', (e) => {
-      const btn = e.target.closest('.berry-btn');
-      if (!btn) return;
-      this._useBerry(btn.dataset.berry);
-    });
+    this.$vitaminGrid.addEventListener('item-pick', (e) => this._useVitamin(e.detail.id));
+    this.$wingGrid.addEventListener('item-pick', (e) => this._useFeather(e.detail.id));
+    this.$berryGrid.addEventListener('item-pick', (e) => this._useBerry(e.detail.id));
     this.$search.addEventListener('pokemon-pick', (e) => {
       this._battle(e.detail.name, 'Looking up battle data…');
     });
@@ -753,8 +637,7 @@ export class CaughtPokemonCard extends HTMLElement {
     if (!e) return;
     const modernSprite = e.sprite || FALLBACK_SPRITE;
     const versioned = versionedSpriteUrl(store.spriteBaseGame(), e.speciesId);
-    this._spriteModernFallback = versioned ? modernSprite : null;
-    this.$sprite.src = versioned || modernSprite;
+    this._spriteFallback.setVersionedSprite(versioned, modernSprite);
     this.$nickname.value = e.nickname || titleCase(e.speciesName);
     this.$speciesNum.textContent = `#${String(e.speciesId).padStart(3, '0')}`;
     // The species name only earns a second mention when a nickname is
@@ -785,7 +668,7 @@ export class CaughtPokemonCard extends HTMLElement {
     const trained = totalEvs(e.evs) >= TOTAL_CAP;
     this.toggleAttribute('fully-trained', trained);
 
-    this._populateItemButtons(store.powerItemBonus(), store.trainingItemAvailability());
+    this._updateItemGrid();
     const aids = store.effectiveAids(e);
     const pokerusActive = !!e.pokerus;
     this.$pokerusToggle.setAttribute('aria-pressed', String(pokerusActive));
@@ -806,15 +689,15 @@ export class CaughtPokemonCard extends HTMLElement {
     this.$expShareToggle.setAttribute('aria-pressed', String(expShareActive));
     this.$expShareToggle.classList.toggle('ds-item-btn--active', expShareActive);
     this.$vitaminStatus.textContent = '';
-    this._updateVitaminButtons(e);
+    this._updateVitaminGrid(e);
     const wingsAvailable = store.wingsAvailable();
     this.$wingsSection.hidden = !wingsAvailable;
     this.$wingStatus.textContent = '';
-    if (wingsAvailable) this._updateWingButtons(e);
+    if (wingsAvailable) this._updateWingGrid(e);
     const berriesAvailable = store.berriesAvailable();
     this.$berriesSection.hidden = !berriesAvailable;
     this.$berryStatus.textContent = '';
-    if (berriesAvailable) this._updateBerryButtons(e);
+    if (berriesAvailable) this._updateBerryGrid(e);
     this.$evoChain.entry = e;
     this.$histLog.entry = e;
   }
@@ -881,72 +764,62 @@ export class CaughtPokemonCard extends HTMLElement {
       .join('');
   }
 
-  // Marks a button dim before it's even clicked when this game's rules
-  // mean it wouldn't gain anything — the Gen III-VII 100-EV vitamin
-  // cutoff, or the stat already sitting at the 252 cap. Also badges each
-  // button with how many times it's already been fed, since that's
-  // otherwise invisible once EVs from vitamins mix in with battle EVs.
-  _updateVitaminButtons(e) {
+  // Same template as the training item buttons — sprite, name, and the
+  // stat it feeds in a lighter line underneath — so there's no need to
+  // remember which vitamin maps to which stat. Marks a button dim before
+  // it's even clicked when this game's rules mean it wouldn't gain
+  // anything — the Gen III-VII 100-EV vitamin cutoff, or the stat
+  // already sitting at the 252 cap. Also badges each button with how
+  // many times it's already been fed, since that's otherwise invisible
+  // once EVs from vitamins mix in with battle EVs.
+  _updateVitaminGrid(e) {
     const cutoffApplies = store.vitaminCutoffApplies();
-    for (const btn of this.$vitaminGrid.children) {
-      const vitamin = VITAMINS.find((v) => v.id === btn.dataset.vitamin);
-      const stat = e.evs[vitamin.stat];
+    this.$vitaminGrid.items = SORTED_VITAMINS.map((v) => {
+      const stat = e.evs[v.stat];
       const cappedByCutoff = cutoffApplies && stat >= VITAMIN_STAT_CUTOFF;
       const cappedByStatCap = stat >= 252;
-      const count = e.history.filter((h) => h.kind === 'vitamin' && h.vitaminId === vitamin.id).length;
-      btn.dataset.count = count;
+      const capped = cappedByCutoff || cappedByStatCap;
+      const count = e.history.filter((h) => h.kind === 'vitamin' && h.vitaminId === v.id).length;
       const fedNote = count ? ` — fed ${count}×` : '';
-      if (cappedByCutoff || cappedByStatCap) {
-        btn.dataset.capped = '';
-        btn.title =
-          (cappedByCutoff
-            ? `This game stops vitamins once ${STAT_LABEL[vitamin.stat]} has ${VITAMIN_STAT_CUTOFF}+ EVs`
-            : `${STAT_LABEL[vitamin.stat]} is already at the 252 cap`) + fedNote;
-      } else {
-        delete btn.dataset.capped;
-        btn.title = `Feed ${vitamin.label} — raises ${STAT_LABEL[vitamin.stat]} EVs by up to ${VITAMIN_BONUS}` + fedNote;
-      }
-    }
+      const title = capped
+        ? (cappedByCutoff
+            ? `This game stops vitamins once ${STAT_LABEL[v.stat]} has ${VITAMIN_STAT_CUTOFF}+ EVs`
+            : `${STAT_LABEL[v.stat]} is already at the 252 cap`) + fedNote
+        : `Feed ${v.label} — raises ${STAT_LABEL[v.stat]} EVs by up to ${VITAMIN_BONUS}` + fedNote;
+      return { id: v.id, label: v.label, sprite: v.sprite, boost: `+${VITAMIN_BONUS} ${STAT_LABEL[v.stat]}`, title, capped, count };
+    });
   }
 
-  // Same idea as _updateVitaminButtons but simpler — Wings have no
-  // cutoff, only the 252 stat cap.
-  _updateWingButtons(e) {
-    for (const btn of this.$wingGrid.children) {
-      const feather = FEATHERS.find((f) => f.id === btn.dataset.feather);
-      const stat = e.evs[feather.stat];
+  // Same shape as vitamins, minus the 100-EV-cutoff framing — Wings
+  // never have one.
+  _updateWingGrid(e) {
+    this.$wingGrid.items = SORTED_FEATHERS.map((f) => {
+      const stat = e.evs[f.stat];
       const capped = stat >= 252;
-      const count = e.history.filter((h) => h.kind === 'feather' && h.featherId === feather.id).length;
-      btn.dataset.count = count;
+      const count = e.history.filter((h) => h.kind === 'feather' && h.featherId === f.id).length;
       const fedNote = count ? ` — fed ${count}×` : '';
-      if (capped) {
-        btn.dataset.capped = '';
-        btn.title = `${STAT_LABEL[feather.stat]} is already at the 252 cap` + fedNote;
-      } else {
-        delete btn.dataset.capped;
-        btn.title = `Feed ${feather.label} — raises ${STAT_LABEL[feather.stat]} EVs by ${FEATHER_BONUS}` + fedNote;
-      }
-    }
+      const title = capped
+        ? `${STAT_LABEL[f.stat]} is already at the 252 cap` + fedNote
+        : `Feed ${f.label} — raises ${STAT_LABEL[f.stat]} EVs by ${FEATHER_BONUS}` + fedNote;
+      return { id: f.id, label: f.label, sprite: f.sprite, boost: `+${FEATHER_BONUS} ${STAT_LABEL[f.stat]}`, title, capped, count };
+    });
   }
 
-  // Mirrors _updateWingButtons, but "capped" here means nothing left to
-  // remove (the stat is already at 0) rather than at the ceiling.
-  _updateBerryButtons(e) {
-    for (const btn of this.$berryGrid.children) {
-      const berry = EV_BERRIES.find((b) => b.id === btn.dataset.berry);
-      const stat = e.evs[berry.stat];
+  // Mirrors _updateWingGrid, but "capped" here means nothing left to
+  // remove (the stat is already at 0) rather than at the ceiling, and
+  // the boost reads as a reduction — these subtract EVs rather than add
+  // them.
+  _updateBerryGrid(e) {
+    this.$berryGrid.items = SORTED_EV_BERRIES.map((b) => {
+      const stat = e.evs[b.stat];
       const capped = stat <= 0;
-      const count = e.history.filter((h) => h.kind === 'berry' && h.berryId === berry.id).length;
-      btn.dataset.count = count;
+      const count = e.history.filter((h) => h.kind === 'berry' && h.berryId === b.id).length;
       const fedNote = count ? ` — fed ${count}×` : '';
-      if (capped) {
-        btn.dataset.capped = '';
-        btn.title = `${STAT_LABEL[berry.stat]} is already at 0` + fedNote;
-      } else {
-        delete btn.dataset.capped;
-        btn.title = `Feed ${berry.label} — removes up to ${EV_BERRY_REDUCTION} ${STAT_LABEL[berry.stat]} EVs` + fedNote;
-      }
-    }
+      const title = capped
+        ? `${STAT_LABEL[b.stat]} is already at 0` + fedNote
+        : `Feed ${b.label} — removes up to ${EV_BERRY_REDUCTION} ${STAT_LABEL[b.stat]} EVs` + fedNote;
+      return { id: b.id, label: b.label, sprite: b.sprite, boost: `−${EV_BERRY_REDUCTION} ${STAT_LABEL[b.stat]}`, title, capped, count };
+    });
   }
 }
-customElements.define('caught-pokemon-card', CaughtPokemonCard);
+customElements.define('caught-pokemon-detail', CaughtPokemonDetail);
