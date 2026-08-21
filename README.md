@@ -8,10 +8,11 @@ A local-only Pokémon EV (Effort Value) training tracker. Catch Pokémon,
 log the battles you defeat while training them, and watch their EVs fill
 up, across as many parties (save files / playthroughs) as you're juggling at once.
 
-**[Open the app](https://thijs5.github.io/effortdex/)**. It runs entirely
-in your browser, works offline once loaded, and keeps everything on your
-device (see [Data & privacy](#data--privacy) below). See what's new in
-the [changelog](https://github.com/Thijs5/effortdex/releases).
+**[Open the app](https://thijs5.github.io/effortdex/)**. No account
+creation is needed: it runs entirely in your browser, works offline
+once loaded, and keeps everything on your device (see
+[Data & privacy](#data--privacy) below). See what's new in the
+[changelog](https://github.com/Thijs5/effortdex/releases).
 
 ## Features
 
