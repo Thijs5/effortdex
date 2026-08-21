@@ -57,6 +57,29 @@ file.
    to matter, that's the moment to introduce keyed patching — not
    before.
 
+## Rule review
+
+"No frameworks" is a standing decision, not a permanent one — it holds
+because the app's actual pain points (see
+[docs/adr/0008-page-level-module-boundaries.md](0008-page-level-module-boundaries.md))
+have consistently turned out to be file organization, not templating or
+reactivity boilerplate that a small library would remove. Re-examine it
+whenever a change is proposed that would add a dependency, rather than
+letting it stand on inertia:
+
+- Weigh it against the *specific* pain being solved, not "frameworks are
+  generally nice to have." A library that would mostly replace manual
+  `querySelector`/attribute-sync code in `components/*.js` (e.g. Lit) is
+  answering a different problem than the module-boundary sprawl this ADR
+  is actually about — the latter is solved by moving code, not by adding
+  a dependency.
+- Weigh the migration cost (every existing component's file touched) and
+  the cost of reversing an explicit, documented decision against the
+  size of the actual problem today (~10 components, one contributor).
+- The moment that calculus changes — component count or interaction
+  complexity grows enough that manual DOM sync, not organization, is the
+  bottleneck — is the moment to revisit this ADR, not before.
+
 ## Consequences
 
 - Adding a new external data source, a new persistence backend, or a
