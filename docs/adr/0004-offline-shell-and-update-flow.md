@@ -43,13 +43,14 @@ localStorage-backed cache with different rules (see ADR 0001).
    JS against new assumptions.
 4. **`version.json` is the staleness probe for long-lived tabs.** It is
    served network-first by the worker (a cache-first read would echo
-   back the cached version and defeat the check). `app.js` snapshots
-   the version at load, then re-fetches with `cache: no-store` on
-   `load`, on visibility change, and every 15 minutes; a mismatch wipes
-   all caches, unregisters the worker, and reloads. Note the snapshot
-   is "version at page load", not literally the running shell's build —
-   a shell that is *already* stale at load is handled by mechanism 3,
-   not this probe.
+   back the cached version and defeat the check). `lib/app-version.js`
+   snapshots the version at load, then re-fetches with `cache: no-store`
+   on `load`, on visibility change, and once a day as a fallback for a
+   tab that's never backgrounded or reloaded; a mismatch wipes all
+   caches, unregisters the worker, and reloads. Note the snapshot is
+   "version at page load", not literally the running shell's build — a
+   shell that is *already* stale at load is handled by mechanism 3, not
+   this probe.
 5. **`fetch()` in `lib/version-check.js` is the sanctioned exception**
    to ADR 0001's "no fetch outside pokeapi-client.js" red flag: it
    fetches app infrastructure (same-origin `version.json`), not

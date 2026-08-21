@@ -32,3 +32,14 @@ body:
       placeholder: e.g. Chrome 128 on Android
     validations:
       required: false
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: Diagnostics
+      description: >-
+        Auto-filled from the app's "Report a bug" link — app/schema
+        version and roster counts only, no names or nicknames. Safe to
+        leave as-is.
+      render: text
+    validations:
+      required: false
