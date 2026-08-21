@@ -1,0 +1,144 @@
+{
+  "schema": 1,
+  "activePartyId": "01a02482-accb-7b19-9583-a28bc5ac2608",
+  "parties": [
+    {
+      "id": "01a02482-accb-7b19-9583-a28bc5ac2608",
+      "name": "Fixture party",
+      "description": "",
+      "baseGame": "Ultra Sun",
+      "overrides": {
+        "powerItemBonus": null,
+        "powerItems": null,
+        "machoBrace": null,
+        "vitaminCutoff": null,
+        "pokerus": null,
+        "wings": null,
+        "evBerries": null,
+        "nature": null,
+        "spriteVersion": null
+      },
+      "slug": "fixture-party",
+      "pokemon": [
+        {
+          "uid": "01a02482-accb-7b19-9583-a28c62852a9a",
+          "nickname": "Buddy",
+          "nature": "adamant",
+          "powerItem": null,
+          "machoBrace": true,
+          "events": [
+            {
+              "id": "01a02482-accb-7b19-9583-a28d3040f9d1",
+              "kind": "catch",
+              "timestamp": 1787318938827,
+              "speciesName": "bulbasaur",
+              "speciesId": 1,
+              "sprite": "bulbasaur.png",
+              "baseStats": {
+                "hp": 45,
+                "atk": 49,
+                "def": 49,
+                "spa": 65,
+                "spd": 65,
+                "spe": 45
+              },
+              "level": 5
+            },
+            {
+              "id": "01a02482-accc-712e-b1bc-98ac1371d500",
+              "kind": "pokerus",
+              "timestamp": 1787318938828,
+              "active": true
+            },
+            {
+              "id": "01a02482-accc-712e-b1bc-98ad1799d651",
+              "kind": "exp-share",
+              "timestamp": 1787318938828,
+              "active": true
+            },
+            {
+              "id": "01a02482-accc-712e-b1bc-98ae789123b6",
+              "kind": "battle",
+              "timestamp": 1787318938828,
+              "opponentName": "rattata",
+              "sprite": "rattata.png",
+              "applied": {
+                "hp": 0,
+                "atk": 2,
+                "def": 0,
+                "spa": 0,
+                "spd": 0,
+                "spe": 0
+              },
+              "powerItem": null,
+              "machoBrace": false,
+              "pokerus": true
+            },
+            {
+              "id": "01a02482-accc-712e-b1bc-98afcf61b9ba",
+              "kind": "vitamin",
+              "timestamp": 1787318938828,
+              "vitaminId": "hp-up",
+              "stat": "hp",
+              "applied": 10,
+              "blockedByCutoff": false
+            },
+            {
+              "id": "01a02482-accc-712e-b1bc-98b04bc872f1",
+              "kind": "feather",
+              "timestamp": 1787318938828,
+              "featherId": "muscle-wing",
+              "stat": "atk",
+              "applied": 1
+            },
+            {
+              "id": "01a02482-accc-712e-b1bc-98b143662240",
+              "kind": "berry",
+              "timestamp": 1787318938828,
+              "berryId": "pomeg",
+              "stat": "hp",
+              "applied": 10
+            },
+            {
+              "id": "01a02482-accc-712e-b1bc-98b2ca3ded5d",
+              "kind": "level",
+              "timestamp": 1787318938828,
+              "toLevel": 12
+            },
+            {
+              "id": "01a02482-accc-712e-b1bc-98b3ac45bb15",
+              "kind": "evolve",
+              "timestamp": 1787318938828,
+              "from": {
+                "speciesName": "bulbasaur",
+                "speciesId": 1,
+                "sprite": "bulbasaur.png",
+                "baseStats": {
+                  "hp": 45,
+                  "atk": 49,
+                  "def": 49,
+                  "spa": 65,
+                  "spd": 65,
+                  "spe": 45
+                }
+              },
+              "to": {
+                "speciesName": "ivysaur",
+                "speciesId": 2,
+                "sprite": "ivysaur.png",
+                "baseStats": {
+                  "hp": 60,
+                  "atk": 62,
+                  "def": 63,
+                  "spa": 80,
+                  "spd": 80,
+                  "spe": 60
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

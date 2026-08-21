@@ -145,6 +145,17 @@
         <p id="clear-cache-status" class="status-line" aria-live="polite"></p>
       </section>
 
+      <section class="settings-section" id="pre-migration-backup-section" hidden>
+        <h3>Pre-migration backup</h3>
+        <p class="hint">
+          A copy of your data from just before your last data update.
+          You won't need this unless a developer asks for it while
+          looking into a bug report.
+        </p>
+        <button id="copy-backup-btn" class="ds-btn ds-btn--ghost">Copy to clipboard</button>
+        <p id="copy-backup-status" class="status-line" aria-live="polite"></p>
+      </section>
+
       <section class="settings-section">
         <h3>Transfer</h3>
         <p class="hint">Move your parties and roster to another device via a shareable link.</p>
@@ -171,7 +182,7 @@
 
     <footer class="bezel-footer">
       <span>Data via PokéAPI &middot; stored locally in this browser</span>
-      <span><a class="footer-link" href="https://github.com/Thijs5/effortdex/issues/new?template=bug_report.yml" target="_blank" rel="noopener">Report a bug</a></span>
+      <span><a id="report-bug-link" class="footer-link" href="https://github.com/Thijs5/effortdex/issues/new?template=bug_report.yml" target="_blank" rel="noopener">Report a bug</a></span>
       <span id="app-version" class="app-version" hidden></span>
     </footer>
   </div>

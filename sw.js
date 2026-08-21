@@ -39,6 +39,7 @@ const SHELL_PATHS = [
   'lib/game-versions.js',
   'lib/pokeapi-client.js',
   'lib/router.js',
+  'lib/schema-version.js',
   'lib/services.js',
   'lib/shell.js',
   'lib/slug.js',

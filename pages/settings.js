@@ -1,12 +1,16 @@
 // @ts-check
 // Settings ("/settings") — app version, manual cache clear (mainly for
 // someone stuck on a stale shell despite app-version.js's automatic
-// check), and the entry point to the Transfer page.
+// check), an explicit "copy my pre-migration backup" for bug reports
+// (docs/adr/0009 — the raw copy, not the safe diagnostics that
+// lib/shell.js attaches automatically), and the entry point to the
+// Transfer page.
 
 import * as router from '../lib/router.js';
 import { wireUtilityBackLink } from '../lib/dom.js';
 import { clearAppCache } from '../lib/version-check.js';
 import { getAppVersion, hasResolvedAppVersion, onAppVersion } from '../lib/app-version.js';
+import { readPreMigrationBackup } from '../lib/store.js';
 
 export const view = document.getElementById('settings-view');
 const backFromSettings = document.getElementById('back-from-settings');
@@ -14,6 +18,9 @@ const settingsVersion = document.getElementById('settings-version');
 const clearCacheBtn = document.getElementById('clear-cache-btn');
 const clearCacheStatus = document.getElementById('clear-cache-status');
 const transferBtn = document.getElementById('transfer-btn');
+const backupSection = document.getElementById('pre-migration-backup-section');
+const copyBackupBtn = document.getElementById('copy-backup-btn');
+const copyBackupStatus = document.getElementById('copy-backup-status');
 
 const setBackLinkPath = wireUtilityBackLink(backFromSettings);
 transferBtn.addEventListener('click', () => router.navigateToTransfer());
@@ -27,6 +34,19 @@ function renderVersion() {
 // app-version.js fetch settles) — refresh the line when that happens.
 onAppVersion(renderVersion);
 
+// Only ever shown if a breaking migration has actually run on this
+// install — most installs never see this section at all.
+function renderBackupSection() {
+  backupSection.hidden = !readPreMigrationBackup();
+}
+
+copyBackupBtn.addEventListener('click', async () => {
+  const backup = readPreMigrationBackup();
+  if (!backup) return;
+  await navigator.clipboard.writeText(backup);
+  copyBackupStatus.textContent = 'Copied — paste it into your bug report if a developer asks for it.';
+});
+
 clearCacheBtn.addEventListener('click', async () => {
   clearCacheBtn.disabled = true;
   clearCacheStatus.textContent = 'Clearing cache… your parties and roster are untouched.';
@@ -39,5 +59,7 @@ clearCacheBtn.addEventListener('click', async () => {
 export function render(contentPath) {
   setBackLinkPath(contentPath);
   renderVersion();
+  renderBackupSection();
   clearCacheStatus.textContent = '';
+  copyBackupStatus.textContent = '';
 }

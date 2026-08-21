@@ -1,8 +1,10 @@
 import './support/localstorage-polyfill.js';
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 
-import { Store } from '../lib/store.js';
+import { Store, MIGRATIONS } from '../lib/store.js';
+import { SCHEMA_VERSION } from '../lib/schema-version.js';
 import { STAT_CAP, TOTAL_CAP, VITAMIN_BONUS, MIN_LEVEL, MAX_LEVEL, DEFAULT_LEVEL } from '../lib/constants.js';
 
 function mon(overrides = {}) {
@@ -661,11 +663,57 @@ test('a migrated save persists as schema 2 and round-trips', () => {
 
 test('corrupt or unrecognized saved state falls back to a fresh empty state', () => {
   localStorage.setItem('effortdex:state', 'not json {');
-  assert.deepEqual(new Store().state, { schema: 2, parties: [], activePartyId: null });
+  assert.deepEqual(new Store().state, { schema: 1, parties: [], activePartyId: null });
 
   // The ancient pre-party shape is no longer migrated (ADR 0006 §7).
   localStorage.setItem('effortdex:state', JSON.stringify({ caughtPokemon: [] }));
-  assert.deepEqual(new Store().state, { schema: 2, parties: [], activePartyId: null });
+  assert.deepEqual(new Store().state, { schema: 1, parties: [], activePartyId: null });
+});
+
+// docs/adr/0009's guard against the easy mistake: bumping SCHEMA_VERSION
+// without writing the migration that reaches it, or the reverse. Catches
+// gaps/out-of-order entries too.
+test('SCHEMA_VERSION and the MIGRATIONS chain agree on the current version', () => {
+  let expected = 1;
+  for (const step of MIGRATIONS) {
+    assert.equal(step.from, expected, `MIGRATIONS has a gap or is out of order before version ${step.to}`);
+    expected = step.to;
+  }
+  assert.equal(
+    SCHEMA_VERSION,
+    expected,
+    "SCHEMA_VERSION must match the last MIGRATIONS entry's `to` (or stay 1 with an empty chain)"
+  );
+});
+
+// The harder half of that guard: a real save frozen at schema 1
+// (test/fixtures/state-schema-1.json, built via
+// test/fixtures/generate-state-schema-1.mjs) that must keep loading and
+// projecting correctly forever. If a future change to the event-sourced
+// shape or its projection breaks this without adding a MIGRATIONS entry
+// and a new fixture, this test — not a real user's save — is what fails
+// (docs/adr/0009).
+test('a real save frozen at schema 1 still loads and projects correctly', () => {
+  const fixture = readFileSync(new URL('./fixtures/state-schema-1.json', import.meta.url), 'utf8');
+  localStorage.setItem('effortdex:state', fixture);
+
+  const loaded = new Store();
+  const party = loaded.activeParty;
+  assert.equal(party.name, 'Fixture party');
+  assert.equal(party.baseGame, 'Ultra Sun');
+
+  const entry = party.pokemon[0];
+  assert.equal(entry.nickname, 'Buddy');
+  assert.equal(entry.nature, 'adamant');
+  assert.equal(entry.powerItem, null);
+  assert.equal(entry.machoBrace, true);
+  assert.equal(entry.speciesName, 'ivysaur');
+  assert.equal(entry.level, 12);
+  assert.equal(entry.pokerus, true);
+  assert.equal(entry.expShare, true);
+  assert.deepEqual(entry.evs, { hp: 0, atk: 3, def: 0, spa: 0, spd: 0, spe: 0 });
+  assert.equal(entry.evolutions.length, 1);
+  assert.equal(entry.events.length, 9);
 });
 
 test('only source data is persisted — projections are rebuilt from events at load', () => {
