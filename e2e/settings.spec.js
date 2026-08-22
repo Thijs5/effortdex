@@ -42,6 +42,22 @@ test.describe('Settings', () => {
     await expect(page.getByRole('button', { name: 'Clear cache' })).toBeVisible();
   });
 
+  test('the Clear cache button shows how much cached data it will delete', async ({ page }) => {
+    await page.goto('/');
+    // The service worker (and its Cache Storage population) is deliberately
+    // disabled on localhost (lib/shell.js), so seed a cache entry by hand
+    // to exercise the size label without depending on that.
+    await page.evaluate(async () => {
+      const cache = await caches.open('e2e-synthetic-cache');
+      await cache.put('/synthetic-cache-entry', new Response(new Uint8Array(2048)));
+    });
+
+    await page.getByRole('button', { name: 'Menu' }).click();
+    await page.getByRole('menuitem', { name: 'Settings' }).click();
+
+    await expect(page.getByRole('button', { name: 'Clear cache (2.0 KB)' })).toBeVisible();
+  });
+
   test('Settings is reachable without any party existing yet', async ({ page }) => {
     await page.goto('/');
     await page.getByRole('button', { name: 'Menu' }).click();
