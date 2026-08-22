@@ -821,11 +821,11 @@ test('a migrated save persists as schema 2 and round-trips', () => {
 
 test('corrupt or unrecognized saved state falls back to a fresh empty state', () => {
   localStorage.setItem('effortdex:state', 'not json {');
-  assert.deepEqual(new Store().state, { schema: 1, parties: [], activePartyId: null });
+  assert.deepEqual(new Store().state, { schema: 1, statExpBackfillApplied: true, parties: [], activePartyId: null });
 
   // The ancient pre-party shape is no longer migrated (ADR 0006 §7).
   localStorage.setItem('effortdex:state', JSON.stringify({ caughtPokemon: [] }));
-  assert.deepEqual(new Store().state, { schema: 1, parties: [], activePartyId: null });
+  assert.deepEqual(new Store().state, { schema: 1, statExpBackfillApplied: true, parties: [], activePartyId: null });
 });
 
 // docs/adr/0009's guard against the easy mistake: bumping SCHEMA_VERSION
@@ -872,6 +872,144 @@ test('a real save frozen at schema 1 still loads and projects correctly', () => 
   assert.deepEqual(entry.evs, { hp: 0, atk: 3, def: 0, spa: 0, spd: 0, spe: 0 });
   assert.equal(entry.evolutions.length, 1);
   assert.equal(entry.events.length, 9);
+});
+
+// The one-time Gen I/II Stat Experience backfill (docs/adr/0010):
+// battle/vitamin events recorded on a Gen I-II party before this system
+// existed were computed under the old modern-EV rules and need
+// recomputing, sourced from the local PokeAPI cache (injected here via
+// `peekCachedMon` instead of a real PokeApiClient) — never a network call.
+function legacyRedState(events, overrides = {}) {
+  return {
+    schema: SCHEMA_VERSION,
+    activePartyId: 'party-1',
+    parties: [
+      {
+        id: 'party-1',
+        name: 'Old Red run',
+        description: '',
+        baseGame: 'Red',
+        overrides,
+        slug: 'old-red-run',
+        pokemon: [
+          {
+            uid: 'mon-1',
+            nickname: '',
+            nature: null,
+            powerItem: null,
+            machoBrace: false,
+            events,
+          },
+        ],
+      },
+    ],
+  };
+}
+
+const legacyCatchEvent = {
+  id: 'ev-catch',
+  kind: 'catch',
+  timestamp: 1,
+  speciesName: 'bulbasaur',
+  speciesId: 1,
+  sprite: null,
+  baseStats: { hp: 45, atk: 49, def: 49, spa: 65, spd: 65, spe: 45 },
+  level: 5,
+};
+
+// Old-model battle event: a small modern-EV-yield-sized `applied`, as
+// every generation computed it before Gen I/II had its own rules.
+const legacyBattleEvent = {
+  id: 'ev-battle',
+  kind: 'battle',
+  timestamp: 2,
+  opponentName: 'onix',
+  sprite: null,
+  applied: { hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 },
+  powerItem: null,
+  machoBrace: false,
+  pokerus: false,
+};
+
+// Old-model vitamin event: the old flat +10, no linkedStat/blockedByCeiling.
+const legacyVitaminEvent = {
+  id: 'ev-vit',
+  kind: 'vitamin',
+  timestamp: 3,
+  vitaminId: 'protein',
+  stat: 'atk',
+  applied: 10,
+  blockedByCutoff: false,
+};
+
+const onixMon = { id: 95, name: 'onix', sprite: null, evYield: {}, baseStats: { hp: 35, atk: 45, def: 160, spa: 30, spd: 45, spe: 70 } };
+
+test('the Gen I/II Stat Experience backfill recomputes old battle/vitamin events from the local mon cache', () => {
+  localStorage.setItem(
+    'effortdex:state',
+    JSON.stringify(legacyRedState([legacyCatchEvent, legacyBattleEvent, legacyVitaminEvent]))
+  );
+
+  const loaded = new Store({ peekCachedMon: (name) => (name === 'onix' ? onixMon : null) });
+  const entry = loaded.activeParty.pokemon[0];
+
+  // Onix's real Attack (45), not the old modern EV yield (1), then +2,560
+  // from the vitamin (well under the 25,600 ceiling).
+  assert.equal(entry.evs.atk, 45 + 2560);
+  assert.equal(entry.evs.hp, 35);
+  assert.equal(entry.evs.def, 160);
+  assert.equal(loaded.state.statExpBackfillApplied, true);
+});
+
+test('the backfill leaves a battle event untouched when its opponent is no longer cached', () => {
+  localStorage.setItem('effortdex:state', JSON.stringify(legacyRedState([legacyCatchEvent, legacyBattleEvent])));
+
+  const loaded = new Store({ peekCachedMon: () => null }); // nothing cached
+  const entry = loaded.activeParty.pokemon[0];
+
+  assert.equal(entry.evs.atk, 1); // old value, best-effort left alone
+});
+
+test('the backfill runs at most once — a second load never re-touches already-corrected events', () => {
+  localStorage.setItem(
+    'effortdex:state',
+    JSON.stringify(legacyRedState([legacyCatchEvent, legacyBattleEvent]))
+  );
+
+  const first = new Store({ peekCachedMon: (name) => (name === 'onix' ? onixMon : null) });
+  assert.equal(first.activeParty.pokemon[0].evs.atk, 45);
+
+  // Reloading with a DIFFERENT (wrong) mock proves the flag, not the mock,
+  // is what's gating this — a second run would double-count otherwise.
+  const secondMon = { ...onixMon, baseStats: { ...onixMon.baseStats, atk: 999 } };
+  const second = new Store({ peekCachedMon: (name) => (name === 'onix' ? secondMon : null) });
+  assert.equal(second.activeParty.pokemon[0].evs.atk, 45);
+  assert.equal(second.state.statExpBackfillApplied, true);
+});
+
+test('the backfill does not touch a Gen III+ party\'s events at all', () => {
+  const rawState = legacyRedState([legacyCatchEvent, legacyBattleEvent, legacyVitaminEvent]);
+  rawState.parties[0].baseGame = 'Emerald';
+  localStorage.setItem('effortdex:state', JSON.stringify(rawState));
+
+  const loaded = new Store({ peekCachedMon: () => onixMon });
+  const entry = loaded.activeParty.pokemon[0];
+
+  assert.equal(entry.evs.atk, 1 + 10); // untouched: old battle +1, old vitamin +10
+});
+
+test('the backfill merges Gen I\'s Special stat via gen1-special-stats.js, not the opponent\'s raw modern split', () => {
+  // Chansey: modern spa 35 / spd 105, real Gen I Special 105 — see
+  // lib/gen1-special-stats.js and its own dedicated tests.
+  const chansey = { id: 113, name: 'chansey', sprite: null, evYield: {}, baseStats: { hp: 250, atk: 5, def: 5, spa: 35, spd: 105, spe: 50 } };
+  const legacyChanseyBattle = { ...legacyBattleEvent, opponentName: 'chansey', applied: { hp: 0, atk: 0, def: 0, spa: 3, spd: 0, spe: 0 } };
+  localStorage.setItem('effortdex:state', JSON.stringify(legacyRedState([legacyCatchEvent, legacyChanseyBattle])));
+
+  const loaded = new Store({ peekCachedMon: (name) => (name === 'chansey' ? chansey : null) });
+  const entry = loaded.activeParty.pokemon[0];
+
+  assert.equal(entry.evs.spa, 105);
+  assert.equal(entry.evs.spd, 105);
 });
 
 test('only source data is persisted — projections are rebuilt from events at load', () => {
