@@ -8,9 +8,10 @@
 
 import * as router from '../lib/router.js';
 import { wireUtilityBackLink } from '../lib/dom.js';
-import { clearAppCache } from '../lib/version-check.js';
+import { clearAppCache, estimateCacheSize } from '../lib/version-check.js';
 import { getAppVersion, hasResolvedAppVersion, onAppVersion } from '../lib/app-version.js';
 import { readPreMigrationBackup } from '../lib/store.js';
+import { formatBytes } from '../lib/utils.js';
 
 export const view = document.getElementById('settings-view');
 const backFromSettings = document.getElementById('back-from-settings');
@@ -47,6 +48,15 @@ copyBackupBtn.addEventListener('click', async () => {
   copyBackupStatus.textContent = 'Copied — paste it into your bug report if a developer asks for it.';
 });
 
+// Shows how much the button is about to delete, e.g. "Clear cache (3.4
+// MB)" — falls back to the plain label while the size is still being
+// computed, or if Cache Storage isn't available at all.
+async function renderCacheSize() {
+  clearCacheBtn.textContent = 'Clear cache';
+  const size = await estimateCacheSize();
+  if (size) clearCacheBtn.textContent = `Clear cache (${formatBytes(size)})`;
+}
+
 clearCacheBtn.addEventListener('click', async () => {
   clearCacheBtn.disabled = true;
   clearCacheStatus.textContent = 'Clearing cache… your parties and roster are untouched.';
@@ -60,6 +70,7 @@ export function render(contentPath) {
   setBackLinkPath(contentPath);
   renderVersion();
   renderBackupSection();
+  renderCacheSize();
   clearCacheStatus.textContent = '';
   copyBackupStatus.textContent = '';
 }

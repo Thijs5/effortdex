@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { titleCase, emptyEvs, totalEvs, formatEvYield, natureLabel, natureEffectHint, sortedNatures, natureOptionsHtml, escapeHtml, dayKey, dayLabel } from '../lib/utils.js';
+import { titleCase, emptyEvs, totalEvs, formatEvYield, natureLabel, natureEffectHint, sortedNatures, natureOptionsHtml, escapeHtml, dayKey, dayLabel, formatBytes } from '../lib/utils.js';
 import { NATURES } from '../lib/constants.js';
 
 test('titleCase capitalizes words and replaces hyphens with spaces', () => {
@@ -48,6 +48,16 @@ test('natureOptionsHtml puts Unknown first, then one option per nature', () => {
   assert.ok(html.startsWith('<option value="">Unknown</option>'));
   assert.equal(html.match(/<option /g).length, 26); // Unknown + 25 natures
   assert.ok(html.includes('value="adamant"'));
+});
+
+test('formatBytes picks the largest unit that keeps the value readable', () => {
+  assert.equal(formatBytes(0), '0 B');
+  assert.equal(formatBytes(512), '512 B');
+  assert.equal(formatBytes(1024), '1.0 KB');
+  assert.equal(formatBytes(1536), '1.5 KB');
+  assert.equal(formatBytes(15 * 1024), '15 KB');
+  assert.equal(formatBytes(3.4 * 1024 * 1024), '3.4 MB');
+  assert.equal(formatBytes(1024 * 1024 * 1024), '1.0 GB');
 });
 
 test('escapeHtml neutralizes markup-significant characters', () => {
