@@ -505,7 +505,7 @@ test('a single stat under Stat Experience is capped at 65,535 with no combined t
   assert.equal(entry.evs.atk, 65535); // clamped, not 120000
 });
 
-test('useVitamin under Stat Experience adds STAT_EXP_VITAMIN_BONUS and only counts its first 10 uses', () => {
+test('useVitamin under Stat Experience adds STAT_EXP_VITAMIN_BONUS and stops once the stat has 25,600', () => {
   store.createParty('Crystal run', '', 'Crystal'); // Gen 2
   const entry = store.catchPokemon(mon());
   for (let i = 0; i < 10; i++) store.useVitamin(entry.uid, 'protein');
@@ -513,8 +513,41 @@ test('useVitamin under Stat Experience adds STAT_EXP_VITAMIN_BONUS and only coun
 
   const blocked = store.useVitamin(entry.uid, 'protein');
   assert.equal(blocked.applied, 0);
-  assert.equal(blocked.blockedByUseLimit, true);
+  assert.equal(blocked.blockedByCeiling, true);
   assert.equal(entry.evs.atk, 25600); // 11th use does nothing
+});
+
+test('useVitamin under Stat Experience is blocked by pre-existing battle Stat Experience, not a use counter', () => {
+  // The real Gen I/II mechanic checks the stat's CURRENT value against the
+  // 25,600 ceiling, regardless of source — it is not "the first 10 uses of
+  // this vitamin". A stat already at/above 25,600 from battling alone must
+  // block the very first vitamin use.
+  store.createParty('Red run', '', 'Red'); // Gen 1
+  const entry = store.catchPokemon(mon());
+  const opp = opponent({}, { baseStats: { hp: 0, atk: 30000, def: 0, spa: 0, spd: 0, spe: 0 } });
+  store.logDefeat(entry.uid, opp); // atk = 30000, already past the ceiling
+
+  const result = store.useVitamin(entry.uid, 'protein');
+  assert.equal(result.applied, 0);
+  assert.equal(result.blockedByCeiling, true);
+  assert.equal(entry.evs.atk, 30000); // unchanged — no use counter to exhaust first
+});
+
+test('useVitamin under Stat Experience adds its full bonus even if that pushes the stat past 25,600', () => {
+  // Real Gen I/II behavior: the game only checks whether the stat is BELOW
+  // 25,600 before adding — a value just under the ceiling still gets the
+  // full +2,560, so the result can land above 25,600 (not clamped to it).
+  store.createParty('Red run', '', 'Red'); // Gen 1
+  const entry = store.catchPokemon(mon());
+  const opp = opponent({}, { baseStats: { hp: 0, atk: 25000, def: 0, spa: 0, spd: 0, spe: 0 } });
+  store.logDefeat(entry.uid, opp); // atk = 25000, still under the ceiling
+
+  const result = store.useVitamin(entry.uid, 'protein');
+  assert.equal(result.applied, 2560);
+  assert.equal(entry.evs.atk, 27560); // past 25,600, since the check ran before adding
+
+  const blocked = store.useVitamin(entry.uid, 'protein');
+  assert.equal(blocked.applied, 0); // now blocked, since 27560 >= 25600
 });
 
 test('pokerusAvailable is false for Gen I (didn\'t exist yet) and true for Gen II', () => {
@@ -557,6 +590,31 @@ test('deleteHistoryEntry on a merged-Special vitamin event reverts both spa and 
   store.deleteHistoryEntry(entry.uid, result.id);
   assert.equal(entry.evs.spa, 0);
   assert.equal(entry.evs.spd, 0);
+});
+
+test('logDefeat under merged Special sources the REAL Gen I Special stat, not modern spa/spd independently', () => {
+  // Chansey's modern split (spa 35 / spd 105) is nothing like its real Gen I
+  // Special stat (105) — Gen II's split wasn't an even divide. Defeating it
+  // on a Gen I party must add 105 to BOTH spa and spd, not 35 to one and
+  // 105 to the other (which would silently desync the merged pair).
+  store.createParty('Red run', '', 'Red'); // Gen 1
+  const entry = store.catchPokemon(mon());
+  const chansey = opponent(
+    {},
+    { id: 113, baseStats: { hp: 250, atk: 5, def: 5, spa: 35, spd: 105, spe: 50 } }
+  );
+  store.logDefeat(entry.uid, chansey);
+  assert.equal(entry.evs.spa, 105);
+  assert.equal(entry.evs.spd, 105);
+});
+
+test('logDefeat under merged Special falls back to max(spa, spd) for a species outside the Gen I dex', () => {
+  store.createParty('Red run', '', 'Red'); // Gen 1
+  const entry = store.catchPokemon(mon());
+  const genVMon = opponent({}, { id: 999, baseStats: { hp: 0, atk: 0, def: 0, spa: 40, spd: 90, spe: 0 } });
+  store.logDefeat(entry.uid, genVMon);
+  assert.equal(entry.evs.spa, 90);
+  assert.equal(entry.evs.spd, 90);
 });
 
 test('deleteHistoryEntry removes the record and reverts the EVs it applied', () => {
