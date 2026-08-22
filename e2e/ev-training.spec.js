@@ -9,9 +9,9 @@ import { catchPokemon, openDetail, openMoreOptions, logBattle } from './support/
 // (Macho Brace Gen III-VI, Power items Gen IV+). All at the caps enforced
 // everywhere (252/stat, 510/total).
 //
-// Only currently-implemented generations are exercised here — no Gen I/II
-// coverage yet, since that era's stat-experience mechanics don't exist in
-// the app. See docs/adr/0007.
+// Only Gen III+ EV mechanics are exercised here — Gen I/II's structurally
+// different Stat Experience model has its own spec file, per docs/adr/0007:
+// e2e/stat-experience.spec.js.
 
 test.describe('EV training', () => {
   test('logging a battle applies the opponent\'s EV yield', async ({ page }) => {
