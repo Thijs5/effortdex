@@ -72,6 +72,30 @@ test.describe('Gen I/II Stat Experience', () => {
     await expect(card.locator('ev-summary ev-bar[data-key="spa"]').locator('.value')).toHaveText('105/65535');
   });
 
+  test('battling several strong opponents keeps growing past the old 510 total — there is no combined cap to hit', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Red run', baseGame: 'Red' });
+    await catchPokemon(page, 'Bulbasaur');
+    const card = await openDetail(page, 'Bulbasaur');
+
+    // Two high-base-stat opponents alone add well past the modern 510 EV
+    // total cap — under Stat Experience there's no combined total to hit
+    // (see lib/store.js's totalCap(), which returns null under
+    // usesStatExpSystem()), so the total row stays hidden throughout and
+    // no per-stat bar reads as "maxed" this early.
+    await logBattle(card, 'Mewtwo');
+    await logBattle(card, 'Mewtwo');
+
+    await expect(card.locator('ev-summary .total')).toBeHidden();
+    await expect(card).not.toHaveAttribute('fully-trained', '');
+    const values = await card.locator('ev-summary ev-bar:not([hidden]) .value').allTextContents();
+    const combined = values.reduce((sum, v) => sum + Number(v.split('/')[0]), 0);
+    expect(combined).toBeGreaterThan(510);
+    for (const bar of await card.locator('ev-summary ev-bar').all()) {
+      await expect(bar).not.toHaveAttribute('maxed', '');
+    }
+  });
+
   test('Pokérus doesn\'t exist on a Gen I party', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Red run', baseGame: 'Red' });
