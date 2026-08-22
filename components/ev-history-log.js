@@ -1,4 +1,4 @@
-import { POWER_ITEMS, VITAMINS, FEATHERS, EV_BERRIES, EXP_SHARE_SPRITE, STAT_LABEL, VITAMIN_STAT_CUTOFF, STAT_EXP_VITAMIN_MAX_USES, FALLBACK_SPRITE, FALLBACK_ONERROR } from '../lib/constants.js';
+import { POWER_ITEMS, VITAMINS, FEATHERS, EV_BERRIES, EXP_SHARE_SPRITE, STAT_LABEL, VITAMIN_STAT_CUTOFF, STAT_EXP_VITAMIN_CEILING, FALLBACK_SPRITE, FALLBACK_ONERROR } from '../lib/constants.js';
 import { titleCase, formatEvYield, escapeHtml, dayKey, dayLabel } from '../lib/utils.js';
 import { store } from '../lib/services.js';
 import { attachDesignSystem } from '../lib/design-system.js';
@@ -149,8 +149,8 @@ export class EvHistoryLog extends HTMLElement {
         ? `+${h.applied} ${statLabel}`
         : h.blockedByCutoff
           ? `No ${noun} gained (${statLabel} ≥ ${VITAMIN_STAT_CUTOFF} EVs, this game's vitamin limit)`
-          : h.blockedByUseLimit
-            ? `No ${noun} gained (this game only counts a vitamin's first ${STAT_EXP_VITAMIN_MAX_USES} uses)`
+          : h.blockedByCeiling
+            ? `No ${noun} gained (${statLabel} ≥ ${STAT_EXP_VITAMIN_CEILING} Stat Experience, this game's vitamin limit)`
             : `No ${noun} gained (capped)`;
       return `<li>
         <img src="${vitamin?.sprite || FALLBACK_SPRITE}" alt="" ${FALLBACK_ONERROR} />

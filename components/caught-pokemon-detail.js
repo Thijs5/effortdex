@@ -1,4 +1,5 @@
-import { POWER_ITEMS, MACHO_BRACE_SPRITE, EXP_SHARE_SPRITE, VITAMINS, FEATHERS, FEATHER_BONUS, EV_BERRIES, EV_BERRY_REDUCTION, NATURES, STAT_LABEL, MACHO_BRACE_MULTIPLIER, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, STAT_EXP_VITAMIN_BONUS, STAT_EXP_VITAMIN_MAX_USES, FALLBACK_SPRITE, FALLBACK_ONERROR, MIN_LEVEL, MAX_LEVEL } from '../lib/constants.js';
+import { POWER_ITEMS, MACHO_BRACE_SPRITE, EXP_SHARE_SPRITE, VITAMINS, FEATHERS, FEATHER_BONUS, EV_BERRIES, EV_BERRY_REDUCTION, NATURES, STAT_LABEL, MACHO_BRACE_MULTIPLIER, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, STAT_EXP_VITAMIN_BONUS, STAT_EXP_VITAMIN_CEILING, FALLBACK_SPRITE, FALLBACK_ONERROR, MIN_LEVEL, MAX_LEVEL } from '../lib/constants.js';
+import { gen1SpecialStat } from '../lib/gen1-special-stats.js';
 import { titleCase, totalEvs, natureEffectHint, natureOptionsHtml, dayLabel, escapeHtml, sortByLabel } from '../lib/utils.js';
 import { api, store } from '../lib/services.js';
 import { versionedSpriteUrl } from '../lib/pokeapi-client.js';
@@ -616,8 +617,8 @@ export class CaughtPokemonDetail extends HTMLElement {
       this.$vitaminStatus.textContent = `${vitamin.label}: +${result.applied} ${statLabel}`;
     } else if (result.blockedByCutoff) {
       this.$vitaminStatus.textContent = `${vitamin.label}: no ${noun} gained — this game stops vitamins once ${statLabel} has ${VITAMIN_STAT_CUTOFF}+ EVs`;
-    } else if (result.blockedByUseLimit) {
-      this.$vitaminStatus.textContent = `${vitamin.label}: no ${noun} gained — this game only counts a vitamin's first ${STAT_EXP_VITAMIN_MAX_USES} uses`;
+    } else if (result.blockedByCeiling) {
+      this.$vitaminStatus.textContent = `${vitamin.label}: no ${noun} gained — vitamins stop working once ${statLabel} has ${STAT_EXP_VITAMIN_CEILING}+ Stat Experience`;
     } else {
       this.$vitaminStatus.textContent = `${vitamin.label}: no ${noun} gained — ${statLabel} is already maxed out`;
     }
@@ -674,17 +675,24 @@ export class CaughtPokemonDetail extends HTMLElement {
       .map((h) => ({ name: h.opponentName, sprite: h.sprite }));
     const statExp = store.usesStatExpSystem();
     const totalCap = store.totalCap();
+    const mergedSpecial = store.specialStatMerged();
     this.$evSummary.evs = e.evs;
-    this.$evSummary.baseStats = e.baseStats;
+    // The caught mon's own modern spa/spd isn't a 50/50 split of Gen I's
+    // single Special stat (see gen1-special-stats.js) — show the real
+    // historical value in the merged "Base SPC" label instead.
+    this.$evSummary.baseStats =
+      mergedSpecial && e.baseStats
+        ? { ...e.baseStats, spa: gen1SpecialStat(e.speciesId, e.baseStats.spa, e.baseStats.spd), spd: gen1SpecialStat(e.speciesId, e.baseStats.spa, e.baseStats.spd) }
+        : e.baseStats;
     this.$evSummary.nature = nature;
     this.$evSummary.statCap = store.statCap();
     this.$evSummary.totalCap = totalCap;
-    this.$evSummary.mergedSpecial = store.specialStatMerged();
+    this.$evSummary.mergedSpecial = mergedSpecial;
     this.$evHelpBtn.title = statExp
       ? "Stat Experience is this game's hidden bonus stat pool — up to 65,535 per stat, gained mainly from battling (equal to the defeated Pokémon's own base stat). Nature is fixed when a Pokémon is caught or hatched: it boosts one stat by 10% and lowers another. Nature doesn't change Stat Experience, but training the stat your nature already boosts gets the most out of your points."
       : "EVs (Effort Values) are hidden bonus stat points earned mainly from battling — up to 252 per stat, 510 total. Nature is fixed when a Pokémon is caught or hatched: it boosts one stat by 10% and lowers another. Nature doesn't change EVs, but training the stat your nature already boosts gets the most out of your points.";
     this.$vitaminHelpBtn.title = statExp
-      ? `Vitamins (HP Up, Protein, Iron, Calcium, Carbos) instantly add Stat Experience to one stat without battling. Each only counts for its first ${STAT_EXP_VITAMIN_MAX_USES} uses per stat — after that, only battling can push it further toward the 65,535 cap.`
+      ? `Vitamins (HP Up, Protein, Iron, Calcium, Carbos) instantly add ${STAT_EXP_VITAMIN_BONUS} Stat Experience to one stat without battling — but only work until that stat has ${STAT_EXP_VITAMIN_CEILING} Stat Experience from any source (battling included); after that, only battling can push it further toward the 65,535 cap.`
       : 'Vitamins (HP Up, Protein, Iron, Calcium, Zinc, Carbos) instantly add EVs to one stat without battling — a quick way to top off a stat. Each only works until that stat has 100 EVs from any source; after that, only battling, items, or Pokérus can push it further toward the 252 cap.';
 
     const trained = totalCap != null && totalEvs(e.evs) >= totalCap;
@@ -790,11 +798,12 @@ export class CaughtPokemonDetail extends HTMLElement {
   // stat it feeds in a lighter line underneath — so there's no need to
   // remember which vitamin maps to which stat. Marks a button dim before
   // it's even clicked when this game's rules mean it wouldn't gain
-  // anything — the Gen III-VII 100-EV vitamin cutoff, the Gen I-II 10-use
-  // limit, or the stat already sitting at its cap. Also badges each
-  // button with how many times it's already been fed, since that's
-  // otherwise invisible once EVs mix in with battle EVs. On Gen I, Zinc
-  // is dropped entirely — Special hasn't split into SpA/SpD yet.
+  // anything — the Gen III-VII 100-EV vitamin cutoff, the Gen I-II
+  // 25,600-Stat-Experience ceiling, or the stat already sitting at its
+  // cap. Also badges each button with how many times it's already been
+  // fed, since that's otherwise invisible once EVs mix in with battle
+  // EVs. On Gen I, Zinc is dropped entirely — Special hasn't split into
+  // SpA/SpD yet.
   _updateVitaminGrid(e) {
     const statExp = store.usesStatExpSystem();
     const mergedSpecial = store.specialStatMerged();
@@ -806,15 +815,15 @@ export class CaughtPokemonDetail extends HTMLElement {
       const stat = e.evs[v.stat];
       const cappedByCutoff = cutoffApplies && stat >= VITAMIN_STAT_CUTOFF;
       const cappedByStatCap = stat >= statCap;
+      const cappedByCeiling = statExp && stat >= STAT_EXP_VITAMIN_CEILING;
       const count = e.history.filter((h) => h.kind === 'vitamin' && h.vitaminId === v.id).length;
-      const cappedByUseLimit = statExp && count >= STAT_EXP_VITAMIN_MAX_USES;
-      const capped = cappedByCutoff || cappedByUseLimit || cappedByStatCap;
+      const capped = cappedByCutoff || cappedByCeiling || cappedByStatCap;
       const fedNote = count ? ` — fed ${count}×` : '';
       const title = capped
         ? (cappedByCutoff
             ? `This game stops vitamins once ${statLabel} has ${VITAMIN_STAT_CUTOFF}+ EVs`
-            : cappedByUseLimit
-              ? `This game only counts a vitamin's first ${STAT_EXP_VITAMIN_MAX_USES} uses`
+            : cappedByCeiling
+              ? `Vitamins stop working once ${statLabel} has ${STAT_EXP_VITAMIN_CEILING}+ Stat Experience`
               : `${statLabel} is already at the ${statCap} cap`) + fedNote
         : `Feed ${v.label} — raises ${statLabel} by up to ${bonus}` + fedNote;
       return { id: v.id, label: v.label, sprite: v.sprite, boost: `+${bonus} ${statLabel}`, title, capped, count };
