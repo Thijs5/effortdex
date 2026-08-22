@@ -24,11 +24,17 @@ The base game decides which vitamin, training item, Pokérus and nature
 rules apply, and which title's sprites are shown; everything is
 overridable per party for ROM hacks and house rules.
 
-Every Pokémon gets six stat bars plus a total, capped at 252/stat and
-510/total, tracked through:
+Every Pokémon gets six stat bars plus a total, tracked through the EV
+system of whichever generation the party belongs to: Gen III onward
+caps each stat at 252 and the total at 510, while Gen I/II track the
+real, structurally different Stat Experience system instead — 0-65,535
+per stat, no combined total cap, gained equal to the defeated Pokémon's
+own base stat, and (Gen I only) one merged Special bar rather than
+separate Sp. Atk/Sp. Def, since that split didn't happen until Gen II.
 
 - **Training items & Pokérus**: held items and Pokérus, matching
-  the rules of whichever generation the party belongs to.
+  the rules of whichever generation the party belongs to (Pokérus
+  itself didn't exist until Gen II).
 - **Vitamins**: fed straight from the roster card, capped like battling
   and accurate to the rules of whichever generation the party belongs to.
 - **EV-yield previews**: see what EVs a catch or battle would actually
@@ -103,7 +109,8 @@ npm run test:e2e
 ```
 
 See [`docs/adr/0007`](docs/adr/0007-e2e-testing-strategy.md) for why it's
-organized this way and what it deliberately doesn't cover yet (Gen I/II).
+organized this way — Gen I/II's Stat Experience system has its own spec
+file (`e2e/stat-experience.spec.js`), separate from the Gen III+ specs.
 
 CI (`.github/workflows/test.yml`) runs both suites plus a JSDoc-based
 typecheck (`npm run typecheck`, which runs `tsc --noEmit` over `lib/` and
@@ -119,7 +126,9 @@ every pull request.
   `pokeapi-client.js` (the only module that talks to PokéAPI),
   `router.js` (hash-based routing), `slug.js` (party name → URL
   segment), `game-versions.js` (official titles and the generation each
-  belongs to), `version-check.js` (deploy/update detection),
+  belongs to), `gen1-special-stats.js` (the real Gen I Special stat per
+  species, sourced from Bulbapedia — modern PokéAPI's Sp. Atk/Sp. Def
+  split can't reconstruct it), `version-check.js` (deploy/update detection),
   `combobox.js` (shared suggestion-dropdown behavior),
   `services.js` (composition root), `constants.js`/`utils.js`.
 - `components/`: one custom element per piece of UI, each owning its
