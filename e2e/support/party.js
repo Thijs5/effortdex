@@ -7,13 +7,16 @@
  * game-version-picker's suggestion list, and submits. Leaves the page on
  * the newly created party's roster.
  * @param {import('@playwright/test').Page} page
- * @param {{ name: string, baseGame: string, description?: string }} opts
+ * @param {{ name: string, baseGame: string, description?: string, trackIvs?: boolean }} opts
  */
-export async function createParty(page, { name, baseGame, description }) {
+export async function createParty(page, { name, baseGame, description, trackIvs }) {
   await page.getByRole('button', { name: '+ New party' }).click();
   await page.getByPlaceholder('e.g. Emerald Nuzlocke').fill(name);
   if (description) {
     await page.getByPlaceholder('Optional notes: ruleset, save slot…').fill(description);
+  }
+  if (trackIvs) {
+    await page.getByRole('checkbox', { name: 'Track IVs' }).check();
   }
   await pickBaseGame(page, baseGame);
   await page.getByRole('button', { name: 'Create party' }).click();

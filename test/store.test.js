@@ -1434,3 +1434,109 @@ test('applyImport leaves an existing entry\'s nickname/nature/held item untouche
   assert.equal(entry.powerItem, 'lens');
   assert.equal(entry.machoBrace, false);
 });
+
+// ---------------- IV tracking ----------------
+
+test('a caught Pokémon starts with IV tracking off and every IV unknown', () => {
+  const entry = store.catchPokemon(mon());
+  assert.equal(entry.trackIvs, false);
+  assert.deepEqual(entry.ivs, { hp: null, atk: null, def: null, spa: null, spd: null, spe: null });
+});
+
+test('setPartyTrackIvs and setEntryTrackIvs persist independently', () => {
+  const entry = store.catchPokemon(mon());
+  assert.equal(store.activeParty.trackIvs, false);
+  store.setPartyTrackIvs(store.activeParty.id, true);
+  assert.equal(store.activeParty.trackIvs, true);
+  assert.equal(entry.trackIvs, false); // per-mon toggle is independent, still off
+  store.setEntryTrackIvs(entry.uid, true);
+  assert.equal(entry.trackIvs, true);
+});
+
+test('ivRange is 0-31 for a modern party, 0-15 (legacy) for a Gen I/II party', () => {
+  assert.deepEqual(store.ivRange(), { min: 0, max: 31, legacy: false });
+  store.createParty('Red run', '', 'Red');
+  assert.deepEqual(store.ivRange(), { min: 0, max: 15, legacy: true });
+});
+
+test('setIv clamps to the active party\'s range and null clears back to unknown', () => {
+  const entry = store.catchPokemon(mon());
+  store.setIv(entry.uid, 'spe', 40); // above the modern 31 max
+  assert.equal(entry.ivs.spe, 31);
+  store.setIv(entry.uid, 'atk', -5);
+  assert.equal(entry.ivs.atk, 0);
+  store.setIv(entry.uid, 'atk', 20);
+  assert.equal(entry.ivs.atk, 20);
+  store.setIv(entry.uid, 'atk', null);
+  assert.equal(entry.ivs.atk, null);
+});
+
+test('on a Gen I/II party, writing Sp. Atk mirrors to Sp. Def (one stored Special DV)', () => {
+  store.createParty('Gold run', '', 'Gold');
+  const entry = store.catchPokemon(mon());
+  store.setIv(entry.uid, 'spa', 12);
+  assert.equal(entry.ivs.spa, 12);
+  assert.equal(entry.ivs.spd, 12);
+});
+
+test('on a Gen I/II party, HP DV is derived from the other four\'s parity, not directly settable', () => {
+  store.createParty('Red run', '', 'Red');
+  const entry = store.catchPokemon(mon());
+  // Attempting to set HP directly is a no-op.
+  store.setIv(entry.uid, 'hp', 10);
+  assert.equal(entry.ivs.hp, null);
+  // Still indeterminate until all four other DVs are known.
+  store.setIv(entry.uid, 'atk', 9); // odd -> +8
+  store.setIv(entry.uid, 'def', 8); // even -> +0
+  assert.equal(entry.ivs.hp, null);
+  store.setIv(entry.uid, 'spe', 3); // odd -> +2
+  store.setIv(entry.uid, 'spa', 5); // odd (mirrors to spd) -> +1
+  assert.equal(entry.ivs.hp, 8 + 0 + 2 + 1);
+});
+
+test('ivRange clamps a legacy party\'s value to 15, even if entered as if modern', () => {
+  store.createParty('Blue run', '', 'Blue');
+  const entry = store.catchPokemon(mon());
+  store.setIv(entry.uid, 'atk', 31);
+  assert.equal(entry.ivs.atk, 15);
+});
+
+test('possibleIvsForStat finds every IV that reproduces an observed stat, and includes the true one', () => {
+  const entry = store.catchPokemon(mon());
+  store.setLevel(entry.uid, 50);
+  // Level 50, base 80, EV 0, neutral nature, true IV 25:
+  // floor((2*80+25+0)*50/100)+5 = floor(185*0.5)+5 = 92+5 = 97
+  const observed = 97;
+  const matches = store.possibleIvsForStat(entry, 'atk', observed, 80);
+  assert.ok(matches.includes(25), `expected 25 among candidates, got ${matches}`);
+  assert.ok(matches.length >= 1);
+});
+
+test('possibleIvsForStat returns nothing for a Gen I/II (legacy) party — not implemented for DVs yet', () => {
+  store.createParty('Yellow run', '', 'Yellow');
+  const entry = store.catchPokemon(mon());
+  assert.deepEqual(store.possibleIvsForStat(entry, 'atk', 50, 80), []);
+});
+
+test('exportPayload includes trackIvs/ivs, and a fresh load defaults them for old saves missing the fields', () => {
+  const entry = store.catchPokemon(mon());
+  store.setPartyTrackIvs(store.activeParty.id, true);
+  store.setEntryTrackIvs(entry.uid, true);
+  store.setIv(entry.uid, 'spe', 31);
+  const [party] = store.exportPayload();
+  assert.equal(party.trackIvs, true);
+  assert.equal(party.pokemon[0].trackIvs, true);
+  assert.deepEqual(party.pokemon[0].ivs, { hp: null, atk: null, def: null, spa: null, spd: null, spe: 31 });
+
+  // Simulate an old save from before IV tracking existed (fields absent).
+  const raw = JSON.parse(localStorage.getItem('effortdex:state'));
+  delete raw.parties[0].trackIvs;
+  delete raw.parties[0].pokemon[0].trackIvs;
+  delete raw.parties[0].pokemon[0].ivs;
+  localStorage.setItem('effortdex:state', JSON.stringify(raw));
+
+  const reloaded = new Store();
+  assert.equal(reloaded.activeParty.trackIvs, false);
+  assert.equal(reloaded.activeParty.pokemon[0].trackIvs, false);
+  assert.deepEqual(reloaded.activeParty.pokemon[0].ivs, { hp: null, atk: null, def: null, spa: null, spd: null, spe: null });
+});
