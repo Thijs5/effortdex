@@ -329,6 +329,35 @@ test('two concurrent prefetchGame() calls for the same title share one fetch per
   assert.deepEqual(api.calls, ['bulbasaur']); // not fetched twice just because two callers asked
 });
 
+// A remake's own Pokédex spans every earlier generation too, but
+// PokéAPI's /generation/{n} only lists species *introduced* in gen n —
+// prefetchGame (and spriteUrlsForGame, its cache-status counterpart) must
+// walk 1..gen, not just request gen itself, or an earlier-gen species
+// (e.g. Geodude in HeartGold) never gets cached at all.
+test("prefetchGame() for a remake fetches every earlier generation's species too, not just its own release generation's", async () => {
+  const api = fakeApi({
+    generations: {
+      1: [{ name: 'geodude', id: 74 }],
+      4: [{ name: 'turtwig', id: 387 }],
+    },
+  });
+  const svc = service({ api, store: fakeStore([{ baseGame: 'HeartGold' }]) });
+  await svc.prefetchGame('HeartGold'); // gen 4
+  assert.deepEqual(new Set(api.calls), new Set(['geodude', 'turtwig']));
+});
+
+test('spriteUrlsForGame() for a remake also includes every earlier generation, matching prefetchGame()', async () => {
+  const api = fakeApi({
+    generations: {
+      1: [{ name: 'geodude', id: 74 }],
+      4: [{ name: 'turtwig', id: 387 }],
+    },
+  });
+  const svc = service({ api, store: fakeStore([{ baseGame: 'HeartGold' }]) });
+  const urls = await svc.spriteUrlsForGame('HeartGold');
+  assert.equal(urls.length, 2);
+});
+
 /* ---------------- spriteUrlsForGame() — pure, no fetching ---------------- */
 
 test('spriteUrlsForGame() computes URLs without calling getPokemon or touching the network', async () => {
@@ -393,6 +422,23 @@ test('prefetchGame() does NOT route through withoutTracking — manual work stay
 
   assert.deepEqual(spy.calls, []);
   assert.deepEqual(api.calls, ['bulbasaur']); // the work still happened, just not silenced
+});
+
+// Unlike prefetchGame (which needs a whole game's cumulative Pokédex —
+// see the remake test above), this is deliberately scoped to exactly
+// gen 4's own introduced species — it backs the per-generation cache
+// controls in pages/sprite-cache.js ("Generation IV" meaning Sinnoh's
+// own species only, not everything up to it).
+test("prefetchGeneration() fetches only that generation's own species, not earlier generations too", async () => {
+  const api = fakeApi({
+    generations: {
+      1: [{ name: 'geodude', id: 74 }],
+      4: [{ name: 'turtwig', id: 387 }],
+    },
+  });
+  const svc = service({ api });
+  await svc.prefetchGeneration(4);
+  assert.deepEqual(api.calls, ['turtwig']);
 });
 
 test('prefetchGeneration() also does not route through withoutTracking', async () => {
