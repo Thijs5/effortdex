@@ -494,6 +494,112 @@ html[data-modal-open] body {
   text-align: center;
 }
 
+.roster-toolbar {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.roster-toolbar #roster-search { flex: 1 1 auto; }
+
+@media (max-width: 520px) {
+  .roster-toolbar { flex-direction: column; align-items: stretch; }
+}
+
+/* Same box model as .ds-field (padding/border/font-size) so this button
+   matches the search input and sort <select> exactly, height included —
+   .ds-field itself doesn't apply here since a <button>'s content wraps
+   an icon + label rather than being an editable value. */
+.roster-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--lcd-line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-family: var(--font-mono);
+  font-size: var(--font-size-input);
+  color: var(--ink);
+  cursor: pointer;
+  white-space: nowrap;
+}
+.roster-filter-btn:hover { border-color: var(--teal); }
+.roster-filter-btn svg { flex: 0 0 auto; width: 16px; height: 16px; }
+.roster-filter-count {
+  display: inline-block;
+  padding: 0 0.4em;
+  border-radius: var(--radius-pill);
+  background: var(--teal);
+  color: var(--on-teal);
+  font-size: var(--font-size-2xs);
+}
+
+.roster-filter-dialog { width: min(360px, calc(100vw - 2.4rem)); }
+/* Full-width, stacked, not the side-by-side pill pair every other dialog
+   uses (.party-dialog-actions) — Clear filters/Show N Pokémon are equally
+   wide, easy touch targets, and read top-to-bottom as "reset, then
+   confirm" rather than competing for space on one row. */
+.roster-filter-actions {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.roster-filter-actions .ds-btn { width: 100%; }
+.roster-filter-group {
+  display: grid;
+  gap: var(--space-2);
+  border: none;
+  padding: 0;
+  margin: 0 0 var(--space-4);
+}
+.roster-filter-group legend {
+  padding: 0;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+}
+.roster-filter-group label {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-md);
+  cursor: pointer;
+}
+.roster-filter-range {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink-soft);
+}
+.roster-filter-range .ds-field { width: 0; flex: 1 1 0; }
+
+/* Pokérus/Exp. Share as .ds-item-btn toggles — same look as the "other
+   buttons" in this dialog (Clear filters/Done) and as the per-Pokémon
+   Pokérus/Exp. Share toggles on the detail page, instead of bare OS
+   checkboxes that read as a different, plainer control. */
+/* auto-fit + collapsing empty tracks: two toggles side by side when both
+   fit, one full-width when only it's visible (e.g. Pokérus gen-gated out)
+   or the row is too narrow to fit two — no separate breakpoint needed. */
+.roster-filter-toggles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+.roster-filter-toggle { justify-content: center; }
+/* Same glyph as the detail page's own Pokérus toggle (lib/icons.js's
+   POKERUS_ICON_SVG, injected by pages/roster.js) — .ds-item-icon (the
+   Exp. Share sprite's sizing) already lives in the shared design system,
+   but this wrapper is local to that shadow-DOM component, so it needs
+   its own copy here for the light-DOM filter dialog. */
+.pokerus-icon { width: 22px; height: 22px; flex: 0 0 auto; display: inline-flex; color: var(--pokerus-purple); }
+.pokerus-icon svg { width: 100%; height: 100%; }
+
 .roster {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
@@ -507,16 +613,47 @@ html[data-modal-open] body {
 .roster-card {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
   background: var(--lcd);
   border: 1px solid var(--lcd-line);
   border-radius: var(--radius-md);
   padding: var(--space-3) var(--space-4);
-  text-decoration: none;
-  color: inherit;
   transition: box-shadow var(--transition-med), transform var(--transition-fast);
 }
 .roster-card:hover { box-shadow: var(--shadow-panel); transform: translateY(-1px); }
+.roster-card--dragging { opacity: 0.6; box-shadow: var(--shadow-panel); }
+.roster-card--drop-target { outline: 2px dashed var(--teal); outline-offset: 2px; }
+
+.roster-card-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  flex: 1 1 auto;
+  text-decoration: none;
+  color: inherit;
+}
+
+/* A grip handle for manual drag reordering — only rendered when the
+   roster is unfiltered and in its default order, since dragging a card
+   in a sorted or filtered view wouldn't map onto a stable position in
+   the underlying roster. touch-action: none stops the browser's own
+   scroll gesture from fighting a touch drag. Not yet keyboard-operable
+   (see issue #9). */
+.roster-card-handle {
+  flex: 0 0 auto;
+  border: none;
+  background: transparent;
+  padding: var(--space-2);
+  margin: calc(var(--space-2) * -1);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+  color: var(--ink-soft);
+  cursor: grab;
+  touch-action: none;
+}
+.roster-card-handle:hover { color: var(--ink); }
+.roster-card--dragging .roster-card-handle { cursor: grabbing; }
 
 .roster-card-sprite {
   flex: 0 0 auto;
