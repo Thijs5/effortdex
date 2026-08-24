@@ -132,17 +132,12 @@
       <section class="settings-section">
         <h3>Storage</h3>
         <p class="hint">
-          Effortdex caches its own files (and PokéAPI lookups)
-          so it keeps working offline. "Clear cache" only wipes that
-          offline copy &mdash; it gets rebuilt fresh on the next load.
+          Effortdex caches its own files and sprite images so it keeps working offline.
         </p>
-        <p class="hint safe-data-note">
-          <strong>Your parties, roster and battle history are safe.</strong>
-          They live separately in this browser's storage and are never
-          touched by this button.
-        </p>
-        <button id="clear-cache-btn" class="ds-btn ds-btn--ghost">Clear cache</button>
-        <p id="clear-cache-status" class="status-line" aria-live="polite"></p>
+        <button id="manage-storage-btn" class="ds-btn ds-btn--outline icon-btn">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M21 12c0 1.66-4 3-9 3s-9-1.34-9-3"/><path d="M3 5v14c0 1.66 4 3 9 3s9-1.34 9-3V5"/></svg>
+          <span>Manage storage</span>
+        </button>
       </section>
 
       <section class="settings-section" id="pre-migration-backup-section" hidden>
@@ -171,6 +166,56 @@
       <a id="back-from-transfer" class="back-link" href="#/">&larr; Back</a>
       <h2>Transfer to another device</h2>
       <transfer-panel></transfer-panel>
+    </main>
+
+    <!-- "/settings/cache" — full storage management: the blanket app-shell
+         clear plus per-game/generation sprite cache control (ADR 0012) -->
+    <main id="cache-view" class="settings-view" hidden>
+      <a id="back-from-cache" class="back-link" href="#/settings">&larr; Back</a>
+      <h2>Storage</h2>
+
+      <section class="settings-section">
+        <p class="hint">
+          Effortdex caches its own files (and PokéAPI lookups, including
+          sprite images) so it keeps working offline. "Clear cache" wipes
+          all of it at once &mdash; it gets rebuilt fresh on the next load.
+        </p>
+        <p class="hint safe-data-note">
+          <strong>Your parties, roster and battle history are safe.</strong>
+          They live separately in this browser's storage and are never
+          touched by anything on this page.
+        </p>
+        <button id="clear-cache-btn" class="ds-btn ds-btn--ghost">Clear cache</button>
+        <p id="clear-cache-status" class="status-line" aria-live="polite"></p>
+      </section>
+
+      <section class="settings-section">
+        <h3>By generation</h3>
+        <p class="hint">
+          Warm up (or clear) sprites for a specific game or generation
+          instead of everything at once. Some titles share the exact same
+          sprite artwork on PokéAPI (e.g. Ruby &amp; Sapphire) — those are
+          listed as one row, since caching or clearing one always does the
+          same to the other.
+        </p>
+        <div id="sprite-cache-generations"></div>
+      </section>
+
+      <section class="settings-section">
+        <h3>Developer: disable caching</h3>
+        <p class="hint">
+          Turns off the service worker and all offline caching entirely
+          &mdash; every reload then always hits the real files on the
+          server, never a cached copy. Only useful while actively
+          developing Effortdex itself; the app stops working offline
+          while this is on, so leave it off otherwise. Takes effect
+          immediately (reloads the page).
+        </p>
+        <label class="field-label field-label--checkbox">
+          <input type="checkbox" id="disable-caching-input" />
+          <span>Disable caching</span>
+        </label>
+      </section>
     </main>
 
     <!-- "/import/<payload>" — review screen a shared transfer link opens to -->
@@ -206,6 +251,13 @@
           <game-ball id="dialog-game-cart"></game-ball>
         </div>
         <span class="field-error" id="party-base-game-error" hidden>Choose a base game &mdash; it sets this party's EV rules and default sprite style. Playing a ROM hack or fan game? Pick whichever official title it's a hack of.</span>
+      </label>
+      <label class="field-label field-label--checkbox" id="party-cache-offline-row">
+        <input type="checkbox" id="party-cache-offline-input" checked />
+        <span>
+          Cache this game's sprites for offline use
+          <span class="hint">Fetches quietly in the background while you keep using the app &mdash; you don't need to wait for it.</span>
+        </span>
       </label>
       <label class="field-label">
         Description

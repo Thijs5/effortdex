@@ -6,7 +6,7 @@
 // lives here. All domain logic lives in lib/, and each custom element
 // owns its own rendering.
 
-import { store } from './lib/services.js';
+import { store, prefetchService } from './lib/services.js';
 import { attachDesignSystem } from './lib/design-system.js';
 import { wireDialogCloseButtons } from './lib/dom.js';
 import * as router from './lib/router.js';
@@ -17,6 +17,7 @@ import * as roster from './pages/roster.js';
 import * as pokemon from './pages/pokemon.js';
 import * as settings from './pages/settings.js';
 import * as transfer from './pages/transfer.js';
+import * as spriteCache from './pages/sprite-cache.js';
 import * as importPage from './pages/import.js';
 
 // Let light-DOM markup (the party dialog) use the same .ds-field/.ds-btn
@@ -28,7 +29,7 @@ wireDialogCloseButtons();
 /* Router <-> page                                                     */
 /* ------------------------------------------------------------------ */
 
-const VIEWS = [picker.view, roster.view, pokemon.view, settings.view, transfer.view, importPage.view];
+const VIEWS = [picker.view, roster.view, pokemon.view, settings.view, transfer.view, spriteCache.view, importPage.view];
 function showView(view) {
   for (const v of VIEWS) v.hidden = v !== view;
 }
@@ -53,6 +54,12 @@ function render() {
   if (page === 'transfer') {
     showView(transfer.view);
     transfer.render(lastContentPath);
+    return;
+  }
+
+  if (page === 'cache') {
+    showView(spriteCache.view);
+    spriteCache.render();
     return;
   }
 
@@ -99,3 +106,21 @@ function render() {
 router.onRouteChange(render);
 store.addEventListener('change', render);
 render();
+
+// Warms sw.js's sprite cache ahead of need (docs/adr/0011), and resumes
+// any manual cache/generation run a previous page load got cut off
+// mid-fetch (docs/adr/0012's "resume" addendum — the queue itself lives
+// only in memory, so a refresh has no way to survive on its own) —
+// deferred until the browser is idle so neither competes with first
+// render.
+if ('requestIdleCallback' in window) {
+  requestIdleCallback(() => {
+    prefetchService.start();
+    prefetchService.resumeInterrupted();
+  });
+} else {
+  setTimeout(() => {
+    prefetchService.start();
+    prefetchService.resumeInterrupted();
+  }, 2000);
+}

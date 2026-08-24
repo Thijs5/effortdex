@@ -104,20 +104,32 @@ html[data-modal-open] body {
 .bezel h1 a:hover { text-decoration: underline; }
 .e-accent { color: var(--gold-soft); }
 
-/* Power LED — amber while running from the offline cache, green when
-   the network is reachable (app.js toggles .is-online). */
+/* Power LED — a router-style network activity indicator
+   (lib/network-activity.js sets data-status via lib/shell.js): dark/
+   unlit while offline (the base rule, and the default before JS has
+   run), blue while online and idle ("ready"), orange while a request is
+   in flight ("sending"), a brief green flash once one completes
+   ("receiving"). */
 .power-led {
   display: inline-block;
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background: var(--gold);
-  box-shadow: 0 0 6px var(--gold);
+  background: var(--led-off);
+  box-shadow: none;
   margin-right: 0.6em;
   vertical-align: 2px;
-  transition: background var(--transition-med), box-shadow var(--transition-med);
+  transition: background var(--transition-fast), box-shadow var(--transition-fast);
 }
-.power-led.is-online {
+.power-led[data-status='ready'] {
+  background: var(--led-ready);
+  box-shadow: 0 0 6px var(--led-ready);
+}
+.power-led[data-status='sending'] {
+  background: var(--led-sending);
+  box-shadow: 0 0 6px var(--led-sending);
+}
+.power-led[data-status='receiving'] {
   background: var(--led-online);
   box-shadow: 0 0 6px var(--led-online);
 }
@@ -649,6 +661,73 @@ html[data-modal-open] body {
   font-family: var(--font-mono);
 }
 
+/* ---------- sprite cache manager ("/settings/cache", pages/sprite-cache.js) ---------- */
+.sprite-cache-generation {
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--line);
+}
+.sprite-cache-generation:last-child { border-bottom: none; }
+/* The marker pseudo-element + label + status badge become flex items in
+   document order; margin-left: auto on the status pushes it to the end
+   regardless of how many items precede it, so it stays visible in the
+   collapsed row without needing to open the section. */
+.sprite-cache-generation > summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+.sprite-cache-summary-status {
+  margin-left: auto;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-2xs);
+  font-weight: 400;
+  color: var(--ink-soft);
+}
+.sprite-cache-summary-status[data-state='busy'] {
+  color: var(--led-sending);
+}
+.sprite-cache-summary-status[data-state='full'] {
+  color: var(--teal);
+}
+.sprite-cache-generation-body {
+  margin-top: var(--space-3);
+  display: grid;
+  gap: var(--space-3);
+}
+.sprite-cache-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  flex-wrap: wrap;
+}
+.sprite-cache-row-info {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+}
+.sprite-cache-row-label {
+  font-weight: 600;
+}
+.sprite-cache-row-count {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-sm);
+  color: var(--ink-soft);
+}
+.sprite-cache-row-note {
+  margin: 0;
+  font-size: var(--font-size-2xs);
+}
+.sprite-cache-row-actions {
+  display: flex;
+  gap: var(--space-2);
+  flex: 0 0 auto;
+}
+
 /* Buttons and dialog chrome are shared design-system primitives
    (.ds-btn--primary/--ghost/--danger, .ds-dialog — lib/design-system.js,
    adopted into the document by app.js); only page-specific styling for
@@ -750,6 +829,24 @@ textarea.ds-field { resize: vertical; }
   justify-content: space-between;
   gap: var(--space-3);
   margin-bottom: var(--space-3);
+}
+.field-label--checkbox {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3);
+  font-weight: 600;
+  color: var(--ink);
+}
+.field-label--checkbox input[type='checkbox'] {
+  margin-top: 3px;
+  width: 16px;
+  height: 16px;
+  accent-color: var(--teal);
+  flex: 0 0 auto;
+}
+.field-label--checkbox .hint {
+  margin: 2px 0 0;
+  font-weight: 400;
 }
 /* A fixed width, not auto, on purpose: a <select>'s auto width follows
    its own longest option text, so left to itself each of these six

@@ -2,6 +2,7 @@
 import { test, expect } from '@playwright/test';
 import { createParty } from './support/party.js';
 import { catchPokemon, rosterRow, openDetail, openMoreOptions } from './support/pokemon.js';
+import { mockPokeApi } from './support/pokeapi-mock.js';
 
 // Evolving a caught Pokémon carries its EVs, nickname, training aids and
 // history forward — only its species identity changes (lib/store.js's
@@ -9,6 +10,10 @@ import { catchPokemon, rosterRow, openDetail, openMoreOptions } from './support/
 // evolution just deletes that event and re-folds.
 
 test.describe('Evolution', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockPokeApi(page);
+  });
+
   test('evolving a caught Pokémon updates its species while keeping its EVs', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });

@@ -56,10 +56,29 @@ localStorage-backed cache with different rules (see ADR 0001).
    fetches app infrastructure (same-origin `version.json`), not
    external data, and caching it through `_cached` would defeat its
    purpose.
-6. **Caching is disabled on localhost** (`app.js` skips registration
-   and actively unregisters workers/caches) so local development always
-   hits the files on disk. Testing offline behavior locally requires a
-   LAN IP or tunnel.
+6. **Caching is ON by default everywhere, localhost included** —
+   `lib/shell.js` registers the service worker unconditionally. This is
+   a reversal of this ADR's original point 6 (caching *off* on
+   localhost, no override at all): local dev now exercises the exact
+   same offline/caching behavior a real deploy has, by default, with no
+   LAN IP or tunnel needed to see it. The tradeoff the original default
+   existed to avoid — a reload can now serve a cached copy from a few
+   edits ago instead of the file on disk — is accepted; turning caching
+   *off* is the explicit action instead, via the "Developer: disable
+   caching" toggle on the Storage page (`#/settings/cache`,
+   `pages/sprite-cache.js`), which persists a flag to `localStorage`
+   (`effortdex:dev-no-cache`) that disables service-worker registration
+   and unregisters/wipes any existing worker and caches. `lib/shell.js`
+   and the toggle read/write that one key through a small shared module,
+   `lib/dev-cache.js` — a single source of truth, not two copies of the
+   same string. (An earlier version of this also accepted a `?noCache=1`
+   query param as a second way to set the same flag, before the UI
+   toggle existed to make it discoverable; removed once the toggle
+   shipped, since it was then just a redundant second entry point to
+   the exact same mechanism.) The toggle reloads the page immediately on
+   change, since the flag is only ever consulted once, at load, to
+   decide whether to register the service worker at all — there's no
+   live register/unregister path to switch into instead.
 7. **A manual escape hatch exists**: the Settings page's "Clear cache"
    button calls the same wipe (`clearAppCache`) for anyone stuck on a
    stale shell despite the automatic paths. User data is unaffected —
@@ -70,12 +89,24 @@ localStorage-backed cache with different rules (see ADR 0001).
 - Deploys are atomic from the user's point of view: either the old
   shell (fully cached) or the new one, never a mix — the cache is
   replaced wholesale under a new name.
-- Sprites and item icons are cross-origin and *not* cached offline; the
-  UI degrades to a local fallback image (`FALLBACK_ONERROR` /
-  `FALLBACK_SPRITE`) rather than broken images. Caching the sprite CDN
-  in the worker would close that gap and is an accepted future
-  amendment — it was skipped to keep the worker's scope minimal.
+- Sprites are cross-origin and, at the time this ADR was written, were
+  not cached offline; the UI degraded to a local fallback image
+  (`FALLBACK_ONERROR` / `FALLBACK_SPRITE`) rather than broken images.
+  This gap was closed by [docs/adr/0011](0011-background-sprite-prefetch.md),
+  which adds a second, sprite-specific cache to `sw.js` — the fallback
+  image still exists and still matters for a species that was never
+  cached at all (e.g. one outside every party's generation).
 - The 15-minute poll costs one tiny same-origin request; acceptable.
 - Two update mechanisms (SW lifecycle + version probe) overlap by
   design — belt and suspenders for the installed-app case where the
   browser's own SW update heuristics can lag by days.
+- Flipping point 6's default surfaced a real problem in
+  `e2e/**/*.spec.js`: the suite was written assuming caching never
+  actually activates on localhost, and hung indefinitely once a real
+  service worker started registering under it. Fixed in
+  `playwright.config.js` by pre-seeding every test's browser context
+  with `effortdex:dev-no-cache=1` via `use.storageState` — the suite
+  tests the app, not `sw.js`/Cache Storage (ADR 0011/0012's own specs
+  already seed Cache Storage directly rather than depend on a real SW,
+  for exactly this reason), so restoring the fresh-files-only behavior
+  it was built against was the correct fix, not a suite rewrite.
