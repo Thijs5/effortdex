@@ -21,10 +21,15 @@ const RECENT_LIMIT = 5;
  * (detail: { name }) when a species is chosen.
  *
  * On narrow touch viewports, focusing the input opens a full-screen
- * sheet instead of an inline dropdown: results fill the space above the
- * input, which sticks to the top of the keyboard. A dropdown anchored
- * to the input doesn't work well there — the keyboard eats most of the
- * screen, and anchoring is fighting the viewport instead of using it.
+ * sheet instead of an inline dropdown: a header, then the input, then
+ * results filling the rest — same top-anchored layout as a native app's
+ * search (iOS Spotlight, Android search). A dropdown anchored to the
+ * input doesn't work well there — the keyboard eats most of the screen,
+ * and anchoring is fighting the viewport instead of using it. Anchoring
+ * the input to the *bottom*, next to the keyboard, was tried first, but
+ * it strands the input far from a still-loading or empty results list
+ * with a dead gap between them (and permanently so wherever no software
+ * keyboard appears — an external keyboard, a foldable, a tablet).
  *
  * `show-ev-yield` shows each result's EV yield (fetched lazily, per
  * visible row — cached, so repeat lookups anywhere are free). Set only
@@ -155,7 +160,7 @@ export class PokemonSearch extends HTMLElement {
         }
         .sheet-close:hover { color: var(--ink); }
         .wrap.sheet input.ds-field {
-          order: 2;
+          order: 1;
           flex: 0 0 auto;
           /* .ds-field's shared width: 100% is relative to the flex
              container, same as the margin below — combined they'd
@@ -165,7 +170,7 @@ export class PokemonSearch extends HTMLElement {
           margin: var(--space-2) var(--space-3);
         }
         .wrap.sheet ul.suggestions {
-          order: 1;
+          order: 2;
           position: static;
           flex: 1 1 auto;
           min-height: 0;
@@ -175,15 +180,6 @@ export class PokemonSearch extends HTMLElement {
           border: none;
           border-radius: 0;
           box-shadow: none;
-        }
-        /* An empty (not-yet-typed-into) list still needs to occupy the
-           flexible space, or nothing pushes the input down to the
-           keyboard and it ends up stranded under the header instead.
-           !important to beat the design system's [hidden] reset, which
-           is itself !important and would otherwise win regardless of
-           this rule's higher specificity. */
-        .wrap.sheet ul.suggestions[hidden] {
-          display: block !important;
         }
       </style>
       <div class="wrap">
