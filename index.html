@@ -111,24 +111,11 @@
           </p>
           <div id="roster-toolbar" class="roster-toolbar" hidden>
             <input type="search" id="roster-search" class="ds-field" placeholder="Search by name or species&hellip;" aria-label="Search roster" />
-            <details id="roster-filter" class="roster-filter ds-disclosure">
-              <summary>Filter<span id="roster-filter-count" class="roster-filter-count" hidden></span></summary>
-              <div class="roster-filter-panel">
-                <fieldset id="roster-filter-trained-group" class="roster-filter-group">
-                  <legend>Trained status</legend>
-                  <label><input type="radio" name="roster-filter-trained" value="all" checked /> All</label>
-                  <label><input type="radio" name="roster-filter-trained" value="trained" /> Fully trained</label>
-                  <label><input type="radio" name="roster-filter-trained" value="training" /> Still training</label>
-                </fieldset>
-                <label id="roster-filter-pokerus-row" class="roster-filter-check">
-                  <input type="checkbox" id="roster-filter-pokerus" /> Pok&eacute;rus active
-                </label>
-                <label class="roster-filter-check">
-                  <input type="checkbox" id="roster-filter-exp-share" /> Holding Exp. Share
-                </label>
-                <button type="button" id="roster-filter-clear" class="ds-btn ds-btn--ghost ds-btn--sm">Clear filters</button>
-              </div>
-            </details>
+            <button type="button" id="roster-filter-btn" class="roster-filter-btn" aria-haspopup="dialog">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+              <span>Filter</span>
+              <span id="roster-filter-count" class="roster-filter-count" hidden></span>
+            </button>
             <select id="roster-sort" class="ds-field" aria-label="Sort roster">
               <option value="catch">Custom order</option>
               <option value="name">Name (A&ndash;Z)</option>
@@ -416,6 +403,32 @@
         <button type="submit" id="catch-dialog-submit-btn" class="ds-btn ds-btn--primary" disabled>Catch!</button>
       </div>
     </form>
+  </dialog>
+
+  <dialog id="roster-filter-dialog" class="roster-filter-dialog ds-dialog">
+    <header class="ds-dialog-header">
+      <h2>Filter roster</h2>
+      <button type="button" id="roster-filter-dialog-close" class="ds-dialog-close" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </header>
+    <fieldset id="roster-filter-trained-group" class="roster-filter-group">
+      <legend>Trained status</legend>
+      <label><input type="radio" name="roster-filter-trained" value="all" checked /> All</label>
+      <label><input type="radio" name="roster-filter-trained" value="trained" /> Fully trained</label>
+      <label><input type="radio" name="roster-filter-trained" value="training" /> Still training</label>
+    </fieldset>
+    <label id="roster-filter-pokerus-row" class="roster-filter-check">
+      <input type="checkbox" id="roster-filter-pokerus" /> Pok&eacute;rus active
+    </label>
+    <label class="roster-filter-check">
+      <input type="checkbox" id="roster-filter-exp-share" /> Holding Exp. Share
+    </label>
+    <div class="party-dialog-actions">
+      <span class="spacer"></span>
+      <button type="button" id="roster-filter-clear" class="ds-btn ds-btn--ghost">Clear filters</button>
+      <button type="button" id="roster-filter-done" class="ds-btn ds-btn--primary">Done</button>
+    </div>
   </dialog>
 
   <script type="module" src="app.js"></script>

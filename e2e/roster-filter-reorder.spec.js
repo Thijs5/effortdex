@@ -19,7 +19,7 @@ test.describe('Roster filters, manual reorder, and URL state', () => {
     await catchPokemon(page, 'Bulbasaur');
     await catchPokemon(page, 'Charmander');
 
-    await page.locator('#roster-filter summary').click();
+    await page.getByRole('button', { name: 'Filter' }).click();
     await page.getByLabel('Still training').check();
 
     await expect(rosterRow(page, 'Bulbasaur')).toBeVisible();
@@ -31,7 +31,7 @@ test.describe('Roster filters, manual reorder, and URL state', () => {
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
     await catchPokemon(page, 'Bulbasaur');
 
-    await page.locator('#roster-filter summary').click();
+    await page.getByRole('button', { name: 'Filter' }).click();
     await page.getByLabel('Pokérus active').check();
     await page.getByRole('button', { name: 'Clear filters' }).click();
 

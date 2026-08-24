@@ -48,7 +48,9 @@ const rosterToolbar = document.getElementById('roster-toolbar');
 const rosterSearchInput = document.getElementById('roster-search');
 const rosterSortSelect = document.getElementById('roster-sort');
 const rosterNoResults = document.getElementById('roster-no-results');
-const rosterFilter = document.getElementById('roster-filter');
+const rosterFilterBtn = document.getElementById('roster-filter-btn');
+const rosterFilterDialog = document.getElementById('roster-filter-dialog');
+const rosterFilterDialogClose = document.getElementById('roster-filter-dialog-close');
 const rosterFilterCount = document.getElementById('roster-filter-count');
 const rosterFilterTrainedGroup = document.getElementById('roster-filter-trained-group');
 const rosterFilterTrainedRadios = [...document.getElementsByName('roster-filter-trained')];
@@ -56,6 +58,7 @@ const rosterFilterPokerusRow = document.getElementById('roster-filter-pokerus-ro
 const rosterFilterPokerus = document.getElementById('roster-filter-pokerus');
 const rosterFilterExpShare = document.getElementById('roster-filter-exp-share');
 const rosterFilterClear = document.getElementById('roster-filter-clear');
+const rosterFilterDone = document.getElementById('roster-filter-done');
 
 const catchDialog = document.getElementById('catch-dialog');
 const catchForm = document.getElementById('catch-form');
@@ -235,7 +238,7 @@ function writeRosterStateToQuery() {
   if (filters.trained !== 'all') params.set('trained', filters.trained);
   if (filters.pokerus) params.set('pokerus', '1');
   if (filters.expShare) params.set('expShare', '1');
-  if (rosterFilter.open) params.set('filterOpen', '1');
+  if (rosterFilterDialog.open) params.set('filterOpen', '1');
   const qs = params.toString();
   const url = `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`;
   // replaceState, not pushState: every keystroke/toggle shouldn't grow
@@ -472,9 +475,15 @@ rosterFilterClear.addEventListener('click', () => {
   resetRosterFilters();
   renderRoster(store.activeParty);
 });
-// <details>'s own open/closed state isn't controlled by any of the
-// listeners above, so it needs its own hook to stay synced to the URL.
-rosterFilter.addEventListener('toggle', () => writeRosterStateToQuery());
+rosterFilterBtn.addEventListener('click', () => rosterFilterDialog.showModal());
+rosterFilterDialogClose.addEventListener('click', () => rosterFilterDialog.close());
+rosterFilterDone.addEventListener('click', () => rosterFilterDialog.close());
+// One 'close' listener covers every way the dialog can close — Done,
+// the X, Escape, and a backdrop click — same reasoning as catchDialog's
+// own 'close' listener below. The dialog's own open/closed state isn't
+// touched by any of the listeners above, so it needs this hook to stay
+// synced to the URL.
+rosterFilterDialog.addEventListener('close', () => writeRosterStateToQuery());
 
 /** @param {ReturnType<typeof store.getPartyBySlug>} party */
 export function render(party) {
@@ -492,12 +501,12 @@ export function render(party) {
       for (const radio of rosterFilterTrainedRadios) radio.checked = radio.value === restored.trained;
       rosterFilterPokerus.checked = restored.pokerus;
       rosterFilterExpShare.checked = restored.expShare;
-      rosterFilter.open = restored.filterOpen;
+      if (restored.filterOpen) rosterFilterDialog.showModal();
     } else {
       rosterSearchInput.value = '';
       rosterSortSelect.value = 'catch';
       resetRosterFilters();
-      rosterFilter.open = false;
+      rosterFilterDialog.close();
     }
   }
   activePartyName.textContent = party.name;

@@ -508,52 +508,44 @@ html[data-modal-open] body {
   .roster-toolbar #roster-sort { width: 100%; }
 }
 
-.roster-filter {
-  position: relative;
+/* Same box model as .ds-field (padding/border/font-size) so this button
+   matches the search input and sort <select> exactly, height included —
+   .ds-field itself doesn't apply here since a <button>'s content wraps
+   an icon + label rather than being an editable value. */
+.roster-filter-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
   flex: 0 0 auto;
-}
-.roster-filter > summary {
-  list-style: none;
-  cursor: pointer;
   padding: var(--space-3) var(--space-4);
   border: 1px solid var(--lcd-line);
   border-radius: var(--radius-sm);
   background: var(--surface);
+  font-family: var(--font-mono);
   font-size: var(--font-size-input);
   color: var(--ink);
+  cursor: pointer;
   white-space: nowrap;
 }
-.roster-filter > summary::-webkit-details-marker { display: none; }
-.roster-filter[open] > summary { border-color: var(--teal); }
+.roster-filter-btn:hover { border-color: var(--teal); }
+.roster-filter-btn svg { flex: 0 0 auto; width: 16px; height: 16px; }
 .roster-filter-count {
   display: inline-block;
-  margin-left: var(--space-1);
   padding: 0 0.4em;
   border-radius: var(--radius-pill);
   background: var(--teal);
   color: var(--on-teal);
   font-size: var(--font-size-2xs);
 }
-.roster-filter-panel {
-  position: absolute;
-  z-index: 10;
-  top: calc(100% + var(--space-1));
-  right: 0;
-  min-width: 220px;
-  display: grid;
-  gap: var(--space-3);
-  padding: var(--space-4);
-  background: var(--surface);
-  border: 1px solid var(--lcd-line);
-  border-radius: var(--radius-sm);
-  box-shadow: var(--shadow-suggestions);
-}
+
+.roster-filter-dialog { width: min(360px, calc(100vw - 2.4rem)); }
+.roster-filter-dialog .party-dialog-actions { margin-top: var(--space-2); }
 .roster-filter-group {
   display: grid;
   gap: var(--space-2);
   border: none;
   padding: 0;
-  margin: 0;
+  margin: 0 0 var(--space-4);
 }
 .roster-filter-group legend {
   padding: 0;
@@ -571,10 +563,7 @@ html[data-modal-open] body {
   font-size: var(--font-size-md);
   cursor: pointer;
 }
-
-@media (max-width: 520px) {
-  .roster-filter-panel { left: 0; right: 0; min-width: 0; }
-}
+.roster-filter-check { margin-bottom: var(--space-3); }
 
 .roster {
   display: grid;
