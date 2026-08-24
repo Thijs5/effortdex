@@ -109,6 +109,18 @@
           <p id="empty-state" class="empty-state">
             No Pok&eacute;mon caught yet &mdash; catch one on the left to start tracking EVs.
           </p>
+          <div id="roster-toolbar" class="roster-toolbar" hidden>
+            <input type="search" id="roster-search" class="ds-field" placeholder="Search by name or species&hellip;" aria-label="Search roster" />
+            <select id="roster-sort" class="ds-field" aria-label="Sort roster">
+              <option value="catch">Catch order</option>
+              <option value="name">Name (A&ndash;Z)</option>
+              <option value="level">Level (high to low)</option>
+              <option value="evs">EVs trained (high to low)</option>
+            </select>
+          </div>
+          <p id="roster-no-results" class="empty-state" hidden>
+            No Pok&eacute;mon match &ldquo;<span id="roster-no-results-query"></span>&rdquo;.
+          </p>
           <div id="roster" class="roster"></div>
         </section>
       </div>

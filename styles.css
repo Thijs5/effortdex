@@ -494,6 +494,19 @@ html[data-modal-open] body {
   text-align: center;
 }
 
+.roster-toolbar {
+  display: flex;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.roster-toolbar #roster-search { flex: 1 1 auto; }
+.roster-toolbar #roster-sort { flex: 0 0 auto; width: auto; }
+
+@media (max-width: 520px) {
+  .roster-toolbar { flex-direction: column; }
+  .roster-toolbar #roster-sort { width: 100%; }
+}
+
 .roster {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));

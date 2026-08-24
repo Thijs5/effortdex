@@ -44,6 +44,11 @@ const catchSearch = document.getElementById('catch-search');
 const catchStatus = document.getElementById('catch-status');
 const roster = document.getElementById('roster');
 const emptyState = document.getElementById('empty-state');
+const rosterToolbar = document.getElementById('roster-toolbar');
+const rosterSearchInput = document.getElementById('roster-search');
+const rosterSortSelect = document.getElementById('roster-sort');
+const rosterNoResults = document.getElementById('roster-no-results');
+const rosterNoResultsQuery = document.getElementById('roster-no-results-query');
 
 const catchDialog = document.getElementById('catch-dialog');
 const catchForm = document.getElementById('catch-form');
@@ -149,9 +154,37 @@ catchForm.addEventListener('submit', (e) => {
 /* Roster rows — link to each Pokémon's own detail page                */
 /* ------------------------------------------------------------------ */
 
+// Keyed by <select id="roster-sort">'s option values. 'catch' is a no-op
+// since `party.pokemon` is already append-ordered (see render()'s
+// catchSearch.recent comment) — that's the roster's long-standing
+// default order, so leave it alone rather than re-sort it.
+const ROSTER_SORTS = {
+  catch: (entries) => entries,
+  name: (entries) =>
+    [...entries].sort((a, b) =>
+      (a.nickname || a.speciesName).localeCompare(b.nickname || b.speciesName)
+    ),
+  level: (entries) => [...entries].sort((a, b) => b.level - a.level),
+  evs: (entries) => [...entries].sort((a, b) => totalEvs(b.evs) - totalEvs(a.evs)),
+};
+
+function matchesRosterQuery(entry, query) {
+  if (!query) return true;
+  return (
+    (entry.nickname && entry.nickname.toLowerCase().includes(query)) ||
+    entry.speciesName.toLowerCase().includes(query)
+  );
+}
+
 function renderRoster(party) {
-  const entries = party.pokemon;
-  emptyState.hidden = entries.length > 0;
+  const query = rosterSearchInput.value.trim().toLowerCase();
+  const sorted = ROSTER_SORTS[rosterSortSelect.value](party.pokemon);
+  const entries = sorted.filter((entry) => matchesRosterQuery(entry, query));
+
+  rosterToolbar.hidden = party.pokemon.length === 0;
+  emptyState.hidden = party.pokemon.length > 0;
+  rosterNoResults.hidden = party.pokemon.length === 0 || entries.length > 0;
+  if (!rosterNoResults.hidden) rosterNoResultsQuery.textContent = rosterSearchInput.value.trim();
   roster.innerHTML = '';
   const natureAvailable = store.natureAvailable();
   const spriteGame = store.spriteBaseGame();
@@ -244,8 +277,21 @@ function renderLegend() {
   trainingLegend.innerHTML = items.map((i) => `<li>${i}</li>`).join('');
 }
 
+// The search/sort controls are static markup, not rebuilt by renderRoster,
+// so their value survives a same-party re-render (e.g. catching another
+// Pokémon while filtered) — only reset them on an actual party switch.
+let currentPartySlug = null;
+
+rosterSearchInput.addEventListener('input', () => renderRoster(store.activeParty));
+rosterSortSelect.addEventListener('change', () => renderRoster(store.activeParty));
+
 /** @param {ReturnType<typeof store.getPartyBySlug>} party */
 export function render(party) {
+  if (party.slug !== currentPartySlug) {
+    currentPartySlug = party.slug;
+    rosterSearchInput.value = '';
+    rosterSortSelect.value = 'catch';
+  }
   activePartyName.textContent = party.name;
   activePartyGame.hidden = !party.baseGame;
   activePartyGameCart.name = party.baseGame;
