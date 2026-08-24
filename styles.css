@@ -572,8 +572,12 @@ html[data-modal-open] body {
    buttons" in this dialog (Clear filters/Done) and as the per-Pokémon
    Pokérus/Exp. Share toggles on the detail page, instead of bare OS
    checkboxes that read as a different, plainer control. */
+/* auto-fit + collapsing empty tracks: two toggles side by side when both
+   fit, one full-width when only it's visible (e.g. Pokérus gen-gated out)
+   or the row is too narrow to fit two — no separate breakpoint needed. */
 .roster-filter-toggles {
   display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: var(--space-2);
   margin-bottom: var(--space-4);
 }
