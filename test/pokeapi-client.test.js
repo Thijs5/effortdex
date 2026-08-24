@@ -2,7 +2,7 @@ import './support/localstorage-polyfill.js';
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { PokeApiClient, versionedSpriteUrl } from '../lib/pokeapi-client.js';
+import { PokeApiClient, versionedSpriteUrl, modernSpriteUrl } from '../lib/pokeapi-client.js';
 
 // A tiny programmable fetch: routes by substring match on the URL, counts
 // calls, and can be told to fail. Exercises ADR 0001's cache guarantees
@@ -121,6 +121,42 @@ test('getAllSpecies derives ids and sprite URLs from the list URLs', async () =>
   assert.equal(species[1].sprite, null);
 });
 
+test('getGenerationSpecies derives ids from the listing URLs and caches the result', async () => {
+  routes.push({
+    match: '/generation/1',
+    handler: () =>
+      respond({
+        pokemon_species: [
+          { name: 'bulbasaur', url: 'https://pokeapi.co/api/v2/pokemon-species/1/' },
+          { name: 'weird', url: 'https://pokeapi.co/api/v2/pokemon-species/x' }, // unparseable id
+        ],
+      }),
+  });
+  const client = new PokeApiClient();
+  const species = await client.getGenerationSpecies(1);
+  assert.deepEqual(species, [
+    { name: 'bulbasaur', id: 1 },
+    { name: 'weird', id: null },
+  ]);
+
+  await client.getGenerationSpecies(1);
+  assert.equal(fetchCalls.length, 1); // second call hit the cache, not the network
+});
+
+test('getGenerationSpecies rejects on a non-ok response and does not cache the failure', async () => {
+  let fail = true;
+  routes.push({
+    match: '/generation/2',
+    handler: () => (fail ? { ok: false, json: async () => ({}) } : respond({ pokemon_species: [] })),
+  });
+  const client = new PokeApiClient();
+  await assert.rejects(() => client.getGenerationSpecies(2), /generation 2/);
+
+  fail = false;
+  await client.getGenerationSpecies(2); // retries instead of replaying the failure
+  assert.equal(fetchCalls.length, 2);
+});
+
 // An Eevee-style branching family: root -> (vaporeon | jolteon), with
 // jolteon further evolving in this fiction to check depth past a branch.
 const CHAIN = {
@@ -189,4 +225,9 @@ test('versionedSpriteUrl returns null for a title with no distinct sprite, or a 
   assert.equal(versionedSpriteUrl('Sword', 1), null); // 3D-only title, never got a sprite rip
   assert.equal(versionedSpriteUrl('', 1), null); // no base game / override set
   assert.equal(versionedSpriteUrl('Emerald', null), null);
+});
+
+test('modernSpriteUrl builds the default sprite URL from an id, or null without one', () => {
+  assert.equal(modernSpriteUrl(25), 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/25.png');
+  assert.equal(modernSpriteUrl(null), null);
 });

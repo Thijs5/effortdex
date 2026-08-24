@@ -2,6 +2,7 @@
 import { test, expect } from '@playwright/test';
 import { createParty } from './support/party.js';
 import { catchPokemon, openDetail, openMoreOptions, logBattle } from './support/pokemon.js';
+import { mockPokeApi } from './support/pokeapi-mock.js';
 
 // Pokérus (Gen II+) doubles a Pokémon's own battle EVs. Exp. Share (Gen I+
 // in this app's model) lets a Pokémon earn EVs passively whenever any other
@@ -9,6 +10,10 @@ import { catchPokemon, openDetail, openMoreOptions, logBattle } from './support/
 // Both toggles live in a caught Pokémon's "More options" dialog.
 
 test.describe('Pokérus and Exp. Share', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockPokeApi(page);
+  });
+
   test('Pokérus doubles the EVs a direct battle earns', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });

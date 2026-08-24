@@ -33,29 +33,16 @@ test.describe('Settings', () => {
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   });
 
-  test('the Settings page shows the app version and a Clear cache control', async ({ page }) => {
+  test('the Settings page shows the app version and a link to storage management', async ({ page }) => {
     await page.goto('/');
     await page.getByRole('button', { name: 'Menu' }).click();
     await page.getByRole('menuitem', { name: 'Settings' }).click();
 
     await expect(page.locator('#settings-version')).toHaveText(/^v\d+\.\d+\.\d+$/);
-    await expect(page.getByRole('button', { name: 'Clear cache' })).toBeVisible();
-  });
-
-  test('the Clear cache button shows how much cached data it will delete', async ({ page }) => {
-    await page.goto('/');
-    // The service worker (and its Cache Storage population) is deliberately
-    // disabled on localhost (lib/shell.js), so seed a cache entry by hand
-    // to exercise the size label without depending on that.
-    await page.evaluate(async () => {
-      const cache = await caches.open('e2e-synthetic-cache');
-      await cache.put('/synthetic-cache-entry', new Response(new Uint8Array(2048)));
-    });
-
-    await page.getByRole('button', { name: 'Menu' }).click();
-    await page.getByRole('menuitem', { name: 'Settings' }).click();
-
-    await expect(page.getByRole('button', { name: 'Clear cache (2.0 KB)' })).toBeVisible();
+    // The actual "Clear cache" control lives on /settings/cache now
+    // (e2e/sprite-cache.spec.js) — Settings only links there.
+    await expect(page.getByRole('button', { name: 'Manage storage' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Clear cache' })).not.toBeAttached();
   });
 
   test('Settings is reachable without any party existing yet', async ({ page }) => {

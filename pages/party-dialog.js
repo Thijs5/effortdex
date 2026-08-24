@@ -3,8 +3,9 @@
 // and the roster page ("Edit party"), so it's its own module rather than
 // living in either.
 
-import { store } from '../lib/services.js';
+import { store, prefetchService } from '../lib/services.js';
 import * as router from '../lib/router.js';
+import { isCachingDisabled } from '../lib/dev-cache.js';
 import '../components/game-ball.js';
 import '../components/game-version-picker.js';
 
@@ -19,6 +20,8 @@ partyBaseGame.addEventListener('version-change', (e) => {
   dialogGameCart.name = e.detail.value.trim();
   if (e.detail.value.trim()) partyBaseGameError.hidden = true;
 });
+const partyCacheOfflineRow = document.getElementById('party-cache-offline-row');
+const partyCacheOfflineInput = /** @type {HTMLInputElement} */ (document.getElementById('party-cache-offline-input'));
 const partyDescriptionInput = document.getElementById('party-description-input');
 const partyAdvancedRules = document.getElementById('party-advanced-rules');
 const partySubmitBtn = document.getElementById('party-submit-btn');
@@ -78,6 +81,15 @@ export function openCreateDialog() {
   dialogGameCart.name = '';
   partyDescriptionInput.value = '';
   writeOverridesToDialog(null);
+  // Only offered at creation, and only when caching can actually do
+  // something — lib/prefetch-service.js refuses to fetch anything while
+  // caching is disabled (see lib/dev-cache.js), so a checkbox that can
+  // never have an effect would just be confusing. Checked by default
+  // otherwise (offline-readiness is opt-out, not opt-in), reset every
+  // time so an earlier uncheck doesn't silently carry over to the next
+  // party.
+  partyCacheOfflineRow.hidden = isCachingDisabled();
+  partyCacheOfflineInput.checked = true;
   partyDialog.showModal();
   partyNameInput.focus();
 }
@@ -92,6 +104,10 @@ export function openEditDialog(party) {
   dialogGameCart.name = party.baseGame;
   partyDescriptionInput.value = party.description;
   writeOverridesToDialog(party.overrides);
+  // Editing doesn't re-trigger a background fetch — the sprite cache
+  // manager ("/settings/cache") is the tool for warming an existing
+  // party's game by hand, not a checkbox on an unrelated edit form.
+  partyCacheOfflineRow.hidden = true;
   partyDialog.showModal();
   partyNameInput.focus();
 }
@@ -120,6 +136,12 @@ partyForm.addEventListener('submit', (e) => {
 
   if (dialogEditingId === null) {
     const party = store.createParty(name, description, baseGame, overrides);
+    // Deliberately not awaited: this runs in the background (through
+    // lib/prefetch-service.js's shared, throttled queue — ADR 0012) while
+    // the user is immediately dropped onto the new roster and can keep
+    // using the app. Unchecking the box just means "don't bother", not
+    // "block until this finishes".
+    if (partyCacheOfflineInput.checked) prefetchService.prefetchGame(baseGame);
     partyDialog.close();
     router.navigateToParty(party.slug);
   } else {

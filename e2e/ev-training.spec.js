@@ -2,6 +2,7 @@
 import { test, expect } from '@playwright/test';
 import { createParty } from './support/party.js';
 import { catchPokemon, openDetail, openMoreOptions, logBattle } from './support/pokemon.js';
+import { mockPokeApi } from './support/pokeapi-mock.js';
 
 // EV training mechanics — how the six per-stat values fill up, per
 // lib/store.js: battling (logBattle), vitamins (100-EV cutoff on Gen
@@ -14,6 +15,10 @@ import { catchPokemon, openDetail, openMoreOptions, logBattle } from './support/
 // e2e/stat-experience.spec.js.
 
 test.describe('EV training', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockPokeApi(page);
+  });
+
   test('logging a battle applies the opponent\'s EV yield', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
