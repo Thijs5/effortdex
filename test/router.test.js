@@ -45,6 +45,21 @@ test('currentRoute treats the reserved transfer slug as the transfer page', () =
   assert.deepEqual(router.currentRoute(), { page: 'transfer', partySlug: null, pokemonUid: null, payload: null });
 });
 
+test('currentRoute treats "settings/cache" as the sprite cache manager page, nested under settings', () => {
+  window.location.hash = '#/settings/cache';
+  assert.deepEqual(router.currentRoute(), { page: 'cache', partySlug: null, pokemonUid: null, payload: null });
+});
+
+test('currentRoute still treats a bare "settings" as the settings page, not the cache page', () => {
+  window.location.hash = '#/settings';
+  assert.equal(router.currentRoute().page, 'settings');
+});
+
+test('currentRoute treats a bare "cache" as an ordinary (unknown) party slug, not the cache page — only "settings/cache" is special', () => {
+  window.location.hash = '#/cache';
+  assert.deepEqual(router.currentRoute(), { page: null, partySlug: 'cache', pokemonUid: null, payload: null });
+});
+
 test('currentRoute treats the reserved import slug as the import page, with its payload', () => {
   window.location.hash = '#/import/abc123';
   assert.deepEqual(router.currentRoute(), { page: 'import', partySlug: null, pokemonUid: null, payload: 'abc123' });
@@ -59,6 +74,7 @@ test('path builders produce the hashes currentRoute parses back', () => {
   assert.equal(router.pokemonPath('emerald-run', 'abc'), '#/emerald-run/abc');
   assert.equal(router.settingsPath(), '#/settings');
   assert.equal(router.transferPath(), '#/transfer');
+  assert.equal(router.cachePath(), '#/settings/cache');
   assert.equal(router.importPath('abc123'), '#/import/abc123');
 });
 
@@ -69,6 +85,8 @@ test('navigate helpers set the hash', () => {
   assert.equal(window.location.hash, '#/settings');
   router.navigateToTransfer();
   assert.equal(window.location.hash, '#/transfer');
+  router.navigateToCache();
+  assert.equal(window.location.hash, '#/settings/cache');
   router.navigateToImport();
   assert.equal(window.location.hash, '#/import');
   router.navigateToPath(router.pokemonPath('emerald-run', 'abc'));

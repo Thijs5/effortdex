@@ -15,6 +15,18 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:4173',
     trace: 'on-first-retry',
+    // Caching is ON by default even on localhost now (docs/adr/0004) —
+    // this suite tests the *app*, not sw.js/Cache Storage, and was never
+    // built to run against a real, persisting service worker (individual
+    // specs that specifically DO want Cache Storage behavior — ADR
+    // 0012's `e2e/sprite-cache.spec.js` — seed it directly instead of
+    // relying on a real SW anyway). Pre-seeding this flag opts every
+    // test's browser context out, restoring the fresh-files-only
+    // behavior the suite has always assumed.
+    storageState: {
+      cookies: [],
+      origins: [{ origin: 'http://localhost:4173', localStorage: [{ name: 'effortdex:dev-no-cache', value: '1' }] }],
+    },
   },
   webServer: {
     command: 'npx serve . -l 4173',

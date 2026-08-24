@@ -2,6 +2,7 @@
 import { test, expect } from '@playwright/test';
 import { createParty } from './support/party.js';
 import { catchPokemon, rosterRow, openDetail, openMoreOptions } from './support/pokemon.js';
+import { mockPokeApi } from './support/pokeapi-mock.js';
 
 // Catching adds a Pokémon to the active party's roster. The level is set at
 // catch time (not defaulted and edited later) since that's genuinely when a
@@ -9,6 +10,10 @@ import { catchPokemon, rosterRow, openDetail, openMoreOptions } from './support/
 // didn't exist before then (lib/store.js's natureAvailable()).
 
 test.describe('Catching', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockPokeApi(page);
+  });
+
   test('catching a species adds it to the roster with the chosen level', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });

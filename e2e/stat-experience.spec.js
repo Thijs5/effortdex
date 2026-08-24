@@ -2,6 +2,7 @@
 import { test, expect } from '@playwright/test';
 import { createParty } from './support/party.js';
 import { catchPokemon, openDetail, openMoreOptions, logBattle } from './support/pokemon.js';
+import { mockPokeApi } from './support/pokeapi-mock.js';
 
 // Generation I/II's Stat Experience system (lib/store.js's
 // usesStatExpSystem/specialStatMerged/statCap/totalCap) — a structurally
@@ -13,6 +14,9 @@ import { catchPokemon, openDetail, openMoreOptions, logBattle } from './support/
 // it's a different era's model, not a variant of the Gen III+ one.
 
 test.describe('Gen I/II Stat Experience', () => {
+  test.beforeEach(async ({ page }) => {
+    await mockPokeApi(page);
+  });
   test('logging a battle adds the opponent\'s own base stat, not a fixed EV yield', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Red run', baseGame: 'Red' });

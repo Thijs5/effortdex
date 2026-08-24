@@ -1,6 +1,6 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
-import { createParty } from './support/party.js';
+import { createParty, pickBaseGame } from './support/party.js';
 
 // Parties are the top-level grouping (one per save file/playthrough) that
 // everything else — roster, EV mechanics, base-game rules — hangs off of.
@@ -77,5 +77,30 @@ test.describe('Party management', () => {
     await page.getByRole('button', { name: /Delete/ }).click();
 
     await expect(page.getByText('No parties yet')).toBeVisible();
+  });
+
+  // "Cache this game's sprites for offline use" (checked by default) —
+  // see docs/adr/0012's addendum. This whole suite runs with caching
+  // explicitly disabled (playwright.config.js), under which
+  // lib/prefetch-service.js refuses to fetch anything at all — so the
+  // checkbox itself is hidden rather than offered as a control that
+  // could never have an effect (pages/party-dialog.js). That's what
+  // this test actually verifies; the checkbox's live fetch-triggering
+  // behavior when caching *is* on is covered at the unit level
+  // (test/prefetch-service.test.js) with real dependency injection,
+  // not here — a real service worker is unreliable to exercise in this
+  // e2e environment (see docs/adr/0012 and e2e/sprite-cache.spec.js's
+  // own note on the same issue).
+  test('the offline-cache checkbox isn\'t offered while caching is disabled', async ({ page }) => {
+    await page.goto('/');
+    await page.getByRole('button', { name: '+ New party' }).click();
+    await page.getByPlaceholder('e.g. Emerald Nuzlocke').fill('Red Run');
+    await pickBaseGame(page, 'Red');
+
+    await expect(page.getByRole('checkbox', { name: /Cache this game's sprites/ })).toBeHidden();
+
+    // Creating the party still works fine with the row absent.
+    await page.getByRole('button', { name: 'Create party' }).click();
+    await expect(page.getByRole('heading', { name: 'Catch a Pokémon' })).toBeVisible();
   });
 });

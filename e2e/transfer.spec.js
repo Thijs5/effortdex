@@ -2,6 +2,7 @@
 import { test, expect } from '@playwright/test';
 import { createParty } from './support/party.js';
 import { catchPokemon, rosterRow } from './support/pokemon.js';
+import { mockPokeApi } from './support/pokeapi-mock.js';
 
 // Device-to-device transfer: exports every party as a link encoding a
 // snapshot of local state (lib/transfer.js), which another browser can open
@@ -12,6 +13,10 @@ import { catchPokemon, rosterRow } from './support/pokemon.js';
 
 test.describe('Transfer', () => {
   test('a transfer link opens on a second device and imports the party and its Pokémon', async ({ page, browser }) => {
+    // The import flow itself (below, on `otherPage`) makes no PokéAPI
+    // calls — only the first device's catch does — so only this page
+    // needs mocking.
+    await mockPokeApi(page);
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
     await catchPokemon(page, 'Bulbasaur', { level: 12 });
