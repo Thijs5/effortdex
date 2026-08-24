@@ -30,6 +30,9 @@
   --gold: #e9ae1e;
   --gold-soft: #f4dc96;
   --led-online: #52c15e;
+  --led-ready: #3d7bf5;
+  --led-sending: #e9821e;
+  --led-off: rgba(0, 0, 0, 0.3);
   --badge-ink: #7a5800;
   --teal: #2b6a5c;
   --teal-strong: #1f5346;
@@ -106,6 +109,9 @@
     --gold: #f0b731;
     --gold-soft: #453711;
     --led-online: #63d96f;
+    --led-ready: #6a9bff;
+    --led-sending: #f5a23d;
+    --led-off: rgba(0, 0, 0, 0.35);
     --badge-ink: #f0cd76;
     --teal: #6fbfa8;
     --teal-strong: #8fd4bf;
@@ -148,6 +154,9 @@
   --gold: #f0b731;
   --gold-soft: #453711;
   --led-online: #63d96f;
+  --led-ready: #6a9bff;
+  --led-sending: #f5a23d;
+  --led-off: rgba(0, 0, 0, 0.35);
   --badge-ink: #f0cd76;
   --teal: #6fbfa8;
   --teal-strong: #8fd4bf;
