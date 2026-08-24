@@ -103,6 +103,18 @@ test.describe('Roster filters, manual reorder, and URL state', () => {
     await expect(rosterRow(page, 'Bulbasaur')).toBeHidden();
   });
 
+  test('opening the filter dialog alone is reflected in the URL, and survives a reload', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
+    await catchPokemon(page, 'Bulbasaur');
+
+    await page.getByRole('button', { name: 'Filter' }).click();
+    await expect(page).toHaveURL(/[?&]filterOpen=1/);
+
+    await page.reload();
+    await expect(page.locator('#roster-filter-dialog')).toBeVisible();
+  });
+
   test('default state (no search/filters) keeps a bare party URL', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });

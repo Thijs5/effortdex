@@ -497,7 +497,13 @@ rosterFilterClear.addEventListener('click', () => {
   resetRosterFilters();
   renderRoster(store.activeParty);
 });
-rosterFilterBtn.addEventListener('click', () => rosterFilterDialog.showModal());
+rosterFilterBtn.addEventListener('click', () => {
+  rosterFilterDialog.showModal();
+  // Opening alone doesn't trigger renderRoster (nothing filterable has
+  // changed yet) — without this, filterOpen only reached the URL once
+  // something inside the dialog did.
+  writeRosterStateToQuery();
+});
 rosterFilterDialogClose.addEventListener('click', () => rosterFilterDialog.close());
 rosterFilterDone.addEventListener('click', () => rosterFilterDialog.close());
 // One 'close' listener covers every way the dialog can close — Done,
