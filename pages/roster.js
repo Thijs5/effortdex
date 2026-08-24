@@ -21,6 +21,7 @@ import {
   NATURES,
 } from '../lib/constants.js';
 import { titleCase, totalEvs, natureOptionsHtml, escapeHtml } from '../lib/utils.js';
+import { POKERUS_ICON_SVG } from '../lib/icons.js';
 import { api, store } from '../lib/services.js';
 import { versionedSpriteUrl } from '../lib/pokeapi-client.js';
 import { wireSpriteFallback } from '../lib/sprite-fallback.js';
@@ -54,11 +55,15 @@ const rosterFilterDialogClose = document.getElementById('roster-filter-dialog-cl
 const rosterFilterCount = document.getElementById('roster-filter-count');
 const rosterFilterTrainedGroup = document.getElementById('roster-filter-trained-group');
 const rosterFilterTrainedRadios = [...document.getElementsByName('roster-filter-trained')];
-const rosterFilterPokerusRow = document.getElementById('roster-filter-pokerus-row');
 const rosterFilterPokerus = document.getElementById('roster-filter-pokerus');
 const rosterFilterExpShare = document.getElementById('roster-filter-exp-share');
 const rosterFilterClear = document.getElementById('roster-filter-clear');
 const rosterFilterDone = document.getElementById('roster-filter-done');
+
+// Populated once — same icons the detail page's own Pokérus/Exp. Share
+// toggles use, so the filter reads as "the same thing" wherever it shows up.
+document.getElementById('roster-filter-pokerus-icon').innerHTML = POKERUS_ICON_SVG;
+/** @type {HTMLImageElement} */ (document.getElementById('roster-filter-exp-share-icon')).src = EXP_SHARE_SPRITE;
 
 const catchDialog = document.getElementById('catch-dialog');
 const catchForm = document.getElementById('catch-form');
@@ -187,14 +192,25 @@ function matchesRosterQuery(entry, query) {
   );
 }
 
+// Pokérus/Exp. Share are .ds-item-btn toggles, not checkboxes — same
+// pressed-state convention as the detail page's own Pokérus/Exp. Share
+// toggles (components/caught-pokemon-detail.js).
+function isToggleActive(btn) {
+  return btn.getAttribute('aria-pressed') === 'true';
+}
+function setToggleActive(btn, active) {
+  btn.setAttribute('aria-pressed', String(active));
+  btn.classList.toggle('ds-item-btn--active', active);
+}
+
 /** Reads the filter panel's controls into a plain object — called fresh
  * each render rather than cached, since the controls are the source of
  * truth (same reasoning as reading rosterSearchInput.value directly). */
 function readRosterFilters() {
   return {
     trained: rosterFilterTrainedRadios.find((r) => r.checked)?.value || 'all',
-    pokerus: rosterFilterPokerus.checked,
-    expShare: rosterFilterExpShare.checked,
+    pokerus: isToggleActive(rosterFilterPokerus),
+    expShare: isToggleActive(rosterFilterExpShare),
   };
 }
 
@@ -252,7 +268,7 @@ function renderRoster(party) {
   // broken, not as "nothing matches."
   const totalCap = store.totalCap();
   rosterFilterTrainedGroup.hidden = totalCap == null;
-  rosterFilterPokerusRow.hidden = !store.pokerusAvailable();
+  rosterFilterPokerus.hidden = !store.pokerusAvailable();
 
   const query = rosterSearchInput.value.trim().toLowerCase();
   const filters = readRosterFilters();
@@ -454,8 +470,8 @@ function renderLegend() {
 
 function resetRosterFilters() {
   for (const radio of rosterFilterTrainedRadios) radio.checked = radio.value === 'all';
-  rosterFilterPokerus.checked = false;
-  rosterFilterExpShare.checked = false;
+  setToggleActive(rosterFilterPokerus, false);
+  setToggleActive(rosterFilterExpShare, false);
 }
 
 // The search/sort/filter controls are static markup, not rebuilt by
@@ -469,8 +485,14 @@ rosterSortSelect.addEventListener('change', () => renderRoster(store.activeParty
 for (const radio of rosterFilterTrainedRadios) {
   radio.addEventListener('change', () => renderRoster(store.activeParty));
 }
-rosterFilterPokerus.addEventListener('change', () => renderRoster(store.activeParty));
-rosterFilterExpShare.addEventListener('change', () => renderRoster(store.activeParty));
+rosterFilterPokerus.addEventListener('click', () => {
+  setToggleActive(rosterFilterPokerus, !isToggleActive(rosterFilterPokerus));
+  renderRoster(store.activeParty);
+});
+rosterFilterExpShare.addEventListener('click', () => {
+  setToggleActive(rosterFilterExpShare, !isToggleActive(rosterFilterExpShare));
+  renderRoster(store.activeParty);
+});
 rosterFilterClear.addEventListener('click', () => {
   resetRosterFilters();
   renderRoster(store.activeParty);
@@ -499,8 +521,8 @@ export function render(party) {
       rosterSearchInput.value = restored.q;
       rosterSortSelect.value = restored.sort;
       for (const radio of rosterFilterTrainedRadios) radio.checked = radio.value === restored.trained;
-      rosterFilterPokerus.checked = restored.pokerus;
-      rosterFilterExpShare.checked = restored.expShare;
+      setToggleActive(rosterFilterPokerus, restored.pokerus);
+      setToggleActive(rosterFilterExpShare, restored.expShare);
       if (restored.filterOpen) rosterFilterDialog.showModal();
     } else {
       rosterSearchInput.value = '';

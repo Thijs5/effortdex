@@ -32,11 +32,13 @@ test.describe('Roster filters, manual reorder, and URL state', () => {
     await catchPokemon(page, 'Bulbasaur');
 
     await page.getByRole('button', { name: 'Filter' }).click();
-    await page.getByLabel('Pokérus active').check();
+    const pokerusToggle = page.getByRole('button', { name: 'Pokérus active' });
+    await pokerusToggle.click();
+    await expect(pokerusToggle).toHaveAttribute('aria-pressed', 'true');
     await page.getByRole('button', { name: 'Clear filters' }).click();
 
     await expect(page.getByLabel('All')).toBeChecked();
-    await expect(page.getByLabel('Pokérus active')).not.toBeChecked();
+    await expect(pokerusToggle).toHaveAttribute('aria-pressed', 'false');
   });
 
   test('dragging a card by its handle reorders the roster', async ({ page }) => {
@@ -73,6 +75,7 @@ test.describe('Roster filters, manual reorder, and URL state', () => {
     await catchPokemon(page, 'Charmander');
 
     await expect(page.locator('.roster-card-handle')).toHaveCount(2);
+    await page.getByRole('button', { name: 'Filter' }).click();
     await page.getByRole('combobox', { name: 'Sort roster' }).selectOption('name');
     await expect(page.locator('.roster-card-handle')).toHaveCount(0);
   });
@@ -83,7 +86,9 @@ test.describe('Roster filters, manual reorder, and URL state', () => {
     await catchPokemon(page, 'Bulbasaur');
     await catchPokemon(page, 'Charmander');
 
+    await page.getByRole('button', { name: 'Filter' }).click();
     await page.getByRole('combobox', { name: 'Sort roster' }).selectOption('name');
+    await page.getByRole('button', { name: 'Done' }).click();
     await page.getByRole('searchbox', { name: 'Search roster' }).fill('Char');
 
     await expect(page).toHaveURL(/[?&]q=Char/);
@@ -92,6 +97,7 @@ test.describe('Roster filters, manual reorder, and URL state', () => {
     await page.reload();
 
     await expect(page.getByRole('searchbox', { name: 'Search roster' })).toHaveValue('Char');
+    await page.getByRole('button', { name: 'Filter' }).click();
     await expect(page.getByRole('combobox', { name: 'Sort roster' })).toHaveValue('name');
     await expect(rosterRow(page, 'Charmander')).toBeVisible();
     await expect(rosterRow(page, 'Bulbasaur')).toBeHidden();

@@ -501,11 +501,9 @@ html[data-modal-open] body {
   margin-bottom: var(--space-3);
 }
 .roster-toolbar #roster-search { flex: 1 1 auto; }
-.roster-toolbar #roster-sort { flex: 0 0 auto; width: auto; }
 
 @media (max-width: 520px) {
   .roster-toolbar { flex-direction: column; align-items: stretch; }
-  .roster-toolbar #roster-sort { width: 100%; }
 }
 
 /* Same box model as .ds-field (padding/border/font-size) so this button
@@ -555,15 +553,31 @@ html[data-modal-open] body {
   letter-spacing: 0.06em;
   color: var(--ink-soft);
 }
-.roster-filter-group label,
-.roster-filter-check {
+.roster-filter-group label {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   font-size: var(--font-size-md);
   cursor: pointer;
 }
-.roster-filter-check { margin-bottom: var(--space-3); }
+
+/* Pokérus/Exp. Share as .ds-item-btn toggles — same look as the "other
+   buttons" in this dialog (Clear filters/Done) and as the per-Pokémon
+   Pokérus/Exp. Share toggles on the detail page, instead of bare OS
+   checkboxes that read as a different, plainer control. */
+.roster-filter-toggles {
+  display: grid;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+.roster-filter-toggle { justify-content: center; }
+/* Same glyph as the detail page's own Pokérus toggle (lib/icons.js's
+   POKERUS_ICON_SVG, injected by pages/roster.js) — .ds-item-icon (the
+   Exp. Share sprite's sizing) already lives in the shared design system,
+   but this wrapper is local to that shadow-DOM component, so it needs
+   its own copy here for the light-DOM filter dialog. */
+.pokerus-icon { width: 22px; height: 22px; flex: 0 0 auto; display: inline-flex; color: var(--pokerus-purple); }
+.pokerus-icon svg { width: 100%; height: 100%; }
 
 .roster {
   display: grid;
