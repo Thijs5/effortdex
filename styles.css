@@ -496,6 +496,7 @@ html[data-modal-open] body {
 
 .roster-toolbar {
   display: flex;
+  align-items: flex-start;
   gap: var(--space-3);
   margin-bottom: var(--space-3);
 }
@@ -503,8 +504,76 @@ html[data-modal-open] body {
 .roster-toolbar #roster-sort { flex: 0 0 auto; width: auto; }
 
 @media (max-width: 520px) {
-  .roster-toolbar { flex-direction: column; }
+  .roster-toolbar { flex-direction: column; align-items: stretch; }
   .roster-toolbar #roster-sort { width: 100%; }
+}
+
+.roster-filter {
+  position: relative;
+  flex: 0 0 auto;
+}
+.roster-filter > summary {
+  list-style: none;
+  cursor: pointer;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--lcd-line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: var(--font-size-input);
+  color: var(--ink);
+  white-space: nowrap;
+}
+.roster-filter > summary::-webkit-details-marker { display: none; }
+.roster-filter[open] > summary { border-color: var(--teal); }
+.roster-filter-count {
+  display: inline-block;
+  margin-left: var(--space-1);
+  padding: 0 0.4em;
+  border-radius: var(--radius-pill);
+  background: var(--teal);
+  color: var(--on-teal);
+  font-size: var(--font-size-2xs);
+}
+.roster-filter-panel {
+  position: absolute;
+  z-index: 10;
+  top: calc(100% + var(--space-1));
+  right: 0;
+  min-width: 220px;
+  display: grid;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--lcd-line);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-suggestions);
+}
+.roster-filter-group {
+  display: grid;
+  gap: var(--space-2);
+  border: none;
+  padding: 0;
+  margin: 0;
+}
+.roster-filter-group legend {
+  padding: 0;
+  font-family: var(--font-mono);
+  font-size: var(--font-size-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+}
+.roster-filter-group label,
+.roster-filter-check {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--font-size-md);
+  cursor: pointer;
+}
+
+@media (max-width: 520px) {
+  .roster-filter-panel { left: 0; right: 0; min-width: 0; }
 }
 
 .roster {
@@ -520,16 +589,47 @@ html[data-modal-open] body {
 .roster-card {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
   background: var(--lcd);
   border: 1px solid var(--lcd-line);
   border-radius: var(--radius-md);
   padding: var(--space-3) var(--space-4);
-  text-decoration: none;
-  color: inherit;
   transition: box-shadow var(--transition-med), transform var(--transition-fast);
 }
 .roster-card:hover { box-shadow: var(--shadow-panel); transform: translateY(-1px); }
+.roster-card--dragging { opacity: 0.6; box-shadow: var(--shadow-panel); }
+.roster-card--drop-target { outline: 2px dashed var(--teal); outline-offset: 2px; }
+
+.roster-card-link {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  min-width: 0;
+  flex: 1 1 auto;
+  text-decoration: none;
+  color: inherit;
+}
+
+/* A grip handle for manual drag reordering — only rendered when the
+   roster is unfiltered and in its default order, since dragging a card
+   in a sorted or filtered view wouldn't map onto a stable position in
+   the underlying roster. touch-action: none stops the browser's own
+   scroll gesture from fighting a touch drag. Not yet keyboard-operable
+   (see issue #9). */
+.roster-card-handle {
+  flex: 0 0 auto;
+  border: none;
+  background: transparent;
+  padding: var(--space-2);
+  margin: calc(var(--space-2) * -1);
+  font-size: var(--font-size-lg);
+  line-height: 1;
+  color: var(--ink-soft);
+  cursor: grab;
+  touch-action: none;
+}
+.roster-card-handle:hover { color: var(--ink); }
+.roster-card--dragging .roster-card-handle { cursor: grabbing; }
 
 .roster-card-sprite {
   flex: 0 0 auto;

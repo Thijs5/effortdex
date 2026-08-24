@@ -48,7 +48,14 @@ const rosterToolbar = document.getElementById('roster-toolbar');
 const rosterSearchInput = document.getElementById('roster-search');
 const rosterSortSelect = document.getElementById('roster-sort');
 const rosterNoResults = document.getElementById('roster-no-results');
-const rosterNoResultsQuery = document.getElementById('roster-no-results-query');
+const rosterFilter = document.getElementById('roster-filter');
+const rosterFilterCount = document.getElementById('roster-filter-count');
+const rosterFilterTrainedGroup = document.getElementById('roster-filter-trained-group');
+const rosterFilterTrainedRadios = [...document.getElementsByName('roster-filter-trained')];
+const rosterFilterPokerusRow = document.getElementById('roster-filter-pokerus-row');
+const rosterFilterPokerus = document.getElementById('roster-filter-pokerus');
+const rosterFilterExpShare = document.getElementById('roster-filter-exp-share');
+const rosterFilterClear = document.getElementById('roster-filter-clear');
 
 const catchDialog = document.getElementById('catch-dialog');
 const catchForm = document.getElementById('catch-form');
@@ -156,8 +163,9 @@ catchForm.addEventListener('submit', (e) => {
 
 // Keyed by <select id="roster-sort">'s option values. 'catch' is a no-op
 // since `party.pokemon` is already append-ordered (see render()'s
-// catchSearch.recent comment) — that's the roster's long-standing
-// default order, so leave it alone rather than re-sort it.
+// catchSearch.recent comment, and store.reorderPokemon) — that's the
+// roster's long-standing default order, catch-order or manually
+// reordered alike, so leave it alone rather than re-sort it.
 const ROSTER_SORTS = {
   catch: (entries) => entries,
   name: (entries) =>
@@ -176,19 +184,100 @@ function matchesRosterQuery(entry, query) {
   );
 }
 
+/** Reads the filter panel's controls into a plain object — called fresh
+ * each render rather than cached, since the controls are the source of
+ * truth (same reasoning as reading rosterSearchInput.value directly). */
+function readRosterFilters() {
+  return {
+    trained: rosterFilterTrainedRadios.find((r) => r.checked)?.value || 'all',
+    pokerus: rosterFilterPokerus.checked,
+    expShare: rosterFilterExpShare.checked,
+  };
+}
+
+function matchesRosterFilters(entry, filters, totalCap) {
+  if (filters.trained !== 'all' && totalCap != null) {
+    const trained = totalEvs(entry.evs) >= totalCap;
+    if (filters.trained === 'trained' && !trained) return false;
+    if (filters.trained === 'training' && trained) return false;
+  }
+  if (filters.pokerus && !store.effectiveAids(entry).pokerus) return false;
+  if (filters.expShare && !entry.expShare) return false;
+  return true;
+}
+
+// The roster's search/sort/filter picks round-trip through the URL's
+// query string (ADR 0013) — reloading or sharing a link lands back on
+// the same view instead of the roster's bare defaults.
+const ROSTER_SORT_VALUES = ['catch', 'name', 'level', 'evs'];
+const ROSTER_TRAINED_VALUES = ['all', 'trained', 'training'];
+
+function readRosterStateFromQuery() {
+  const params = new URLSearchParams(window.location.search);
+  const sort = params.get('sort');
+  const trained = params.get('trained');
+  return {
+    q: params.get('q') || '',
+    sort: ROSTER_SORT_VALUES.includes(sort) ? sort : 'catch',
+    trained: ROSTER_TRAINED_VALUES.includes(trained) ? trained : 'all',
+    pokerus: params.get('pokerus') === '1',
+    expShare: params.get('expShare') === '1',
+    filterOpen: params.get('filterOpen') === '1',
+  };
+}
+
+function writeRosterStateToQuery() {
+  const params = new URLSearchParams();
+  const q = rosterSearchInput.value.trim();
+  if (q) params.set('q', q);
+  if (rosterSortSelect.value !== 'catch') params.set('sort', rosterSortSelect.value);
+  const filters = readRosterFilters();
+  if (filters.trained !== 'all') params.set('trained', filters.trained);
+  if (filters.pokerus) params.set('pokerus', '1');
+  if (filters.expShare) params.set('expShare', '1');
+  if (rosterFilter.open) params.set('filterOpen', '1');
+  const qs = params.toString();
+  const url = `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`;
+  // replaceState, not pushState: every keystroke/toggle shouldn't grow
+  // browser history — only actual navigation (lib/router.js) should.
+  history.replaceState(null, '', url);
+}
+
 function renderRoster(party) {
+  // Hide filter options a party's game version makes meaningless, same
+  // gating the rules legend below uses — an always-empty filter reads as
+  // broken, not as "nothing matches."
+  const totalCap = store.totalCap();
+  rosterFilterTrainedGroup.hidden = totalCap == null;
+  rosterFilterPokerusRow.hidden = !store.pokerusAvailable();
+
   const query = rosterSearchInput.value.trim().toLowerCase();
+  const filters = readRosterFilters();
   const sorted = ROSTER_SORTS[rosterSortSelect.value](party.pokemon);
-  const entries = sorted.filter((entry) => matchesRosterQuery(entry, query));
+  const entries = sorted
+    .filter((entry) => matchesRosterQuery(entry, query))
+    .filter((entry) => matchesRosterFilters(entry, filters, totalCap));
+
+  const activeFilterCount =
+    (filters.trained !== 'all' ? 1 : 0) + (filters.pokerus ? 1 : 0) + (filters.expShare ? 1 : 0);
+  rosterFilterCount.hidden = activeFilterCount === 0;
+  rosterFilterCount.textContent = String(activeFilterCount);
 
   rosterToolbar.hidden = party.pokemon.length === 0;
   emptyState.hidden = party.pokemon.length > 0;
   rosterNoResults.hidden = party.pokemon.length === 0 || entries.length > 0;
-  if (!rosterNoResults.hidden) rosterNoResultsQuery.textContent = rosterSearchInput.value.trim();
+  if (!rosterNoResults.hidden) {
+    rosterNoResults.textContent = query
+      ? `No Pokémon match “${rosterSearchInput.value.trim()}”.`
+      : 'No Pokémon match the selected filters.';
+  }
   roster.innerHTML = '';
   const natureAvailable = store.natureAvailable();
   const spriteGame = store.spriteBaseGame();
-  const totalCap = store.totalCap();
+  // Dragging to reorder only makes sense against the roster's own array
+  // order with nothing hiding or re-sorting it — otherwise a card's
+  // on-screen position wouldn't map onto a stable index to move it to.
+  const reorderable = rosterSortSelect.value === 'catch' && entries.length === party.pokemon.length;
   for (const entry of entries) {
     const trained = totalCap != null && totalEvs(entry.evs) >= totalCap;
     const pokerusActive = store.effectiveAids(entry).pokerus;
@@ -206,27 +295,110 @@ function renderRoster(party) {
     const spriteSrc = versionedSprite || modernSprite;
     const spriteOnError = versionedSprite ? versionedSpriteOnError(modernSprite) : FALLBACK_ONERROR;
 
-    const row = document.createElement('a');
+    const row = document.createElement('div');
     row.className = 'roster-card';
-    row.href = router.pokemonPath(party.slug, entry.uid);
+    row.dataset.uid = entry.uid;
     row.innerHTML = `
-      <img class="roster-card-sprite${trained ? ' roster-card-sprite--trained' : ''}${pokerusActive ? ' roster-card-sprite--pokerus' : ''}" src="${spriteSrc}" alt="" title="${trained ? 'Fully trained' : pokerusActive ? 'Pokérus — every EV earned from battling is doubled, permanently' : ''}" ${spriteOnError} />
-      <div class="roster-card-body">
-        <span class="roster-card-name">${namePrefix}${escapeHtml(displayName)}</span>
-        <span class="roster-card-meta">
-          Lv. ${entry.level}${speciesAside}
-          ${entry.expShare ? `<img class="roster-card-exp-share" src="${EXP_SHARE_SPRITE}" alt="" title="Exp. Share — earns EVs from other battles" ${FALLBACK_ONERROR} />` : ''}
-        </span>
-      </div>
-      <ev-bar class="roster-card-evbar"></ev-bar>
+      ${reorderable ? `<button type="button" class="roster-card-handle" aria-label="Reorder ${escapeHtml(displayName)}">&#9776;</button>` : ''}
+      <a class="roster-card-link" href="${router.pokemonPath(party.slug, entry.uid)}">
+        <img class="roster-card-sprite${trained ? ' roster-card-sprite--trained' : ''}${pokerusActive ? ' roster-card-sprite--pokerus' : ''}" src="${spriteSrc}" alt="" title="${trained ? 'Fully trained' : pokerusActive ? 'Pokérus — every EV earned from battling is doubled, permanently' : ''}" ${spriteOnError} />
+        <div class="roster-card-body">
+          <span class="roster-card-name">${namePrefix}${escapeHtml(displayName)}</span>
+          <span class="roster-card-meta">
+            Lv. ${entry.level}${speciesAside}
+            ${entry.expShare ? `<img class="roster-card-exp-share" src="${EXP_SHARE_SPRITE}" alt="" title="Exp. Share — earns EVs from other battles" ${FALLBACK_ONERROR} />` : ''}
+          </span>
+        </div>
+        <ev-bar class="roster-card-evbar"></ev-bar>
+      </a>
     `;
+    const link = row.querySelector('.roster-card-link');
     const evBar = row.querySelector('ev-bar');
     evBar.hidden = totalCap == null;
     evBar.max = totalCap;
     evBar.value = totalEvs(entry.evs);
-    interceptLinkClick(row, () => router.navigateToPokemon(party.slug, entry.uid));
+    interceptLinkClick(link, () => router.navigateToPokemon(party.slug, entry.uid));
+    if (reorderable) wireDragHandle(row.querySelector('.roster-card-handle'), row);
     roster.appendChild(row);
   }
+  writeRosterStateToQuery();
+}
+
+/**
+ * Pointer-driven drag-to-reorder (not native HTML5 drag-and-drop, which
+ * doesn't fire from touch on mobile browsers) — press the handle, drag
+ * up/down, and whichever neighbor the pointer is nearest gets highlighted
+ * as the drop target. Only on release does the card actually move: a
+ * single DOM reorder plus a single store.reorderPokemon call, since only
+ * the dragged card needs to move, everything else just shifts to make
+ * room, same as the in-game party-reorder screen.
+ *
+ * Deliberately doesn't move the card in the DOM live, for two reasons.
+ * First, the roster is a CSS Grid, not a single-column list (auto-fill
+ * puts several cards per row on anything wider than ~520px) — reordering
+ * live would change which grid column a neighbor falls into, changing
+ * its measured position, which can immediately reverse the very decision
+ * that just moved it: an oscillation instead of a settled drop. Second,
+ * moving the dragged card's own subtree — which contains the handle that
+ * has pointer capture — mid-gesture silently drops that capture in
+ * Chromium, ending the drag after a single move event.
+ * @param {HTMLButtonElement} handle @param {HTMLElement} row
+ */
+function wireDragHandle(handle, row) {
+  handle.addEventListener('pointerdown', (e) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    e.preventDefault();
+    handle.setPointerCapture(e.pointerId);
+    const cardsNow = () => [...roster.querySelectorAll('.roster-card')];
+    const startIndex = cardsNow().indexOf(row);
+    row.classList.add('roster-card--dragging');
+
+    // Snapshot once, not re-measured per move — see the doc comment above.
+    const others = cardsNow()
+      .filter((card) => card !== row)
+      .map((card) => {
+        const rect = card.getBoundingClientRect();
+        return { card, rect, cx: rect.left + rect.width / 2, cy: rect.top + rect.height / 2 };
+      });
+
+    /** @type {{ card: Element, before: boolean } | null} */
+    let dropTarget = null;
+
+    const onMove = (moveEvent) => {
+      const { clientX: x, clientY: y } = moveEvent;
+      let closest = null;
+      let closestDist = Infinity;
+      for (const candidate of others) {
+        const dist = (x - candidate.cx) ** 2 + (y - candidate.cy) ** 2;
+        if (dist < closestDist) {
+          closestDist = dist;
+          closest = candidate;
+        }
+      }
+      if (!closest) return;
+      const { card, rect, cx, cy } = closest;
+      const sameRow = y >= rect.top && y <= rect.bottom;
+      const before = sameRow ? x < cx : y < cy;
+      for (const other of others) other.card.classList.remove('roster-card--drop-target');
+      card.classList.add('roster-card--drop-target');
+      dropTarget = { card, before };
+    };
+    const onEnd = () => {
+      row.classList.remove('roster-card--dragging');
+      for (const other of others) other.card.classList.remove('roster-card--drop-target');
+      handle.removeEventListener('pointermove', onMove);
+      handle.removeEventListener('pointerup', onEnd);
+      handle.removeEventListener('pointercancel', onEnd);
+      if (dropTarget) {
+        roster.insertBefore(row, dropTarget.before ? dropTarget.card : dropTarget.card.nextSibling);
+      }
+      const endIndex = cardsNow().indexOf(row);
+      if (endIndex !== startIndex) store.reorderPokemon(row.dataset.uid, endIndex);
+    };
+    handle.addEventListener('pointermove', onMove);
+    handle.addEventListener('pointerup', onEnd);
+    handle.addEventListener('pointercancel', onEnd);
+  });
 }
 
 /* ------------------------------------------------------------------ */
@@ -277,20 +449,56 @@ function renderLegend() {
   trainingLegend.innerHTML = items.map((i) => `<li>${i}</li>`).join('');
 }
 
-// The search/sort controls are static markup, not rebuilt by renderRoster,
-// so their value survives a same-party re-render (e.g. catching another
-// Pokémon while filtered) — only reset them on an actual party switch.
+function resetRosterFilters() {
+  for (const radio of rosterFilterTrainedRadios) radio.checked = radio.value === 'all';
+  rosterFilterPokerus.checked = false;
+  rosterFilterExpShare.checked = false;
+}
+
+// The search/sort/filter controls are static markup, not rebuilt by
+// renderRoster, so their value survives a same-party re-render (e.g.
+// catching another Pokémon while filtered) — only reset them on an
+// actual party switch.
 let currentPartySlug = null;
 
 rosterSearchInput.addEventListener('input', () => renderRoster(store.activeParty));
 rosterSortSelect.addEventListener('change', () => renderRoster(store.activeParty));
+for (const radio of rosterFilterTrainedRadios) {
+  radio.addEventListener('change', () => renderRoster(store.activeParty));
+}
+rosterFilterPokerus.addEventListener('change', () => renderRoster(store.activeParty));
+rosterFilterExpShare.addEventListener('change', () => renderRoster(store.activeParty));
+rosterFilterClear.addEventListener('click', () => {
+  resetRosterFilters();
+  renderRoster(store.activeParty);
+});
+// <details>'s own open/closed state isn't controlled by any of the
+// listeners above, so it needs its own hook to stay synced to the URL.
+rosterFilter.addEventListener('toggle', () => writeRosterStateToQuery());
 
 /** @param {ReturnType<typeof store.getPartyBySlug>} party */
 export function render(party) {
   if (party.slug !== currentPartySlug) {
+    // The very first render since this page loaded doubles as "did the
+    // user land here with a URL that already encodes a view" (a reload,
+    // or a shared link) — ADR 0013. Anything after that is an in-app
+    // party switch, which starts the new party's roster from scratch.
+    const isFreshLoad = currentPartySlug === null;
     currentPartySlug = party.slug;
-    rosterSearchInput.value = '';
-    rosterSortSelect.value = 'catch';
+    if (isFreshLoad) {
+      const restored = readRosterStateFromQuery();
+      rosterSearchInput.value = restored.q;
+      rosterSortSelect.value = restored.sort;
+      for (const radio of rosterFilterTrainedRadios) radio.checked = radio.value === restored.trained;
+      rosterFilterPokerus.checked = restored.pokerus;
+      rosterFilterExpShare.checked = restored.expShare;
+      rosterFilter.open = restored.filterOpen;
+    } else {
+      rosterSearchInput.value = '';
+      rosterSortSelect.value = 'catch';
+      resetRosterFilters();
+      rosterFilter.open = false;
+    }
   }
   activePartyName.textContent = party.name;
   activePartyGame.hidden = !party.baseGame;
