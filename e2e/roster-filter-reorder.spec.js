@@ -37,6 +37,7 @@ test.describe('Roster filters, manual reorder, and URL state', () => {
 
     await expect(rosterRow(page, 'Charmander')).toBeVisible();
     await expect(rosterRow(page, 'Bulbasaur')).toBeHidden();
+    await expect(page.locator('#roster-filter-done')).toContainText('Show 1 Pokémon');
   });
 
   test('the nature filter shows only Pokémon with the selected nature', async ({ page }) => {
@@ -130,7 +131,7 @@ test.describe('Roster filters, manual reorder, and URL state', () => {
 
     await page.getByRole('button', { name: 'Filter' }).click();
     await page.getByRole('combobox', { name: 'Sort roster' }).selectOption('name');
-    await page.getByRole('button', { name: 'Done' }).click();
+    await page.locator('#roster-filter-done').click();
     await page.getByRole('searchbox', { name: 'Search roster' }).fill('Char');
 
     await expect(page).toHaveURL(/[?&]q=Char/);

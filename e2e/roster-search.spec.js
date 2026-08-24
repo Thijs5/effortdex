@@ -43,7 +43,7 @@ test.describe('Roster search, filter, and sort', () => {
 
     await page.getByRole('button', { name: 'Filter' }).click();
     await page.getByRole('combobox', { name: 'Sort roster' }).selectOption('name');
-    await page.getByRole('button', { name: 'Done' }).click();
+    await page.locator('#roster-filter-done').click();
 
     const names = page.locator('#roster .roster-card-name');
     await expect(names).toHaveCount(2);
@@ -59,7 +59,7 @@ test.describe('Roster search, filter, and sort', () => {
 
     await page.getByRole('button', { name: 'Filter' }).click();
     await page.getByRole('combobox', { name: 'Sort roster' }).selectOption('level');
-    await page.getByRole('button', { name: 'Done' }).click();
+    await page.locator('#roster-filter-done').click();
 
     const names = page.locator('#roster .roster-card-name');
     await expect(names.first()).toContainText('Charmander');

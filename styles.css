@@ -537,7 +537,17 @@ html[data-modal-open] body {
 }
 
 .roster-filter-dialog { width: min(360px, calc(100vw - 2.4rem)); }
-.roster-filter-dialog .party-dialog-actions { margin-top: var(--space-2); }
+/* Full-width, stacked, not the side-by-side pill pair every other dialog
+   uses (.party-dialog-actions) — Clear filters/Show N Pokémon are equally
+   wide, easy touch targets, and read top-to-bottom as "reset, then
+   confirm" rather than competing for space on one row. */
+.roster-filter-actions {
+  flex-direction: column;
+  align-items: stretch;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+.roster-filter-actions .ds-btn { width: 100%; }
 .roster-filter-group {
   display: grid;
   gap: var(--space-2);

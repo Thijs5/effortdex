@@ -68,6 +68,7 @@ const rosterFilterNatureField = document.getElementById('roster-filter-nature-fi
 const rosterFilterNature = /** @type {HTMLSelectElement} */ (document.getElementById('roster-filter-nature'));
 const rosterFilterClear = document.getElementById('roster-filter-clear');
 const rosterFilterDone = document.getElementById('roster-filter-done');
+const rosterFilterDoneCount = document.getElementById('roster-filter-done-count');
 
 // Populated once — same icons the detail page's own Pokérus/Exp. Share/
 // Macho Brace controls use, so each filter reads as "the same thing"
@@ -331,6 +332,7 @@ function renderRoster(party) {
     (filters.nature ? 1 : 0);
   rosterFilterCount.hidden = activeFilterCount === 0;
   rosterFilterCount.textContent = String(activeFilterCount);
+  rosterFilterDoneCount.textContent = String(entries.length);
 
   rosterToolbar.hidden = party.pokemon.length === 0;
   emptyState.hidden = party.pokemon.length > 0;
