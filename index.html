@@ -415,22 +415,46 @@
         <option value="evs">EVs trained (high to low)</option>
       </select>
     </label>
+    <!-- Below Sort by, every filter is ordered by the earliest generation
+         it applies to (ADR 0014) — Level first (Gen I+, never hidden), down
+         to Nature last (Gen III+). A party from an older generation just
+         sees a shorter list from the top; nothing already visible moves
+         when a later-gen party reveals more, since new filters only ever
+         append at the point their own generation unlocks them. -->
+    <fieldset class="roster-filter-group">
+      <legend>Level</legend>
+      <div class="roster-filter-range">
+        <input type="number" id="roster-filter-level-min" class="ds-field" min="1" max="100" placeholder="Min" aria-label="Minimum level" />
+        <span aria-hidden="true">&ndash;</span>
+        <input type="number" id="roster-filter-level-max" class="ds-field" min="1" max="100" placeholder="Max" aria-label="Maximum level" />
+      </div>
+    </fieldset>
+    <div class="roster-filter-toggles">
+      <button type="button" id="roster-filter-exp-share" class="ds-item-btn roster-filter-toggle" aria-pressed="false">
+        <img id="roster-filter-exp-share-icon" class="ds-item-icon" src="" alt="" />
+        <span class="ds-item-btn-label">Holding Exp. Share</span>
+      </button>
+      <button type="button" id="roster-filter-pokerus" class="ds-item-btn roster-filter-toggle" aria-pressed="false">
+        <span id="roster-filter-pokerus-icon" class="pokerus-icon" aria-hidden="true"></span>
+        <span class="ds-item-btn-label">Pok&eacute;rus active</span>
+      </button>
+    </div>
     <fieldset id="roster-filter-trained-group" class="roster-filter-group">
       <legend>Trained status</legend>
       <label><input type="radio" name="roster-filter-trained" value="all" checked /> All</label>
       <label><input type="radio" name="roster-filter-trained" value="trained" /> Fully trained</label>
       <label><input type="radio" name="roster-filter-trained" value="training" /> Still training</label>
     </fieldset>
-    <div class="roster-filter-toggles">
-      <button type="button" id="roster-filter-pokerus" class="ds-item-btn roster-filter-toggle" aria-pressed="false">
-        <span id="roster-filter-pokerus-icon" class="pokerus-icon" aria-hidden="true"></span>
-        <span class="ds-item-btn-label">Pok&eacute;rus active</span>
-      </button>
-      <button type="button" id="roster-filter-exp-share" class="ds-item-btn roster-filter-toggle" aria-pressed="false">
-        <img id="roster-filter-exp-share-icon" class="ds-item-icon" src="" alt="" />
-        <span class="ds-item-btn-label">Holding Exp. Share</span>
+    <div id="roster-filter-item-row" class="roster-filter-toggles">
+      <button type="button" id="roster-filter-item" class="ds-item-btn roster-filter-toggle" aria-pressed="false">
+        <img id="roster-filter-item-icon" class="ds-item-icon" src="" alt="" />
+        <span class="ds-item-btn-label">Holding a training item</span>
       </button>
     </div>
+    <label id="roster-filter-nature-field" class="field-label field-label--inline">
+      Nature
+      <select id="roster-filter-nature" class="ds-field" aria-label="Filter by nature"></select>
+    </label>
     <div class="party-dialog-actions">
       <span class="spacer"></span>
       <button type="button" id="roster-filter-clear" class="ds-btn ds-btn--ghost">Clear filters</button>

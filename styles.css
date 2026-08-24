@@ -560,6 +560,13 @@ html[data-modal-open] body {
   font-size: var(--font-size-md);
   cursor: pointer;
 }
+.roster-filter-range {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--ink-soft);
+}
+.roster-filter-range .ds-field { width: 0; flex: 1 1 0; }
 
 /* Pokérus/Exp. Share as .ds-item-btn toggles — same look as the "other
    buttons" in this dialog (Clear filters/Done) and as the per-Pokémon

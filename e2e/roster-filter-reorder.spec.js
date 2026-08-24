@@ -26,6 +26,48 @@ test.describe('Roster filters, manual reorder, and URL state', () => {
     await expect(rosterRow(page, 'Charmander')).toBeVisible();
   });
 
+  test('the level range filter hides Pokémon outside min/max', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
+    await catchPokemon(page, 'Bulbasaur', { level: 5 });
+    await catchPokemon(page, 'Charmander', { level: 50 });
+
+    await page.getByRole('button', { name: 'Filter' }).click();
+    await page.getByLabel('Minimum level').fill('20');
+
+    await expect(rosterRow(page, 'Charmander')).toBeVisible();
+    await expect(rosterRow(page, 'Bulbasaur')).toBeHidden();
+  });
+
+  test('the nature filter shows only Pokémon with the selected nature', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
+    await catchPokemon(page, 'Bulbasaur', { nature: 'adamant' });
+    await catchPokemon(page, 'Charmander', { nature: 'timid' });
+
+    await page.getByRole('button', { name: 'Filter' }).click();
+    await page.getByLabel('Filter by nature').selectOption('adamant');
+
+    await expect(rosterRow(page, 'Bulbasaur')).toBeVisible();
+    await expect(rosterRow(page, 'Charmander')).toBeHidden();
+  });
+
+  test('gen-gated filters only append below the always-available ones, in generation order', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Red Solo Run', baseGame: 'Red' });
+    await catchPokemon(page, 'Bulbasaur');
+    await page.getByRole('button', { name: 'Filter' }).click();
+
+    // Gen I: no total EV cap and no Pokérus yet — only the always-available
+    // filters show.
+    await expect(page.getByLabel('Minimum level')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Holding Exp. Share' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Pokérus active' })).toBeHidden();
+    await expect(page.getByText('Trained status')).toBeHidden();
+    await expect(page.getByRole('button', { name: 'Holding a training item' })).toBeHidden();
+    await expect(page.getByLabel('Filter by nature')).toBeHidden();
+  });
+
   test('Clear filters resets the panel back to All', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });

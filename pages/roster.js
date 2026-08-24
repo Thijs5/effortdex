@@ -13,14 +13,17 @@ import {
   STAT_EXP_VITAMIN_BONUS,
   STAT_EXP_VITAMIN_CEILING,
   MACHO_BRACE_MULTIPLIER,
+  MACHO_BRACE_SPRITE,
   DEFAULT_LEVEL,
+  MIN_LEVEL,
+  MAX_LEVEL,
   FALLBACK_SPRITE,
   FALLBACK_ONERROR,
   EXP_SHARE_SPRITE,
   versionedSpriteOnError,
   NATURES,
 } from '../lib/constants.js';
-import { titleCase, totalEvs, natureOptionsHtml, escapeHtml } from '../lib/utils.js';
+import { titleCase, totalEvs, natureOptionsHtml, escapeHtml, sortedNatures, natureLabel } from '../lib/utils.js';
 import { POKERUS_ICON_SVG } from '../lib/icons.js';
 import { api, store } from '../lib/services.js';
 import { versionedSpriteUrl } from '../lib/pokeapi-client.js';
@@ -53,17 +56,35 @@ const rosterFilterBtn = document.getElementById('roster-filter-btn');
 const rosterFilterDialog = document.getElementById('roster-filter-dialog');
 const rosterFilterDialogClose = document.getElementById('roster-filter-dialog-close');
 const rosterFilterCount = document.getElementById('roster-filter-count');
+const rosterFilterLevelMin = /** @type {HTMLInputElement} */ (document.getElementById('roster-filter-level-min'));
+const rosterFilterLevelMax = /** @type {HTMLInputElement} */ (document.getElementById('roster-filter-level-max'));
+const rosterFilterExpShare = document.getElementById('roster-filter-exp-share');
+const rosterFilterPokerus = document.getElementById('roster-filter-pokerus');
 const rosterFilterTrainedGroup = document.getElementById('roster-filter-trained-group');
 const rosterFilterTrainedRadios = [...document.getElementsByName('roster-filter-trained')];
-const rosterFilterPokerus = document.getElementById('roster-filter-pokerus');
-const rosterFilterExpShare = document.getElementById('roster-filter-exp-share');
+const rosterFilterItemRow = document.getElementById('roster-filter-item-row');
+const rosterFilterItem = document.getElementById('roster-filter-item');
+const rosterFilterNatureField = document.getElementById('roster-filter-nature-field');
+const rosterFilterNature = /** @type {HTMLSelectElement} */ (document.getElementById('roster-filter-nature'));
 const rosterFilterClear = document.getElementById('roster-filter-clear');
 const rosterFilterDone = document.getElementById('roster-filter-done');
 
-// Populated once — same icons the detail page's own Pokérus/Exp. Share
-// toggles use, so the filter reads as "the same thing" wherever it shows up.
+// Populated once — same icons the detail page's own Pokérus/Exp. Share/
+// Macho Brace controls use, so each filter reads as "the same thing"
+// wherever it shows up. Macho Brace stands in as the generic "a training
+// item is held" glyph — there's no single icon for "Power item or Macho
+// Brace", and it's the training item every generation this filter can
+// apply to (Gen III+) recognizes.
 document.getElementById('roster-filter-pokerus-icon').innerHTML = POKERUS_ICON_SVG;
 /** @type {HTMLImageElement} */ (document.getElementById('roster-filter-exp-share-icon')).src = EXP_SHARE_SPRITE;
+/** @type {HTMLImageElement} */ (document.getElementById('roster-filter-item-icon')).src = MACHO_BRACE_SPRITE;
+rosterFilterLevelMin.min = rosterFilterLevelMax.min = String(MIN_LEVEL);
+rosterFilterLevelMin.max = rosterFilterLevelMax.max = String(MAX_LEVEL);
+rosterFilterNature.innerHTML =
+  '<option value="">Any nature</option>' +
+  sortedNatures()
+    .map((n) => `<option value="${n.id}">${natureLabel(n)}</option>`)
+    .join('');
 
 const catchDialog = document.getElementById('catch-dialog');
 const catchForm = document.getElementById('catch-form');
@@ -208,20 +229,31 @@ function setToggleActive(btn, active) {
  * truth (same reasoning as reading rosterSearchInput.value directly). */
 function readRosterFilters() {
   return {
-    trained: rosterFilterTrainedRadios.find((r) => r.checked)?.value || 'all',
-    pokerus: isToggleActive(rosterFilterPokerus),
+    levelMin: rosterFilterLevelMin.value ? Number(rosterFilterLevelMin.value) : null,
+    levelMax: rosterFilterLevelMax.value ? Number(rosterFilterLevelMax.value) : null,
     expShare: isToggleActive(rosterFilterExpShare),
+    pokerus: isToggleActive(rosterFilterPokerus),
+    trained: rosterFilterTrainedRadios.find((r) => r.checked)?.value || 'all',
+    item: isToggleActive(rosterFilterItem),
+    nature: rosterFilterNature.value,
   };
 }
 
 function matchesRosterFilters(entry, filters, totalCap) {
+  if (filters.levelMin != null && entry.level < filters.levelMin) return false;
+  if (filters.levelMax != null && entry.level > filters.levelMax) return false;
+  if (filters.expShare && !entry.expShare) return false;
+  if (filters.pokerus && !store.effectiveAids(entry).pokerus) return false;
   if (filters.trained !== 'all' && totalCap != null) {
     const trained = totalEvs(entry.evs) >= totalCap;
     if (filters.trained === 'trained' && !trained) return false;
     if (filters.trained === 'training' && trained) return false;
   }
-  if (filters.pokerus && !store.effectiveAids(entry).pokerus) return false;
-  if (filters.expShare && !entry.expShare) return false;
+  if (filters.item) {
+    const aids = store.effectiveAids(entry);
+    if (!aids.machoBrace && !aids.powerItem) return false;
+  }
+  if (filters.nature && entry.nature !== filters.nature) return false;
   return true;
 }
 
@@ -235,12 +267,18 @@ function readRosterStateFromQuery() {
   const params = new URLSearchParams(window.location.search);
   const sort = params.get('sort');
   const trained = params.get('trained');
+  const levelMin = Number(params.get('levelMin'));
+  const levelMax = Number(params.get('levelMax'));
   return {
     q: params.get('q') || '',
     sort: ROSTER_SORT_VALUES.includes(sort) ? sort : 'catch',
-    trained: ROSTER_TRAINED_VALUES.includes(trained) ? trained : 'all',
-    pokerus: params.get('pokerus') === '1',
+    levelMin: params.has('levelMin') && Number.isInteger(levelMin) ? levelMin : null,
+    levelMax: params.has('levelMax') && Number.isInteger(levelMax) ? levelMax : null,
     expShare: params.get('expShare') === '1',
+    pokerus: params.get('pokerus') === '1',
+    trained: ROSTER_TRAINED_VALUES.includes(trained) ? trained : 'all',
+    item: params.get('item') === '1',
+    nature: params.get('nature') || '',
     filterOpen: params.get('filterOpen') === '1',
   };
 }
@@ -251,9 +289,13 @@ function writeRosterStateToQuery() {
   if (q) params.set('q', q);
   if (rosterSortSelect.value !== 'catch') params.set('sort', rosterSortSelect.value);
   const filters = readRosterFilters();
-  if (filters.trained !== 'all') params.set('trained', filters.trained);
-  if (filters.pokerus) params.set('pokerus', '1');
+  if (filters.levelMin != null) params.set('levelMin', String(filters.levelMin));
+  if (filters.levelMax != null) params.set('levelMax', String(filters.levelMax));
   if (filters.expShare) params.set('expShare', '1');
+  if (filters.pokerus) params.set('pokerus', '1');
+  if (filters.trained !== 'all') params.set('trained', filters.trained);
+  if (filters.item) params.set('item', '1');
+  if (filters.nature) params.set('nature', filters.nature);
   if (rosterFilterDialog.open) params.set('filterOpen', '1');
   const qs = params.toString();
   const url = `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`;
@@ -267,8 +309,11 @@ function renderRoster(party) {
   // gating the rules legend below uses — an always-empty filter reads as
   // broken, not as "nothing matches."
   const totalCap = store.totalCap();
+  const { machoBrace, powerItems } = store.trainingItemAvailability();
   rosterFilterTrainedGroup.hidden = totalCap == null;
   rosterFilterPokerus.hidden = !store.pokerusAvailable();
+  rosterFilterItemRow.hidden = !machoBrace && !powerItems;
+  rosterFilterNatureField.hidden = !store.natureAvailable();
 
   const query = rosterSearchInput.value.trim().toLowerCase();
   const filters = readRosterFilters();
@@ -278,7 +323,12 @@ function renderRoster(party) {
     .filter((entry) => matchesRosterFilters(entry, filters, totalCap));
 
   const activeFilterCount =
-    (filters.trained !== 'all' ? 1 : 0) + (filters.pokerus ? 1 : 0) + (filters.expShare ? 1 : 0);
+    (filters.levelMin != null || filters.levelMax != null ? 1 : 0) +
+    (filters.expShare ? 1 : 0) +
+    (filters.pokerus ? 1 : 0) +
+    (filters.trained !== 'all' ? 1 : 0) +
+    (filters.item ? 1 : 0) +
+    (filters.nature ? 1 : 0);
   rosterFilterCount.hidden = activeFilterCount === 0;
   rosterFilterCount.textContent = String(activeFilterCount);
 
@@ -469,9 +519,13 @@ function renderLegend() {
 }
 
 function resetRosterFilters() {
-  for (const radio of rosterFilterTrainedRadios) radio.checked = radio.value === 'all';
-  setToggleActive(rosterFilterPokerus, false);
+  rosterFilterLevelMin.value = '';
+  rosterFilterLevelMax.value = '';
   setToggleActive(rosterFilterExpShare, false);
+  setToggleActive(rosterFilterPokerus, false);
+  for (const radio of rosterFilterTrainedRadios) radio.checked = radio.value === 'all';
+  setToggleActive(rosterFilterItem, false);
+  rosterFilterNature.value = '';
 }
 
 // The search/sort/filter controls are static markup, not rebuilt by
@@ -482,17 +536,24 @@ let currentPartySlug = null;
 
 rosterSearchInput.addEventListener('input', () => renderRoster(store.activeParty));
 rosterSortSelect.addEventListener('change', () => renderRoster(store.activeParty));
-for (const radio of rosterFilterTrainedRadios) {
-  radio.addEventListener('change', () => renderRoster(store.activeParty));
-}
-rosterFilterPokerus.addEventListener('click', () => {
-  setToggleActive(rosterFilterPokerus, !isToggleActive(rosterFilterPokerus));
-  renderRoster(store.activeParty);
-});
+rosterFilterLevelMin.addEventListener('input', () => renderRoster(store.activeParty));
+rosterFilterLevelMax.addEventListener('input', () => renderRoster(store.activeParty));
 rosterFilterExpShare.addEventListener('click', () => {
   setToggleActive(rosterFilterExpShare, !isToggleActive(rosterFilterExpShare));
   renderRoster(store.activeParty);
 });
+rosterFilterPokerus.addEventListener('click', () => {
+  setToggleActive(rosterFilterPokerus, !isToggleActive(rosterFilterPokerus));
+  renderRoster(store.activeParty);
+});
+for (const radio of rosterFilterTrainedRadios) {
+  radio.addEventListener('change', () => renderRoster(store.activeParty));
+}
+rosterFilterItem.addEventListener('click', () => {
+  setToggleActive(rosterFilterItem, !isToggleActive(rosterFilterItem));
+  renderRoster(store.activeParty);
+});
+rosterFilterNature.addEventListener('change', () => renderRoster(store.activeParty));
 rosterFilterClear.addEventListener('click', () => {
   resetRosterFilters();
   renderRoster(store.activeParty);
@@ -526,9 +587,13 @@ export function render(party) {
       const restored = readRosterStateFromQuery();
       rosterSearchInput.value = restored.q;
       rosterSortSelect.value = restored.sort;
-      for (const radio of rosterFilterTrainedRadios) radio.checked = radio.value === restored.trained;
-      setToggleActive(rosterFilterPokerus, restored.pokerus);
+      rosterFilterLevelMin.value = restored.levelMin != null ? String(restored.levelMin) : '';
+      rosterFilterLevelMax.value = restored.levelMax != null ? String(restored.levelMax) : '';
       setToggleActive(rosterFilterExpShare, restored.expShare);
+      setToggleActive(rosterFilterPokerus, restored.pokerus);
+      for (const radio of rosterFilterTrainedRadios) radio.checked = radio.value === restored.trained;
+      setToggleActive(rosterFilterItem, restored.item);
+      rosterFilterNature.value = restored.nature;
       if (restored.filterOpen) rosterFilterDialog.showModal();
     } else {
       rosterSearchInput.value = '';

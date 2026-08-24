@@ -26,7 +26,8 @@ and a `?query#hash` URL is valid and unambiguous.
    read/written directly by `pages/roster.js` (`readRosterStateFromQuery`/
    `writeRosterStateToQuery`) — not through `lib/router.js`, which stays
    scoped to routing only (ADR 0002's module boundaries). Keys: `q`,
-   `sort`, `trained`, `pokerus`, `expShare`, `filterOpen`.
+   `sort`, `levelMin`, `levelMax`, `expShare`, `pokerus`, `trained`,
+   `item`, `nature`, `filterOpen`.
 2. **Every write is `history.replaceState`, never `pushState`.** These
    controls change on every keystroke/toggle; growing browser history
    per keystroke would make Back nearly unusable. Only actual navigation
