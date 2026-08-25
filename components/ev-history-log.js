@@ -1,4 +1,4 @@
-import { POWER_ITEMS, VITAMINS, FEATHERS, EV_BERRIES, EXP_SHARE_SPRITE, STAT_LABEL, VITAMIN_STAT_CUTOFF, STAT_EXP_VITAMIN_CEILING, FALLBACK_SPRITE, FALLBACK_ONERROR } from '../lib/constants.js';
+import { POWER_ITEMS, MACHO_BRACE_SPRITE, VITAMINS, FEATHERS, EV_BERRIES, EXP_SHARE_SPRITE, STAT_LABEL, VITAMIN_STAT_CUTOFF, STAT_EXP_VITAMIN_CEILING, FALLBACK_SPRITE, FALLBACK_ONERROR } from '../lib/constants.js';
 import { titleCase, formatEvYield, escapeHtml, dayKey, dayLabel } from '../lib/utils.js';
 import { store } from '../lib/services.js';
 import { attachDesignSystem } from '../lib/design-system.js';
@@ -56,6 +56,31 @@ export class EvHistoryLog extends HTMLElement {
           color: var(--ink-soft); line-height: 1; padding: var(--space-2);
         }
         .delete-hist-btn:hover { color: var(--poke-red); }
+        /* One Save committing several events at once (the Level popup's
+           level + stat readings, or the Items popup's queued Vitamin/
+           Wing/berry clicks) collapses into one entry instead of
+           flooding the log — reads exactly like a plain entry (icon +
+           summary line) so it doesn't stand out as a different kind of
+           row, just an expandable one. The <details>/<summary> is only
+           the mechanism; no group-wide delete exists on purpose — only
+           the individual entries revealed inside can be deleted. */
+        ul.hist-list li.hist-batch { display: block; }
+        ul.hist-list li.hist-batch details { display: block; }
+        ul.hist-list li.hist-batch summary {
+          display: flex; align-items: center; gap: var(--space-2) var(--space-3);
+          cursor: pointer; list-style: none;
+        }
+        ul.hist-list li.hist-batch summary::-webkit-details-marker { display: none; }
+        ul.hist-list li.hist-batch summary > div { flex: 1 1 140px; min-width: 0; }
+        /* A chevron stands in for the delete button's column, so the
+           summary row lines up with every plain entry's icon/text/action
+           layout above and below it. */
+        .hist-batch-chevron { flex: 0 0 auto; color: var(--ink-soft); font-size: var(--font-size-input); padding: var(--space-2); }
+        ul.hist-list li.hist-batch details[open] .hist-batch-chevron { transform: rotate(90deg); }
+        ul.hist-list .hist-batch-items {
+          list-style: none; margin: var(--space-3) 0 0; padding-left: var(--space-4);
+          border-left: 2px solid var(--lcd-line); display: grid; gap: var(--space-3);
+        }
       </style>
       <details class="history ds-disclosure">
         <summary>History (<span class="hist-count">0</span>)</summary>
@@ -111,19 +136,162 @@ export class EvHistoryLog extends HTMLElement {
   // Groups consecutive same-day history entries under one date heading.
   // `history` is already newest-first (each store mutation unshifts), so
   // grouping in place — without re-sorting — keeps both the day order and
-  // the entries within each day newest-first.
+  // the entries within each day newest-first. Within a day, a further run
+  // of consecutive entries sharing both the same batchId — everything one
+  // Save committed together as a single user action (lib/store.js's
+  // makeEvent) — *and* the same `_batchGroupKey` collapses into one
+  // collapsible entry, so e.g. a Level popup Save's level change and its
+  // stat readings group together, but an Items popup Save's vitamins and
+  // berries get their own separate group each rather than one mixed blob.
+  // Entries with no batchId (most kinds — it's opt-in per call site) are
+  // never grouped, each staying its own top-level entry as before.
   _listHtml(history) {
     let html = '';
     let lastKey = null;
-    for (const h of history) {
+    let i = 0;
+    while (i < history.length) {
+      const h = history[i];
       const key = dayKey(h.timestamp);
       if (key !== lastKey) {
         html += `<li class="hist-date">${dayLabel(h.timestamp)}</li>`;
         lastKey = key;
       }
-      html += this._itemHtml(h);
+      let j = i + 1;
+      if (h.batchId) {
+        const groupKey = this._batchGroupKey(h);
+        while (j < history.length && history[j].batchId === h.batchId && this._batchGroupKey(history[j]) === groupKey) j++;
+      }
+      const batch = history.slice(i, j);
+      html += batch.length > 1 ? this._batchHtml(batch) : this._itemHtml(h);
+      i = j;
     }
     return html;
+  }
+
+  // 'level' and 'stat-reading' share one group (a level-up's readings
+  // belong with it); every other kind groups only with its own kind, so
+  // Vitamins/Wings/berries queued together in one Items-popup Save still
+  // get their own separate entry each instead of one mixed "5 things".
+  /** @param {any} h @returns {string} */
+  _batchGroupKey(h) {
+    return h.kind === 'level' || h.kind === 'stat-reading' ? 'level' : h.kind;
+  }
+
+  /**
+   * One collapsible entry for a run of same-batchId, same-kind-group
+   * events — reads like any other entry (icon + title + gain line), with
+   * a chevron standing in for the usual delete button's column since
+   * there's no group-wide delete; expanding it reveals every individual
+   * entry nested, each still its own deletable item.
+   * @param {any[]} batch
+   */
+  _batchHtml(batch) {
+    const { title, gain } = this._batchContent(batch);
+    return `<li class="hist-batch">
+      <details>
+        <summary>
+          <img src="${this._batchIcon(batch)}" alt="" ${FALLBACK_ONERROR} />
+          <div>
+            <strong>${escapeHtml(title)}</strong>
+            ${gain ? `<span class="gain">${escapeHtml(gain)}</span>` : ''}
+          </div>
+          <span class="hist-batch-chevron" aria-hidden="true">▸</span>
+        </summary>
+        <ul class="hist-batch-items">${batch.map((h) => this._itemHtml(h)).join('')}</ul>
+      </details>
+    </li>`;
+  }
+
+  // A Vitamin/Wing/berry/held-item batch is always the *same* item (or,
+  // for held-item, the one thing it ended up set to) — show its own
+  // icon instead of the generic species sprite, since it reads as "here
+  // is what was fed/equipped" rather than "here is what happened to this
+  // Pokémon" the way the level/evolve groups do.
+  /** @param {any[]} batch @returns {string} */
+  _batchIcon(batch) {
+    const kind = this._batchGroupKey(batch[0]);
+    if (kind === 'vitamin') return VITAMINS.find((v) => v.id === batch[0].vitaminId)?.sprite || FALLBACK_SPRITE;
+    if (kind === 'feather') return FEATHERS.find((f) => f.id === batch[0].featherId)?.sprite || FALLBACK_SPRITE;
+    if (kind === 'berry') return EV_BERRIES.find((b) => b.id === batch[0].berryId)?.sprite || FALLBACK_SPRITE;
+    if (kind === 'held-item') {
+      const h = batch[0];
+      if (h.machoBrace) return MACHO_BRACE_SPRITE;
+      if (h.powerItem) return POWER_ITEMS.find((p) => p.id === h.powerItem)?.sprite || FALLBACK_SPRITE;
+      return FALLBACK_SPRITE; // cleared to no item — nothing specific to show
+    }
+    return this._entry.sprite || FALLBACK_SPRITE; // level/evolve group
+  }
+
+  // Same id (e.g. every "Calcium" in the batch) collapses into one row
+  // with its `applied` amounts summed — "10 vitamins" as a title but
+  // "Calcium +100 SPA" as the gain, not ten repeated "+10 SPA"s.
+  /** @param {any[]} chronological @param {string} idKey @returns {any[]} */
+  _mergeByItem(chronological, idKey) {
+    const order = [];
+    const totals = new Map();
+    for (const h of chronological) {
+      const id = h[idKey];
+      if (!totals.has(id)) {
+        totals.set(id, { ...h, applied: 0 });
+        order.push(id);
+      }
+      totals.get(id).applied += h.applied || 0;
+    }
+    return order.map((id) => totals.get(id));
+  }
+
+  /** @param {any[]} batch @returns {{ title: string, gain: string }} */
+  _batchContent(batch) {
+    const count = batch.length;
+    // batch is newest-first (like the rest of history) — reverse to the
+    // order they were actually clicked/applied in for the summary line,
+    // which reads more naturally left-to-right than newest-first would.
+    const chronological = [...batch].reverse();
+    if (this._batchGroupKey(batch[0]) === 'level') {
+      const level = batch.find((h) => h.kind === 'level');
+      const readings = chronological.filter((h) => h.kind === 'stat-reading');
+      const title = level
+        ? `${level.toLevel > level.fromLevel ? 'Level up' : 'Level correction'} to Lv. ${level.toLevel}`
+        : `${readings.length} stat reading${readings.length === 1 ? '' : 's'} logged`;
+      const gain = level
+        ? readings.length
+          ? `${readings.length} stat reading${readings.length === 1 ? '' : 's'} logged`
+          : ''
+        : readings.map((r) => `${STAT_LABEL[r.statKey]} ${r.observedStat}`).join(', ');
+      return { title, gain };
+    }
+    if (batch[0].kind === 'vitamin') {
+      const gain = this._mergeByItem(chronological, 'vitaminId')
+        .map((h) => {
+          const vitamin = VITAMINS.find((v) => v.id === h.vitaminId);
+          const label = h.linkedStat ? 'SPC' : STAT_LABEL[h.stat];
+          return `${vitamin?.label ?? h.vitaminId} ${h.applied ? `+${h.applied} ${label}` : '(no gain)'}`;
+        })
+        .join(', ');
+      return { title: `${count} vitamin${count === 1 ? '' : 's'}`, gain };
+    }
+    if (batch[0].kind === 'feather') {
+      const gain = this._mergeByItem(chronological, 'featherId')
+        .map((h) => {
+          const feather = FEATHERS.find((f) => f.id === h.featherId);
+          return `${feather?.label ?? h.featherId} ${h.applied ? `+${h.applied} ${STAT_LABEL[h.stat]}` : '(no gain)'}`;
+        })
+        .join(', ');
+      return { title: `${count} Wing${count === 1 ? '' : 's'}`, gain };
+    }
+    if (batch[0].kind === 'berry') {
+      const gain = this._mergeByItem(chronological, 'berryId')
+        .map((h) => {
+          const berry = EV_BERRIES.find((b) => b.id === h.berryId);
+          return `${berry?.label ?? h.berryId} ${h.applied ? `−${h.applied} ${STAT_LABEL[h.stat]}` : '(no change)'}`;
+        })
+        .join(', ');
+      return { title: `${count} ${count === 1 ? 'berry' : 'berries'}`, gain };
+    }
+    if (batch[0].kind === 'held-item') {
+      return { title: `${count} held item change${count === 1 ? '' : 's'}`, gain: '' };
+    }
+    return { title: `${count} events logged together`, gain: '' };
   }
 
   _itemHtml(h) {
@@ -233,6 +401,32 @@ export class EvHistoryLog extends HTMLElement {
         <div>
           <strong>${h.active ? 'Exp. Share equipped' : 'Exp. Share removed'}</strong>
           <span class="gain">${h.active ? 'Now earns EVs from other battles' : 'No longer earns EVs from other battles'}</span>
+        </div>
+        <span class="hist-actions">
+          <button class="delete-hist-btn" type="button" data-id="${h.id}" title="Delete this log entry" aria-label="Delete this log entry">✕</button>
+        </span>
+      </li>`;
+    }
+    if (h.kind === 'held-item') {
+      const item = h.powerItem ? POWER_ITEMS.find((p) => p.id === h.powerItem) : null;
+      const sprite = h.machoBrace ? MACHO_BRACE_SPRITE : item?.sprite;
+      const label = h.machoBrace ? 'Macho Brace' : item?.label;
+      return `<li>
+        <img src="${sprite || FALLBACK_SPRITE}" alt="" ${FALLBACK_ONERROR} />
+        <div>
+          <strong>${label ? `${label} equipped` : 'Held item removed'}</strong>
+        </div>
+        <span class="hist-actions">
+          <button class="delete-hist-btn" type="button" data-id="${h.id}" title="Delete this log entry" aria-label="Delete this log entry">✕</button>
+        </span>
+      </li>`;
+    }
+    if (h.kind === 'stat-reading') {
+      return `<li>
+        <img src="${this._entry.sprite || FALLBACK_SPRITE}" alt="" ${FALLBACK_ONERROR} />
+        <div>
+          <strong>${STAT_LABEL[h.statKey]} reading logged</strong>
+          <span class="gain">${h.observedStat} at Lv. ${h.level}</span>
         </div>
         <span class="hist-actions">
           <button class="delete-hist-btn" type="button" data-id="${h.id}" title="Delete this log entry" aria-label="Delete this log entry">✕</button>

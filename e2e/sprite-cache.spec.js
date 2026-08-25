@@ -93,11 +93,18 @@ test.describe('Sprite cache manager', () => {
 
     // Toggling reloads the page — a real reload, not SPA navigation, but
     // the URL (a hash route) survives it, so the router lands back on
-    // this same page automatically once it settles.
+    // this same page automatically once it settles. Unchecking clears
+    // the stored flag (lib/dev-cache.js), but this suite runs against
+    // localhost, which forces caching disabled regardless of the flag
+    // (docs/adr/0004 point 6) — so the checkbox reflects that *effective*
+    // state and stays checked even once the flag itself is gone. (There's
+    // no way to click it back to an explicit '1' from here: it's already
+    // displayed as checked, so the next click would only uncheck it
+    // again — this override is one-directional on localhost by design.)
     await Promise.all([page.waitForEvent('load'), toggle.click()]);
-    await expect(page.getByRole('checkbox', { name: 'Disable caching' })).not.toBeChecked();
     const flag = await page.evaluate(() => localStorage.getItem('effortdex:dev-no-cache'));
     expect(flag).toBeNull();
+    await expect(page.getByRole('checkbox', { name: 'Disable caching' })).toBeChecked();
   });
 
   test('lives at #/settings/cache, and its back link returns to Settings specifically, not the party picker', async ({ page }) => {

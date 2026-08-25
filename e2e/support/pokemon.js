@@ -60,15 +60,29 @@ export async function openDetail(page, species) {
 }
 
 /**
- * Opens a caught Pokémon's "More options" dialog (vitamins, training
- * items, Pokérus, Exp. Share, evolution, level & nature all live there)
- * from its already-open detail card, and returns the dialog's locator.
+ * Opens the Items popup from the card header's item badge — Training
+ * item/Macho Brace, Exp. Share, Vitamins, Wings, and EV-reducing berries
+ * all live there (docs/adr/0017) and all apply instantly, no Save button
+ * — they're cheap to undo (re-click, or delete the History entry).
  * @param {import('@playwright/test').Locator} card
  */
-export async function openMoreOptions(card) {
-  await card.getByRole('button', { name: 'More' }).click();
-  await card.getByRole('menuitem', { name: 'Training & EVs' }).click();
-  const dialog = card.locator('dialog.more-dialog');
+export async function openItemDialog(card) {
+  await card.locator('.held-item-btn').click();
+  const dialog = card.locator('dialog.item-dialog');
+  await dialog.waitFor({ state: 'visible' });
+  return dialog;
+}
+
+/**
+ * Opens the Nature popup from the card header's nature badge (shows
+ * "Set nature" until one is picked). Unlike the Items popup, Nature has
+ * no History event to cheaply undo (ADR 0006), so it stays preview-then-
+ * Save (docs/adr/0017) — nothing applies until its own "Save" is clicked.
+ * @param {import('@playwright/test').Locator} card
+ */
+export async function openNatureDialog(card) {
+  await card.locator('.nature-btn').click();
+  const dialog = card.locator('dialog.nature-dialog');
   await dialog.waitFor({ state: 'visible' });
   return dialog;
 }
@@ -97,6 +111,20 @@ export async function openIvs(card) {
   await card.getByRole('button', { name: 'More' }).click();
   await card.getByRole('menuitem', { name: 'IVs' }).click();
   const dialog = card.locator('dialog.iv-dialog');
+  await dialog.waitFor({ state: 'visible' });
+  return dialog;
+}
+
+/**
+ * Opens the Level popup from the card header's level button — the one
+ * place to set level (a same-or-lower value applies and stops there; an
+ * actual increase reveals stat-reading rows and, if applicable, an
+ * evolution section).
+ * @param {import('@playwright/test').Locator} card
+ */
+export async function openLevelUpDialog(card) {
+  await card.getByTitle('Set level').click();
+  const dialog = card.locator('dialog.level-up-dialog');
   await dialog.waitFor({ state: 'visible' });
   return dialog;
 }

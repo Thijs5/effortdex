@@ -1,7 +1,7 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 import { createParty } from './support/party.js';
-import { catchPokemon, openDetail, openMoreOptions, logBattle } from './support/pokemon.js';
+import { catchPokemon, openDetail, openItemDialog, logBattle } from './support/pokemon.js';
 import { mockPokeApi } from './support/pokeapi-mock.js';
 
 // EV training mechanics — how the six per-stat values fill up, per
@@ -36,9 +36,10 @@ test.describe('EV training', () => {
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
     await catchPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
-    const dialog = await openMoreOptions(card);
+    const dialog = await openItemDialog(card);
 
     await dialog.locator('[data-id="protein"] button').click();
+    await dialog.locator('.item-dialog-save-btn').click();
 
     await expect(card.locator('ev-summary ev-bar[data-key="atk"]').locator('.value')).toHaveText('10/252');
   });
@@ -48,14 +49,16 @@ test.describe('EV training', () => {
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
     await catchPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
-    const dialog = await openMoreOptions(card);
+    const dialog = await openItemDialog(card);
+    const proteinBtn = dialog.locator('[data-id="protein"] button');
 
-    // 10 Proteins reach exactly 100 Atk EVs — the cutoff threshold.
-    for (let i = 0; i < 10; i++) await dialog.locator('[data-id="protein"] button').click();
-    await expect(card.locator('ev-summary ev-bar[data-key="atk"]').locator('.value')).toHaveText('100/252');
+    // 10 Proteins reach exactly 100 Atk EVs — the cutoff threshold — and
+    // queuing an 11th is blocked outright (disabled, not just a no-op
+    // click) once the simulated total hits it.
+    for (let i = 0; i < 10; i++) await proteinBtn.click();
+    await expect(proteinBtn).toBeDisabled();
 
-    // An 11th does nothing more — the cutoff, not the 252 cap, stops it.
-    await dialog.locator('[data-id="protein"] button').click();
+    await dialog.locator('.item-dialog-save-btn').click();
     await expect(card.locator('ev-summary ev-bar[data-key="atk"]').locator('.value')).toHaveText('100/252');
   });
 
@@ -64,9 +67,10 @@ test.describe('EV training', () => {
     await createParty(page, { name: 'Shield Playthrough', baseGame: 'Shield' });
     await catchPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
-    const dialog = await openMoreOptions(card);
+    const dialog = await openItemDialog(card);
 
     for (let i = 0; i < 11; i++) await dialog.locator('[data-id="protein"] button').click();
+    await dialog.locator('.item-dialog-save-btn').click();
 
     await expect(card.locator('ev-summary ev-bar[data-key="atk"]').locator('.value')).toHaveText('110/252');
   });
@@ -76,10 +80,10 @@ test.describe('EV training', () => {
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
     await catchPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
-    const dialog = await openMoreOptions(card);
+    const itemDialog = await openItemDialog(card);
 
-    await dialog.locator('.item-grid [data-id="macho-brace"] button').click();
-    await dialog.getByRole('button', { name: 'Close' }).click();
+    await itemDialog.locator('.item-grid [data-id="macho-brace"] button').click();
+    await itemDialog.locator('.item-dialog-save-btn').click(); // Save closes the dialog
     await logBattle(card, 'Caterpie'); // base +1 HP, doubled to +2
 
     await expect(card.locator('ev-summary ev-bar[data-key="hp"]').locator('.value')).toHaveText('2/252');
@@ -90,12 +94,15 @@ test.describe('EV training', () => {
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
     await catchPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
-    const dialog = await openMoreOptions(card);
 
+    let dialog = await openItemDialog(card);
     await dialog.locator('[data-id="protein"] button').click();
+    await dialog.locator('.item-dialog-save-btn').click();
     await expect(card.locator('ev-summary ev-bar[data-key="atk"]').locator('.value')).toHaveText('10/252');
 
+    dialog = await openItemDialog(card);
     await dialog.locator('[data-id="kelpsy"] button').click();
+    await dialog.locator('.item-dialog-save-btn').click();
     await expect(card.locator('ev-summary ev-bar[data-key="atk"]').locator('.value')).toHaveText('0/252');
   });
 
@@ -104,10 +111,102 @@ test.describe('EV training', () => {
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Black' });
     await catchPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
-    const dialog = await openMoreOptions(card);
+    const dialog = await openItemDialog(card);
 
     for (let i = 0; i < 3; i++) await dialog.locator('[data-id="genius-wing"] button').click();
+    await dialog.locator('.item-dialog-save-btn').click();
 
     await expect(card.locator('ev-summary ev-bar[data-key="spa"]').locator('.value')).toHaveText('3/252');
+  });
+
+  test('Save applies every queued Vitamin/Wing/berry click and closes the Items popup; queued and already-fed counts are shown separately', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
+    await catchPokemon(page, 'Bulbasaur');
+    const card = await openDetail(page, 'Bulbasaur');
+    const proteinBtn1 = (await openItemDialog(card)).locator('[data-id="protein"] button');
+
+    // Two queued clicks apply nothing until Save.
+    await proteinBtn1.click();
+    await proteinBtn1.click();
+    await expect(card.locator('ev-summary ev-bar[data-key="atk"]').locator('.value')).toHaveText('0/252');
+    await expect(proteinBtn1).toContainText('2× queued');
+
+    const dialog1 = card.locator('dialog.item-dialog');
+    await dialog1.locator('.item-dialog-save-btn').click();
+    await expect(dialog1).toBeHidden(); // Save applies everything queued and closes, unlike the old instant-apply flow
+    await expect(card.locator('ev-summary ev-bar[data-key="atk"]').locator('.value')).toHaveText('20/252');
+
+    // Reopening shows "fed 2×" (history, permanent) with nothing queued this session.
+    const proteinDialog2 = await openItemDialog(card);
+    await expect(proteinDialog2.locator('[data-id="protein"]')).toHaveAttribute('title', /fed 2×/);
+    await expect(proteinDialog2.locator('[data-id="protein"] button')).not.toContainText('queued');
+  });
+
+  test('Save groups every queued click into one history entry, styled like any other entry, with no group-wide delete', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
+    await catchPokemon(page, 'Bulbasaur');
+    const card = await openDetail(page, 'Bulbasaur');
+    const dialog = await openItemDialog(card);
+
+    await dialog.locator('[data-id="protein"] button').click();
+    await dialog.locator('[data-id="iron"] button').click();
+    await dialog.locator('.item-dialog-save-btn').click();
+    await expect(dialog).toBeHidden();
+
+    await card.getByText(/History/).click();
+    const histLog = card.locator('ev-history-log');
+    const batch = histLog.locator('li.hist-batch');
+    await expect(batch.locator('summary strong')).toHaveText('2 vitamins');
+    await expect(batch.locator('summary .gain')).toHaveText('Protein +10 ATK, Iron +10 DEF'); // second line, like any other entry
+    await expect(batch.locator('summary img')).toBeVisible(); // reads like any other entry: icon + summary
+    await expect(batch.getByRole('button', { name: 'Delete this log entry' })).toHaveCount(0); // no group-wide delete
+
+    await batch.locator('summary').click();
+    const nested = histLog.locator('.hist-batch-items li');
+    await expect(nested).toHaveCount(2);
+    await expect(nested.getByRole('button', { name: 'Delete this log entry' })).toHaveCount(2); // each nested entry still deletable on its own
+  });
+
+  test('10 of the same vitamin collapses to one summed total, not ten repeated lines, with that vitamin\'s own icon', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
+    await catchPokemon(page, 'Bulbasaur');
+    const card = await openDetail(page, 'Bulbasaur');
+    const dialog = await openItemDialog(card);
+    const calciumBtn = dialog.locator('[data-id="calcium"] button');
+
+    for (let i = 0; i < 10; i++) await calciumBtn.click();
+    await dialog.locator('.item-dialog-save-btn').click();
+    await expect(dialog).toBeHidden();
+
+    await card.getByText(/History/).click();
+    const batch = card.locator('ev-history-log li.hist-batch');
+    await expect(batch.locator('summary strong')).toHaveText('10 vitamins');
+    await expect(batch.locator('summary .gain')).toHaveText('Calcium +100 SPA'); // one summed line, not ten "+10 SPA"s
+    await expect(batch.locator('summary img')).toHaveAttribute('src', /calcium/); // the specific item's own icon, not the species sprite
+  });
+
+  test('a Save mixing multiple item kinds groups each kind into its own entry, not one mixed blob', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
+    await catchPokemon(page, 'Bulbasaur');
+    const card = await openDetail(page, 'Bulbasaur');
+    const dialog = await openItemDialog(card);
+
+    await dialog.locator('[data-id="protein"] button').click();
+    await dialog.locator('[data-id="iron"] button').click();
+    await dialog.locator('[data-id="kelpsy"] button').click(); // reduces ATK — must see the queued Protein via the shared simulated EVs
+    await dialog.locator('.item-dialog-save-btn').click();
+    await expect(dialog).toBeHidden();
+
+    await card.getByText(/History/).click();
+    const histLog = card.locator('ev-history-log');
+    // Two vitamins group together; the lone berry doesn't need batch
+    // treatment at all and stays a plain top-level entry.
+    await expect(histLog.locator('li.hist-batch')).toHaveCount(1);
+    await expect(histLog.locator('li.hist-batch summary strong')).toHaveText('2 vitamins');
+    await expect(histLog.locator('ul.hist-list > li').filter({ hasText: 'Kelpsy Berry' })).toBeVisible();
   });
 });

@@ -1,13 +1,13 @@
 import { attachDesignSystem } from '../lib/design-system.js';
 import './ds-item-button.js';
 
-/** @typedef {{ id: string, label: string, sprite: string, boost: string, title: string, active?: boolean, capped?: boolean, count?: number }} ItemButtonSpec */
+/** @typedef {{ id: string, label: string, sprite: string, boost: string, title: string, active?: boolean, capped?: boolean, count?: number, disabled?: boolean }} ItemButtonSpec */
 
 /**
  * <item-button-grid> — a grid of icon+label+boost buttons: training
  * items, vitamins, Wings and EV-reducing berries all use this same
  * shape (see caught-pokemon-detail.js). Set `.items` to
- *   [{ id, label, sprite, boost, title, active?, capped?, count? }]
+ *   [{ id, label, sprite, boost, title, active?, capped?, count?, disabled? }]
  * and it rebuilds its buttons from scratch — these lists never exceed a
  * handful of entries, so a full rebuild on every render is cheap, same
  * "rebuild rather than patch" convention as the rest of the app (see
@@ -16,9 +16,12 @@ import './ds-item-button.js';
  * training item); `capped`/`count` instead decorate a button that can
  * be clicked repeatedly with no selection state (vitamins/Wings/
  * berries) — the two are independent, a button can use either, both or
- * neither. Clicking a button fires `item-pick` with `{ id }` in its
- * detail; nothing about Store, EVs or capped rules lives here — callers
- * decide what a pick means and compute `capped`/`title` themselves.
+ * neither. `disabled` actually blocks the click (unlike `capped`, which
+ * is purely a visual dimming) — used once queuing another pending click
+ * genuinely couldn't add/remove anything more. Clicking a button fires
+ * `item-pick` with `{ id }` in its detail; nothing about Store, EVs or
+ * capped rules lives here — callers decide what a pick means and
+ * compute `capped`/`disabled`/`title` themselves.
  * `columns` (attribute) sets the grid's column count, default 3.
  */
 export class ItemButtonGrid extends HTMLElement {
@@ -36,6 +39,14 @@ export class ItemButtonGrid extends HTMLElement {
       <style>
         :host { display: block; }
         .grid { display: grid; grid-template-columns: repeat(var(--columns, 3), 1fr); gap: var(--space-2); }
+        /* A multi-column grid leaves too little width per button on a
+           narrow phone for the sprite + label + boost text to fit
+           without clipping against the dialog's own edge — stack to one
+           column there instead, regardless of how many columns this
+           instance normally uses. */
+        @media (max-width: 420px) {
+          .grid { grid-template-columns: 1fr; }
+        }
       </style>
       <div class="grid"></div>
     `;
@@ -72,6 +83,7 @@ export class ItemButtonGrid extends HTMLElement {
       btn.setAttribute('boost', item.boost);
       if (item.active !== undefined) btn.toggleAttribute('active', item.active);
       if (item.capped) btn.toggleAttribute('capped', true);
+      if (item.disabled) btn.toggleAttribute('disabled', true);
       if (item.count !== undefined) btn.setAttribute('count', String(item.count));
       this.$grid.appendChild(btn);
     }

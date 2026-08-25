@@ -1,7 +1,7 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 import { createParty } from './support/party.js';
-import { catchPokemon, openDetail, openMoreOptions, logBattle } from './support/pokemon.js';
+import { catchPokemon, openDetail, openItemDialog, logBattle } from './support/pokemon.js';
 import { mockPokeApi } from './support/pokeapi-mock.js';
 
 // Generation I/II's Stat Experience system (lib/store.js's
@@ -34,13 +34,14 @@ test.describe('Gen I/II Stat Experience', () => {
     await createParty(page, { name: 'Crystal run', baseGame: 'Crystal' });
     await catchPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
-    const dialog = await openMoreOptions(card);
+    const dialog = await openItemDialog(card);
+    const proteinBtn = dialog.locator('[data-id="protein"] button');
 
-    for (let i = 0; i < 10; i++) await dialog.locator('[data-id="protein"] button').click();
-    await expect(card.locator('ev-summary ev-bar[data-key="atk"]').locator('.value')).toHaveText('25600/65535');
+    for (let i = 0; i < 10; i++) await proteinBtn.click();
+    // An 11th is blocked outright — a 25,600 value ceiling, not a use counter.
+    await expect(proteinBtn).toBeDisabled();
 
-    // The 11th does nothing — a 25,600 value ceiling, not a use counter.
-    await dialog.locator('[data-id="protein"] button').click();
+    await dialog.locator('.item-dialog-save-btn').click();
     await expect(card.locator('ev-summary ev-bar[data-key="atk"]').locator('.value')).toHaveText('25600/65535');
 
     // No total row at all under Stat Experience (unlike Gen III+'s 510 cap).
@@ -55,9 +56,10 @@ test.describe('Gen I/II Stat Experience', () => {
 
     await expect(card.locator('ev-summary ev-bar[data-key="spd"]')).toBeHidden();
 
-    const dialog = await openMoreOptions(card);
+    const dialog = await openItemDialog(card);
     await expect(dialog.locator('[data-id="zinc"]')).toBeHidden();
     await dialog.locator('[data-id="calcium"] button').click();
+    await dialog.locator('.item-dialog-save-btn').click();
 
     await expect(card.locator('ev-summary ev-bar[data-key="spa"]').locator('.value')).toHaveText('2560/65535');
   });
@@ -105,7 +107,7 @@ test.describe('Gen I/II Stat Experience', () => {
     await createParty(page, { name: 'Red run', baseGame: 'Red' });
     await catchPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
-    const dialog = await openMoreOptions(card);
+    const dialog = await openItemDialog(card);
 
     await expect(dialog.locator('.pokerus-toggle-btn button')).toBeDisabled();
   });
@@ -115,8 +117,30 @@ test.describe('Gen I/II Stat Experience', () => {
     await createParty(page, { name: 'Gold run', baseGame: 'Gold' });
     await catchPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
-    const dialog = await openMoreOptions(card);
+    const dialog = await openItemDialog(card);
 
     await expect(dialog.locator('.pokerus-toggle-btn button')).toBeEnabled();
+  });
+
+  // Regression: the header's item badge used to hide itself entirely
+  // whenever this party's generation has no held-item mechanic at all
+  // (pre-Gen III) — reasonable while it only opened a "held item" picker,
+  // but once Vitamins/Pokérus/Exp. Share moved into that same Items
+  // popup (docs/adr/0017), hiding the badge also cut off the only way to
+  // reach those on a Gen I/II party. It must stay visible (as a generic
+  // "Items" label, not a misleading "No item") regardless of generation.
+  test('the item badge stays visible on a Gen I party, even with no held-item mechanic at all', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Red run', baseGame: 'Red' });
+    await catchPokemon(page, 'Bulbasaur');
+    const card = await openDetail(page, 'Bulbasaur');
+
+    const itemBtn = card.getByRole('button', { name: 'Items', exact: true });
+    await expect(itemBtn).toBeVisible();
+    await itemBtn.click();
+    const dialog = card.locator('dialog.item-dialog');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator('.vitamin-grid')).toBeVisible();
+    await expect(dialog.locator('.pokerus-toggle-btn')).toBeVisible();
   });
 });
