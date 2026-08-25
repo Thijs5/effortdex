@@ -1,7 +1,11 @@
-import { FALLBACK_SPRITE, FALLBACK_ONERROR } from '../lib/constants.js';
+import { FALLBACK_SPRITE } from '../lib/constants.js';
 import { titleCase, escapeHtml } from '../lib/utils.js';
 import { api, store } from '../lib/services.js';
 import { attachDesignSystem } from '../lib/design-system.js';
+import './ds-item-button.js';
+
+/** @typedef {import('../lib/store.js').RosterEntry} RosterEntry */
+/** @typedef {import('../lib/pokeapi-client.js').EvolutionNode} EvolutionNode */
 
 /**
  * <evolution-chain> — a caught Pokémon's whole evolution family rendered
@@ -19,6 +23,7 @@ import { attachDesignSystem } from '../lib/design-system.js';
 export class EvolutionChain extends HTMLElement {
   constructor() {
     super();
+    /** @type {RosterEntry|null} */
     this._entry = null;
 
     const shadow = this.attachShadow({ mode: 'open' });
@@ -30,27 +35,25 @@ export class EvolutionChain extends HTMLElement {
         .evo-chain { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
         .evo-stage { display: flex; flex-direction: column; gap: var(--space-2); }
         .evo-arrow { color: var(--ink-soft); font-size: var(--font-size-md); }
-        .evo-node:disabled { cursor: default; opacity: 0.5; }
-        .evo-node--current { border-color: var(--teal); color: var(--teal-strong); background: var(--teal-soft); opacity: 1; }
-        .evo-node:not(:disabled):hover { border-color: var(--teal); color: var(--teal-strong); }
         .evolve-status { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--teal); min-height: 1em; }
       </style>
       <p class="evo-note" hidden></p>
       <div class="evo-chain"></div>
       <p class="evolve-status" aria-live="polite"></p>
     `;
-    this.$note = shadow.querySelector('.evo-note');
-    this.$chain = shadow.querySelector('.evo-chain');
-    this.$status = shadow.querySelector('.evolve-status');
+    this.$note = /** @type {HTMLElement} */ (shadow.querySelector('.evo-note'));
+    this.$chain = /** @type {HTMLElement} */ (shadow.querySelector('.evo-chain'));
+    this.$status = /** @type {HTMLElement} */ (shadow.querySelector('.evolve-status'));
 
-    this.$chain.addEventListener('click', (e) => {
-      const btn = e.target.closest('button[data-action]');
-      if (!btn) return;
-      if (btn.dataset.action === 'evolve') this._evolveInto(btn.dataset.name);
+    this.$chain.addEventListener('pick', (e) => {
+      const btn = /** @type {HTMLElement} */ (e.target).closest('[data-action]');
+      if (!(btn instanceof HTMLElement)) return;
+      if (btn.dataset.action === 'evolve') this._evolveInto(/** @type {string} */ (btn.dataset.name));
       else if (btn.dataset.action === 'undo') this._undoEvolve();
     });
   }
 
+  /** @param {RosterEntry|null} e */
   set entry(e) {
     this._entry = e;
     this._renderNote();
@@ -76,20 +79,21 @@ export class EvolutionChain extends HTMLElement {
     this.$chain.innerHTML = '';
     this.$status.textContent = 'Loading evolution chain…';
     try {
-      const nodes = await api.getEvolutionChain(this._entry.speciesName);
+      const nodes = await api.getEvolutionChain(/** @type {RosterEntry} */ (this._entry).speciesName);
       const mons = await Promise.all(
-        nodes.map((n) => api.getPokemon(n.name).catch(() => ({ name: n.name, sprite: null })))
+        nodes.map((n) => api.getPokemon(n.name).catch(() => ({ name: n.name, sprite: /** @type {string|null} */ (null) })))
       );
       const spriteByName = new Map(mons.map((m) => [m.name, m.sprite]));
       this.$status.textContent = '';
       this._renderChain(nodes, spriteByName);
     } catch (err) {
-      this.$status.textContent = err.message || 'Could not load the evolution chain.';
+      this.$status.textContent = err instanceof Error ? err.message : 'Could not load the evolution chain.';
     }
   }
 
+  /** @param {EvolutionNode[]} nodes @param {Map<string, string|null>} spriteByName */
   _renderChain(nodes, spriteByName) {
-    const currentName = this._entry.speciesName.toLowerCase();
+    const currentName = /** @type {RosterEntry} */ (this._entry).speciesName.toLowerCase();
     const currentNode = nodes.find((n) => n.name === currentName);
     const nextNames = new Set(nodes.filter((n) => n.parent === currentName).map((n) => n.name));
     const prevName = currentNode?.parent ?? null;
@@ -110,38 +114,43 @@ export class EvolutionChain extends HTMLElement {
   // training item and vitamin buttons. The lighter line is the level
   // requirement for evolving into that node, when it evolves by
   // level-up — root forms and trade/item/friendship evolutions have none.
+  /**
+   * @param {EvolutionNode} node
+   * @param {string} currentName
+   * @param {string|null} prevName
+   * @param {Set<string>} nextNames
+   * @param {Map<string, string|null>} spriteByName
+   */
   _nodeHtml(node, currentName, prevName, nextNames, spriteByName) {
     const label = titleCase(node.name);
     const sprite = spriteByName.get(node.name) || FALLBACK_SPRITE;
     const boost = node.minLevel ? `Lv. ${node.minLevel}` : '';
-    const inner = `<img class="ds-item-icon" src="${sprite}" alt="" ${FALLBACK_ONERROR} />
-      <span class="ds-item-btn-text">
-        <span class="ds-item-btn-label">${label}</span>
-        ${boost ? `<span class="ds-item-btn-boost">${boost}</span>` : ''}
-      </span>`;
+    const attrs = `icon="${escapeHtml(sprite)}" label="${escapeHtml(label)}" boost="${escapeHtml(boost)}"`;
 
     if (node.name === currentName) {
-      return `<button type="button" class="ds-item-btn evo-node evo-node--current" disabled title="Current form">${inner}</button>`;
+      return `<ds-item-button ${attrs} active disabled title="Current form"></ds-item-button>`;
     }
     if (node.name === prevName) {
-      return `<button type="button" class="ds-item-btn evo-node" data-action="undo" data-name="${escapeHtml(node.name)}" title="Undo evolution — revert to ${label}">${inner}</button>`;
+      return `<ds-item-button ${attrs} data-action="undo" data-name="${escapeHtml(node.name)}" title="Undo evolution — revert to ${label}"></ds-item-button>`;
     }
     if (nextNames.has(node.name)) {
-      return `<button type="button" class="ds-item-btn evo-node" data-action="evolve" data-name="${escapeHtml(node.name)}" title="Evolve into ${label}">${inner}</button>`;
+      return `<ds-item-button ${attrs} data-action="evolve" data-name="${escapeHtml(node.name)}" title="Evolve into ${label}"></ds-item-button>`;
     }
-    return `<button type="button" class="ds-item-btn evo-node" disabled title="${label} — not directly reachable from here">${inner}</button>`;
+    return `<ds-item-button ${attrs} disabled title="${label} — not directly reachable from here"></ds-item-button>`;
   }
 
+  /** @param {string} name */
   async _evolveInto(name) {
-    const from = titleCase(this._entry.nickname || this._entry.speciesName);
+    const entry = /** @type {RosterEntry} */ (this._entry);
+    const from = titleCase(entry.nickname || entry.speciesName);
     if (!confirm(`Evolve ${from} into ${titleCase(name)}?`)) return;
     this.$status.textContent = `Evolving into ${titleCase(name)}…`;
     try {
       const mon = await api.getPokemon(name);
-      store.evolvePokemon(this._entry.uid, mon);
+      store.evolvePokemon(entry.uid, mon);
       await this.load(); // species changed — the chain shown needs to move with it
     } catch (err) {
-      this.$status.textContent = err.message || 'Could not evolve.';
+      this.$status.textContent = err instanceof Error ? err.message : 'Could not evolve.';
     }
   }
 
@@ -152,10 +161,11 @@ export class EvolutionChain extends HTMLElement {
    * and re-folding (ADR 0006).
    */
   async _undoEvolve() {
-    const last = this._entry.evolutions[0];
+    const entry = /** @type {RosterEntry} */ (this._entry);
+    const last = entry.evolutions[0];
     if (!last) return;
     if (!confirm(`Undo evolution and revert to ${titleCase(last.fromName)}?`)) return;
-    store.revertEvolution(this._entry.uid);
+    store.revertEvolution(entry.uid);
     await this.load();
   }
 }

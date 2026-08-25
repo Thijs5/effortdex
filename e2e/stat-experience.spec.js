@@ -36,11 +36,11 @@ test.describe('Gen I/II Stat Experience', () => {
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openMoreOptions(card);
 
-    for (let i = 0; i < 10; i++) await dialog.locator('button[data-id="protein"]').click();
+    for (let i = 0; i < 10; i++) await dialog.locator('[data-id="protein"] button').click();
     await expect(card.locator('ev-summary ev-bar[data-key="atk"]').locator('.value')).toHaveText('25600/65535');
 
     // The 11th does nothing — a 25,600 value ceiling, not a use counter.
-    await dialog.locator('button[data-id="protein"]').click();
+    await dialog.locator('[data-id="protein"] button').click();
     await expect(card.locator('ev-summary ev-bar[data-key="atk"]').locator('.value')).toHaveText('25600/65535');
 
     // No total row at all under Stat Experience (unlike Gen III+'s 510 cap).
@@ -56,8 +56,8 @@ test.describe('Gen I/II Stat Experience', () => {
     await expect(card.locator('ev-summary ev-bar[data-key="spd"]')).toBeHidden();
 
     const dialog = await openMoreOptions(card);
-    await expect(dialog.locator('button[data-id="zinc"]')).toBeHidden();
-    await dialog.locator('button[data-id="calcium"]').click();
+    await expect(dialog.locator('[data-id="zinc"]')).toBeHidden();
+    await dialog.locator('[data-id="calcium"] button').click();
 
     await expect(card.locator('ev-summary ev-bar[data-key="spa"]').locator('.value')).toHaveText('2560/65535');
   });
@@ -107,7 +107,7 @@ test.describe('Gen I/II Stat Experience', () => {
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openMoreOptions(card);
 
-    await expect(dialog.locator('button.pokerus-toggle-btn')).toBeDisabled();
+    await expect(dialog.locator('.pokerus-toggle-btn button')).toBeDisabled();
   });
 
   test('Pokérus is available on a Gen II party (introduced there)', async ({ page }) => {
@@ -117,6 +117,6 @@ test.describe('Gen I/II Stat Experience', () => {
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openMoreOptions(card);
 
-    await expect(dialog.locator('button.pokerus-toggle-btn')).toBeEnabled();
+    await expect(dialog.locator('.pokerus-toggle-btn button')).toBeEnabled();
   });
 });
