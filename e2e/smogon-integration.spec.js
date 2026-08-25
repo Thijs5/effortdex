@@ -32,6 +32,19 @@ test.describe('Smogon competitive data', () => {
     await expect(sets.first()).toContainText('Seismic Toss');
   });
 
+  test("shows the species' base stats, since a fixed reference is what min-maxing a build actually needs, not this Pokémon's own current values", async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Scarlet Run', baseGame: 'Scarlet' });
+    await catchPokemon(page, 'Chansey');
+    const card = await openDetail(page, 'Chansey');
+    const dialog = await openCompetitive(card);
+
+    const rows = dialog.locator('.base-stat-row');
+    await expect(rows).toHaveCount(6);
+    await expect(rows.filter({ hasText: 'HP' })).toContainText('250');
+    await expect(rows.filter({ hasText: 'ATK' })).toContainText('5');
+  });
+
   test('a set with an array of alternative EV spreads shows the first one as plain numbers, not [object Object]', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Scarlet Run', baseGame: 'Scarlet' });

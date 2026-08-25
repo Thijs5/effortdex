@@ -51,6 +51,24 @@ test.describe('IV tracking', () => {
     await expect(dialog3.getByLabel('SPE IV')).toHaveValue('31');
   });
 
+  test("next to the EV bars, a stat shows its actual current value once its IV is known, base stat otherwise blank", async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
+    await catchPokemon(page, 'Bulbasaur', { level: 5 });
+    const card = await openDetail(page, 'Bulbasaur');
+
+    const hpBar = card.locator('ev-summary ev-bar[data-key="hp"]');
+    await expect(hpBar.locator('.actual-stat')).toBeEmpty(); // IV unknown yet — not the species' base stat either
+
+    const dialog = await openIvs(card);
+    await dialog.getByLabel('HP IV').fill('20');
+    await dialog.getByLabel('HP IV').blur();
+    await dialog.getByRole('button', { name: 'Save' }).click();
+
+    // Base HP 45, IV 20, 0 EV, Lv. 5: floor(((2*45+20)*5)/100) + 5 + 10 = 5 + 5 + 10 = 20.
+    await expect(hpBar.locator('.actual-stat')).toHaveText('20');
+  });
+
   test('on a Gen I/II party, HP is shown as derived (not an input) and Sp. Atk/Sp. Def merge into one field', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Gold Run', baseGame: 'Gold' });

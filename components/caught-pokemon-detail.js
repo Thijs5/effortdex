@@ -424,6 +424,18 @@ export class CaughtPokemonDetail extends HTMLElement {
         .pokerus-note { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--ink-soft); }
 
         .competitive-panel { display: grid; gap: var(--space-2); }
+        /* Base stats: a fixed reference for min-maxing a build (which
+           stats are worth EVs against a species' own ceiling) — moved
+           here from next to the EV bars, where a number that never
+           changes for this Pokémon specifically wasn't as useful as its
+           actual current stat (caught-pokemon-detail's own _render). */
+        .competitive-base-stats { display: grid; gap: var(--space-1); }
+        .base-stat-row {
+          display: grid; grid-template-columns: 3.5em 1fr; align-items: center; gap: var(--space-2);
+          font-size: var(--font-size-xs); color: var(--ink-soft);
+        }
+        .base-stat-label { font-family: var(--font-mono); }
+        .base-stat-value { font-family: var(--font-mono); color: var(--ink); text-align: right; }
         /* Three loose groups, not a full per-tier rainbow — a 14-color
            gradient would just be a new scale to learn. Default (teal):
            every ordinary ranked tier (OU down through PU/ZU and their
@@ -633,6 +645,8 @@ export class CaughtPokemonDetail extends HTMLElement {
             </button>
           </header>
           <div class="competitive-panel">
+            <h3 class="section-title">Base stats</h3>
+            <div class="competitive-base-stats"></div>
             <h3 class="section-title">Tier &amp; common sets
               <button type="button" class="help-btn" aria-expanded="false" aria-label="Where does this come from?" title="Tier via Pokémon Showdown, common sets via Smogon University's strategy dex — both fetched live and cached locally for about a week. Shown for this party's own generation. Not every species has a published competitive analysis.">?</button>
               <button type="button" class="tier-badge help-btn" aria-expanded="false" aria-label="What does this tier mean?" hidden></button>
@@ -724,6 +738,7 @@ export class CaughtPokemonDetail extends HTMLElement {
     this.$berriesSection = shadow.querySelector('.berries');
     this.$berryGrid = shadow.querySelector('.berry-grid');
     this.$tierBadge = shadow.querySelector('.tier-badge');
+    this.$competitiveBaseStats = shadow.querySelector('.competitive-base-stats');
     this.$competitiveSets = shadow.querySelector('.competitive-sets');
     this.$competitiveEmpty = shadow.querySelector('.competitive-empty');
     this._competitiveToken = 0; // guards against a stale async response landing after a fast species switch
@@ -1235,17 +1250,22 @@ export class CaughtPokemonDetail extends HTMLElement {
     const totalCap = store.totalCap();
     const mergedSpecial = store.specialStatMerged();
     this.$evSummary.evs = e.evs;
-    // The caught mon's own modern spa/spd isn't a 50/50 split of Gen I's
-    // single Special stat (see gen1-special-stats.js) — show the real
-    // historical value in the merged "Base SPC" label instead.
-    this.$evSummary.baseStats =
-      mergedSpecial && e.baseStats
-        ? { ...e.baseStats, spa: gen1SpecialStat(e.speciesId, e.baseStats.spa, e.baseStats.spd), spd: gen1SpecialStat(e.speciesId, e.baseStats.spa, e.baseStats.spd) }
-        : e.baseStats;
+    // The real current value per stat, not the species' base — a
+    // reference number that never actually changes isn't as useful next
+    // to a per-Pokémon EV tracker as what this specific one currently
+    // has (docs/adr note: base stats moved to the Competitive dialog,
+    // where min-maxing a build is the actual relevant use for them).
+    // Null (blank) under Stat Experience (Gen I/II — store.actualStat
+    // doesn't attempt that era's own rounding) or wherever this stat's
+    // IV isn't known yet, same as store.actualStat's own contract.
+    this.$evSummary.actualStats = e.baseStats
+      ? Object.fromEntries(STATS.map(({ key }) => [key, store.actualStat(e, key, e.baseStats[key])]))
+      : null;
     this.$evSummary.nature = nature;
     this.$evSummary.statCap = store.statCap();
     this.$evSummary.totalCap = totalCap;
     this.$evSummary.mergedSpecial = mergedSpecial;
+    this._renderBaseStats(e, mergedSpecial);
     this.$evHelpBtn.title = statExp
       ? "Stat Experience is this game's hidden bonus stat pool — up to 65,535 per stat, gained mainly from battling (equal to the defeated Pokémon's own base stat). Nature is fixed when a Pokémon is caught or hatched: it boosts one stat by 10% and lowers another. Nature doesn't change Stat Experience, but training the stat your nature already boosts gets the most out of your points."
       : "EVs (Effort Values) are hidden bonus stat points earned mainly from battling — up to 252 per stat, 510 total. Nature is fixed when a Pokémon is caught or hatched: it boosts one stat by 10% and lowers another. Nature doesn't change EVs, but training the stat your nature already boosts gets the most out of your points.";
@@ -1278,6 +1298,33 @@ export class CaughtPokemonDetail extends HTMLElement {
     if (berriesAvailable) this._updateBerryGrid(e);
     this.$histLog.entry = e;
     this._renderCompetitive(e);
+  }
+
+  /**
+   * Species base stats, in the Competitive dialog now rather than next
+   * to the EV bars — a fixed number that's the same for every one of
+   * this species is the relevant reference when planning which stats to
+   * invest EVs into against their own ceiling, not something to check
+   * repeatedly next to this specific Pokémon's own current progress.
+   * @param {RosterEntry} e @param {boolean} mergedSpecial
+   */
+  _renderBaseStats(e, mergedSpecial) {
+    if (!e.baseStats) {
+      this.$competitiveBaseStats.innerHTML = '';
+      return;
+    }
+    // Same Gen I real-Special-stat substitution as the EV bars used to
+    // show (gen1-special-stats.js) — the modern spa/spd split isn't a
+    // 50/50 divide of the real historical value.
+    const bs = mergedSpecial
+      ? { ...e.baseStats, spa: gen1SpecialStat(e.speciesId, e.baseStats.spa, e.baseStats.spd), spd: gen1SpecialStat(e.speciesId, e.baseStats.spa, e.baseStats.spd) }
+      : e.baseStats;
+    this.$competitiveBaseStats.innerHTML = STATS.filter(({ key }) => !(mergedSpecial && key === 'spd'))
+      .map(({ key, label }) => {
+        const shownLabel = mergedSpecial && key === 'spa' ? 'SPC' : label;
+        return `<div class="base-stat-row"><span class="base-stat-label">${escapeHtml(shownLabel)}</span><span class="base-stat-value">${bs[key]}</span></div>`;
+      })
+      .join('');
   }
 
   /**

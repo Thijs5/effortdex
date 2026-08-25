@@ -17,12 +17,12 @@ export class EvBar extends HTMLElement {
            right end instead (see .badge), so the bar runs the full row
            width with no dead space reserved on the right. */
         .row { display: grid; grid-template-columns: 34px auto 1fr auto; align-items: center; gap: var(--space-3); }
-        /* Bare mode (no label, no base stat — e.g. the roster's total
-           bar): drop the empty label columns so the bar + value fit
-           narrow hosts instead of overflowing them. */
+        /* Bare mode (no label, no actual-stat hint — e.g. the roster's
+           total bar): drop the empty label columns so the bar + value
+           fit narrow hosts instead of overflowing them. */
         :host([bare]) .row { grid-template-columns: 1fr auto; }
         :host([bare]) .label,
-        :host([bare]) .base-stat { display: none; }
+        :host([bare]) .actual-stat { display: none; }
         :host([bare]) .track,
         :host([bare]) .badge { grid-column: 1; }
         .label {
@@ -38,7 +38,7 @@ export class EvBar extends HTMLElement {
            stat only, so it never reads as "this is the good one". */
         :host([nature-effect="boost"]) .label { color: var(--teal); }
         :host([nature-effect="hinder"]) .label { color: var(--poke-red-dark); }
-        .base-stat {
+        .actual-stat {
           font-family: var(--font-mono);
           font-size: var(--font-size-2xs);
           color: var(--ink-soft);
@@ -117,20 +117,20 @@ export class EvBar extends HTMLElement {
       </style>
       <div class="row">
         <span class="label"><span class="label-text"></span></span>
-        <span class="base-stat"></span>
+        <span class="actual-stat"></span>
         <div class="track" role="progressbar" aria-valuemin="0"><div class="fill"></div></div>
         <span class="value"></span>
         <span class="badge" hidden title="Maxed out"></span>
       </div>
     `;
     this.$label = shadow.querySelector('.label-text');
-    this.$baseStat = shadow.querySelector('.base-stat');
+    this.$actualStat = shadow.querySelector('.actual-stat');
     this.$track = shadow.querySelector('.track');
     this.$fill = shadow.querySelector('.fill');
     this.$value = shadow.querySelector('.value');
     this.$badge = shadow.querySelector('.badge');
     this._label = '';
-    this._baseStat = null;
+    this._actualStat = null;
     this._natureEffect = null;
     this._value = 0;
     this._max = 252;
@@ -143,13 +143,13 @@ export class EvBar extends HTMLElement {
   get label() {
     return this._label;
   }
-  /** The species' base stat for this row, shown as a small hint next to the label. Null hides it. */
-  set baseStat(v) {
-    this._baseStat = v;
+  /** This Pokémon's real current value for this stat (base+IV+EV+level+nature), shown as a small hint next to the label. Null hides it — unknown until this stat's IV is (Gen III+ only; see store.js's actualStat). */
+  set actualStat(v) {
+    this._actualStat = v;
     this._render();
   }
-  get baseStat() {
-    return this._baseStat;
+  get actualStat() {
+    return this._actualStat;
   }
   /** This stat's nature effect: 'boost', 'hinder', or null. Colors the label accordingly. */
   set natureEffect(v) {
@@ -175,10 +175,10 @@ export class EvBar extends HTMLElement {
   }
 
   _render() {
-    this.toggleAttribute('bare', !this._label && this._baseStat == null);
+    this.toggleAttribute('bare', !this._label && this._actualStat == null);
     this.$label.textContent = this._label;
-    this.$baseStat.textContent = this._baseStat != null ? String(this._baseStat) : '';
-    this.$baseStat.title = this._baseStat != null ? `Base ${this._label}: ${this._baseStat}` : '';
+    this.$actualStat.textContent = this._actualStat != null ? String(this._actualStat) : '';
+    this.$actualStat.title = this._actualStat != null ? `${this._label}: ${this._actualStat}` : '';
     if (this._natureEffect) this.setAttribute('nature-effect', this._natureEffect);
     else this.removeAttribute('nature-effect');
     const pct = Math.max(0, Math.min(100, (this._value / this._max) * 100));
