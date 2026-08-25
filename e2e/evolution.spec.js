@@ -21,9 +21,9 @@ test.describe('Evolution', () => {
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openMoreOptions(card);
 
-    await dialog.locator('button[data-id="protein"]').click();
+    await dialog.locator('[data-id="protein"] button').click();
     page.once('dialog', (d) => d.accept());
-    await dialog.locator('evolution-chain button[data-action="evolve"]').first().click();
+    await dialog.locator('evolution-chain [data-action="evolve"] button').first().click();
 
     await expect(card.getByRole('textbox', { name: 'Nickname' })).toHaveValue('Ivysaur');
     await expect(card.locator('ev-summary ev-bar[data-key="atk"]').locator('.value')).toHaveText('10/252');
@@ -41,11 +41,11 @@ test.describe('Evolution', () => {
     const dialog = await openMoreOptions(card);
 
     page.once('dialog', (d) => d.accept());
-    await dialog.locator('evolution-chain button[data-action="evolve"]').first().click();
+    await dialog.locator('evolution-chain [data-action="evolve"] button').first().click();
     await expect(card.getByRole('textbox', { name: 'Nickname' })).toHaveValue('Ivysaur');
 
     page.once('dialog', (d) => d.accept());
-    await dialog.locator('evolution-chain button[data-action="undo"]').first().click();
+    await dialog.locator('evolution-chain [data-action="undo"] button').first().click();
 
     await expect(card.getByRole('textbox', { name: 'Nickname' })).toHaveValue('Bulbasaur');
   });
