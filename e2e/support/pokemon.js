@@ -66,8 +66,24 @@ export async function openDetail(page, species) {
  * @param {import('@playwright/test').Locator} card
  */
 export async function openMoreOptions(card) {
-  await card.getByRole('button', { name: 'More options' }).click();
+  await card.getByRole('button', { name: 'More' }).click();
+  await card.getByRole('menuitem', { name: 'Training & EVs' }).click();
   const dialog = card.locator('dialog.more-dialog');
+  await dialog.waitFor({ state: 'visible' });
+  return dialog;
+}
+
+/**
+ * Opens the Competitive dialog (tier + common Smogon sets) — the
+ * "More" button's other menu item, split into its own dialog from the
+ * Training & EVs one so a quick tier/sets check doesn't have to scroll
+ * past training controls to get there.
+ * @param {import('@playwright/test').Locator} card
+ */
+export async function openCompetitive(card) {
+  await card.getByRole('button', { name: 'More' }).click();
+  await card.getByRole('menuitem', { name: 'Competitive' }).click();
+  const dialog = card.locator('dialog.competitive-dialog');
   await dialog.waitFor({ state: 'visible' });
   return dialog;
 }

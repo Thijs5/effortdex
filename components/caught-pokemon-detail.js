@@ -141,16 +141,33 @@ export class CaughtPokemonDetail extends HTMLElement {
         .level-up-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .level-up-btn svg { width: 11px; height: 11px; color: var(--teal); }
         .level-up-btn:disabled svg { color: inherit; }
-        .more-btn { grid-area: more; align-self: start; display: inline-flex; align-items: center; gap: 0.3em; white-space: nowrap; }
+        .more-btn-wrap { grid-area: more; align-self: start; position: relative; }
+        .more-btn { display: inline-flex; align-items: center; gap: 0.3em; white-space: nowrap; }
         .more-btn svg { width: 14px; height: 14px; }
         /* The number+nature prefix (added ahead of the editable name)
            leaves less room for a long nickname on a phone-width card —
            drop the "More" label and keep just its icon, freeing that
-           width back up. The dialog's own title still says "More
-           options" for anyone who lands there another way. */
+           width back up. */
         @media (max-width: 420px) {
           .more-btn-label { display: none; }
         }
+
+        /* Mirrors the app-shell header menu (styles.css's .header-menu)
+           — same look, reimplemented locally since shadow DOM can't
+           reach that light-DOM stylesheet's rules. */
+        .more-menu {
+          position: absolute; top: calc(100% + 8px); right: 0; z-index: 50;
+          min-width: 180px; display: grid; gap: 2px; padding: var(--space-2);
+          background: var(--surface); color: var(--ink); border: 1px solid var(--lcd-line);
+          border-radius: var(--radius-md); box-shadow: var(--shadow-suggestions);
+        }
+        .more-menu[hidden] { display: none; }
+        .more-menu-item {
+          display: flex; align-items: center; width: 100%; padding: var(--space-2) var(--space-3);
+          border: none; border-radius: var(--radius-sm); background: transparent;
+          text-align: left; font-size: var(--font-size-md); color: inherit; cursor: pointer;
+        }
+        .more-menu-item:hover { background: var(--lcd); }
 
         /* An inline item in .meta now, not its own row — flex-wrap here
            lets its own pills wrap independently if they run out of room. */
@@ -198,6 +215,11 @@ export class CaughtPokemonDetail extends HTMLElement {
             grid-column: 1 / -1;
           }
         }
+        .competitive-dialog { gap: var(--space-4); }
+        .competitive-dialog:not([open]) { display: none; }
+        .competitive-dialog[open] { display: grid; }
+        .competitive-dialog.ds-dialog { width: min(420px, calc(100vw - 2.4rem)); }
+        .competitive-dialog .ds-dialog-header { margin-bottom: 0; }
         .release {
           display: inline-flex; align-items: center; justify-content: center; gap: 0.35em;
           border: 1px solid var(--lcd-line); background: transparent; cursor: pointer; width: 100%;
@@ -309,15 +331,21 @@ export class CaughtPokemonDetail extends HTMLElement {
               <div class="status-row" hidden></div>
             </div>
           </div>
-          <button class="more-btn ds-btn ds-btn--outline ds-btn--sm" type="button" title="More options" aria-label="More options" aria-haspopup="dialog">
-            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="17.5" r="1.7"/></svg>
-            <span class="more-btn-label">More</span>
-          </button>
+          <div class="more-btn-wrap">
+            <button class="more-btn ds-btn ds-btn--outline ds-btn--sm" type="button" title="More" aria-label="More" aria-haspopup="menu" aria-expanded="false">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="17.5" r="1.7"/></svg>
+              <span class="more-btn-label">More</span>
+            </button>
+            <div class="more-menu" role="menu" aria-label="More" hidden>
+              <button class="more-menu-item" type="button" role="menuitem" data-open="training">Training &amp; EVs</button>
+              <button class="more-menu-item" type="button" role="menuitem" data-open="competitive">Competitive</button>
+            </div>
+          </div>
         </header>
 
         <dialog class="more-dialog ds-dialog">
           <header class="ds-dialog-header">
-            <h2>More options</h2>
+            <h2>Training &amp; EVs</h2>
             <button class="more-dialog-close ds-dialog-close" type="button" aria-label="Close">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
             </button>
@@ -413,8 +441,20 @@ export class CaughtPokemonDetail extends HTMLElement {
             <evolution-chain></evolution-chain>
           </div>
 
+          <button class="release" title="Release this Pokémon" aria-label="Release this Pokémon">
+            <span aria-hidden="true">↪</span> Release this Pokémon
+          </button>
+        </dialog>
+
+        <dialog class="competitive-dialog ds-dialog">
+          <header class="ds-dialog-header">
+            <h2>Competitive</h2>
+            <button class="competitive-dialog-close ds-dialog-close" type="button" aria-label="Close">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
+          </header>
           <div class="competitive-panel">
-            <h3 class="section-title">Competitive
+            <h3 class="section-title">Tier &amp; common sets
               <button type="button" class="help-btn" aria-expanded="false" aria-label="Where does this come from?" title="Tier via Pokémon Showdown, common sets via Smogon University's strategy dex — both fetched live and cached locally for about a week. Shown for this party's own generation. Not every species has a published competitive analysis.">?</button>
               <span class="tier-badge" hidden></span>
             </h3>
@@ -422,10 +462,6 @@ export class CaughtPokemonDetail extends HTMLElement {
             <p class="competitive-empty" hidden>No published competitive data for this Pokémon in this generation.</p>
             <p class="competitive-attribution">Tiers via Pokémon Showdown &middot; sets via Smogon University</p>
           </div>
-
-          <button class="release" title="Release this Pokémon" aria-label="Release this Pokémon">
-            <span aria-hidden="true">↪</span> Release this Pokémon
-          </button>
         </dialog>
 
         <div class="card-body">
@@ -461,9 +497,13 @@ export class CaughtPokemonDetail extends HTMLElement {
     this.$natureHint = shadow.querySelector('.nature-hint');
     this.$naturePrefix = shadow.querySelector('.nature-prefix');
     this.$statusRow = shadow.querySelector('.status-row');
+    this.$moreBtnWrap = shadow.querySelector('.more-btn-wrap');
     this.$moreBtn = shadow.querySelector('.more-btn');
+    this.$moreMenu = shadow.querySelector('.more-menu');
     this.$moreDialog = shadow.querySelector('.more-dialog');
     this.$moreDialogClose = shadow.querySelector('.more-dialog-close');
+    this.$competitiveDialog = shadow.querySelector('.competitive-dialog');
+    this.$competitiveDialogClose = shadow.querySelector('.competitive-dialog-close');
     this.$release = shadow.querySelector('.release');
     this.$evSummary = shadow.querySelector('ev-summary');
     this.$itemGrid = shadow.querySelector('.item-grid');
@@ -553,20 +593,63 @@ export class CaughtPokemonDetail extends HTMLElement {
       store.setNature(this._entry.uid, this.$nature.value || null);
       this._renderNatureHint();
     });
-    this.$moreBtn.addEventListener('click', () => {
-      this.$moreDialog.showModal();
-      // styles.css's html:has(dialog[open]) scroll lock can't see into
-      // this shadow root, so flag the open state on <html> ourselves.
-      document.documentElement.dataset.modalOpen = '';
-      this.$evoChain.load();
+    // The "More" button opens a small menu (Training & EVs / Competitive)
+    // rather than a dialog directly — the combined dialog got long enough
+    // (Level & nature through Release, now Competitive on top) that
+    // splitting by "what am I here to do" beat one long scroll. Mirrors
+    // the app shell's own header menu (lib/shell.js) — open/outside-
+    // click/Escape/arrow-key behavior all match it, reimplemented locally
+    // since shadow DOM can't reuse that light-DOM listener setup.
+    const moreMenuItems = () => [...this.$moreMenu.querySelectorAll('.more-menu-item')];
+    const setMoreMenuOpen = (open) => {
+      this.$moreMenu.hidden = !open;
+      this.$moreBtn.setAttribute('aria-expanded', String(open));
+      if (open) moreMenuItems()[0].focus();
+    };
+    this.$moreBtn.addEventListener('click', () => setMoreMenuOpen(this.$moreMenu.hidden));
+    this.$moreMenu.addEventListener('click', (e) => {
+      const item = /** @type {HTMLElement} */ (e.target).closest('.more-menu-item');
+      if (!item) return;
+      setMoreMenuOpen(false);
+      if (item.dataset.open === 'training') this._openDialog(this.$moreDialog);
+      else if (item.dataset.open === 'competitive') this._openDialog(this.$competitiveDialog);
     });
-    // 'close' catches every path: the ✕, Esc, and backdrop clicks.
-    this.$moreDialog.addEventListener('close', () => {
-      delete document.documentElement.dataset.modalOpen;
+    // A click anywhere outside the menu closes it — listened on
+    // `document`, not this.shadowRoot, since a click that lands outside
+    // the whole component (e.g. the page background) never reaches a
+    // shadow-root-scoped listener at all. e.target retargets to the host
+    // element from outside the shadow boundary, so composedPath() (which
+    // doesn't) is what actually finds .more-btn-wrap when the click was
+    // inside it.
+    document.addEventListener('click', (e) => {
+      if (!this.$moreMenu.hidden && !e.composedPath().includes(this.$moreBtnWrap)) setMoreMenuOpen(false);
     });
+    this.shadowRoot.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !this.$moreMenu.hidden) {
+        setMoreMenuOpen(false);
+        this.$moreBtn.focus();
+      }
+    });
+    this.$moreMenu.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      e.preventDefault();
+      const items = moreMenuItems();
+      const current = items.indexOf(/** @type {HTMLElement} */ (this.shadowRoot.activeElement));
+      const step = e.key === 'ArrowDown' ? 1 : -1;
+      items[(current + step + items.length) % items.length].focus();
+    });
+
+    // 'close' catches every path a dialog can close by: the ✕, Esc, and
+    // a backdrop click.
+    this.$moreDialog.addEventListener('close', () => this._onDialogClosed());
     this.$moreDialogClose.addEventListener('click', () => this.$moreDialog.close());
     this.$moreDialog.addEventListener('click', (e) => {
       if (e.target === this.$moreDialog) this.$moreDialog.close();
+    });
+    this.$competitiveDialog.addEventListener('close', () => this._onDialogClosed());
+    this.$competitiveDialogClose.addEventListener('click', () => this.$competitiveDialog.close());
+    this.$competitiveDialog.addEventListener('click', (e) => {
+      if (e.target === this.$competitiveDialog) this.$competitiveDialog.close();
     });
     // The "?" buttons toggle their explanation inline: title tooltips are
     // hover-only, which leaves them unreachable on touch devices. Listens
@@ -621,6 +704,19 @@ export class CaughtPokemonDetail extends HTMLElement {
     this.$histLog.addEventListener('redefeat', (e) => {
       this._battle(e.detail.name, `Re-logging battle vs ${titleCase(e.detail.name)}…`);
     });
+  }
+
+  /** @param {HTMLDialogElement} dialog */
+  _openDialog(dialog) {
+    dialog.showModal();
+    // styles.css's html:has(dialog[open]) scroll lock can't see into
+    // this shadow root, so flag the open state on <html> ourselves.
+    document.documentElement.dataset.modalOpen = '';
+    if (dialog === this.$moreDialog) this.$evoChain.load();
+  }
+
+  _onDialogClosed() {
+    delete document.documentElement.dataset.modalOpen;
   }
 
   set entry(e) {

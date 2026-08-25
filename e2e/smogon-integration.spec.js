@@ -1,7 +1,7 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 import { createParty } from './support/party.js';
-import { catchPokemon, openDetail, openMoreOptions } from './support/pokemon.js';
+import { catchPokemon, openDetail, openCompetitive } from './support/pokemon.js';
 import { mockPokeApi } from './support/pokeapi-mock.js';
 import { mockSmogon } from './support/smogon-mock.js';
 
@@ -20,7 +20,7 @@ test.describe('Smogon competitive data', () => {
     await createParty(page, { name: 'Scarlet Run', baseGame: 'Scarlet' });
     await catchPokemon(page, 'Chansey');
     const card = await openDetail(page, 'Chansey');
-    const dialog = await openMoreOptions(card);
+    const dialog = await openCompetitive(card);
 
     await expect(dialog.locator('.tier-badge')).toHaveText('PU');
     const sets = dialog.locator('.competitive-set');
@@ -37,7 +37,7 @@ test.describe('Smogon competitive data', () => {
     await createParty(page, { name: 'Scarlet Run', baseGame: 'Scarlet' });
     await catchPokemon(page, 'Chansey');
     const card = await openDetail(page, 'Chansey');
-    const dialog = await openMoreOptions(card);
+    const dialog = await openCompetitive(card);
 
     const nuSet = dialog.locator('.competitive-set', { hasText: 'nu' });
     await expect(nuSet).toContainText('8 HP / 252 DEF / 248 SPD');
@@ -49,7 +49,7 @@ test.describe('Smogon competitive data', () => {
     await createParty(page, { name: 'Scarlet Run', baseGame: 'Scarlet' });
     await catchPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
-    const dialog = await openMoreOptions(card);
+    const dialog = await openCompetitive(card);
 
     await expect(dialog.locator('.tier-badge')).toHaveText('LC');
     await expect(dialog.locator('.competitive-empty')).toBeVisible();
@@ -63,7 +63,7 @@ test.describe('Smogon competitive data', () => {
     await createParty(page, { name: 'Scarlet Run', baseGame: 'Scarlet' });
     await catchPokemon(page, 'Chansey');
     const card = await openDetail(page, 'Chansey');
-    const dialog = await openMoreOptions(card);
+    const dialog = await openCompetitive(card);
 
     await expect(dialog.locator('.competitive-empty')).toBeVisible();
     await expect(dialog.locator('.tier-badge')).toBeHidden();
