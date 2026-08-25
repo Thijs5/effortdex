@@ -23,17 +23,28 @@ export class EvHistoryLog extends HTMLElement {
     super();
     this._entry = null;
     this._open = false;
+    this._filterKind = 'all';
+    this._search = '';
 
     const shadow = this.attachShadow({ mode: 'open' });
     attachDesignSystem(shadow);
     shadow.innerHTML = `
       <style>
         :host { display: block; }
-        ul.hist-list { list-style: none; margin: var(--space-3) 0 0; padding: 0; display: grid; gap: var(--space-3); max-height: 220px; overflow-y: auto; }
+        .hist-toolbar { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); margin: var(--space-3) 0 0; }
+        .hist-search { flex: 1 1 12em; }
+        .hist-kind-filter { flex: 0 1 12em; }
+        ul.hist-list {
+          list-style: none; margin: var(--space-3) 0 0; padding: 0;
+          display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+          align-items: start; gap: var(--space-3);
+          max-height: 60vh; overflow-y: auto;
+        }
         ul.hist-list li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); font-size: var(--font-size-xs); }
-        ul.hist-list li.empty { display: block; color: var(--ink-soft); }
+        ul.hist-list li.empty { display: block; color: var(--ink-soft); grid-column: 1 / -1; }
         ul.hist-list li.hist-date {
           display: block;
+          grid-column: 1 / -1;
           margin-top: var(--space-2);
           font-family: var(--font-mono);
           font-size: var(--font-size-2xs);
@@ -84,15 +95,40 @@ export class EvHistoryLog extends HTMLElement {
       </style>
       <details class="history ds-disclosure">
         <summary>History (<span class="hist-count">0</span>)</summary>
+        <div class="hist-toolbar">
+          <input type="search" class="hist-search ds-field" placeholder="Search history…" aria-label="Search history" />
+          <select class="hist-kind-filter ds-field" aria-label="Filter by type">
+            <option value="all">All types</option>
+            <option value="battle">Battles</option>
+            <option value="vitamin">Vitamins</option>
+            <option value="feather">Wings</option>
+            <option value="berry">EV-reducing berries</option>
+            <option value="held-item">Held items</option>
+            <option value="pokerus">Pokérus</option>
+            <option value="exp-share">Exp. Share</option>
+            <option value="level">Level &amp; stat readings</option>
+            <option value="evolve">Evolutions</option>
+          </select>
+        </div>
         <ul class="hist-list"></ul>
       </details>
     `;
     this.$details = shadow.querySelector('details');
     this.$histCount = shadow.querySelector('.hist-count');
     this.$histList = shadow.querySelector('.hist-list');
+    this.$histSearch = shadow.querySelector('.hist-search');
+    this.$histKindFilter = shadow.querySelector('.hist-kind-filter');
 
     this.$details.addEventListener('toggle', () => {
       this._open = this.$details.open;
+    });
+    this.$histSearch.addEventListener('input', () => {
+      this._search = this.$histSearch.value.trim().toLowerCase();
+      this._renderList();
+    });
+    this.$histKindFilter.addEventListener('change', () => {
+      this._filterKind = this.$histKindFilter.value;
+      this._renderList();
     });
     this.$histList.addEventListener('click', (e) => {
       const redefeatBtn = e.target.closest('.redefeat-btn');
@@ -128,9 +164,46 @@ export class EvHistoryLog extends HTMLElement {
     if (!e) return;
     this.$details.open = this._open;
     this.$histCount.textContent = e.history.length;
-    this.$histList.innerHTML = e.history.length
-      ? this._listHtml(e.history)
-      : '<li class="empty">Nothing logged yet.</li>';
+    this._renderList();
+  }
+
+  // Re-renders just the list against the current search/kind filter,
+  // without touching the toolbar or the total count in the summary
+  // (that count is always the unfiltered total, so filtering never
+  // makes "History (N)" look like entries went missing).
+  _renderList() {
+    const e = this._entry;
+    if (!e) return;
+    const filtered = e.history.filter((h) => this._matchesFilter(h));
+    if (!e.history.length) {
+      this.$histList.innerHTML = '<li class="empty">Nothing logged yet.</li>';
+    } else if (!filtered.length) {
+      this.$histList.innerHTML = '<li class="empty">No history entries match this search/filter.</li>';
+    } else {
+      this.$histList.innerHTML = this._listHtml(filtered);
+    }
+  }
+
+  // Kind filter groups 'level' and 'stat-reading' together (same as
+  // batching does) since a user thinking "level" wants both the level
+  // change itself and any readings logged alongside it. Search matches
+  // against a plain-text rendering of the entry, so it stays in sync
+  // with whatever _itemHtml/_batchContent actually show without a
+  // second, separately-maintained field list.
+  /** @param {any} h @returns {boolean} */
+  _matchesFilter(h) {
+    if (this._filterKind !== 'all' && this._batchGroupKey(h) !== this._filterKind) return false;
+    if (!this._search) return true;
+    return this._searchText(h).includes(this._search);
+  }
+
+  /** @param {any} h @returns {string} */
+  _searchText(h) {
+    return this._itemHtml(h)
+      .replace(/<[^>]*>/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim()
+      .toLowerCase();
   }
 
   // Groups consecutive same-day history entries under one date heading.

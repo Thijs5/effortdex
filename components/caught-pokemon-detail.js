@@ -675,10 +675,10 @@ export class CaughtPokemonDetail extends HTMLElement {
               <pokemon-search placeholder="Defeated Pokémon…" show-ev-yield></pokemon-search>
               <p class="status" aria-live="polite"></p>
             </section>
-
-            <ev-history-log></ev-history-log>
           </div>
         </div>
+
+        <ev-history-log></ev-history-log>
       </article>
     `;
 

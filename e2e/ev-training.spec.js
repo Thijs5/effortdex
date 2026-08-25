@@ -209,4 +209,37 @@ test.describe('EV training', () => {
     await expect(histLog.locator('li.hist-batch summary strong')).toHaveText('2 vitamins');
     await expect(histLog.locator('ul.hist-list > li').filter({ hasText: 'Kelpsy Berry' })).toBeVisible();
   });
+
+  test('the history log can be filtered by type and searched by name, without changing the total count', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
+    await catchPokemon(page, 'Bulbasaur');
+    const card = await openDetail(page, 'Bulbasaur');
+
+    await logBattle(card, 'Caterpie');
+    const dialog = await openItemDialog(card);
+    await dialog.locator('[data-id="protein"] button').click();
+    await dialog.locator('.item-dialog-save-btn').click();
+    await expect(dialog).toBeHidden();
+
+    await card.getByText(/History/).click();
+    const histLog = card.locator('ev-history-log');
+
+    // Total count in the summary always reflects everything logged,
+    // regardless of the current filter/search.
+    await expect(histLog.locator('.hist-count')).toHaveText('3'); // catch + battle + vitamin
+
+    await histLog.locator('.hist-kind-filter').selectOption('vitamin');
+    await expect(histLog.locator('ul.hist-list > li').filter({ hasText: 'Protein' })).toBeVisible();
+    await expect(histLog.locator('ul.hist-list > li').filter({ hasText: 'Caterpie' })).toBeHidden();
+    await expect(histLog.locator('.hist-count')).toHaveText('3');
+
+    await histLog.locator('.hist-kind-filter').selectOption('all');
+    await histLog.locator('.hist-search').fill('caterpie');
+    await expect(histLog.locator('ul.hist-list > li').filter({ hasText: 'Caterpie' })).toBeVisible();
+    await expect(histLog.locator('ul.hist-list > li').filter({ hasText: 'Protein' })).toBeHidden();
+
+    await histLog.locator('.hist-search').fill('nothing matches this');
+    await expect(histLog.locator('ul.hist-list li.empty')).toHaveText(/No history entries match/);
+  });
 });
