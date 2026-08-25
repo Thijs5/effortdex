@@ -56,6 +56,17 @@ export class EvHistoryLog extends HTMLElement {
           color: var(--ink-soft); line-height: 1; padding: var(--space-2);
         }
         .delete-hist-btn:hover { color: var(--poke-red); }
+        /* One Save committing several events at once (the Level popup's
+           level + every filled-in stat reading, typically) collapses
+           into one batch entry instead of flooding the log — display:
+           block overrides the plain-entry li's flex row, since this li
+           holds a <details> rather than the icon+text+actions layout. */
+        ul.hist-list li.hist-batch { display: block; }
+        ul.hist-list li.hist-batch summary { cursor: pointer; }
+        ul.hist-list .hist-batch-items {
+          list-style: none; margin: var(--space-3) 0 0; padding-left: var(--space-4);
+          border-left: 2px solid var(--lcd-line); display: grid; gap: var(--space-3);
+        }
       </style>
       <details class="history ds-disclosure">
         <summary>History (<span class="hist-count">0</span>)</summary>
@@ -111,19 +122,56 @@ export class EvHistoryLog extends HTMLElement {
   // Groups consecutive same-day history entries under one date heading.
   // `history` is already newest-first (each store mutation unshifts), so
   // grouping in place — without re-sorting — keeps both the day order and
-  // the entries within each day newest-first.
+  // the entries within each day newest-first. Within a day, a further run
+  // of consecutive entries sharing the same batchId — everything one Save
+  // committed together as a single user action, most commonly the Level
+  // popup's level change plus every filled-in stat reading (lib/store.js's
+  // makeEvent/setLevel/logStatReading) — collapses into one collapsible
+  // entry instead of flooding the list with what reads as one action.
+  // Entries with no batchId (most kinds — it's opt-in per call site) are
+  // never grouped, each staying its own top-level entry as before.
   _listHtml(history) {
     let html = '';
     let lastKey = null;
-    for (const h of history) {
+    let i = 0;
+    while (i < history.length) {
+      const h = history[i];
       const key = dayKey(h.timestamp);
       if (key !== lastKey) {
         html += `<li class="hist-date">${dayLabel(h.timestamp)}</li>`;
         lastKey = key;
       }
-      html += this._itemHtml(h);
+      let j = i + 1;
+      if (h.batchId) {
+        while (j < history.length && history[j].batchId === h.batchId) j++;
+      }
+      const batch = history.slice(i, j);
+      html += batch.length > 1 ? this._batchHtml(batch) : this._itemHtml(h);
+      i = j;
     }
     return html;
+  }
+
+  /** One collapsible entry for a run of same-timestamp events — a summary line, then every individual entry nested (still each its own deletable item). @param {any[]} batch */
+  _batchHtml(batch) {
+    return `<li class="hist-batch">
+      <details class="ds-disclosure">
+        <summary>${this._batchSummary(batch)}</summary>
+        <ul class="hist-batch-items">${batch.map((h) => this._itemHtml(h)).join('')}</ul>
+      </details>
+    </li>`;
+  }
+
+  /** @param {any[]} batch @returns {string} */
+  _batchSummary(batch) {
+    const level = batch.find((h) => h.kind === 'level');
+    const evolve = batch.find((h) => h.kind === 'evolve');
+    const readings = batch.filter((h) => h.kind === 'stat-reading').length;
+    const parts = [];
+    if (level) parts.push(`${level.toLevel > level.fromLevel ? 'Level up' : 'Level correction'} to Lv. ${level.toLevel}`);
+    if (evolve) parts.push(`Evolved into ${titleCase(evolve.toName)}`);
+    if (readings) parts.push(`${readings} stat reading${readings === 1 ? '' : 's'}`);
+    return escapeHtml(parts.length ? parts.join(' + ') : `${batch.length} events logged together`);
   }
 
   _itemHtml(h) {

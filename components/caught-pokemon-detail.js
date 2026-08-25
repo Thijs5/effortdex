@@ -149,12 +149,15 @@ export class CaughtPokemonDetail extends HTMLElement {
         }
         .nature-btn:hover { color: var(--teal); }
         .nature-btn--empty { font-size: var(--font-size-xs); font-style: italic; }
-        /* Same height as the sprite and top-aligned with it, so the name
-           sits level with the sprite's top edge instead of floating in a
-           taller, vertically-centered box. */
+        /* At least as tall as the sprite and top-aligned with it, so the
+           name sits level with the sprite's top edge instead of floating
+           in a taller, vertically-centered box — min-height, not a fixed
+           height, so a long held-item label wrapping .meta onto a second
+           line grows this box instead of overflowing past its bottom
+           edge into the divider/content below it. */
         .titles {
           grid-area: titles; align-self: start; min-width: 0;
-          height: 64px; display: flex; flex-direction: column; justify-content: space-between;
+          min-height: 64px; display: flex; flex-direction: column; justify-content: space-between;
         }
         .nickname {
           display: block; flex: 1 1 auto; min-width: 0; width: auto; border: none; background: transparent;
@@ -260,8 +263,6 @@ export class CaughtPokemonDetail extends HTMLElement {
            the one footer Save button (docs/adr/0017) — except Pokérus,
            which stays instant (a plain reversible toggle, not a
            queued/counted action). */
-        .item-dialog-footer { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
-        .item-dialog-save-hint { margin: 0; font-size: var(--font-size-2xs); color: var(--ink-soft); }
         .level-up-dialog { gap: var(--space-4); }
         .level-up-dialog:not([open]) { display: none; }
         .level-up-dialog[open] { display: grid; }
@@ -271,11 +272,17 @@ export class CaughtPokemonDetail extends HTMLElement {
            on one row before wrapping. */
         .level-up-dialog.ds-dialog { width: min(560px, calc(100vw - 2.4rem)); }
         .level-up-dialog .ds-dialog-header { margin-bottom: 0; }
+        /* min-width: 0 overrides a grid/flex item's default min-width:
+           auto — without it, this row (itself a grid child of
+           .level-up-dialog[open]) refuses to shrink past its own
+           children's combined intrinsic content width, so on a narrow
+           phone it overflows .ds-dialog's own right padding instead of
+           actually shrinking to fit. */
         .level-up-dialog .field-inline {
           display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
-          font-size: var(--font-size-xs); color: var(--ink-soft);
+          font-size: var(--font-size-xs); color: var(--ink-soft); min-width: 0;
         }
-        .level-up-dialog .field-inline level-input { flex: 1 1 auto; max-width: 14em; }
+        .level-up-dialog .field-inline level-input { flex: 1 1 auto; min-width: 0; max-width: 14em; }
         /* The current level is read-only context, not part of what Save
            applies — only the level-input to its right is editable. */
         .level-up-from { font-family: var(--font-mono); white-space: nowrap; }
@@ -310,7 +317,7 @@ export class CaughtPokemonDetail extends HTMLElement {
             border-radius: var(--radius-md);
           }
         }
-        .level-up-evolve, .level-up-stats { display: grid; gap: var(--space-2); }
+        .level-up-evolve, .level-up-stats { display: grid; gap: var(--space-2); min-width: 0; }
         .level-up-stats-hint { margin: 0; font-size: var(--font-size-2xs); color: var(--ink-soft); }
         .level-up-stats-fields { display: grid; gap: var(--space-2); }
 
@@ -354,14 +361,19 @@ export class CaughtPokemonDetail extends HTMLElement {
         }
         .nature-hint:empty { display: none; }
 
-        .ivs { display: grid; gap: var(--space-2); }
+        .ivs { display: grid; gap: var(--space-2); min-width: 0; }
         .iv-grid { display: grid; gap: var(--space-2); }
+        /* min-width: 0 on the row and its 1fr column's input — see the
+           Level field's own min-width comment above for why a grid/flex
+           item's default min-width: auto matters here (a narrow phone
+           otherwise overflows past the dialog's own right edge instead
+           of the input actually shrinking to fit). */
         .iv-row {
           display: grid; grid-template-columns: 3.5em 1fr; align-items: center; gap: var(--space-2);
-          font-size: var(--font-size-xs); color: var(--ink-soft);
+          font-size: var(--font-size-xs); color: var(--ink-soft); min-width: 0;
         }
         .iv-row-label { font-family: var(--font-mono); }
-        .iv-row input { width: auto; }
+        .iv-row input { width: auto; min-width: 0; }
         .iv-row-derived {
           font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--ink-soft);
           text-align: right; padding-right: var(--space-2);
@@ -501,7 +513,9 @@ export class CaughtPokemonDetail extends HTMLElement {
             <select class="nature-select ds-field" aria-label="Nature"></select>
           </label>
           <p class="nature-hint" aria-live="polite"></p>
-          <button type="button" class="ds-btn ds-btn--primary nature-dialog-save-btn">Save</button>
+          <footer class="ds-dialog-footer">
+            <button type="button" class="ds-btn ds-btn--primary nature-dialog-save-btn">Save</button>
+          </footer>
         </dialog>
 
         <dialog class="item-dialog ds-dialog" aria-labelledby="item-dialog-title">
@@ -554,8 +568,7 @@ export class CaughtPokemonDetail extends HTMLElement {
             <p class="berry-status" aria-live="polite"></p>
           </section>
 
-          <footer class="ds-dialog-footer item-dialog-footer">
-            <p class="item-dialog-save-hint">Nothing above applies until Save</p>
+          <footer class="ds-dialog-footer">
             <button type="button" class="ds-btn ds-btn--primary item-dialog-save-btn">Save</button>
           </footer>
         </dialog>
@@ -571,7 +584,9 @@ export class CaughtPokemonDetail extends HTMLElement {
           </header>
           <div class="iv-grid"></div>
           <p class="iv-summary" hidden></p>
-          <button type="button" class="ds-btn ds-btn--primary iv-dialog-save-btn">Save</button>
+          <footer class="ds-dialog-footer">
+            <button type="button" class="ds-btn ds-btn--primary iv-dialog-save-btn">Save</button>
+          </footer>
           <details class="iv-calc" hidden>
             <summary>Don't know an IV? Calculate it from a stat</summary>
             <p class="iv-calc-hint">Check this Pokémon's actual <em class="iv-calc-stat-name"></em> stat right now (its summary screen in-game) and log it below — uses its current level and EVs, so check it now rather than typing in an old reading. Logging another reading later (after it levels up or gains EVs) narrows the candidates further.</p>
@@ -609,7 +624,9 @@ export class CaughtPokemonDetail extends HTMLElement {
             <div class="level-up-stats-fields"></div>
           </section>
 
-          <button type="button" class="ds-btn ds-btn--primary level-up-done-btn" hidden>Save</button>
+          <footer class="ds-dialog-footer">
+            <button type="button" class="ds-btn ds-btn--primary level-up-done-btn" hidden>Save</button>
+          </footer>
         </dialog>
 
         <dialog class="competitive-dialog ds-dialog" aria-labelledby="competitive-dialog-title">
@@ -1561,7 +1578,10 @@ export class CaughtPokemonDetail extends HTMLElement {
    * here — see evolution-chain.js's `commit()`), then the level, then
    * every filled-in stat row (at that now-current level), then closes.
    * A failed commit leaves the dialog open with its own error message
-   * shown instead of closing over a Save that didn't fully apply.
+   * shown instead of closing over a Save that didn't fully apply. The
+   * level and every stat reading share one batchId (not the evolve,
+   * which stays its own prominent entry) so ev-history-log.js collapses
+   * them into a single summarized entry instead of one row per stat.
    */
   async _saveLevelUp() {
     const e = this._entry;
@@ -1570,10 +1590,11 @@ export class CaughtPokemonDetail extends HTMLElement {
     } catch {
       return;
     }
-    store.setLevel(e.uid, this.$levelUpInput.value);
+    const batchId = crypto.randomUUID();
+    store.setLevel(e.uid, this.$levelUpInput.value, batchId);
     for (const input of this.$levelUpStatsFields.querySelectorAll('input[data-stat]')) {
       const observed = Number(input.value);
-      if (observed) store.logStatReading(e.uid, /** @type {StatKey} */ (input.dataset.stat), observed);
+      if (observed) store.logStatReading(e.uid, /** @type {StatKey} */ (input.dataset.stat), observed, batchId);
     }
     this.$levelUpDialog.close();
   }

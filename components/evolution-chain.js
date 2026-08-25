@@ -38,9 +38,15 @@ export class EvolutionChain extends HTMLElement {
     attachDesignSystem(shadow);
     shadow.innerHTML = `
       <style>
-        :host { display: grid; gap: var(--space-2); }
+        /* min-width: 0 overrides a grid item's default min-width: auto —
+           without it, this host refuses to shrink below its widest
+           unwrapped line's own content width, forcing the whole Level
+           popup's single-column grid (and every sibling row in it) that
+           wide too, on a narrow phone overflowing past the dialog's own
+           edge instead of actually wrapping to fit. */
+        :host { display: grid; gap: var(--space-2); min-width: 0; }
         .evo-note { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--ink-soft); }
-        .evo-chain { display: flex; align-items: center; gap: var(--space-3) var(--space-4); flex-wrap: wrap; row-gap: var(--space-4); }
+        .evo-chain { display: flex; align-items: center; gap: var(--space-3) var(--space-4); flex-wrap: wrap; row-gap: var(--space-4); min-width: 0; }
         .evo-stage { display: flex; flex-direction: column; gap: var(--space-2); }
         .evo-link { display: flex; align-items: center; gap: var(--space-3); }
         .evo-arrow { color: var(--ink-soft); font-size: var(--font-size-md); }

@@ -39,6 +39,14 @@ export class ItemButtonGrid extends HTMLElement {
       <style>
         :host { display: block; }
         .grid { display: grid; grid-template-columns: repeat(var(--columns, 3), 1fr); gap: var(--space-2); }
+        /* A multi-column grid leaves too little width per button on a
+           narrow phone for the sprite + label + boost text to fit
+           without clipping against the dialog's own edge — stack to one
+           column there instead, regardless of how many columns this
+           instance normally uses. */
+        @media (max-width: 420px) {
+          .grid { grid-template-columns: 1fr; }
+        }
       </style>
       <div class="grid"></div>
     `;
