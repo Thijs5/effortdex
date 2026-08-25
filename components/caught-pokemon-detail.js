@@ -13,6 +13,7 @@ import './ev-history-log.js';
 import './evolution-chain.js';
 import './pokemon-search.js';
 import './item-button-grid.js';
+import './ds-item-button.js';
 
 // Sorted once — these tables are static, so re-sorting them on every
 // render (this card's entire point) would be pure waste.
@@ -322,7 +323,6 @@ export class CaughtPokemonDetail extends HTMLElement {
         .exp-pokerus-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); align-items: start; }
 
         .pokerus-section { display: grid; gap: var(--space-2); justify-items: stretch; min-width: 0; }
-        .pokerus-toggle-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .pokerus-icon { width: 22px; height: 22px; flex: 0 0 auto; display: inline-flex; color: var(--pokerus-purple); }
         .pokerus-icon svg { width: 100%; height: 100%; }
 
@@ -451,26 +451,16 @@ export class CaughtPokemonDetail extends HTMLElement {
               <h3 class="section-title">Exp. Share
                 <button type="button" class="help-btn" aria-expanded="false" aria-label="What does Exp. Share do?" title="While holding an Exp. Share, this Pokémon also earns EVs whenever any other Pokémon in this party has a battle logged — the same base amount that Pokémon got, doubled by this Pokémon's own Pokérus if it has any. It never inherits the other Pokémon's held item bonus.">?</button>
               </h3>
-              <button type="button" class="ds-item-btn exp-share-toggle-btn" aria-pressed="false">
-                <img class="ds-item-icon" src="${EXP_SHARE_SPRITE}" alt="" ${FALLBACK_ONERROR} />
-                <span class="ds-item-btn-text">
-                  <span class="ds-item-btn-label">Exp. Share</span>
-                  <span class="ds-item-btn-boost">Shares other EVs</span>
-                </span>
-              </button>
+              <ds-item-button class="exp-share-toggle-btn" icon="${EXP_SHARE_SPRITE}" label="Exp. Share" boost="Shares other EVs"></ds-item-button>
             </section>
 
             <section class="pokerus-section">
               <h3 class="section-title">Pokérus
                 <button type="button" class="help-btn" aria-expanded="false" aria-label="What is Pokérus?" title="A rare, harmless in-game virus. While infected, every EV your Pokémon earns from battling is doubled — pure bonus, no downside. It can also spread to other party members over time. Once it cures (after a few days), the ×2 EV bonus stays forever — no need to toggle this off.">?</button>
               </h3>
-              <button type="button" class="ds-item-btn pokerus-toggle-btn" aria-pressed="false">
-                <span class="pokerus-icon" aria-hidden="true">${POKERUS_ICON_SVG}</span>
-                <span class="ds-item-btn-text">
-                  <span class="ds-item-btn-label">Pokérus</span>
-                  <span class="ds-item-btn-boost">×2 EVs</span>
-                </span>
-              </button>
+              <ds-item-button class="pokerus-toggle-btn" label="Pokérus" boost="×2 EVs">
+                <span slot="icon" class="pokerus-icon" aria-hidden="true">${POKERUS_ICON_SVG}</span>
+              </ds-item-button>
               <p class="pokerus-note" hidden>Pokérus doesn't double EVs in this game.</p>
             </section>
           </div>
@@ -811,11 +801,11 @@ export class CaughtPokemonDetail extends HTMLElement {
         store.setPowerItem(this._entry.uid, val);
       }
     });
-    this.$pokerusToggle.addEventListener('click', () => {
-      store.setPokerus(this._entry.uid, this.$pokerusToggle.getAttribute('aria-pressed') !== 'true');
+    this.$pokerusToggle.addEventListener('pick', () => {
+      store.setPokerus(this._entry.uid, !this.$pokerusToggle.hasAttribute('active'));
     });
-    this.$expShareToggle.addEventListener('click', () => {
-      store.setExpShare(this._entry.uid, this.$expShareToggle.getAttribute('aria-pressed') !== 'true');
+    this.$expShareToggle.addEventListener('pick', () => {
+      store.setExpShare(this._entry.uid, !this.$expShareToggle.hasAttribute('active'));
     });
     this.$vitaminGrid.addEventListener('item-pick', (e) => this._useVitamin(e.detail.id));
     this.$wingGrid.addEventListener('item-pick', (e) => this._useFeather(e.detail.id));
@@ -956,8 +946,7 @@ export class CaughtPokemonDetail extends HTMLElement {
     this._updateItemGrid();
     const aids = store.effectiveAids(e);
     const pokerusActive = !!e.pokerus;
-    this.$pokerusToggle.setAttribute('aria-pressed', String(pokerusActive));
-    this.$pokerusToggle.classList.toggle('ds-item-btn--active', pokerusActive);
+    this.$pokerusToggle.toggleAttribute('active', pokerusActive);
     const pokerusAvailable = store.pokerusAvailable();
     this.toggleAttribute('pokerus-infected', aids.pokerus);
     if (aids.pokerus) {
@@ -968,11 +957,10 @@ export class CaughtPokemonDetail extends HTMLElement {
     } else {
       this.$sprite.title = '';
     }
-    this.$pokerusToggle.disabled = !pokerusAvailable;
+    this.$pokerusToggle.toggleAttribute('disabled', !pokerusAvailable);
     this.$pokerusNote.hidden = pokerusAvailable;
     const expShareActive = !!e.expShare;
-    this.$expShareToggle.setAttribute('aria-pressed', String(expShareActive));
-    this.$expShareToggle.classList.toggle('ds-item-btn--active', expShareActive);
+    this.$expShareToggle.toggleAttribute('active', expShareActive);
     this.$vitaminStatus.textContent = '';
     this._updateVitaminGrid(e);
     const wingsAvailable = store.wingsAvailable();

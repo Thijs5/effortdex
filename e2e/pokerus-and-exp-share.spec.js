@@ -21,7 +21,7 @@ test.describe('Pokérus and Exp. Share', () => {
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openMoreOptions(card);
 
-    await dialog.locator('button.pokerus-toggle-btn').click();
+    await dialog.locator('.pokerus-toggle-btn button').click();
     await dialog.getByRole('button', { name: 'Close' }).click();
     await logBattle(card, 'Caterpie'); // base +1 HP, doubled to +2 by Pokérus
 
@@ -36,7 +36,7 @@ test.describe('Pokérus and Exp. Share', () => {
 
     const charmanderCard = await openDetail(page, 'Charmander');
     const charmanderDialog = await openMoreOptions(charmanderCard);
-    await charmanderDialog.locator('button.exp-share-toggle-btn').click();
+    await charmanderDialog.locator('.exp-share-toggle-btn button').click();
     await charmanderDialog.getByRole('button', { name: 'Close' }).click();
 
     await page.getByRole('link', { name: /^← / }).click();

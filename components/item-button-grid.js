@@ -1,5 +1,7 @@
 import { attachDesignSystem } from '../lib/design-system.js';
-import { FALLBACK_ONERROR } from '../lib/constants.js';
+import './ds-item-button.js';
+
+/** @typedef {{ id: string, label: string, sprite: string, boost: string, title: string, active?: boolean, capped?: boolean, count?: number }} ItemButtonSpec */
 
 /**
  * <item-button-grid> — a grid of icon+label+boost buttons: training
@@ -26,6 +28,7 @@ export class ItemButtonGrid extends HTMLElement {
 
   constructor() {
     super();
+    /** @type {ItemButtonSpec[]} */
     this._items = [];
     const shadow = this.attachShadow({ mode: 'open' });
     attachDesignSystem(shadow);
@@ -33,31 +36,23 @@ export class ItemButtonGrid extends HTMLElement {
       <style>
         :host { display: block; }
         .grid { display: grid; grid-template-columns: repeat(var(--columns, 3), 1fr); gap: var(--space-2); }
-        .item-btn { position: relative; }
-        .item-btn[data-capped] { opacity: 0.55; }
-        .item-btn[data-count]:not([data-count="0"])::after {
-          content: '×' attr(data-count);
-          position: absolute; top: -8px; right: -8px;
-          background: var(--teal); color: var(--on-teal);
-          border-radius: var(--radius-pill); font-family: var(--font-mono);
-          font-size: var(--font-size-2xs); line-height: 1.5; padding: 0 0.4em;
-          box-shadow: 0 0 0 2px var(--paper-panel);
-        }
       </style>
       <div class="grid"></div>
     `;
-    this.$grid = shadow.querySelector('.grid');
-    this.$grid.addEventListener('click', (e) => {
-      const btn = e.target.closest('[data-id]');
-      if (!btn) return;
+    this.$grid = /** @type {HTMLElement} */ (shadow.querySelector('.grid'));
+    this.$grid.addEventListener('pick', (e) => {
+      const btn = /** @type {HTMLElement} */ (e.target).closest('[data-id]');
+      if (!(btn instanceof HTMLElement)) return;
       this.dispatchEvent(new CustomEvent('item-pick', { detail: { id: btn.dataset.id }, bubbles: true, composed: true }));
     });
   }
 
+  /** @param {string} name @param {string|null} _old @param {string|null} value */
   attributeChangedCallback(name, _old, value) {
     if (name === 'columns') this.style.setProperty('--columns', value || '3');
   }
 
+  /** @param {ItemButtonSpec[]} items */
   set items(items) {
     this._items = items;
     this._render();
@@ -69,22 +64,15 @@ export class ItemButtonGrid extends HTMLElement {
   _render() {
     this.$grid.innerHTML = '';
     for (const item of this._items) {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'ds-item-btn item-btn';
+      const btn = document.createElement('ds-item-button');
       btn.dataset.id = item.id;
       btn.title = item.title;
-      if (item.active !== undefined) {
-        btn.classList.toggle('ds-item-btn--active', item.active);
-        btn.setAttribute('aria-pressed', String(!!item.active));
-      }
-      if (item.capped) btn.dataset.capped = '';
-      if (item.count !== undefined) btn.dataset.count = String(item.count);
-      btn.innerHTML = `<img class="ds-item-icon" src="${item.sprite}" alt="" ${FALLBACK_ONERROR} />
-        <span class="ds-item-btn-text">
-          <span class="ds-item-btn-label">${item.label}</span>
-          <span class="ds-item-btn-boost">${item.boost}</span>
-        </span>`;
+      btn.setAttribute('icon', item.sprite);
+      btn.setAttribute('label', item.label);
+      btn.setAttribute('boost', item.boost);
+      if (item.active !== undefined) btn.toggleAttribute('active', item.active);
+      if (item.capped) btn.toggleAttribute('capped', true);
+      if (item.count !== undefined) btn.setAttribute('count', String(item.count));
       this.$grid.appendChild(btn);
     }
   }
