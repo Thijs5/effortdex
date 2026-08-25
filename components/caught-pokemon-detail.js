@@ -1,8 +1,10 @@
 import { POWER_ITEMS, MACHO_BRACE_SPRITE, EXP_SHARE_SPRITE, VITAMINS, FEATHERS, FEATHER_BONUS, EV_BERRIES, EV_BERRY_REDUCTION, NATURES, STAT_LABEL, MACHO_BRACE_MULTIPLIER, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, STAT_EXP_VITAMIN_BONUS, STAT_EXP_VITAMIN_CEILING, FALLBACK_SPRITE, FALLBACK_ONERROR, MIN_LEVEL, MAX_LEVEL } from '../lib/constants.js';
 import { gen1SpecialStat } from '../lib/gen1-special-stats.js';
 import { titleCase, totalEvs, natureEffectHint, natureOptionsHtml, dayLabel, escapeHtml, sortByLabel } from '../lib/utils.js';
-import { api, store } from '../lib/services.js';
+import { api, store, smogon } from '../lib/services.js';
 import { versionedSpriteUrl } from '../lib/pokeapi-client.js';
+import { toShowdownId, smogonSetsKey, TIER_DESCRIPTIONS } from '../lib/smogon-client.js';
+import { matchGameVersion } from '../lib/game-versions.js';
 import { attachDesignSystem } from '../lib/design-system.js';
 import { wireSpriteFallback } from '../lib/sprite-fallback.js';
 import { POKERUS_ICON_SVG } from '../lib/icons.js';
@@ -17,6 +19,11 @@ import './item-button-grid.js';
 const SORTED_VITAMINS = sortByLabel(VITAMINS);
 const SORTED_FEATHERS = sortByLabel(FEATHERS);
 const SORTED_EV_BERRIES = sortByLabel(EV_BERRIES);
+
+// Tier badge color grouping — see .tier-badge's own CSS comment for why
+// this is three loose groups, not a per-tier rainbow.
+const TIER_DANGER = new Set(['Uber', 'AG']);
+const TIER_SPECIAL = new Set(['LC', 'NFE']);
 
 /**
  * <caught-pokemon-detail> — a caught Pokémon's full detail page: identity,
@@ -139,16 +146,33 @@ export class CaughtPokemonDetail extends HTMLElement {
         .level-up-btn:disabled { opacity: 0.5; cursor: not-allowed; }
         .level-up-btn svg { width: 11px; height: 11px; color: var(--teal); }
         .level-up-btn:disabled svg { color: inherit; }
-        .more-btn { grid-area: more; align-self: start; display: inline-flex; align-items: center; gap: 0.3em; white-space: nowrap; }
+        .more-btn-wrap { grid-area: more; align-self: start; position: relative; }
+        .more-btn { display: inline-flex; align-items: center; gap: 0.3em; white-space: nowrap; }
         .more-btn svg { width: 14px; height: 14px; }
         /* The number+nature prefix (added ahead of the editable name)
            leaves less room for a long nickname on a phone-width card —
            drop the "More" label and keep just its icon, freeing that
-           width back up. The dialog's own title still says "More
-           options" for anyone who lands there another way. */
+           width back up. */
         @media (max-width: 420px) {
           .more-btn-label { display: none; }
         }
+
+        /* Mirrors the app-shell header menu (styles.css's .header-menu)
+           — same look, reimplemented locally since shadow DOM can't
+           reach that light-DOM stylesheet's rules. */
+        .more-menu {
+          position: absolute; top: calc(100% + 8px); right: 0; z-index: 50;
+          min-width: 180px; display: grid; gap: 2px; padding: var(--space-2);
+          background: var(--surface); color: var(--ink); border: 1px solid var(--lcd-line);
+          border-radius: var(--radius-md); box-shadow: var(--shadow-suggestions);
+        }
+        .more-menu[hidden] { display: none; }
+        .more-menu-item {
+          display: flex; align-items: center; width: 100%; padding: var(--space-2) var(--space-3);
+          border: none; border-radius: var(--radius-sm); background: transparent;
+          text-align: left; font-size: var(--font-size-md); color: inherit; cursor: pointer;
+        }
+        .more-menu-item:hover { background: var(--lcd); }
 
         /* An inline item in .meta now, not its own row — flex-wrap here
            lets its own pills wrap independently if they run out of room. */
@@ -196,6 +220,11 @@ export class CaughtPokemonDetail extends HTMLElement {
             grid-column: 1 / -1;
           }
         }
+        .competitive-dialog { gap: var(--space-4); }
+        .competitive-dialog:not([open]) { display: none; }
+        .competitive-dialog[open] { display: grid; }
+        .competitive-dialog.ds-dialog { width: min(420px, calc(100vw - 2.4rem)); }
+        .competitive-dialog .ds-dialog-header { margin-bottom: 0; }
         .release {
           display: inline-flex; align-items: center; justify-content: center; gap: 0.35em;
           border: 1px solid var(--lcd-line); background: transparent; cursor: pointer; width: 100%;
@@ -266,6 +295,45 @@ export class CaughtPokemonDetail extends HTMLElement {
 
         .evolve-panel { display: grid; gap: var(--space-2); }
 
+        .competitive-panel { display: grid; gap: var(--space-2); }
+        /* Three loose groups, not a full per-tier rainbow — a 14-color
+           gradient would just be a new scale to learn. Default (teal):
+           every ordinary ranked tier (OU down through PU/ZU and their
+           banlists). --danger: Uber/AG, the "banned for being too
+           strong" case, worth a visual heads-up. --special: LC/NFE,
+           flagged as a different color on purpose since it's a
+           different *axis* (evolution stage, not a power ranking) —
+           the mix-up a newcomer is likeliest to make seeing a two-letter
+           code next to ranked ones. */
+        .tier-badge {
+          font-family: var(--font-mono); font-size: var(--font-size-2xs); font-weight: 700;
+          letter-spacing: 0.04em; color: var(--teal-strong); background: var(--teal-soft);
+          border-radius: var(--radius-pill); padding: 0.15em 0.6em; text-transform: none;
+          border: none; cursor: pointer;
+        }
+        .tier-badge--danger { color: var(--poke-red-dark); background: var(--danger-soft); }
+        .tier-badge--special { color: var(--pokerus-purple); background: var(--pokerus-purple-soft); }
+        /* Deliberately the plainest of the four — Illegal isn't "worse"
+           than a ranked tier the way the danger/special groups carry
+           their own meaning, it's "not applicable here at all", so it
+           gets the same neutral treatment as an unset value elsewhere
+           (e.g. the roster's "no held item" pill) rather than a color
+           that implies it belongs on the same scale. */
+        .tier-badge--illegal { color: var(--ink-soft); background: var(--lcd); border: 1px dashed var(--lcd-line); }
+        .competitive-sets { display: grid; gap: var(--space-3); }
+        .competitive-set {
+          display: grid; gap: 0.2em; padding: var(--space-3); background: var(--lcd);
+          border-radius: var(--radius-sm); font-size: var(--font-size-xs); color: var(--ink-soft);
+        }
+        .competitive-set-title { margin: 0; font-weight: 600; color: var(--ink); }
+        .competitive-set-format { font-weight: 400; color: var(--ink-soft); text-transform: uppercase; }
+        .competitive-set-line { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); }
+        .competitive-set-line:empty { display: none; }
+        .competitive-set-moves { margin: 0; font-size: var(--font-size-2xs); }
+        .competitive-empty { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--ink-soft); }
+        .competitive-attribution { margin: 0; font-size: var(--font-size-2xs); color: var(--ink-soft); }
+        .competitive-attribution a { color: inherit; }
+
         .battle { display: grid; gap: var(--space-2); }
         .status { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--poke-red-dark); min-height: 1em; }
       </style>
@@ -287,15 +355,21 @@ export class CaughtPokemonDetail extends HTMLElement {
               <div class="status-row" hidden></div>
             </div>
           </div>
-          <button class="more-btn ds-btn ds-btn--outline ds-btn--sm" type="button" title="More options" aria-label="More options" aria-haspopup="dialog">
-            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="17.5" r="1.7"/></svg>
-            <span class="more-btn-label">More</span>
-          </button>
+          <div class="more-btn-wrap">
+            <button class="more-btn ds-btn ds-btn--outline ds-btn--sm" type="button" title="More" aria-label="More" aria-haspopup="menu" aria-expanded="false">
+              <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="17.5" r="1.7"/></svg>
+              <span class="more-btn-label">More</span>
+            </button>
+            <div class="more-menu" role="menu" aria-label="More" hidden>
+              <button class="more-menu-item" type="button" role="menuitem" data-open="training">Training &amp; EVs</button>
+              <button class="more-menu-item" type="button" role="menuitem" data-open="competitive">Competitive</button>
+            </div>
+          </div>
         </header>
 
         <dialog class="more-dialog ds-dialog">
           <header class="ds-dialog-header">
-            <h2>More options</h2>
+            <h2>Training &amp; EVs</h2>
             <button class="more-dialog-close ds-dialog-close" type="button" aria-label="Close">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
             </button>
@@ -396,6 +470,24 @@ export class CaughtPokemonDetail extends HTMLElement {
           </button>
         </dialog>
 
+        <dialog class="competitive-dialog ds-dialog">
+          <header class="ds-dialog-header">
+            <h2>Competitive</h2>
+            <button class="competitive-dialog-close ds-dialog-close" type="button" aria-label="Close">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
+          </header>
+          <div class="competitive-panel">
+            <h3 class="section-title">Tier &amp; common sets
+              <button type="button" class="help-btn" aria-expanded="false" aria-label="Where does this come from?" title="Tier via Pokémon Showdown, common sets via Smogon University's strategy dex — both fetched live and cached locally for about a week. Shown for this party's own generation. Not every species has a published competitive analysis.">?</button>
+              <button type="button" class="tier-badge help-btn" aria-expanded="false" aria-label="What does this tier mean?" hidden></button>
+            </h3>
+            <div class="competitive-sets"></div>
+            <p class="competitive-empty" hidden>No published competitive data for this Pokémon in this generation.</p>
+            <p class="competitive-attribution">Tiers via Pokémon Showdown &middot; sets via Smogon University</p>
+          </div>
+        </dialog>
+
         <div class="card-body">
           <div class="card-col card-col--left">
             <h3 class="section-title">EV values</h3>
@@ -429,9 +521,13 @@ export class CaughtPokemonDetail extends HTMLElement {
     this.$natureHint = shadow.querySelector('.nature-hint');
     this.$naturePrefix = shadow.querySelector('.nature-prefix');
     this.$statusRow = shadow.querySelector('.status-row');
+    this.$moreBtnWrap = shadow.querySelector('.more-btn-wrap');
     this.$moreBtn = shadow.querySelector('.more-btn');
+    this.$moreMenu = shadow.querySelector('.more-menu');
     this.$moreDialog = shadow.querySelector('.more-dialog');
     this.$moreDialogClose = shadow.querySelector('.more-dialog-close');
+    this.$competitiveDialog = shadow.querySelector('.competitive-dialog');
+    this.$competitiveDialogClose = shadow.querySelector('.competitive-dialog-close');
     this.$release = shadow.querySelector('.release');
     this.$evSummary = shadow.querySelector('ev-summary');
     this.$itemGrid = shadow.querySelector('.item-grid');
@@ -449,6 +545,10 @@ export class CaughtPokemonDetail extends HTMLElement {
     this.$berryGrid = shadow.querySelector('.berry-grid');
     this.$berryStatus = shadow.querySelector('.berry-status');
     this.$evoChain = shadow.querySelector('evolution-chain');
+    this.$tierBadge = shadow.querySelector('.tier-badge');
+    this.$competitiveSets = shadow.querySelector('.competitive-sets');
+    this.$competitiveEmpty = shadow.querySelector('.competitive-empty');
+    this._competitiveToken = 0; // guards against a stale async response landing after a fast species switch
     this.$search = shadow.querySelector('pokemon-search');
     // Shows what battling this opponent would actually add right now —
     // held item, Pokérus and the 252/510 caps folded in — rather than
@@ -517,20 +617,63 @@ export class CaughtPokemonDetail extends HTMLElement {
       store.setNature(this._entry.uid, this.$nature.value || null);
       this._renderNatureHint();
     });
-    this.$moreBtn.addEventListener('click', () => {
-      this.$moreDialog.showModal();
-      // styles.css's html:has(dialog[open]) scroll lock can't see into
-      // this shadow root, so flag the open state on <html> ourselves.
-      document.documentElement.dataset.modalOpen = '';
-      this.$evoChain.load();
+    // The "More" button opens a small menu (Training & EVs / Competitive)
+    // rather than a dialog directly — the combined dialog got long enough
+    // (Level & nature through Release, now Competitive on top) that
+    // splitting by "what am I here to do" beat one long scroll. Mirrors
+    // the app shell's own header menu (lib/shell.js) — open/outside-
+    // click/Escape/arrow-key behavior all match it, reimplemented locally
+    // since shadow DOM can't reuse that light-DOM listener setup.
+    const moreMenuItems = () => [...this.$moreMenu.querySelectorAll('.more-menu-item')];
+    const setMoreMenuOpen = (open) => {
+      this.$moreMenu.hidden = !open;
+      this.$moreBtn.setAttribute('aria-expanded', String(open));
+      if (open) moreMenuItems()[0].focus();
+    };
+    this.$moreBtn.addEventListener('click', () => setMoreMenuOpen(this.$moreMenu.hidden));
+    this.$moreMenu.addEventListener('click', (e) => {
+      const item = /** @type {HTMLElement} */ (e.target).closest('.more-menu-item');
+      if (!item) return;
+      setMoreMenuOpen(false);
+      if (item.dataset.open === 'training') this._openDialog(this.$moreDialog);
+      else if (item.dataset.open === 'competitive') this._openDialog(this.$competitiveDialog);
     });
-    // 'close' catches every path: the ✕, Esc, and backdrop clicks.
-    this.$moreDialog.addEventListener('close', () => {
-      delete document.documentElement.dataset.modalOpen;
+    // A click anywhere outside the menu closes it — listened on
+    // `document`, not this.shadowRoot, since a click that lands outside
+    // the whole component (e.g. the page background) never reaches a
+    // shadow-root-scoped listener at all. e.target retargets to the host
+    // element from outside the shadow boundary, so composedPath() (which
+    // doesn't) is what actually finds .more-btn-wrap when the click was
+    // inside it.
+    document.addEventListener('click', (e) => {
+      if (!this.$moreMenu.hidden && !e.composedPath().includes(this.$moreBtnWrap)) setMoreMenuOpen(false);
     });
+    this.shadowRoot.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !this.$moreMenu.hidden) {
+        setMoreMenuOpen(false);
+        this.$moreBtn.focus();
+      }
+    });
+    this.$moreMenu.addEventListener('keydown', (e) => {
+      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+      e.preventDefault();
+      const items = moreMenuItems();
+      const current = items.indexOf(/** @type {HTMLElement} */ (this.shadowRoot.activeElement));
+      const step = e.key === 'ArrowDown' ? 1 : -1;
+      items[(current + step + items.length) % items.length].focus();
+    });
+
+    // 'close' catches every path a dialog can close by: the ✕, Esc, and
+    // a backdrop click.
+    this.$moreDialog.addEventListener('close', () => this._onDialogClosed());
     this.$moreDialogClose.addEventListener('click', () => this.$moreDialog.close());
     this.$moreDialog.addEventListener('click', (e) => {
       if (e.target === this.$moreDialog) this.$moreDialog.close();
+    });
+    this.$competitiveDialog.addEventListener('close', () => this._onDialogClosed());
+    this.$competitiveDialogClose.addEventListener('click', () => this.$competitiveDialog.close());
+    this.$competitiveDialog.addEventListener('click', (e) => {
+      if (e.target === this.$competitiveDialog) this.$competitiveDialog.close();
     });
     // The "?" buttons toggle their explanation inline: title tooltips are
     // hover-only, which leaves them unreachable on touch devices. Listens
@@ -585,6 +728,19 @@ export class CaughtPokemonDetail extends HTMLElement {
     this.$histLog.addEventListener('redefeat', (e) => {
       this._battle(e.detail.name, `Re-logging battle vs ${titleCase(e.detail.name)}…`);
     });
+  }
+
+  /** @param {HTMLDialogElement} dialog */
+  _openDialog(dialog) {
+    dialog.showModal();
+    // styles.css's html:has(dialog[open]) scroll lock can't see into
+    // this shadow root, so flag the open state on <html> ourselves.
+    document.documentElement.dataset.modalOpen = '';
+    if (dialog === this.$moreDialog) this.$evoChain.load();
+  }
+
+  _onDialogClosed() {
+    delete document.documentElement.dataset.modalOpen;
   }
 
   set entry(e) {
@@ -730,6 +886,99 @@ export class CaughtPokemonDetail extends HTMLElement {
     if (berriesAvailable) this._updateBerryGrid(e);
     this.$evoChain.entry = e;
     this.$histLog.entry = e;
+    this._renderCompetitive(e);
+  }
+
+  /**
+   * Fetches (or reads from lib/smogon-client.js's own cache) this
+   * species' current tier and common competitive sets, scoped to the
+   * active party's own generation — clamped to Smogon's covered range
+   * (1-9), defaulting to the current generation for an unrecognized/ROM
+   * hack base game rather than showing nothing. Async and best-effort:
+   * offline or a failed fetch just leaves the section showing its empty
+   * state, never an error — this is a nice-to-have overlay on top of the
+   * app's own offline-first EV tracking, not something it depends on.
+   * @param {RosterEntry} e
+   */
+  async _renderCompetitive(e) {
+    const token = ++this._competitiveToken;
+    this.$tierBadge.hidden = true;
+    this.$tierBadge.classList.remove('tier-badge--danger', 'tier-badge--special', 'tier-badge--illegal');
+    // A stale open help-note (from this same badge, on a previous
+    // species) would otherwise show that species' tier description
+    // after switching — close it rather than let it linger.
+    if (this.$tierBadge.getAttribute('aria-expanded') === 'true') {
+      const heading = this.$tierBadge.closest('.section-title');
+      if (heading?.nextElementSibling?.classList.contains('help-note')) heading.nextElementSibling.remove();
+      this.$tierBadge.setAttribute('aria-expanded', 'false');
+    }
+    this.$competitiveSets.innerHTML = '';
+    this.$competitiveEmpty.hidden = true;
+    const gen = Math.min(9, Math.max(1, matchGameVersion(store.activeParty?.baseGame)?.gen ?? 9));
+    try {
+      const [tiers, sets] = await Promise.all([smogon.getTiers(), smogon.getSets(gen)]);
+      if (token !== this._competitiveToken) return; // a newer species/render already owns the UI
+      const tierInfo = tiers[toShowdownId(e.speciesName)];
+      // "No badge" should only ever mean "no data for this species" — an
+      // explicit Illegal tier (banned outright, or not yet released in
+      // this format) is itself meaningful information, not the same
+      // silence as "we don't know." Shown in its own muted color so it
+      // doesn't read as just another ranked tier.
+      if (tierInfo?.tier) {
+        this.$tierBadge.textContent = tierInfo.tier;
+        this.$tierBadge.title = TIER_DESCRIPTIONS[tierInfo.tier] || 'A Pokémon Showdown competitive tier.';
+        this.$tierBadge.classList.toggle('tier-badge--danger', TIER_DANGER.has(tierInfo.tier));
+        this.$tierBadge.classList.toggle('tier-badge--special', TIER_SPECIAL.has(tierInfo.tier));
+        this.$tierBadge.classList.toggle('tier-badge--illegal', tierInfo.tier === 'Illegal');
+        this.$tierBadge.hidden = false;
+      }
+      const speciesSets = sets[smogonSetsKey(e.speciesName)];
+      if (!speciesSets) {
+        this.$competitiveEmpty.hidden = false;
+        return;
+      }
+      const flat = [];
+      for (const [format, bySet] of Object.entries(speciesSets)) {
+        for (const [setName, set] of Object.entries(bySet)) flat.push({ format, setName, set });
+      }
+      // Capped at 3 — this is a quick "is this a competitive spread"
+      // glance, not a full strategy-dex mirror; the attribution line
+      // points to the real thing for anyone who wants more.
+      this.$competitiveSets.innerHTML = flat
+        .slice(0, 3)
+        .map(({ format, setName, set }) => this._competitiveSetHtml(format, setName, set))
+        .join('');
+    } catch {
+      if (token !== this._competitiveToken) return;
+      this.$competitiveEmpty.hidden = false;
+    }
+  }
+
+  /** @param {string} format @param {string} setName @param {any} set @returns {string} */
+  _competitiveSetHtml(format, setName, set) {
+    // Several of a set's own fields — moves (per-slot), item, nature, and
+    // evs — can each be either one value or an array of viable
+    // alternatives (Smogon publishes "or" options within a single set,
+    // e.g. Chansey's NU set offering two different EV spreads). Only the
+    // first alternative is shown here — this card is a quick glance, not
+    // a full options list; the attribution line points to the real dex
+    // entry for anyone who wants the rest.
+    const first = (/** @type {any} */ v) => (Array.isArray(v) ? v[0] : v);
+    const moves = (set.moves || []).map(first).slice(0, 4);
+    const evs = first(set.evs);
+    const evsText = evs
+      ? Object.entries(evs)
+          .map(([key, value]) => `${value} ${STAT_LABEL[/** @type {StatKey} */ (key)] || key.toUpperCase()}`)
+          .join(' / ')
+      : '';
+    return `
+      <div class="competitive-set">
+        <p class="competitive-set-title">${escapeHtml(setName)} <span class="competitive-set-format">${escapeHtml(format)}</span></p>
+        <p class="competitive-set-line">${[first(set.item), first(set.nature)].filter(Boolean).map(escapeHtml).join(' &middot; ')}</p>
+        <p class="competitive-set-line">${escapeHtml(evsText)}</p>
+        <p class="competitive-set-moves">${moves.map(escapeHtml).join(', ')}</p>
+      </div>
+    `;
   }
 
   // Shows the selected nature's stat effect right under the picker, so
