@@ -51,6 +51,41 @@ test.describe('IV tracking', () => {
     await expect(dialog3.getByLabel('SPE IV')).toHaveValue('31');
   });
 
+  test('typing into several IV fields in a row keeps every one of them, not just the last', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
+    await catchPokemon(page, 'Bulbasaur');
+    const card = await openDetail(page, 'Bulbasaur');
+    const dialog = await openIvs(card);
+
+    // No explicit .blur() between fields — tabbing/clicking straight
+    // from one to the next is the realistic path, and it's exactly what
+    // used to lose everything but the last field: the grid rebuilt its
+    // <input> elements on every blur, racing with focus already moving
+    // to whichever field came next.
+    await dialog.getByLabel('HP IV').fill('20');
+    await dialog.getByLabel('ATK IV').fill('15');
+    await dialog.getByLabel('DEF IV').fill('10');
+    await dialog.getByLabel('SPA IV').fill('31');
+    await dialog.getByLabel('SPD IV').fill('5');
+    await dialog.getByLabel('SPE IV').fill('12');
+    await dialog.getByLabel('SPE IV').blur(); // commits the last field's own change event too
+
+    await expect(dialog.getByLabel('HP IV')).toHaveValue('20');
+    await expect(dialog.getByLabel('ATK IV')).toHaveValue('15');
+    await expect(dialog.getByLabel('DEF IV')).toHaveValue('10');
+    await expect(dialog.getByLabel('SPA IV')).toHaveValue('31');
+    await expect(dialog.getByLabel('SPD IV')).toHaveValue('5');
+    await expect(dialog.getByLabel('SPE IV')).toHaveValue('12');
+    await expect(dialog.getByText('6/6 known, 1 perfect (31).')).toBeVisible();
+
+    await dialog.locator('.iv-dialog-save-btn').click();
+    const reopened = await openIvs(card);
+    await expect(reopened.getByLabel('HP IV')).toHaveValue('20');
+    await expect(reopened.getByLabel('ATK IV')).toHaveValue('15');
+    await expect(reopened.getByLabel('SPE IV')).toHaveValue('12');
+  });
+
   test("next to the EV bars, a stat shows its actual current value once its IV is known, base stat otherwise blank", async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });

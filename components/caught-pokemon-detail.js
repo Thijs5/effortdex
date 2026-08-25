@@ -839,12 +839,16 @@ export class CaughtPokemonDetail extends HTMLElement {
       const statKey = input?.dataset?.stat;
       if (!statKey) return;
       // Preview only — store.setIv doesn't run until Save (docs/adr/0017).
-      // Re-render so the "N/6 known" summary and perfect-stat highlight
-      // stay live even though nothing's actually been saved yet; 'change'
-      // only fires on blur/Enter, so losing focus here is expected, not
-      // a mid-type interruption.
+      // Updates the "N/6 known" summary and perfect-stat highlight live,
+      // but deliberately *doesn't* call the full _renderIvs rebuild here:
+      // that replaces every <input> in the grid (a fresh DOM node per
+      // stat), and this fires on blur — the exact moment focus is moving
+      // to whichever field the user clicks/tabs into next. Rebuilding
+      // then would destroy that field's own node out from under the
+      // focus-in-progress, discarding it as if it had never been typed
+      // (a value another stat's change event does).
       this._pendingIvs[statKey] = input.value === '' ? null : Number(input.value);
-      this._renderIvs(this._entry, store.usesStatExpSystem());
+      this._updateIvSummary();
     });
     this.$ivCalcStat.addEventListener('change', () => this._updateIvCalcHint());
     this.$ivCalcBtn.addEventListener('click', () => this._logIvReading());
@@ -1489,16 +1493,36 @@ export class CaughtPokemonDetail extends HTMLElement {
         return `<div class="iv-row${perfect ? ' iv-row--perfect' : ''}"><span class="iv-row-label">${escapeHtml(displayLabel)}</span>${control}</div>`;
       })
       .join('');
+    this.$ivSummary.hidden = false;
+    this._updateIvSummary();
+  }
 
+  /**
+   * The "N/6 known, M perfect" summary line and each row's perfect
+   * highlight, kept live on every field's own change — split out of
+   * _renderIvs (which also rebuilds the grid's <input> elements from
+   * scratch) specifically so a per-field edit never touches any other
+   * field's DOM node; see the grid's 'change' listener for why that
+   * matters. Also refreshes the IV calculator hint, same as a full
+   * _renderIvs would.
+   */
+  _updateIvSummary() {
+    const e = this._entry;
+    const ivs = this._pendingIvs || e.ivs;
+    const { max, legacy } = store.ivRange();
+    const rows = STATS.filter(({ key }) => !(legacy && key === 'spd'));
+    for (const row of this.$ivGrid.children) {
+      const input = /** @type {HTMLElement} */ (row).querySelector('input[data-stat]');
+      const key = /** @type {HTMLInputElement|null} */ (input)?.dataset.stat;
+      if (key) row.classList.toggle('iv-row--perfect', ivs[key] === max);
+    }
     const knownValues = rows.map(({ key }) => ivs[key]);
     const knownCount = knownValues.filter((v) => v != null).length;
     const perfectCount = knownValues.filter((v) => v === max).length;
-    this.$ivSummary.hidden = false;
     this.$ivSummary.textContent =
       knownCount === 0
         ? `Enter what you know — 0-${max} per stat.`
         : `${knownCount}/${rows.length} known${perfectCount > 0 ? `, ${perfectCount} perfect (${max})` : ''}.`;
-
     this._updateIvCalcHint();
   }
 
