@@ -423,7 +423,11 @@ export class CaughtPokemonDetail extends HTMLElement {
         .exp-share-section { display: grid; gap: var(--space-2); justify-items: stretch; min-width: 0; }
         .pokerus-note { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--ink-soft); }
 
-        .competitive-panel { display: grid; gap: var(--space-2); }
+        /* This dialog has no footer, unlike its siblings — .ds-dialog no
+           longer carries its own bottom padding (the footer owns that
+           inset elsewhere), so this panel, as the last row, provides
+           its own instead. */
+        .competitive-panel { display: grid; gap: var(--space-2); padding-bottom: var(--space-5); }
         /* Base stats: a fixed reference for min-maxing a build (which
            stats are worth EVs against a species' own ceiling) — moved
            here from next to the EV bars, where a number that never
