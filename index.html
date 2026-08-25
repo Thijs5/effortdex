@@ -241,7 +241,7 @@
     </footer>
   </div>
 
-  <dialog id="party-dialog" class="party-dialog ds-dialog">
+  <dialog id="party-dialog" class="party-dialog ds-dialog" aria-labelledby="party-dialog-title">
     <form id="party-form">
       <header class="ds-dialog-header">
         <h2 id="party-dialog-title">New party</h2>
@@ -256,7 +256,7 @@
       <label class="field-label">
         Base game
         <div class="game-version-row">
-          <game-version-picker id="party-base-game" maxlength="40"></game-version-picker>
+          <game-version-picker id="party-base-game" maxlength="40" aria-label="Base game"></game-version-picker>
           <game-ball id="dialog-game-cart"></game-ball>
         </div>
         <span class="field-error" id="party-base-game-error" hidden>Choose a base game &mdash; it sets this party's EV rules and default sprite style. Playing a ROM hack or fan game? Pick whichever official title it's a hack of.</span>
@@ -353,7 +353,7 @@
         </label>
         <label class="field-label field-label--inline">
           Sprite style
-          <game-version-picker id="override-sprite-version" maxlength="40" placeholder="Auto (from base game)"></game-version-picker>
+          <game-version-picker id="override-sprite-version" maxlength="40" placeholder="Auto (from base game)" aria-label="Sprite style"></game-version-picker>
         </label>
         <p class="hint sprite-style-hint">Shows this title's sprites for the roster instead of the base game's &mdash; e.g. play a Ruby ROM hack but see Emerald's sprites. Any species missing from that title's sprites falls back to the modern default.</p>
       </details>
@@ -367,7 +367,7 @@
     </form>
   </dialog>
 
-  <dialog id="catch-dialog" class="party-dialog catch-dialog ds-dialog">
+  <dialog id="catch-dialog" class="party-dialog catch-dialog ds-dialog" aria-labelledby="catch-dialog-title">
     <form id="catch-form">
       <header class="ds-dialog-header">
         <h2 id="catch-dialog-title">Catch Pok&eacute;mon</h2>
@@ -398,9 +398,9 @@
     </form>
   </dialog>
 
-  <dialog id="roster-filter-dialog" class="roster-filter-dialog ds-dialog">
+  <dialog id="roster-filter-dialog" class="roster-filter-dialog ds-dialog" aria-labelledby="roster-filter-dialog-title">
     <header class="ds-dialog-header">
-      <h2>Filter &amp; sort roster</h2>
+      <h2 id="roster-filter-dialog-title">Filter &amp; sort roster</h2>
       <button type="button" id="roster-filter-dialog-close" class="ds-dialog-close" aria-label="Close">
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
       </button>
