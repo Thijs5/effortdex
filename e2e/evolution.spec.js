@@ -26,7 +26,7 @@ test.describe('Evolution', () => {
     const card = await openDetail(page, 'Bulbasaur');
     const itemDialog = await openItemDialog(card);
     await itemDialog.locator('[data-id="protein"] button').click();
-    await itemDialog.locator('.item-dialog-close').click();
+    await itemDialog.locator('.item-dialog-save-btn').click();
 
     const dialog = await openLevelUpDialog(card);
     await dialog.getByRole('heading', { name: 'Evolution' }).waitFor({ state: 'visible' });

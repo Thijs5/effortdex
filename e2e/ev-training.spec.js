@@ -39,6 +39,7 @@ test.describe('EV training', () => {
     const dialog = await openItemDialog(card);
 
     await dialog.locator('[data-id="protein"] button').click();
+    await dialog.locator('.item-dialog-save-btn').click();
 
     await expect(card.locator('ev-summary ev-bar[data-key="atk"]').locator('.value')).toHaveText('10/252');
   });
@@ -49,13 +50,15 @@ test.describe('EV training', () => {
     await catchPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openItemDialog(card);
+    const proteinBtn = dialog.locator('[data-id="protein"] button');
 
-    // 10 Proteins reach exactly 100 Atk EVs — the cutoff threshold.
-    for (let i = 0; i < 10; i++) await dialog.locator('[data-id="protein"] button').click();
-    await expect(card.locator('ev-summary ev-bar[data-key="atk"]').locator('.value')).toHaveText('100/252');
+    // 10 Proteins reach exactly 100 Atk EVs — the cutoff threshold — and
+    // queuing an 11th is blocked outright (disabled, not just a no-op
+    // click) once the simulated total hits it.
+    for (let i = 0; i < 10; i++) await proteinBtn.click();
+    await expect(proteinBtn).toBeDisabled();
 
-    // An 11th does nothing more — the cutoff, not the 252 cap, stops it.
-    await dialog.locator('[data-id="protein"] button').click();
+    await dialog.locator('.item-dialog-save-btn').click();
     await expect(card.locator('ev-summary ev-bar[data-key="atk"]').locator('.value')).toHaveText('100/252');
   });
 
@@ -67,6 +70,7 @@ test.describe('EV training', () => {
     const dialog = await openItemDialog(card);
 
     for (let i = 0; i < 11; i++) await dialog.locator('[data-id="protein"] button').click();
+    await dialog.locator('.item-dialog-save-btn').click();
 
     await expect(card.locator('ev-summary ev-bar[data-key="atk"]').locator('.value')).toHaveText('110/252');
   });
@@ -79,8 +83,7 @@ test.describe('EV training', () => {
     const itemDialog = await openItemDialog(card);
 
     await itemDialog.locator('.item-grid [data-id="macho-brace"] button').click();
-    await itemDialog.locator('.held-item-save-btn').click();
-    await itemDialog.locator('.item-dialog-close').click();
+    await itemDialog.locator('.item-dialog-save-btn').click(); // Save closes the dialog
     await logBattle(card, 'Caterpie'); // base +1 HP, doubled to +2
 
     await expect(card.locator('ev-summary ev-bar[data-key="hp"]').locator('.value')).toHaveText('2/252');
@@ -91,12 +94,15 @@ test.describe('EV training', () => {
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
     await catchPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
-    const dialog = await openItemDialog(card);
 
+    let dialog = await openItemDialog(card);
     await dialog.locator('[data-id="protein"] button').click();
+    await dialog.locator('.item-dialog-save-btn').click();
     await expect(card.locator('ev-summary ev-bar[data-key="atk"]').locator('.value')).toHaveText('10/252');
 
+    dialog = await openItemDialog(card);
     await dialog.locator('[data-id="kelpsy"] button').click();
+    await dialog.locator('.item-dialog-save-btn').click();
     await expect(card.locator('ev-summary ev-bar[data-key="atk"]').locator('.value')).toHaveText('0/252');
   });
 
@@ -108,7 +114,32 @@ test.describe('EV training', () => {
     const dialog = await openItemDialog(card);
 
     for (let i = 0; i < 3; i++) await dialog.locator('[data-id="genius-wing"] button').click();
+    await dialog.locator('.item-dialog-save-btn').click();
 
     await expect(card.locator('ev-summary ev-bar[data-key="spa"]').locator('.value')).toHaveText('3/252');
+  });
+
+  test('Save applies every queued Vitamin/Wing/berry click and closes the Items popup; queued and already-fed counts are shown separately', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
+    await catchPokemon(page, 'Bulbasaur');
+    const card = await openDetail(page, 'Bulbasaur');
+    const proteinBtn1 = (await openItemDialog(card)).locator('[data-id="protein"] button');
+
+    // Two queued clicks apply nothing until Save.
+    await proteinBtn1.click();
+    await proteinBtn1.click();
+    await expect(card.locator('ev-summary ev-bar[data-key="atk"]').locator('.value')).toHaveText('0/252');
+    await expect(proteinBtn1).toContainText('2× queued');
+
+    const dialog1 = card.locator('dialog.item-dialog');
+    await dialog1.locator('.item-dialog-save-btn').click();
+    await expect(dialog1).toBeHidden(); // Save applies everything queued and closes, unlike the old instant-apply flow
+    await expect(card.locator('ev-summary ev-bar[data-key="atk"]').locator('.value')).toHaveText('20/252');
+
+    // Reopening shows "fed 2×" (history, permanent) with nothing queued this session.
+    const proteinDialog2 = await openItemDialog(card);
+    await expect(proteinDialog2.locator('[data-id="protein"]')).toHaveAttribute('title', /fed 2×/);
+    await expect(proteinDialog2.locator('[data-id="protein"] button')).not.toContainText('queued');
   });
 });

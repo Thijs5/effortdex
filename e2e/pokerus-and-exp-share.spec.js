@@ -37,8 +37,7 @@ test.describe('Pokérus and Exp. Share', () => {
     const charmanderCard = await openDetail(page, 'Charmander');
     const charmanderDialog = await openItemDialog(charmanderCard);
     await charmanderDialog.locator('.exp-share-toggle-btn button').click();
-    await charmanderDialog.locator('.held-item-save-btn').click();
-    await charmanderDialog.locator('.item-dialog-close').click();
+    await charmanderDialog.locator('.item-dialog-save-btn').click();
 
     await page.getByRole('link', { name: /^← / }).click();
     const bulbasaurCard = await openDetail(page, 'Bulbasaur');

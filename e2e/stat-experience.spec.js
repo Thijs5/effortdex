@@ -35,12 +35,13 @@ test.describe('Gen I/II Stat Experience', () => {
     await catchPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openItemDialog(card);
+    const proteinBtn = dialog.locator('[data-id="protein"] button');
 
-    for (let i = 0; i < 10; i++) await dialog.locator('[data-id="protein"] button').click();
-    await expect(card.locator('ev-summary ev-bar[data-key="atk"]').locator('.value')).toHaveText('25600/65535');
+    for (let i = 0; i < 10; i++) await proteinBtn.click();
+    // An 11th is blocked outright — a 25,600 value ceiling, not a use counter.
+    await expect(proteinBtn).toBeDisabled();
 
-    // The 11th does nothing — a 25,600 value ceiling, not a use counter.
-    await dialog.locator('[data-id="protein"] button').click();
+    await dialog.locator('.item-dialog-save-btn').click();
     await expect(card.locator('ev-summary ev-bar[data-key="atk"]').locator('.value')).toHaveText('25600/65535');
 
     // No total row at all under Stat Experience (unlike Gen III+'s 510 cap).
@@ -58,6 +59,7 @@ test.describe('Gen I/II Stat Experience', () => {
     const dialog = await openItemDialog(card);
     await expect(dialog.locator('[data-id="zinc"]')).toBeHidden();
     await dialog.locator('[data-id="calcium"] button').click();
+    await dialog.locator('.item-dialog-save-btn').click();
 
     await expect(card.locator('ev-summary ev-bar[data-key="spa"]').locator('.value')).toHaveText('2560/65535');
   });

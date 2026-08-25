@@ -46,10 +46,19 @@ export class CaughtPokemonDetail extends HTMLElement {
     // Same idea for the Items dialog's held-item slot (Training item /
     // Exp. Share — mutually exclusive, docs/adr/0017): { powerItem,
     // machoBrace, expShare }, seeded when the dialog opens, applied only
-    // by the held-item section's own Save button. Vitamins/Wings/
-    // berries/Pokérus in the same dialog are unaffected — those stay
-    // instant.
+    // by the dialog's own footer Save button.
     this._pendingHeldItem = null;
+    // Every Vitamin/Wing/berry click queued this dialog session, in the
+    // order clicked: [{ kind: 'vitamin'|'feather'|'berry', id }]. Nothing
+    // is recorded in the store until Save replays this list through the
+    // real store.useVitamin/useFeather/useBerry, in order — an ordered
+    // list rather than a per-id count because whether a *later* click
+    // still adds anything depends on every earlier one already queued
+    // (the same stat's cap gets closer with each), so replay order has
+    // to match click order exactly, for both the live "would this next
+    // click still do anything" preview and the real Save. Pokérus stays
+    // instant/unqueued (a plain reversible toggle, not a counted action).
+    this._pendingApplies = [];
 
     const shadow = this.attachShadow({ mode: 'open' });
     attachDesignSystem(shadow);
@@ -247,12 +256,12 @@ export class CaughtPokemonDetail extends HTMLElement {
         .item-dialog[open] { display: grid; }
         .item-dialog.ds-dialog { width: min(420px, calc(100vw - 2.4rem)); }
         .item-dialog .ds-dialog-header { margin-bottom: 0; }
-        /* Training item + Exp. Share share one held-item slot and are
-           preview-then-Save, unlike everything else in this dialog
-           (Vitamins/Wings/berries/Pokérus), which stays instant — see
-           the Save handler's own comment. */
-        .held-item-save-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
-        .held-item-save-hint { margin: 0; font-size: var(--font-size-2xs); color: var(--ink-soft); }
+        /* Everything in this dialog previews only, applied together by
+           the one footer Save button (docs/adr/0017) — except Pokérus,
+           which stays instant (a plain reversible toggle, not a
+           queued/counted action). */
+        .item-dialog-footer { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+        .item-dialog-save-hint { margin: 0; font-size: var(--font-size-2xs); color: var(--ink-soft); }
         .level-up-dialog { gap: var(--space-4); }
         .level-up-dialog:not([open]) { display: none; }
         .level-up-dialog[open] { display: grid; }
@@ -358,6 +367,12 @@ export class CaughtPokemonDetail extends HTMLElement {
           text-align: right; padding-right: var(--space-2);
         }
         .iv-row--perfect .iv-row-label { color: var(--teal); }
+        /* One extra column for the last-logged-reading note, read-only
+           context before the new-value input (mirrors the level field's
+           own "Lv. X →" shape) — blank (no note) when nothing's been
+           logged for this stat yet, same width either way. */
+        .level-up-stat-row { grid-template-columns: 3.5em auto 1fr; }
+        .level-up-stat-last { font-family: var(--font-mono); font-size: var(--font-size-2xs); white-space: nowrap; }
         .iv-summary { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--ink-soft); }
         .iv-calc {
           display: grid; gap: var(--space-2); margin-top: var(--space-1);
@@ -521,11 +536,6 @@ export class CaughtPokemonDetail extends HTMLElement {
             <ds-item-button class="exp-share-toggle-btn" icon="${EXP_SHARE_SPRITE}" label="Exp. Share" boost="Shares other EVs"></ds-item-button>
           </section>
 
-          <div class="held-item-save-row">
-            <p class="held-item-save-hint">Training item / Exp. Share — nothing above applies until Save</p>
-            <button type="button" class="ds-btn ds-btn--primary held-item-save-btn">Save</button>
-          </div>
-
           <section class="vitamins">
             <h3 class="section-title">Vitamins</h3>
             <item-button-grid class="vitamin-grid"></item-button-grid>
@@ -543,6 +553,11 @@ export class CaughtPokemonDetail extends HTMLElement {
             <item-button-grid class="berry-grid"></item-button-grid>
             <p class="berry-status" aria-live="polite"></p>
           </section>
+
+          <footer class="ds-dialog-footer item-dialog-footer">
+            <p class="item-dialog-save-hint">Nothing above applies until Save</p>
+            <button type="button" class="ds-btn ds-btn--primary item-dialog-save-btn">Save</button>
+          </footer>
         </dialog>
 
         <dialog class="iv-dialog ds-dialog" aria-labelledby="iv-dialog-title">
@@ -685,7 +700,7 @@ export class CaughtPokemonDetail extends HTMLElement {
     this.$competitiveDialogClose = shadow.querySelector('.competitive-dialog-close');
     this.$evSummary = shadow.querySelector('ev-summary');
     this.$itemGrid = shadow.querySelector('.item-grid');
-    this.$heldItemSaveBtn = shadow.querySelector('.held-item-save-btn');
+    this.$itemDialogSaveBtn = shadow.querySelector('.item-dialog-save-btn');
     this.$pokerusToggle = shadow.querySelector('.pokerus-toggle-btn');
     this.$pokerusNote = shadow.querySelector('.pokerus-note');
     this.$expShareToggle = shadow.querySelector('.exp-share-toggle-btn');
@@ -883,7 +898,8 @@ export class CaughtPokemonDetail extends HTMLElement {
     this.$natureBtn.addEventListener('click', () => this._openNatureDialog());
     this.$itemDialog.addEventListener('close', () => {
       this._onDialogClosed();
-      this._pendingHeldItem = null; // discard any uncommitted held-item pick — Save doesn't close this dialog
+      this._pendingHeldItem = null; // discard any uncommitted picks/queue — harmless no-op if Save already applied and closed
+      this._pendingApplies = [];
     });
     this.$itemDialogClose.addEventListener('click', () => this.$itemDialog.close());
     this.$itemDialog.addEventListener('click', (e) => {
@@ -944,10 +960,11 @@ export class CaughtPokemonDetail extends HTMLElement {
         btn.setAttribute('aria-expanded', 'true');
       }
     });
-    // Training item + Exp. Share only preview here (docs/adr/0017) —
-    // they write into `_pendingHeldItem`, applied only by the held-item
-    // Save button below. Everything else in this dialog (Pokérus/
-    // Vitamins/Wings/berries) stays instant.
+    // Everything in this dialog only previews here (docs/adr/0017) —
+    // Training item/Exp. Share write into `_pendingHeldItem`, Vitamins/
+    // Wings/berries queue into `_pendingApplies`; both apply together
+    // only on the dialog's own footer Save button. Pokérus (below) is
+    // the one exception — a plain reversible toggle, it stays instant.
     this.$itemGrid.addEventListener('item-pick', (e) => {
       const val = e.detail.id;
       const pending = this._pendingHeldItem;
@@ -979,10 +996,10 @@ export class CaughtPokemonDetail extends HTMLElement {
       }
       this._updateItemGrid();
     });
-    this.$heldItemSaveBtn.addEventListener('click', () => this._saveHeldItem());
-    this.$vitaminGrid.addEventListener('item-pick', (e) => this._useVitamin(e.detail.id));
-    this.$wingGrid.addEventListener('item-pick', (e) => this._useFeather(e.detail.id));
-    this.$berryGrid.addEventListener('item-pick', (e) => this._useBerry(e.detail.id));
+    this.$itemDialogSaveBtn.addEventListener('click', () => this._saveItemDialog());
+    this.$vitaminGrid.addEventListener('item-pick', (e) => this._queueVitamin(e.detail.id));
+    this.$wingGrid.addEventListener('item-pick', (e) => this._queueFeather(e.detail.id));
+    this.$berryGrid.addEventListener('item-pick', (e) => this._queueBerry(e.detail.id));
     this.$search.addEventListener('pokemon-pick', (e) => {
       this._battle(e.detail.name, 'Looking up battle data…');
     });
@@ -1026,24 +1043,44 @@ export class CaughtPokemonDetail extends HTMLElement {
   /**
    * Seeds the held-item pending state from the entry (so a previous
    * session's discarded pick never leaks into a fresh one — same
-   * reasoning as Nature/IVs, docs/adr/0017), refreshes the item grid
-   * from it, then opens.
+   * reasoning as Nature/IVs, docs/adr/0017), clears the queued Vitamin/
+   * Wing/berry list, refreshes every grid from that, then opens.
    */
   _openItemDialog() {
     const e = this._entry;
     this._pendingHeldItem = { powerItem: e.powerItem, machoBrace: e.machoBrace, expShare: e.expShare };
+    this._pendingApplies = [];
     this._updateItemGrid();
+    this._updateVitaminGrid(e);
+    this._updateWingGrid(e);
+    this._updateBerryGrid(e);
+    this.$vitaminStatus.textContent = '';
+    this.$wingStatus.textContent = '';
+    this.$berryStatus.textContent = '';
     this._openDialog(this.$itemDialog);
   }
 
-  /** Applies the pending held-item choice (Training item, Macho Brace, or Exp. Share — whichever ended up set), then re-seeds pending from the now-current entry. Doesn't close the dialog: Vitamins/Wings/berries/Pokérus below stay usable afterward. */
-  _saveHeldItem() {
+  /**
+   * Applies everything staged in this dialog session, then closes:
+   * the held-item choice (Training item, Macho Brace, or Exp. Share —
+   * whichever ended up set), then every queued Vitamin/Wing/berry click
+   * in the exact order it was queued (`_simulatedEvs`'s own comment
+   * explains why order matters) — replayed through the real
+   * store.useVitamin/useFeather/useBerry, so the store's own capping
+   * logic is what actually runs, not the preview math a second time.
+   */
+  _saveItemDialog() {
     const e = this._entry;
     const p = this._pendingHeldItem;
     if (p.expShare) store.setExpShare(e.uid, true);
     else if (p.machoBrace) store.setMachoBrace(e.uid, true);
     else store.setPowerItem(e.uid, p.powerItem);
-    this._pendingHeldItem = { powerItem: e.powerItem, machoBrace: e.machoBrace, expShare: e.expShare };
+    for (const item of this._pendingApplies) {
+      if (item.kind === 'vitamin') store.useVitamin(e.uid, item.id);
+      else if (item.kind === 'feather') store.useFeather(e.uid, item.id);
+      else store.useBerry(e.uid, item.id);
+    }
+    this.$itemDialog.close();
   }
 
   /** Release is destructive and irreversible, so it's gated behind a native confirm() with no dialog of its own. */
@@ -1087,42 +1124,82 @@ export class CaughtPokemonDetail extends HTMLElement {
     }
   }
 
-  /** Feeds one vitamin and reports exactly which stat moved and by how much. */
-  _useVitamin(vitaminId) {
-    const vitamin = VITAMINS.find((v) => v.id === vitaminId);
-    const result = store.useVitamin(this._entry.uid, vitaminId);
-    if (!result || !vitamin) return;
-    const statLabel = result.linkedStat ? 'SPC' : STAT_LABEL[vitamin.stat];
-    const noun = store.usesStatExpSystem() ? 'Stat Experience' : 'EVs';
-    if (result.applied) {
-      this.$vitaminStatus.textContent = `${vitamin.label}: +${result.applied} ${statLabel}`;
-    } else if (result.blockedByCutoff) {
-      this.$vitaminStatus.textContent = `${vitamin.label}: no ${noun} gained — this game stops vitamins once ${statLabel} has ${VITAMIN_STAT_CUTOFF}+ EVs`;
-    } else if (result.blockedByCeiling) {
-      this.$vitaminStatus.textContent = `${vitamin.label}: no ${noun} gained — vitamins stop working once ${statLabel} has ${STAT_EXP_VITAMIN_CEILING}+ Stat Experience`;
-    } else {
-      this.$vitaminStatus.textContent = `${vitamin.label}: no ${noun} gained — ${statLabel} is already maxed out`;
+  /**
+   * The entry's actual current EVs, folded forward through every
+   * Vitamin/Wing/berry click queued so far this dialog session, in
+   * click order — what Save would produce right now. Used both to
+   * preview one more queued click (would it still add/remove anything)
+   * and to label each button with what it would apply.
+   * @returns {EvMap}
+   */
+  _simulatedEvs() {
+    const evs = { ...this._entry.evs };
+    for (const item of this._pendingApplies) {
+      const y = this._previewYield(item.kind, item.id, evs);
+      if (!y) continue;
+      if (item.kind === 'berry') evs[y.stat] -= y.applied;
+      else {
+        evs[y.stat] += y.applied;
+        if (y.linkedStat) evs[y.linkedStat] += y.applied;
+      }
     }
+    return evs;
   }
 
-  /** Feeds one Wing and reports exactly which stat moved and by how much. */
-  _useFeather(featherId) {
+  /** @param {'vitamin'|'feather'|'berry'} kind @param {string} id @param {EvMap} evs */
+  _previewYield(kind, id, evs) {
+    const uid = this._entry.uid;
+    if (kind === 'vitamin') return store.previewVitamin(uid, id, evs);
+    if (kind === 'feather') return store.previewFeather(uid, id, evs);
+    return store.previewBerry(uid, id, evs);
+  }
+
+  /** Queues one vitamin click (docs/adr/0017) — nothing is recorded until Save. Reports what it would apply, simulated against every click already queued. */
+  _queueVitamin(vitaminId) {
+    const vitamin = VITAMINS.find((v) => v.id === vitaminId);
+    const y = this._previewYield('vitamin', vitaminId, this._simulatedEvs());
+    if (!y || !vitamin) return;
+    const statLabel = y.linkedStat ? 'SPC' : STAT_LABEL[vitamin.stat];
+    const noun = store.usesStatExpSystem() ? 'Stat Experience' : 'EVs';
+    if (y.applied) {
+      this._pendingApplies.push({ kind: 'vitamin', id: vitaminId });
+      this.$vitaminStatus.textContent = `${vitamin.label}: +${y.applied} ${statLabel} queued — applies on Save`;
+    } else if (y.blockedByCutoff) {
+      this.$vitaminStatus.textContent = `${vitamin.label}: no ${noun} left to queue — this game stops vitamins once ${statLabel} has ${VITAMIN_STAT_CUTOFF}+ EVs`;
+    } else if (y.blockedByCeiling) {
+      this.$vitaminStatus.textContent = `${vitamin.label}: no ${noun} left to queue — vitamins stop working once ${statLabel} has ${STAT_EXP_VITAMIN_CEILING}+ Stat Experience`;
+    } else {
+      this.$vitaminStatus.textContent = `${vitamin.label}: no ${noun} left to queue — ${statLabel} is already maxed out`;
+    }
+    this._updateVitaminGrid(this._entry);
+  }
+
+  /** Queues one Wing click — see `_queueVitamin`'s own comment. */
+  _queueFeather(featherId) {
     const feather = FEATHERS.find((f) => f.id === featherId);
-    const result = store.useFeather(this._entry.uid, featherId);
-    if (!result || !feather) return;
-    this.$wingStatus.textContent = result.applied
-      ? `${feather.label}: +${result.applied} ${STAT_LABEL[feather.stat]}`
-      : `${feather.label}: no EVs gained — ${STAT_LABEL[feather.stat]} is already maxed out`;
+    const y = this._previewYield('feather', featherId, this._simulatedEvs());
+    if (!y || !feather) return;
+    if (y.applied) {
+      this._pendingApplies.push({ kind: 'feather', id: featherId });
+      this.$wingStatus.textContent = `${feather.label}: +${y.applied} ${STAT_LABEL[feather.stat]} queued — applies on Save`;
+    } else {
+      this.$wingStatus.textContent = `${feather.label}: nothing left to queue — ${STAT_LABEL[feather.stat]} is already maxed out`;
+    }
+    this._updateWingGrid(this._entry);
   }
 
-  /** Feeds one EV-reducing berry and reports exactly which stat moved and by how much. */
-  _useBerry(berryId) {
+  /** Queues one EV-reducing berry click — see `_queueVitamin`'s own comment. */
+  _queueBerry(berryId) {
     const berry = EV_BERRIES.find((b) => b.id === berryId);
-    const result = store.useBerry(this._entry.uid, berryId);
-    if (!result || !berry) return;
-    this.$berryStatus.textContent = result.applied
-      ? `${berry.label}: −${result.applied} ${STAT_LABEL[berry.stat]}`
-      : `${berry.label}: no EVs removed — ${STAT_LABEL[berry.stat]} is already at 0`;
+    const y = this._previewYield('berry', berryId, this._simulatedEvs());
+    if (!y || !berry) return;
+    if (y.applied) {
+      this._pendingApplies.push({ kind: 'berry', id: berryId });
+      this.$berryStatus.textContent = `${berry.label}: −${y.applied} ${STAT_LABEL[berry.stat]} queued — applies on Save`;
+    } else {
+      this.$berryStatus.textContent = `${berry.label}: nothing left to queue — ${STAT_LABEL[berry.stat]} is already at 0`;
+    }
+    this._updateBerryGrid(this._entry);
   }
 
   _render() {
@@ -1459,9 +1536,15 @@ export class CaughtPokemonDetail extends HTMLElement {
       [...this.$levelUpStatsFields.querySelectorAll('input[data-stat]')].map((input) => [input.dataset.stat, input.value])
     );
     this.$levelUpStatsLevel.textContent = String(level);
+    const e = this._entry;
     this.$levelUpStatsFields.innerHTML = STATS.map(({ key, label }) => {
       const value = existing.get(key) || '';
-      return `<div class="iv-row"><span class="iv-row-label">${escapeHtml(label)}</span><input type="number" inputmode="numeric" class="ds-field" data-stat="${key}" min="1" value="${escapeHtml(value)}" aria-label="${escapeHtml(label)} observed stat value" placeholder="Actual stat" /></div>`;
+      // The most recently logged reading for this stat, regardless of
+      // level — read-only context alongside the new-value input, the
+      // same "before → new" shape as the level field above it.
+      const last = e.events.filter((ev) => ev.kind === 'stat-reading' && ev.statKey === key).at(-1);
+      const lastNote = last ? `${last.observedStat} (Lv. ${last.level}) →` : '';
+      return `<div class="iv-row level-up-stat-row"><span class="iv-row-label">${escapeHtml(label)}</span><span class="level-up-stat-last">${escapeHtml(lastNote)}</span><input type="number" inputmode="numeric" class="ds-field" data-stat="${key}" min="1" value="${escapeHtml(value)}" aria-label="${escapeHtml(label)} observed stat value" placeholder="Actual stat" /></div>`;
     }).join('');
   }
 
@@ -1560,52 +1643,66 @@ export class CaughtPokemonDetail extends HTMLElement {
 
   // Same template as the training item buttons — sprite, name, and the
   // stat it feeds in a lighter line underneath — so there's no need to
-  // remember which vitamin maps to which stat. Marks a button dim before
-  // it's even clicked when this game's rules mean it wouldn't gain
-  // anything — the Gen III-VII 100-EV vitamin cutoff, the Gen I-II
-  // 25,600-Stat-Experience ceiling, or the stat already sitting at its
-  // cap. Also badges each button with how many times it's already been
-  // fed, since that's otherwise invisible once EVs mix in with battle
-  // EVs. On Gen I, Zinc is dropped entirely — Special hasn't split into
-  // SpA/SpD yet.
+  // remember which vitamin maps to which stat. Marks a button dim (and,
+  // unlike a plain "capped" visual, genuinely unclickable — see
+  // item-button-grid.js's own comment) once queuing another click
+  // wouldn't add anything — the Gen III-VII 100-EV vitamin cutoff, the
+  // Gen I-II 25,600-Stat-Experience ceiling, the stat's own cap, or (with
+  // enough already queued this session) the running total from
+  // `_simulatedEvs` hitting one of those first. Also badges each button
+  // with how many times it's already been fed (history, permanent) and,
+  // separately, how many are queued this session (`_pendingApplies`,
+  // discarded if the dialog closes without Save) — the two are deliberately
+  // shown apart so "already happened" and "about to happen on Save" are
+  // never confused for one number. On Gen I, Zinc is dropped entirely —
+  // Special hasn't split into SpA/SpD yet.
   _updateVitaminGrid(e) {
     const statExp = store.usesStatExpSystem();
     const mergedSpecial = store.specialStatMerged();
     const cutoffApplies = !statExp && store.vitaminCutoffApplies();
     const bonus = statExp ? STAT_EXP_VITAMIN_BONUS : VITAMIN_BONUS;
     const statCap = store.statCap();
+    const simEvs = this._simulatedEvs();
     this.$vitaminGrid.items = SORTED_VITAMINS.filter((v) => !(mergedSpecial && v.id === 'zinc')).map((v) => {
       const statLabel = mergedSpecial && v.stat === 'spa' ? 'SPC' : STAT_LABEL[v.stat];
-      const stat = e.evs[v.stat];
+      const stat = simEvs[v.stat];
       const cappedByCutoff = cutoffApplies && stat >= VITAMIN_STAT_CUTOFF;
       const cappedByStatCap = stat >= statCap;
       const cappedByCeiling = statExp && stat >= STAT_EXP_VITAMIN_CEILING;
-      const count = e.history.filter((h) => h.kind === 'vitamin' && h.vitaminId === v.id).length;
+      const fedCount = e.history.filter((h) => h.kind === 'vitamin' && h.vitaminId === v.id).length;
+      const pendingCount = this._pendingApplies.filter((p) => p.kind === 'vitamin' && p.id === v.id).length;
       const capped = cappedByCutoff || cappedByCeiling || cappedByStatCap;
-      const fedNote = count ? ` — fed ${count}×` : '';
+      const fedNote = fedCount ? ` — fed ${fedCount}×` : '';
+      const pendingNote = pendingCount ? ` — ${pendingCount}× queued` : '';
       const title = capped
         ? (cappedByCutoff
             ? `This game stops vitamins once ${statLabel} has ${VITAMIN_STAT_CUTOFF}+ EVs`
             : cappedByCeiling
               ? `Vitamins stop working once ${statLabel} has ${STAT_EXP_VITAMIN_CEILING}+ Stat Experience`
-              : `${statLabel} is already at the ${statCap} cap`) + fedNote
-        : `Feed ${v.label} — raises ${statLabel} by up to ${bonus}` + fedNote;
-      return { id: v.id, label: v.label, sprite: v.sprite, boost: `+${bonus} ${statLabel}`, title, capped, count };
+              : `${statLabel} is already at the ${statCap} cap`) + fedNote + pendingNote
+        : `Feed ${v.label} — raises ${statLabel} by up to ${bonus}` + fedNote + pendingNote;
+      const boost = pendingCount ? `+${bonus} ${statLabel} · ${pendingCount}× queued` : `+${bonus} ${statLabel}`;
+      return { id: v.id, label: v.label, sprite: v.sprite, boost, title, capped, disabled: capped, count: fedCount };
     });
   }
 
   // Same shape as vitamins, minus the 100-EV-cutoff framing — Wings
-  // never have one.
+  // never have one. See `_updateVitaminGrid`'s own comment for the
+  // simulated-EVs/queued-count/disabled reasoning, shared here.
   _updateWingGrid(e) {
+    const simEvs = this._simulatedEvs();
     this.$wingGrid.items = SORTED_FEATHERS.map((f) => {
-      const stat = e.evs[f.stat];
+      const stat = simEvs[f.stat];
       const capped = stat >= 252;
-      const count = e.history.filter((h) => h.kind === 'feather' && h.featherId === f.id).length;
-      const fedNote = count ? ` — fed ${count}×` : '';
+      const fedCount = e.history.filter((h) => h.kind === 'feather' && h.featherId === f.id).length;
+      const pendingCount = this._pendingApplies.filter((p) => p.kind === 'feather' && p.id === f.id).length;
+      const fedNote = fedCount ? ` — fed ${fedCount}×` : '';
+      const pendingNote = pendingCount ? ` — ${pendingCount}× queued` : '';
       const title = capped
-        ? `${STAT_LABEL[f.stat]} is already at the 252 cap` + fedNote
-        : `Feed ${f.label} — raises ${STAT_LABEL[f.stat]} EVs by ${FEATHER_BONUS}` + fedNote;
-      return { id: f.id, label: f.label, sprite: f.sprite, boost: `+${FEATHER_BONUS} ${STAT_LABEL[f.stat]}`, title, capped, count };
+        ? `${STAT_LABEL[f.stat]} is already at the 252 cap` + fedNote + pendingNote
+        : `Feed ${f.label} — raises ${STAT_LABEL[f.stat]} EVs by ${FEATHER_BONUS}` + fedNote + pendingNote;
+      const boost = pendingCount ? `+${FEATHER_BONUS} ${STAT_LABEL[f.stat]} · ${pendingCount}× queued` : `+${FEATHER_BONUS} ${STAT_LABEL[f.stat]}`;
+      return { id: f.id, label: f.label, sprite: f.sprite, boost, title, capped, disabled: capped, count: fedCount };
     });
   }
 
@@ -1614,15 +1711,19 @@ export class CaughtPokemonDetail extends HTMLElement {
   // the boost reads as a reduction — these subtract EVs rather than add
   // them.
   _updateBerryGrid(e) {
+    const simEvs = this._simulatedEvs();
     this.$berryGrid.items = SORTED_EV_BERRIES.map((b) => {
-      const stat = e.evs[b.stat];
+      const stat = simEvs[b.stat];
       const capped = stat <= 0;
-      const count = e.history.filter((h) => h.kind === 'berry' && h.berryId === b.id).length;
-      const fedNote = count ? ` — fed ${count}×` : '';
+      const fedCount = e.history.filter((h) => h.kind === 'berry' && h.berryId === b.id).length;
+      const pendingCount = this._pendingApplies.filter((p) => p.kind === 'berry' && p.id === b.id).length;
+      const fedNote = fedCount ? ` — fed ${fedCount}×` : '';
+      const pendingNote = pendingCount ? ` — ${pendingCount}× queued` : '';
       const title = capped
-        ? `${STAT_LABEL[b.stat]} is already at 0` + fedNote
-        : `Feed ${b.label} — removes up to ${EV_BERRY_REDUCTION} ${STAT_LABEL[b.stat]} EVs` + fedNote;
-      return { id: b.id, label: b.label, sprite: b.sprite, boost: `−${EV_BERRY_REDUCTION} ${STAT_LABEL[b.stat]}`, title, capped, count };
+        ? `${STAT_LABEL[b.stat]} is already at 0` + fedNote + pendingNote
+        : `Feed ${b.label} — removes up to ${EV_BERRY_REDUCTION} ${STAT_LABEL[b.stat]} EVs` + fedNote + pendingNote;
+      const boost = pendingCount ? `−${EV_BERRY_REDUCTION} ${STAT_LABEL[b.stat]} · ${pendingCount}× queued` : `−${EV_BERRY_REDUCTION} ${STAT_LABEL[b.stat]}`;
+      return { id: b.id, label: b.label, sprite: b.sprite, boost, title, capped, disabled: capped, count: fedCount };
     });
   }
 }
