@@ -1437,20 +1437,9 @@ test('applyImport leaves an existing entry\'s nickname/nature/held item untouche
 
 // ---------------- IV tracking ----------------
 
-test('a caught Pokémon starts with IV tracking off and every IV unknown', () => {
+test('a caught Pokémon starts with every IV unknown', () => {
   const entry = store.catchPokemon(mon());
-  assert.equal(entry.trackIvs, false);
   assert.deepEqual(entry.ivs, { hp: null, atk: null, def: null, spa: null, spd: null, spe: null });
-});
-
-test('setPartyTrackIvs and setEntryTrackIvs persist independently', () => {
-  const entry = store.catchPokemon(mon());
-  assert.equal(store.activeParty.trackIvs, false);
-  store.setPartyTrackIvs(store.activeParty.id, true);
-  assert.equal(store.activeParty.trackIvs, true);
-  assert.equal(entry.trackIvs, false); // per-mon toggle is independent, still off
-  store.setEntryTrackIvs(entry.uid, true);
-  assert.equal(entry.trackIvs, true);
 });
 
 test('ivRange is 0-31 for a modern party, 0-15 (legacy) for a Gen I/II party', () => {
@@ -1518,25 +1507,17 @@ test('possibleIvsForStat returns nothing for a Gen I/II (legacy) party — not i
   assert.deepEqual(store.possibleIvsForStat(entry, 'atk', 50, 80), []);
 });
 
-test('exportPayload includes trackIvs/ivs, and a fresh load defaults them for old saves missing the fields', () => {
+test('exportPayload includes ivs, and a fresh load defaults them for old saves missing the field', () => {
   const entry = store.catchPokemon(mon());
-  store.setPartyTrackIvs(store.activeParty.id, true);
-  store.setEntryTrackIvs(entry.uid, true);
   store.setIv(entry.uid, 'spe', 31);
   const [party] = store.exportPayload();
-  assert.equal(party.trackIvs, true);
-  assert.equal(party.pokemon[0].trackIvs, true);
   assert.deepEqual(party.pokemon[0].ivs, { hp: null, atk: null, def: null, spa: null, spd: null, spe: 31 });
 
-  // Simulate an old save from before IV tracking existed (fields absent).
+  // Simulate an old save from before IV tracking existed (field absent).
   const raw = JSON.parse(localStorage.getItem('effortdex:state'));
-  delete raw.parties[0].trackIvs;
-  delete raw.parties[0].pokemon[0].trackIvs;
   delete raw.parties[0].pokemon[0].ivs;
   localStorage.setItem('effortdex:state', JSON.stringify(raw));
 
   const reloaded = new Store();
-  assert.equal(reloaded.activeParty.trackIvs, false);
-  assert.equal(reloaded.activeParty.pokemon[0].trackIvs, false);
   assert.deepEqual(reloaded.activeParty.pokemon[0].ivs, { hp: null, atk: null, def: null, spa: null, spd: null, spe: null });
 });

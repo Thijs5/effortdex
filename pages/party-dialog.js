@@ -23,7 +23,6 @@ partyBaseGame.addEventListener('version-change', (e) => {
 const partyCacheOfflineRow = document.getElementById('party-cache-offline-row');
 const partyCacheOfflineInput = /** @type {HTMLInputElement} */ (document.getElementById('party-cache-offline-input'));
 const partyDescriptionInput = document.getElementById('party-description-input');
-const partyTrackIvsInput = /** @type {HTMLInputElement} */ (document.getElementById('party-track-ivs-input'));
 const partyAdvancedRules = document.getElementById('party-advanced-rules');
 const partySubmitBtn = document.getElementById('party-submit-btn');
 const partyDeleteBtn = document.getElementById('party-delete-btn');
@@ -81,7 +80,6 @@ export function openCreateDialog() {
   partyBaseGame.value = '';
   dialogGameCart.name = '';
   partyDescriptionInput.value = '';
-  partyTrackIvsInput.checked = false;
   writeOverridesToDialog(null);
   // Only offered at creation, and only when caching can actually do
   // something — lib/prefetch-service.js refuses to fetch anything while
@@ -105,7 +103,6 @@ export function openEditDialog(party) {
   partyBaseGame.value = party.baseGame;
   dialogGameCart.name = party.baseGame;
   partyDescriptionInput.value = party.description;
-  partyTrackIvsInput.checked = party.trackIvs;
   writeOverridesToDialog(party.overrides);
   // Editing doesn't re-trigger a background fetch — the sprite cache
   // manager ("/settings/cache") is the tool for warming an existing
@@ -136,10 +133,9 @@ partyForm.addEventListener('submit', (e) => {
     return;
   }
   const overrides = readOverridesFromDialog();
-  const trackIvs = partyTrackIvsInput.checked;
 
   if (dialogEditingId === null) {
-    const party = store.createParty(name, description, baseGame, overrides, trackIvs);
+    const party = store.createParty(name, description, baseGame, overrides);
     // Deliberately not awaited: this runs in the background (through
     // lib/prefetch-service.js's shared, throttled queue — ADR 0012) while
     // the user is immediately dropped onto the new roster and can keep
@@ -149,7 +145,7 @@ partyForm.addEventListener('submit', (e) => {
     partyDialog.close();
     router.navigateToParty(party.slug);
   } else {
-    store.updateParty(dialogEditingId, { name, description, baseGame, overrides, trackIvs });
+    store.updateParty(dialogEditingId, { name, description, baseGame, overrides });
     partyDialog.close();
   }
 });
