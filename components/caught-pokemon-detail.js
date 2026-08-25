@@ -1,8 +1,10 @@
 import { POWER_ITEMS, MACHO_BRACE_SPRITE, EXP_SHARE_SPRITE, VITAMINS, FEATHERS, FEATHER_BONUS, EV_BERRIES, EV_BERRY_REDUCTION, NATURES, STAT_LABEL, MACHO_BRACE_MULTIPLIER, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, STAT_EXP_VITAMIN_BONUS, STAT_EXP_VITAMIN_CEILING, FALLBACK_SPRITE, FALLBACK_ONERROR, MIN_LEVEL, MAX_LEVEL } from '../lib/constants.js';
 import { gen1SpecialStat } from '../lib/gen1-special-stats.js';
 import { titleCase, totalEvs, natureEffectHint, natureOptionsHtml, dayLabel, escapeHtml, sortByLabel } from '../lib/utils.js';
-import { api, store } from '../lib/services.js';
+import { api, store, smogon } from '../lib/services.js';
 import { versionedSpriteUrl } from '../lib/pokeapi-client.js';
+import { toShowdownId, smogonSetsKey } from '../lib/smogon-client.js';
+import { matchGameVersion } from '../lib/game-versions.js';
 import { attachDesignSystem } from '../lib/design-system.js';
 import { wireSpriteFallback } from '../lib/sprite-fallback.js';
 import { POKERUS_ICON_SVG } from '../lib/icons.js';
@@ -266,6 +268,26 @@ export class CaughtPokemonDetail extends HTMLElement {
 
         .evolve-panel { display: grid; gap: var(--space-2); }
 
+        .competitive-panel { display: grid; gap: var(--space-2); }
+        .tier-badge {
+          font-family: var(--font-mono); font-size: var(--font-size-2xs); font-weight: 700;
+          letter-spacing: 0.04em; color: var(--teal-strong); background: var(--teal-soft);
+          border-radius: var(--radius-pill); padding: 0.15em 0.6em; text-transform: none;
+        }
+        .competitive-sets { display: grid; gap: var(--space-3); }
+        .competitive-set {
+          display: grid; gap: 0.2em; padding: var(--space-3); background: var(--lcd);
+          border-radius: var(--radius-sm); font-size: var(--font-size-xs); color: var(--ink-soft);
+        }
+        .competitive-set-title { margin: 0; font-weight: 600; color: var(--ink); }
+        .competitive-set-format { font-weight: 400; color: var(--ink-soft); text-transform: uppercase; }
+        .competitive-set-line { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); }
+        .competitive-set-line:empty { display: none; }
+        .competitive-set-moves { margin: 0; font-size: var(--font-size-2xs); }
+        .competitive-empty { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--ink-soft); }
+        .competitive-attribution { margin: 0; font-size: var(--font-size-2xs); color: var(--ink-soft); }
+        .competitive-attribution a { color: inherit; }
+
         .battle { display: grid; gap: var(--space-2); }
         .status { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--poke-red-dark); min-height: 1em; }
       </style>
@@ -391,6 +413,16 @@ export class CaughtPokemonDetail extends HTMLElement {
             <evolution-chain></evolution-chain>
           </div>
 
+          <div class="competitive-panel">
+            <h3 class="section-title">Competitive
+              <button type="button" class="help-btn" aria-expanded="false" aria-label="Where does this come from?" title="Tier via Pokémon Showdown, common sets via Smogon University's strategy dex — both fetched live and cached locally for about a week. Shown for this party's own generation. Not every species has a published competitive analysis.">?</button>
+              <span class="tier-badge" hidden></span>
+            </h3>
+            <div class="competitive-sets"></div>
+            <p class="competitive-empty" hidden>No published competitive data for this Pokémon in this generation.</p>
+            <p class="competitive-attribution">Tiers via Pokémon Showdown &middot; sets via Smogon University</p>
+          </div>
+
           <button class="release" title="Release this Pokémon" aria-label="Release this Pokémon">
             <span aria-hidden="true">↪</span> Release this Pokémon
           </button>
@@ -449,6 +481,10 @@ export class CaughtPokemonDetail extends HTMLElement {
     this.$berryGrid = shadow.querySelector('.berry-grid');
     this.$berryStatus = shadow.querySelector('.berry-status');
     this.$evoChain = shadow.querySelector('evolution-chain');
+    this.$tierBadge = shadow.querySelector('.tier-badge');
+    this.$competitiveSets = shadow.querySelector('.competitive-sets');
+    this.$competitiveEmpty = shadow.querySelector('.competitive-empty');
+    this._competitiveToken = 0; // guards against a stale async response landing after a fast species switch
     this.$search = shadow.querySelector('pokemon-search');
     // Shows what battling this opponent would actually add right now —
     // held item, Pokérus and the 252/510 caps folded in — rather than
@@ -730,6 +766,81 @@ export class CaughtPokemonDetail extends HTMLElement {
     if (berriesAvailable) this._updateBerryGrid(e);
     this.$evoChain.entry = e;
     this.$histLog.entry = e;
+    this._renderCompetitive(e);
+  }
+
+  /**
+   * Fetches (or reads from lib/smogon-client.js's own cache) this
+   * species' current tier and common competitive sets, scoped to the
+   * active party's own generation — clamped to Smogon's covered range
+   * (1-9), defaulting to the current generation for an unrecognized/ROM
+   * hack base game rather than showing nothing. Async and best-effort:
+   * offline or a failed fetch just leaves the section showing its empty
+   * state, never an error — this is a nice-to-have overlay on top of the
+   * app's own offline-first EV tracking, not something it depends on.
+   * @param {RosterEntry} e
+   */
+  async _renderCompetitive(e) {
+    const token = ++this._competitiveToken;
+    this.$tierBadge.hidden = true;
+    this.$competitiveSets.innerHTML = '';
+    this.$competitiveEmpty.hidden = true;
+    const gen = Math.min(9, Math.max(1, matchGameVersion(store.activeParty?.baseGame)?.gen ?? 9));
+    try {
+      const [tiers, sets] = await Promise.all([smogon.getTiers(), smogon.getSets(gen)]);
+      if (token !== this._competitiveToken) return; // a newer species/render already owns the UI
+      const tierInfo = tiers[toShowdownId(e.speciesName)];
+      if (tierInfo?.tier && tierInfo.tier !== 'Illegal') {
+        this.$tierBadge.textContent = tierInfo.tier;
+        this.$tierBadge.hidden = false;
+      }
+      const speciesSets = sets[smogonSetsKey(e.speciesName)];
+      if (!speciesSets) {
+        this.$competitiveEmpty.hidden = false;
+        return;
+      }
+      const flat = [];
+      for (const [format, bySet] of Object.entries(speciesSets)) {
+        for (const [setName, set] of Object.entries(bySet)) flat.push({ format, setName, set });
+      }
+      // Capped at 3 — this is a quick "is this a competitive spread"
+      // glance, not a full strategy-dex mirror; the attribution line
+      // points to the real thing for anyone who wants more.
+      this.$competitiveSets.innerHTML = flat
+        .slice(0, 3)
+        .map(({ format, setName, set }) => this._competitiveSetHtml(format, setName, set))
+        .join('');
+    } catch {
+      if (token !== this._competitiveToken) return;
+      this.$competitiveEmpty.hidden = false;
+    }
+  }
+
+  /** @param {string} format @param {string} setName @param {any} set @returns {string} */
+  _competitiveSetHtml(format, setName, set) {
+    // Several of a set's own fields — moves (per-slot), item, nature, and
+    // evs — can each be either one value or an array of viable
+    // alternatives (Smogon publishes "or" options within a single set,
+    // e.g. Chansey's NU set offering two different EV spreads). Only the
+    // first alternative is shown here — this card is a quick glance, not
+    // a full options list; the attribution line points to the real dex
+    // entry for anyone who wants the rest.
+    const first = (/** @type {any} */ v) => (Array.isArray(v) ? v[0] : v);
+    const moves = (set.moves || []).map(first).slice(0, 4);
+    const evs = first(set.evs);
+    const evsText = evs
+      ? Object.entries(evs)
+          .map(([key, value]) => `${value} ${STAT_LABEL[/** @type {StatKey} */ (key)] || key.toUpperCase()}`)
+          .join(' / ')
+      : '';
+    return `
+      <div class="competitive-set">
+        <p class="competitive-set-title">${escapeHtml(setName)} <span class="competitive-set-format">${escapeHtml(format)}</span></p>
+        <p class="competitive-set-line">${[first(set.item), first(set.nature)].filter(Boolean).map(escapeHtml).join(' &middot; ')}</p>
+        <p class="competitive-set-line">${escapeHtml(evsText)}</p>
+        <p class="competitive-set-moves">${moves.map(escapeHtml).join(', ')}</p>
+      </div>
+    `;
   }
 
   // Shows the selected nature's stat effect right under the picker, so
