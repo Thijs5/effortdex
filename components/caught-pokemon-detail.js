@@ -14,6 +14,7 @@ import './evolution-chain.js';
 import './pokemon-search.js';
 import './item-button-grid.js';
 import './ds-item-button.js';
+import './level-input.js';
 
 // Sorted once — these tables are static, so re-sorting them on every
 // render (this card's entire point) would be pure waste.
@@ -38,6 +39,30 @@ export class CaughtPokemonDetail extends HTMLElement {
   constructor() {
     super();
     this._entry = null;
+    // Pending edits for the Nature and IVs dialogs (docs/adr/0017) — null
+    // means "unchanged", seeded from the entry when each dialog opens,
+    // applied to the store only on that dialog's Save.
+    this._pendingIvs = null;
+    // Same idea for the Items dialog's held-item slot (Training item /
+    // Exp. Share — mutually exclusive, docs/adr/0017): { powerItem,
+    // machoBrace, expShare }, seeded when the dialog opens, applied only
+    // by the dialog's own footer Save button.
+    this._pendingHeldItem = null;
+    // Every Vitamin/Wing/berry click queued this dialog session, in the
+    // order clicked: [{ kind: 'vitamin'|'feather'|'berry', id }]. Nothing
+    // is recorded in the store until Save replays this list through the
+    // real store.useVitamin/useFeather/useBerry, in order — an ordered
+    // list rather than a per-id count because whether a *later* click
+    // still adds anything depends on every earlier one already queued
+    // (the same stat's cap gets closer with each), so replay order has
+    // to match click order exactly, for both the live "would this next
+    // click still do anything" preview and the real Save.
+    this._pendingApplies = [];
+    // Pokérus's own pending toggle state — null while the dialog isn't
+    // open (or has no uncommitted change), a real boolean once it does.
+    // Not folded into `_pendingApplies`: it's a plain on/off flag, not a
+    // repeatable/counted action, same shape as `_pendingHeldItem`.
+    this._pendingPokerus = null;
 
     const shadow = this.attachShadow({ mode: 'open' });
     attachDesignSystem(shadow);
@@ -115,16 +140,28 @@ export class CaughtPokemonDetail extends HTMLElement {
           font-family: var(--font-mono); font-size: var(--font-size-xs);
           color: var(--ink-soft); white-space: nowrap;
         }
-        .nature-prefix {
+        /* Styled as a sentence fragment ("Adamant"), not a pill badge —
+           unlike .held-item-btn, this sits inline in the title row
+           ("#169 Adamant Slowpoke"), so it needs to read as part of that
+           sentence rather than as chrome. Still a real <button> (opens
+           .nature-dialog); the empty state shows "Set nature" instead of
+           nothing, so there's always something to tap. */
+        .nature-btn {
           font-family: var(--font-display); font-weight: 500; font-size: var(--font-size-input);
-          color: var(--ink-soft); white-space: nowrap;
+          color: var(--ink-soft); white-space: nowrap; border: none; background: none;
+          padding: 0; cursor: pointer;
         }
-        /* Same height as the sprite and top-aligned with it, so the name
-           sits level with the sprite's top edge instead of floating in a
-           taller, vertically-centered box. */
+        .nature-btn:hover { color: var(--teal); }
+        .nature-btn--empty { font-size: var(--font-size-xs); font-style: italic; }
+        /* At least as tall as the sprite and top-aligned with it, so the
+           name sits level with the sprite's top edge instead of floating
+           in a taller, vertically-centered box — min-height, not a fixed
+           height, so a long held-item label wrapping .meta onto a second
+           line grows this box instead of overflowing past its bottom
+           edge into the divider/content below it. */
         .titles {
           grid-area: titles; align-self: start; min-width: 0;
-          height: 64px; display: flex; flex-direction: column; justify-content: space-between;
+          min-height: 64px; display: flex; flex-direction: column; justify-content: space-between;
         }
         .nickname {
           display: block; flex: 1 1 auto; min-width: 0; width: auto; border: none; background: transparent;
@@ -143,10 +180,8 @@ export class CaughtPokemonDetail extends HTMLElement {
           border-radius: var(--radius-pill); font-family: var(--font-mono); font-size: var(--font-size-xs);
           color: var(--ink-soft); padding: 0.2em 0.6em; min-height: 30px; touch-action: manipulation;
         }
-        .level-up-btn:hover:not(:disabled) { color: var(--teal); border-color: var(--teal); }
-        .level-up-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .level-up-btn:hover { color: var(--teal); border-color: var(--teal); }
         .level-up-btn svg { width: 11px; height: 11px; color: var(--teal); }
-        .level-up-btn:disabled svg { color: inherit; }
         .more-btn-wrap { grid-area: more; align-self: start; position: relative; }
         .more-btn { display: inline-flex; align-items: center; gap: 0.3em; white-space: nowrap; }
         .more-btn svg { width: 14px; height: 14px; }
@@ -174,10 +209,13 @@ export class CaughtPokemonDetail extends HTMLElement {
           text-align: left; font-size: var(--font-size-md); color: inherit; cursor: pointer;
         }
         .more-menu-item:hover { background: var(--lcd); }
+        /* Release used to be its own bordered button at the bottom of a
+           long dialog — now it's just a menu entry, gated on its own
+           native confirm() (docs/adr/0017), so the red styling that used
+           to signal "careful" moves here instead. */
+        .more-menu-item--danger { color: var(--poke-red-dark); }
+        .more-menu-item--danger:hover { background: var(--danger-soft); color: var(--poke-red); }
 
-        /* An inline item in .meta now, not its own row — flex-wrap here
-           lets its own pills wrap independently if they run out of room. */
-        .status-row { display: inline-flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
         .status-pill {
           display: inline-flex; align-items: center; gap: 0.35em;
           text-transform: none; letter-spacing: normal; padding: 0.3em 0.65em;
@@ -193,34 +231,23 @@ export class CaughtPokemonDetail extends HTMLElement {
           background: transparent; color: var(--ink-soft);
           border: 1px dashed var(--lcd-line);
         }
+        .held-item-btn { border: none; cursor: pointer; font-family: inherit; }
+        .held-item-btn:hover { filter: brightness(0.97); }
+        /* .status-pill--empty's background is transparent, so the filter
+           above has nothing to darken — give the dashed/no-item state its
+           own visible hover instead of silently doing nothing. */
+        .held-item-btn.status-pill--empty:hover { background: var(--lcd); filter: none; }
 
         /* Dialog chrome comes from the shared .ds-dialog, its header
            from .ds-dialog-header; only the grid layout of this dialog's
            own sections lives here. The grid's gap already spaces the
            header from the first section, so the shared bottom margin
            would double up. */
-        .more-dialog { gap: var(--space-5); }
-        .more-dialog:not([open]) { display: none; }
-        .more-dialog[open] { display: grid; }
-        .more-dialog .ds-dialog-header { margin-bottom: 0; }
-        /* The dialog grew a lot (Wings/Berries/Exp. Share on top of the
-           original sections) — on screens with room to spare, widen it
-           and flow its sections into two columns instead of one long
-           single-column scroll. The header, evolution chain (its own
-           variable-width content) and release button stay full-width. */
-        @media (min-width: 760px) {
-          /* Compound selector (not just .more-dialog), so this reliably
-             beats the shared .ds-dialog width at equal specificity
-             regardless of adoptedStyleSheets vs. shadow-tree <style>
-             ordering — same reasoning as .status-pill--item elsewhere. */
-          .more-dialog.ds-dialog { width: min(720px, calc(100vw - 2.4rem)); }
-          .more-dialog[open] { grid-template-columns: 1fr 1fr; column-gap: var(--space-5); }
-          .more-dialog .ds-dialog-header,
-          .more-dialog .evolve-panel,
-          .more-dialog .release {
-            grid-column: 1 / -1;
-          }
-        }
+        .nature-dialog { gap: var(--space-4); }
+        .nature-dialog:not([open]) { display: none; }
+        .nature-dialog[open] { display: grid; }
+        .nature-dialog .ds-dialog-header { margin-bottom: 0; }
+        .nature-dialog.ds-dialog { width: min(420px, calc(100vw - 2.4rem)); }
         .competitive-dialog { gap: var(--space-4); }
         .competitive-dialog:not([open]) { display: none; }
         .competitive-dialog[open] { display: grid; }
@@ -231,13 +258,72 @@ export class CaughtPokemonDetail extends HTMLElement {
         .iv-dialog[open] { display: grid; }
         .iv-dialog.ds-dialog { width: min(420px, calc(100vw - 2.4rem)); }
         .iv-dialog .ds-dialog-header { margin-bottom: 0; }
-        .release {
-          display: inline-flex; align-items: center; justify-content: center; gap: 0.35em;
-          border: 1px solid var(--lcd-line); background: transparent; cursor: pointer; width: 100%;
-          border-radius: var(--radius-sm); font-size: var(--font-size-xs); font-weight: 600;
-          color: var(--poke-red-dark); padding: var(--space-3);
+        .item-dialog { gap: var(--space-4); }
+        .item-dialog:not([open]) { display: none; }
+        .item-dialog[open] { display: grid; }
+        .item-dialog.ds-dialog { width: min(420px, calc(100vw - 2.4rem)); }
+        .item-dialog .ds-dialog-header { margin-bottom: 0; }
+        /* Everything in this dialog previews only, applied together by
+           the one footer Save button (docs/adr/0017) — except Pokérus,
+           which stays instant (a plain reversible toggle, not a
+           queued/counted action). */
+        .level-up-dialog { gap: var(--space-4); }
+        .level-up-dialog:not([open]) { display: none; }
+        .level-up-dialog[open] { display: grid; }
+        /* Wider than the other compact dialogs (420px) — this is the one
+           that embeds <evolution-chain>, and three stages (current + two
+           evolutions) plus arrows routinely need more than 420px to fit
+           on one row before wrapping. */
+        .level-up-dialog.ds-dialog { width: min(560px, calc(100vw - 2.4rem)); }
+        .level-up-dialog .ds-dialog-header { margin-bottom: 0; }
+        /* min-width: 0 overrides a grid/flex item's default min-width:
+           auto — without it, this row (itself a grid child of
+           .level-up-dialog[open]) refuses to shrink past its own
+           children's combined intrinsic content width, so on a narrow
+           phone it overflows .ds-dialog's own right padding instead of
+           actually shrinking to fit. */
+        .level-up-dialog .field-inline {
+          display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
+          font-size: var(--font-size-xs); color: var(--ink-soft); min-width: 0;
         }
-        .release:hover { color: var(--poke-red); border-color: var(--poke-red); }
+        .level-up-dialog .field-inline level-input { flex: 1 1 auto; min-width: 0; max-width: 14em; }
+        /* The current level is read-only context, not part of what Save
+           applies — only the level-input to its right is editable. */
+        .level-up-from { font-family: var(--font-mono); white-space: nowrap; }
+        /* .ds-dialog's own mobile breakpoint (design-system.js) turns
+           every dialog into a full-height edge-to-edge sheet by zeroing
+           margin/border-radius and forcing height:100dvh — meant for the
+           long, scrolly Training & EVs dialog. These three stay small
+           floating cards instead (their content is short), which the
+           width overrides above already enforce on their own, but width
+           alone left margin:0 in place: with an explicit width narrower
+           than the viewport and inset:0 from the dialog's own centering,
+           margin:0 over-constrains the box and it resolves flush against
+           the left edge rather than centered. Restoring margin/height/
+           radius here at the same breakpoint fixes that — height uses
+           fit-content, not auto: a <dialog>'s UA box is fixed-positioned
+           with top/bottom both pinned (inset:0), and for an abspos box
+           with top and bottom both constrained, height:auto resolves to
+           fill the remaining space rather than shrink to content (CSS2.1
+           10.6.4) — which this grid's default align-content:stretch then
+           spreads across the visible row tracks as a huge gap. fit-content
+           is an explicit (non-auto) value, so it isn't subject to that
+           fill-the-gap resolution and genuinely shrink-wraps instead. */
+        @media (max-width: 640px) {
+          .competitive-dialog.ds-dialog,
+          .iv-dialog.ds-dialog,
+          .item-dialog.ds-dialog,
+          .level-up-dialog.ds-dialog,
+          .nature-dialog.ds-dialog {
+            margin: auto;
+            height: fit-content;
+            max-height: calc(100dvh - 2.4rem);
+            border-radius: var(--radius-md);
+          }
+        }
+        .level-up-evolve, .level-up-stats { display: grid; gap: var(--space-2); min-width: 0; }
+        .level-up-stats-hint { margin: 0; font-size: var(--font-size-2xs); color: var(--ink-soft); }
+        .level-up-stats-fields { display: grid; gap: var(--space-2); }
 
         .card-body { display: grid; gap: var(--space-5); }
         @media (min-width: 760px) {
@@ -268,32 +354,41 @@ export class CaughtPokemonDetail extends HTMLElement {
           text-transform: none; letter-spacing: normal;
         }
 
-        .details-section { display: grid; gap: var(--space-3); }
-        .details-section .field-inline {
+        .nature-dialog .field-inline {
           display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
           font-size: var(--font-size-xs); color: var(--ink-soft);
         }
-        .details-section .field-inline select,
-        .details-section .field-inline input { width: auto; flex: 1 1 auto; max-width: 14em; }
+        .nature-dialog .field-inline select { width: auto; flex: 1 1 auto; max-width: 14em; }
         .nature-hint {
           margin: calc(-1 * var(--space-2)) 0 0; font-family: var(--font-mono);
           font-size: var(--font-size-2xs); color: var(--ink-soft); text-align: right;
         }
         .nature-hint:empty { display: none; }
 
-        .ivs { display: grid; gap: var(--space-2); }
+        .ivs { display: grid; gap: var(--space-2); min-width: 0; }
         .iv-grid { display: grid; gap: var(--space-2); }
+        /* min-width: 0 on the row and its 1fr column's input — see the
+           Level field's own min-width comment above for why a grid/flex
+           item's default min-width: auto matters here (a narrow phone
+           otherwise overflows past the dialog's own right edge instead
+           of the input actually shrinking to fit). */
         .iv-row {
           display: grid; grid-template-columns: 3.5em 1fr; align-items: center; gap: var(--space-2);
-          font-size: var(--font-size-xs); color: var(--ink-soft);
+          font-size: var(--font-size-xs); color: var(--ink-soft); min-width: 0;
         }
         .iv-row-label { font-family: var(--font-mono); }
-        .iv-row input { width: auto; }
+        .iv-row input { width: auto; min-width: 0; }
         .iv-row-derived {
           font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--ink-soft);
           text-align: right; padding-right: var(--space-2);
         }
         .iv-row--perfect .iv-row-label { color: var(--teal); }
+        /* One extra column for the last-logged-reading note, read-only
+           context before the new-value input (mirrors the level field's
+           own "Lv. X →" shape) — blank (no note) when nothing's been
+           logged for this stat yet, same width either way. */
+        .level-up-stat-row { grid-template-columns: 3.5em auto 1fr; }
+        .level-up-stat-last { font-family: var(--font-mono); font-size: var(--font-size-2xs); white-space: nowrap; }
         .iv-summary { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--ink-soft); }
         .iv-calc {
           display: grid; gap: var(--space-2); margin-top: var(--space-1);
@@ -311,16 +406,19 @@ export class CaughtPokemonDetail extends HTMLElement {
           cursor: pointer;
         }
         .iv-calc-chip:hover { border-color: var(--teal); color: var(--teal); }
-
-        .aids { display: grid; gap: var(--space-2); }
+        .iv-calc-readings { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); }
+        .iv-calc-readings:empty { display: none; }
+        .iv-calc-readings li {
+          display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
+          font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--ink-soft);
+        }
+        .iv-calc-reading-delete {
+          border: none; background: none; color: var(--ink-soft); cursor: pointer; padding: 0 var(--space-1);
+          font-size: var(--font-size-2xs); line-height: 1;
+        }
+        .iv-calc-reading-delete:hover { color: var(--poke-red); }
 
         .vitamins, .wings, .berries { display: grid; gap: var(--space-2); }
-        .vitamin-status, .wing-status, .berry-status { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--teal); min-height: 1em; }
-
-        /* Exp. Share and Pokérus are both a single toggle button plus a
-           title — light enough to sit side by side at any dialog width,
-           not just once the dialog itself goes two-column. */
-        .exp-pokerus-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); align-items: start; }
 
         .pokerus-section { display: grid; gap: var(--space-2); justify-items: stretch; min-width: 0; }
         .pokerus-icon { width: 22px; height: 22px; flex: 0 0 auto; display: inline-flex; color: var(--pokerus-purple); }
@@ -329,9 +427,19 @@ export class CaughtPokemonDetail extends HTMLElement {
         .exp-share-section { display: grid; gap: var(--space-2); justify-items: stretch; min-width: 0; }
         .pokerus-note { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--ink-soft); }
 
-        .evolve-panel { display: grid; gap: var(--space-2); }
-
         .competitive-panel { display: grid; gap: var(--space-2); }
+        /* Base stats: a fixed reference for min-maxing a build (which
+           stats are worth EVs against a species' own ceiling) — moved
+           here from next to the EV bars, where a number that never
+           changes for this Pokémon specifically wasn't as useful as its
+           actual current stat (caught-pokemon-detail's own _render). */
+        .competitive-base-stats { display: grid; gap: var(--space-1); }
+        .base-stat-row {
+          display: grid; grid-template-columns: 3.5em 1fr; align-items: center; gap: var(--space-2);
+          font-size: var(--font-size-xs); color: var(--ink-soft);
+        }
+        .base-stat-label { font-family: var(--font-mono); }
+        .base-stat-value { font-family: var(--font-mono); color: var(--ink); text-align: right; }
         /* Three loose groups, not a full per-tier rainbow — a 14-color
            gradient would just be a new scale to learn. Default (teal):
            every ordinary ranked tier (OU down through PU/ZU and their
@@ -379,16 +487,19 @@ export class CaughtPokemonDetail extends HTMLElement {
           <div class="titles">
             <div class="name-row">
               <span class="species-num"></span>
-              <span class="nature-prefix" hidden></span>
+              <button class="nature-btn" type="button" title="Nature" hidden></button>
               <input class="nickname" aria-label="Nickname" />
             </div>
             <div class="meta">
               <span class="species" hidden></span>
-              <button class="level-up-btn" type="button" title="Level up (+1)">
+              <button class="level-up-btn" type="button" title="Set level">
                 <span class="level-value"></span>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg>
               </button>
-              <div class="status-row" hidden></div>
+              <button class="held-item-btn ds-pill-badge status-pill" type="button" title="Held item" hidden>
+                <img class="held-item-btn-sprite" alt="" hidden ${FALLBACK_ONERROR} />
+                <span class="held-item-btn-label"></span>
+              </button>
             </div>
           </div>
           <div class="more-btn-wrap">
@@ -397,73 +508,38 @@ export class CaughtPokemonDetail extends HTMLElement {
               <span class="more-btn-label">More</span>
             </button>
             <div class="more-menu" role="menu" aria-label="More" hidden>
-              <button class="more-menu-item" type="button" role="menuitem" data-open="training">Training &amp; EVs</button>
               <button class="more-menu-item" type="button" role="menuitem" data-open="ivs">IVs</button>
               <button class="more-menu-item" type="button" role="menuitem" data-open="competitive">Competitive</button>
+              <button class="more-menu-item more-menu-item--danger" type="button" role="menuitem" data-action="release">Release</button>
             </div>
           </div>
         </header>
 
-        <dialog class="more-dialog ds-dialog" aria-labelledby="more-dialog-title">
+        <dialog class="nature-dialog ds-dialog" aria-labelledby="nature-dialog-title">
           <header class="ds-dialog-header">
-            <h2 id="more-dialog-title">Training &amp; EVs</h2>
-            <button class="more-dialog-close ds-dialog-close" type="button" aria-label="Close">
+            <h2 id="nature-dialog-title">Nature
+              <button type="button" class="help-btn" aria-expanded="false" aria-label="What is EV training?" title="EVs (Effort Values) are hidden bonus stat points earned mainly from battling — up to 252 per stat, 510 total. Nature is fixed when a Pokémon is caught or hatched: it boosts one stat by 10% and lowers another. Nature doesn't change EVs, but training the stat your nature already boosts gets the most out of your points.">?</button>
+            </h2>
+            <button class="nature-dialog-close ds-dialog-close" type="button" aria-label="Close">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
             </button>
           </header>
+          <label class="field-inline nature-field" hidden>Nature
+            <select class="nature-select ds-field" aria-label="Nature"></select>
+          </label>
+          <p class="nature-hint" aria-live="polite"></p>
+          <footer class="ds-dialog-footer">
+            <button type="button" class="ds-btn ds-btn--primary nature-dialog-save-btn">Save</button>
+          </footer>
+        </dialog>
 
-          <!--
-            Level & nature always leads — it's the one section that's
-            identity, not a training mechanic, so it isn't part of the
-            generation ordering below. Everything after it is ordered by
-            the generation each mechanic was introduced in (Vitamins/
-            Exp. Share Gen I, Pokérus Gen II, Macho Brace/EV-reducing
-            berries Gen III, Power items Gen IV, Wings Gen V), not by
-            feature-add order — a fixed, predictable position beats a
-            "newest at the bottom" list once there are this many.
-            Evolution isn't generation-gated, so it stays last, ahead of
-            Release.
-          -->
-          <section class="details-section">
-            <h3 class="section-title">Level &amp; nature
-              <button type="button" class="help-btn" aria-expanded="false" aria-label="What is EV training?" title="EVs (Effort Values) are hidden bonus stat points earned mainly from battling — up to 252 per stat, 510 total. Nature is fixed when a Pokémon is caught or hatched: it boosts one stat by 10% and lowers another. Nature doesn't change EVs, but training the stat your nature already boosts gets the most out of your points.">?</button>
-            </h3>
-            <label class="field-inline">Level
-              <input type="number" inputmode="numeric" pattern="[0-9]*" class="level-input ds-field" min="${MIN_LEVEL}" max="${MAX_LEVEL}" aria-label="Level" />
-            </label>
-            <label class="field-inline nature-field" hidden>Nature
-              <select class="nature-select ds-field" aria-label="Nature"></select>
-            </label>
-            <p class="nature-hint" aria-live="polite"></p>
-          </section>
-
-
-          <section class="vitamins">
-            <h3 class="section-title">Vitamins
-              <button type="button" class="help-btn" aria-expanded="false" aria-label="What do vitamins do?" title="Vitamins (HP Up, Protein, Iron, Calcium, Zinc, Carbos) instantly add EVs to one stat without battling — a quick way to top off a stat. Each only works until that stat has 100 EVs from any source; after that, only battling, items, or Pokérus can push it further toward the 252 cap.">?</button>
-            </h3>
-            <item-button-grid class="vitamin-grid"></item-button-grid>
-            <p class="vitamin-status" aria-live="polite"></p>
-          </section>
-
-          <div class="exp-pokerus-row">
-            <section class="exp-share-section">
-              <h3 class="section-title">Exp. Share
-                <button type="button" class="help-btn" aria-expanded="false" aria-label="What does Exp. Share do?" title="While holding an Exp. Share, this Pokémon also earns EVs whenever any other Pokémon in this party has a battle logged — the same base amount that Pokémon got, doubled by this Pokémon's own Pokérus if it has any. It never inherits the other Pokémon's held item bonus.">?</button>
-              </h3>
-              <ds-item-button class="exp-share-toggle-btn" icon="${EXP_SHARE_SPRITE}" label="Exp. Share" boost="Shares other EVs"></ds-item-button>
-            </section>
-
-            <section class="pokerus-section">
-              <h3 class="section-title">Pokérus
-                <button type="button" class="help-btn" aria-expanded="false" aria-label="What is Pokérus?" title="A rare, harmless in-game virus. While infected, every EV your Pokémon earns from battling is doubled — pure bonus, no downside. It can also spread to other party members over time. Once it cures (after a few days), the ×2 EV bonus stays forever — no need to toggle this off.">?</button>
-              </h3>
-              <ds-item-button class="pokerus-toggle-btn" label="Pokérus" boost="×2 EVs">
-                <span slot="icon" class="pokerus-icon" aria-hidden="true">${POKERUS_ICON_SVG}</span>
-              </ds-item-button>
-              <p class="pokerus-note" hidden>Pokérus doesn't double EVs in this game.</p>
-            </section>
-          </div>
+        <dialog class="item-dialog ds-dialog" aria-labelledby="item-dialog-title">
+          <header class="ds-dialog-header">
+            <h2 id="item-dialog-title">Items</h2>
+            <button class="item-dialog-close ds-dialog-close" type="button" aria-label="Close">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
+          </header>
 
           <section class="aids">
             <h3 class="section-title">Training item
@@ -472,30 +548,41 @@ export class CaughtPokemonDetail extends HTMLElement {
             <item-button-grid class="item-grid" columns="2"></item-button-grid>
           </section>
 
-          <section class="berries">
-            <h3 class="section-title">EV-reducing berries
-              <button type="button" class="help-btn" aria-expanded="false" aria-label="What do EV-reducing berries do?" title="Pomeg, Kelpsy, Qualot, Hondew, Grepa and Tamato berries remove 10 EVs from one stat — useful for undoing a mis-trained stat. Floors at 0.">?</button>
+          <section class="pokerus-section">
+            <h3 class="section-title">Pokérus
+              <button type="button" class="help-btn" aria-expanded="false" aria-label="What is Pokérus?" title="A rare, harmless in-game virus. While infected, every EV your Pokémon earns from battling is doubled — pure bonus, no downside. It can also spread to other party members over time. Once it cures (after a few days), the ×2 EV bonus stays forever — no need to toggle this off.">?</button>
             </h3>
-            <item-button-grid class="berry-grid"></item-button-grid>
-            <p class="berry-status" aria-live="polite"></p>
+            <ds-item-button class="pokerus-toggle-btn" label="Pokérus" boost="×2 EVs">
+              <span slot="icon" class="pokerus-icon" aria-hidden="true">${POKERUS_ICON_SVG}</span>
+            </ds-item-button>
+            <p class="pokerus-note" hidden>Pokérus doesn't double EVs in this game.</p>
+          </section>
+
+          <section class="exp-share-section">
+            <h3 class="section-title">Exp. Share
+              <button type="button" class="help-btn" aria-expanded="false" aria-label="What does Exp. Share do?" title="While holding an Exp. Share, this Pokémon also earns EVs whenever any other Pokémon in this party has a battle logged — the same base amount that Pokémon got, doubled by this Pokémon's own Pokérus if it has any. It never inherits the other Pokémon's held item bonus.">?</button>
+            </h3>
+            <ds-item-button class="exp-share-toggle-btn" icon="${EXP_SHARE_SPRITE}" label="Exp. Share" boost="Shares other EVs"></ds-item-button>
+          </section>
+
+          <section class="vitamins">
+            <h3 class="section-title">Vitamins</h3>
+            <item-button-grid class="vitamin-grid"></item-button-grid>
           </section>
 
           <section class="wings">
-            <h3 class="section-title">Wings
-              <button type="button" class="help-btn" aria-expanded="false" aria-label="What do Wings do?" title="Wings (Health, Muscle, Resist, Genius, Clever, Swift) instantly add 1 EV to one stat without battling. Unlike vitamins, there's no 100-EV cutoff — they work all the way to the 252 cap.">?</button>
-            </h3>
+            <h3 class="section-title">Wings</h3>
             <item-button-grid class="wing-grid"></item-button-grid>
-            <p class="wing-status" aria-live="polite"></p>
           </section>
 
-          <div class="evolve-panel">
-            <h3 class="section-title">Evolution</h3>
-            <evolution-chain></evolution-chain>
-          </div>
+          <section class="berries">
+            <h3 class="section-title">EV-reducing berries</h3>
+            <item-button-grid class="berry-grid"></item-button-grid>
+          </section>
 
-          <button class="release" title="Release this Pokémon" aria-label="Release this Pokémon">
-            <span aria-hidden="true">↪</span> Release this Pokémon
-          </button>
+          <footer class="ds-dialog-footer">
+            <button type="button" class="ds-btn ds-btn--primary item-dialog-save-btn">Save</button>
+          </footer>
         </dialog>
 
         <dialog class="iv-dialog ds-dialog" aria-labelledby="iv-dialog-title">
@@ -511,15 +598,47 @@ export class CaughtPokemonDetail extends HTMLElement {
           <p class="iv-summary" hidden></p>
           <details class="iv-calc" hidden>
             <summary>Don't know an IV? Calculate it from a stat</summary>
-            <p class="iv-calc-hint">Check this Pokémon's actual <em class="iv-calc-stat-name"></em> stat right now (its summary screen in-game) and enter it below — uses its current level and EVs, so check it now rather than typing in an old reading.</p>
+            <p class="iv-calc-hint">Check this Pokémon's actual <em class="iv-calc-stat-name"></em> stat right now (its summary screen in-game) and log it below — uses its current level and EVs, so check it now rather than typing in an old reading. Logging another reading later (after it levels up or gains EVs) narrows the candidates further.</p>
             <div class="iv-calc-fields">
               <select class="iv-calc-stat ds-field" aria-label="Stat"></select>
               <input type="number" inputmode="numeric" class="iv-calc-observed ds-field" min="1" aria-label="Observed stat value" placeholder="Actual stat" />
-              <button type="button" class="ds-btn ds-btn--ghost iv-calc-btn">Find IV</button>
+              <button type="button" class="ds-btn ds-btn--ghost iv-calc-btn">Log reading</button>
             </div>
+            <ul class="iv-calc-readings" aria-live="polite"></ul>
             <p class="iv-calc-note" aria-live="polite" hidden></p>
             <div class="iv-calc-results" aria-live="polite"></div>
           </details>
+          <footer class="ds-dialog-footer">
+            <button type="button" class="ds-btn ds-btn--primary iv-dialog-save-btn">Save</button>
+          </footer>
+        </dialog>
+
+        <dialog class="level-up-dialog ds-dialog" aria-labelledby="level-up-dialog-title">
+          <header class="ds-dialog-header">
+            <h2 id="level-up-dialog-title">Level</h2>
+            <button class="level-up-dialog-close ds-dialog-close" type="button" aria-label="Close">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
+          </header>
+          <label class="field-inline level-up-field">Level
+            <span class="level-up-from">Lv. <span class="level-up-from-value"></span> →</span>
+            <level-input class="level-up-input" aria-label="New level"></level-input>
+          </label>
+
+          <section class="level-up-evolve" hidden>
+            <h3 class="section-title">Evolution</h3>
+            <evolution-chain class="level-up-evo-chain"></evolution-chain>
+          </section>
+
+          <section class="level-up-stats" hidden>
+            <h3 class="section-title">Log stat readings at Lv. <span class="level-up-stats-level"></span> (optional)</h3>
+            <p class="level-up-stats-hint">Check any of this Pokémon's stats on its summary screen right now and enter them below — narrows its IVs. Leave any blank to skip.</p>
+            <div class="level-up-stats-fields"></div>
+          </section>
+
+          <footer class="ds-dialog-footer">
+            <button type="button" class="ds-btn ds-btn--primary level-up-done-btn" hidden>Save</button>
+          </footer>
         </dialog>
 
         <dialog class="competitive-dialog ds-dialog" aria-labelledby="competitive-dialog-title">
@@ -530,6 +649,8 @@ export class CaughtPokemonDetail extends HTMLElement {
             </button>
           </header>
           <div class="competitive-panel">
+            <h3 class="section-title">Base stats</h3>
+            <div class="competitive-base-stats"></div>
             <h3 class="section-title">Tier &amp; common sets
               <button type="button" class="help-btn" aria-expanded="false" aria-label="Where does this come from?" title="Tier via Pokémon Showdown, common sets via Smogon University's strategy dex — both fetched live and cached locally for about a week. Shown for this party's own generation. Not every species has a published competitive analysis.">?</button>
               <button type="button" class="tier-badge help-btn" aria-expanded="false" aria-label="What does this tier mean?" hidden></button>
@@ -567,11 +688,13 @@ export class CaughtPokemonDetail extends HTMLElement {
     this.$species = shadow.querySelector('.species');
     this.$levelValue = shadow.querySelector('.level-value');
     this.$levelUpBtn = shadow.querySelector('.level-up-btn');
-    this.$levelInput = shadow.querySelector('.level-input');
     this.$natureField = shadow.querySelector('.nature-field');
     this.$nature = shadow.querySelector('.nature-select');
     this.$natureHint = shadow.querySelector('.nature-hint');
-    this.$naturePrefix = shadow.querySelector('.nature-prefix');
+    this.$natureBtn = shadow.querySelector('.nature-btn');
+    this.$natureDialog = shadow.querySelector('.nature-dialog');
+    this.$natureDialogClose = shadow.querySelector('.nature-dialog-close');
+    this.$natureDialogSaveBtn = shadow.querySelector('.nature-dialog-save-btn');
     this.$ivDialog = shadow.querySelector('.iv-dialog');
     this.$ivDialogClose = shadow.querySelector('.iv-dialog-close');
     this.$ivGrid = shadow.querySelector('.iv-grid');
@@ -581,35 +704,45 @@ export class CaughtPokemonDetail extends HTMLElement {
     this.$ivCalcStat = shadow.querySelector('.iv-calc-stat');
     this.$ivCalcObserved = shadow.querySelector('.iv-calc-observed');
     this.$ivCalcBtn = shadow.querySelector('.iv-calc-btn');
+    this.$ivCalcReadings = shadow.querySelector('.iv-calc-readings');
     this.$ivCalcNote = shadow.querySelector('.iv-calc-note');
     this.$ivCalcResults = shadow.querySelector('.iv-calc-results');
+    this.$ivDialogSaveBtn = shadow.querySelector('.iv-dialog-save-btn');
     this.$ivCalcStat.innerHTML = STATS.map(({ key, label }) => `<option value="${key}">${label}</option>`).join('');
-    this.$statusRow = shadow.querySelector('.status-row');
+    this.$levelUpDialog = shadow.querySelector('.level-up-dialog');
+    this.$levelUpDialogClose = shadow.querySelector('.level-up-dialog-close');
+    this.$levelUpInput = shadow.querySelector('.level-up-input');
+    this.$levelUpFromValue = shadow.querySelector('.level-up-from-value');
+    this.$levelUpEvolve = shadow.querySelector('.level-up-evolve');
+    this.$levelUpEvoChain = shadow.querySelector('.level-up-evo-chain');
+    this.$levelUpStats = shadow.querySelector('.level-up-stats');
+    this.$levelUpStatsLevel = shadow.querySelector('.level-up-stats-level');
+    this.$levelUpStatsFields = shadow.querySelector('.level-up-stats-fields');
+    this.$levelUpDoneBtn = shadow.querySelector('.level-up-done-btn');
     this.$moreBtnWrap = shadow.querySelector('.more-btn-wrap');
     this.$moreBtn = shadow.querySelector('.more-btn');
     this.$moreMenu = shadow.querySelector('.more-menu');
-    this.$moreDialog = shadow.querySelector('.more-dialog');
-    this.$moreDialogClose = shadow.querySelector('.more-dialog-close');
+    this.$itemBtn = shadow.querySelector('.held-item-btn');
+    this.$itemBtnSprite = shadow.querySelector('.held-item-btn-sprite');
+    this.$itemBtnLabel = shadow.querySelector('.held-item-btn-label');
+    this.$itemDialog = shadow.querySelector('.item-dialog');
+    this.$itemDialogClose = shadow.querySelector('.item-dialog-close');
     this.$competitiveDialog = shadow.querySelector('.competitive-dialog');
     this.$competitiveDialogClose = shadow.querySelector('.competitive-dialog-close');
-    this.$release = shadow.querySelector('.release');
     this.$evSummary = shadow.querySelector('ev-summary');
     this.$itemGrid = shadow.querySelector('.item-grid');
+    this.$itemDialogSaveBtn = shadow.querySelector('.item-dialog-save-btn');
     this.$pokerusToggle = shadow.querySelector('.pokerus-toggle-btn');
     this.$pokerusNote = shadow.querySelector('.pokerus-note');
     this.$expShareToggle = shadow.querySelector('.exp-share-toggle-btn');
     this.$vitaminGrid = shadow.querySelector('.vitamin-grid');
-    this.$vitaminStatus = shadow.querySelector('.vitamin-status');
-    this.$evHelpBtn = shadow.querySelector('.details-section .help-btn');
-    this.$vitaminHelpBtn = shadow.querySelector('.vitamins .help-btn');
+    this.$evHelpBtn = shadow.querySelector('.nature-dialog .help-btn');
     this.$wingsSection = shadow.querySelector('.wings');
     this.$wingGrid = shadow.querySelector('.wing-grid');
-    this.$wingStatus = shadow.querySelector('.wing-status');
     this.$berriesSection = shadow.querySelector('.berries');
     this.$berryGrid = shadow.querySelector('.berry-grid');
-    this.$berryStatus = shadow.querySelector('.berry-status');
-    this.$evoChain = shadow.querySelector('evolution-chain');
     this.$tierBadge = shadow.querySelector('.tier-badge');
+    this.$competitiveBaseStats = shadow.querySelector('.competitive-base-stats');
     this.$competitiveSets = shadow.querySelector('.competitive-sets');
     this.$competitiveEmpty = shadow.querySelector('.competitive-empty');
     this._competitiveToken = 0; // guards against a stale async response landing after a fast species switch
@@ -633,13 +766,20 @@ export class CaughtPokemonDetail extends HTMLElement {
   // Rebuilt on every render (not just once) because which items are even
   // offered — and the Power item bonus shown — depends on the entry's
   // party's game version, and this one component instance is reused
-  // across different parties as the user navigates. Each button applies
-  // its item immediately on click (clicking the active one again clears
-  // it) — there's no separate "None" option or save step.
+  // across different parties as the user navigates. Reads through
+  // `_pendingHeldItem` while the Items dialog has an uncommitted pick
+  // (docs/adr/0017) — falling back to the entry's actual committed
+  // values the rest of the time (dialog closed, or an unrelated store
+  // change re-rendering everything while it's open) — so an in-progress
+  // pick survives a re-render it didn't cause. Also drives the Exp.
+  // Share toggle's `active` state, since it shares this same pending
+  // held-item slot.
   _updateItemGrid() {
     const bonus = store.powerItemBonus();
     const availability = store.trainingItemAvailability();
-    const selected = this._entry.machoBrace ? 'macho-brace' : this._entry.powerItem || '';
+    const pending = this._pendingHeldItem || this._entry;
+    const selected = pending.machoBrace ? 'macho-brace' : pending.powerItem || '';
+    this.$expShareToggle.toggleAttribute('active', !!pending.expShare);
 
     const offered = [];
     if (availability.machoBrace) {
@@ -668,19 +808,28 @@ export class CaughtPokemonDetail extends HTMLElement {
   }
 
   _wireEvents() {
+    // Nickname stays instant, unlike Nature/Pokérus/Exp. Share/IVs below
+    // (docs/adr/0017) — it isn't inside any dialog at all (it's always
+    // editable right on the card header), so there's no Save button it
+    // could sensibly defer to.
     this.$nickname.addEventListener('change', () => {
       store.renamePokemon(this._entry.uid, this.$nickname.value.trim());
     });
-    this.$levelUpBtn.addEventListener('click', () => {
-      store.setLevel(this._entry.uid, this._entry.level + 1);
+    this.$levelUpBtn.addEventListener('click', () => this._openLevelUpDialog());
+    this.$levelUpInput.addEventListener('change', () => this._previewLevelUpInput());
+    this.$levelUpDoneBtn.addEventListener('click', () => this._saveLevelUp());
+    this.$levelUpDialog.addEventListener('close', () => {
+      this._onDialogClosed();
+      this.$levelUpEvoChain.discard(); // no-op if Save already committed it
     });
-    this.$levelInput.addEventListener('change', () => {
-      store.setLevel(this._entry.uid, this.$levelInput.value);
+    this.$levelUpDialogClose.addEventListener('click', () => this.$levelUpDialog.close());
+    this.$levelUpDialog.addEventListener('click', (e) => {
+      if (e.target === this.$levelUpDialog) this.$levelUpDialog.close();
     });
-    this.$nature.addEventListener('change', () => {
-      store.setNature(this._entry.uid, this.$nature.value || null);
-      this._renderNatureHint();
-    });
+    // Nature also commits only on Save — the select already holds its
+    // own pending value; the hint below is a pure display computation,
+    // not a mutation, so it still updates live.
+    this.$nature.addEventListener('change', () => this._renderNatureHint());
     // Delegated: the grid's number inputs are rebuilt every render (one
     // per stat, fewer in Gen I/II — see _renderIvs), so a single listener
     // here outlives any individual input the way the per-field ones above
@@ -689,14 +838,37 @@ export class CaughtPokemonDetail extends HTMLElement {
       const input = /** @type {HTMLInputElement} */ (e.target);
       const statKey = input?.dataset?.stat;
       if (!statKey) return;
-      store.setIv(this._entry.uid, /** @type {StatKey} */ (statKey), input.value === '' ? null : Number(input.value));
+      // Preview only — store.setIv doesn't run until Save (docs/adr/0017).
+      // Updates the "N/6 known" summary and perfect-stat highlight live,
+      // but deliberately *doesn't* call the full _renderIvs rebuild here:
+      // that replaces every <input> in the grid (a fresh DOM node per
+      // stat), and this fires on blur — the exact moment focus is moving
+      // to whichever field the user clicks/tabs into next. Rebuilding
+      // then would destroy that field's own node out from under the
+      // focus-in-progress, discarding it as if it had never been typed
+      // (a value another stat's change event does).
+      this._pendingIvs[statKey] = input.value === '' ? null : Number(input.value);
+      this._updateIvSummary();
     });
     this.$ivCalcStat.addEventListener('change', () => this._updateIvCalcHint());
-    this.$ivCalcBtn.addEventListener('click', () => this._runIvCalculator());
+    this.$ivCalcBtn.addEventListener('click', () => this._logIvReading());
     this.$ivCalcResults.addEventListener('click', (e) => {
       const chip = /** @type {HTMLElement} */ (e.target).closest('.iv-calc-chip');
       if (!chip) return;
-      store.setIv(this._entry.uid, /** @type {StatKey} */ (this.$ivCalcStat.value), Number(chip.dataset.iv));
+      const statKey = /** @type {StatKey} */ (this.$ivCalcStat.value);
+      const iv = Number(chip.dataset.iv);
+      // Set pending *before* store.setIv, not after: store.setIv's save
+      // synchronously dispatches the store's 'change' event, which
+      // re-renders the grid from _pendingIvs immediately — updating
+      // pending afterward would be one render too late, and Save would
+      // then overwrite the calculator's own result with a stale value.
+      if (this._pendingIvs) this._pendingIvs[statKey] = iv;
+      store.setIv(this._entry.uid, statKey, iv);
+    });
+    this.$ivCalcReadings.addEventListener('click', (e) => {
+      const del = /** @type {HTMLElement} */ (e.target).closest('.iv-calc-reading-delete');
+      if (!del) return;
+      store.deleteHistoryEntry(this._entry.uid, del.dataset.id);
     });
 
     // The "More" button opens a small menu (Training & EVs / Competitive)
@@ -717,9 +889,9 @@ export class CaughtPokemonDetail extends HTMLElement {
       const item = /** @type {HTMLElement} */ (e.target).closest('.more-menu-item');
       if (!item) return;
       setMoreMenuOpen(false);
-      if (item.dataset.open === 'training') this._openDialog(this.$moreDialog);
-      else if (item.dataset.open === 'ivs') this._openDialog(this.$ivDialog);
+      if (item.dataset.open === 'ivs') this._openIvsDialog();
       else if (item.dataset.open === 'competitive') this._openDialog(this.$competitiveDialog);
+      else if (item.dataset.action === 'release') this._releasePokemon();
     });
     // A click anywhere outside the menu closes it — listened on
     // `document`, not this.shadowRoot, since a click that lands outside
@@ -747,31 +919,77 @@ export class CaughtPokemonDetail extends HTMLElement {
     });
 
     // 'close' catches every path a dialog can close by: the ✕, Esc, and
-    // a backdrop click.
-    this.$moreDialog.addEventListener('close', () => this._onDialogClosed());
-    this.$moreDialogClose.addEventListener('click', () => this.$moreDialog.close());
-    this.$moreDialog.addEventListener('click', (e) => {
-      if (e.target === this.$moreDialog) this.$moreDialog.close();
+    // a backdrop click — also, harmlessly, a Save button's own .close()
+    // call, since by then the pending fields it reset are already
+    // applied to the store (docs/adr/0017).
+    this.$natureDialog.addEventListener('close', () => this._onDialogClosed());
+    this.$natureDialogClose.addEventListener('click', () => this.$natureDialog.close());
+    this.$natureDialog.addEventListener('click', (e) => {
+      if (e.target === this.$natureDialog) this.$natureDialog.close();
     });
+    this.$natureDialogSaveBtn.addEventListener('click', () => this._saveNatureDialog());
+    this.$natureBtn.addEventListener('click', () => this._openNatureDialog());
+    this.$itemDialog.addEventListener('close', () => {
+      this._onDialogClosed();
+      this._pendingHeldItem = null; // discard any uncommitted picks/queue — harmless no-op if Save already applied and closed
+      this._pendingApplies = [];
+      this._pendingPokerus = null;
+    });
+    this.$itemDialogClose.addEventListener('click', () => this.$itemDialog.close());
+    this.$itemDialog.addEventListener('click', (e) => {
+      if (e.target === this.$itemDialog) this.$itemDialog.close();
+    });
+    this.$itemBtn.addEventListener('click', () => this._openItemDialog());
     this.$competitiveDialog.addEventListener('close', () => this._onDialogClosed());
     this.$competitiveDialogClose.addEventListener('click', () => this.$competitiveDialog.close());
     this.$competitiveDialog.addEventListener('click', (e) => {
       if (e.target === this.$competitiveDialog) this.$competitiveDialog.close();
     });
-    this.$ivDialog.addEventListener('close', () => this._onDialogClosed());
+    this.$ivDialog.addEventListener('close', () => {
+      this._onDialogClosed();
+      this._pendingIvs = null;
+    });
     this.$ivDialogClose.addEventListener('click', () => this.$ivDialog.close());
     this.$ivDialog.addEventListener('click', (e) => {
       if (e.target === this.$ivDialog) this.$ivDialog.close();
     });
+    this.$ivDialogSaveBtn.addEventListener('click', () => this._saveIvs());
+    // Enter anywhere in a preview-then-Save dialog (Nature/IVs/Level —
+    // docs/adr/0017) commits the same way clicking its own Save button
+    // does, matching ordinary form expectations — without this, a native
+    // <dialog> with no <form> wrapper just swallows Enter and does
+    // nothing. Excluded: a <textarea> (Enter means "new line" there) and
+    // a button (Enter/Space already activates it natively — re-clicking
+    // Save here too would be a harmless but pointless double-fire).
+    for (const [dialog, saveBtn] of /** @type {[HTMLDialogElement, HTMLButtonElement][]} */ ([
+      [this.$natureDialog, this.$natureDialogSaveBtn],
+      [this.$ivDialog, this.$ivDialogSaveBtn],
+      [this.$levelUpDialog, this.$levelUpDoneBtn],
+    ])) {
+      dialog.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter') return;
+        const target = /** @type {HTMLElement} */ (e.target);
+        if (target.tagName === 'TEXTAREA' || target.tagName === 'BUTTON') return;
+        e.preventDefault();
+        saveBtn.click();
+      });
+    }
     // The "?" buttons toggle their explanation inline: title tooltips are
     // hover-only, which leaves them unreachable on touch devices. Listens
-    // on the shadow root, not just $moreDialog, since the battle
-    // section's own help button (Exp. Share) lives outside that dialog.
+    // on the shadow root, since these help buttons are spread across
+    // several separate dialogs now (Nature, Items, IVs, Level).
     this.shadowRoot.addEventListener('click', (e) => {
       const btn = e.target.closest('.help-btn');
       if (!btn) return;
-      const heading = btn.closest('.section-title');
-      const next = heading.nextElementSibling;
+      // A body sub-section's own heading (e.g. "Vitamins") anchors the
+      // note right after it, same as always. A dialog-header "?" (IVs,
+      // Nature, Competitive) has no .section-title ancestor — anchor to
+      // the header itself instead, so the note lands as the body's first
+      // element (right below the sticky header) rather than inside the
+      // header (too cramped) or, with no anchor at all, crashing.
+      const anchor = btn.closest('.section-title') || btn.closest('.ds-dialog-header');
+      if (!anchor) return;
+      const next = anchor.nextElementSibling;
       if (next?.classList.contains('help-note')) {
         next.remove();
         btn.setAttribute('aria-expanded', 'false');
@@ -779,37 +997,51 @@ export class CaughtPokemonDetail extends HTMLElement {
         const note = document.createElement('p');
         note.className = 'help-note';
         note.textContent = btn.title;
-        heading.after(note);
+        anchor.after(note);
         btn.setAttribute('aria-expanded', 'true');
       }
     });
-    this.$release.addEventListener('click', () => {
-      const label = titleCase(this._entry.nickname || this._entry.speciesName);
-      if (confirm(`Release ${label}? Its EV log will be deleted.`)) {
-        this.$moreDialog.close();
-        store.releasePokemon(this._entry.uid);
-      }
-    });
+    // Everything in this dialog only previews here (docs/adr/0017) —
+    // Training item/Exp. Share write into `_pendingHeldItem`, Pokérus
+    // into `_pendingPokerus`, Vitamins/Wings/berries queue into
+    // `_pendingApplies`; all of it applies together only on the
+    // dialog's own footer Save button.
     this.$itemGrid.addEventListener('item-pick', (e) => {
       const val = e.detail.id;
-      const selected = this._entry.machoBrace ? 'macho-brace' : this._entry.powerItem || '';
+      const pending = this._pendingHeldItem;
+      const selected = pending.machoBrace ? 'macho-brace' : pending.powerItem || '';
       if (val === selected) {
-        store.setPowerItem(this._entry.uid, null); // clicking the active item again clears it
+        pending.powerItem = null; // clicking the active item again clears it
+        pending.machoBrace = false;
       } else if (val === 'macho-brace') {
-        store.setMachoBrace(this._entry.uid, true);
+        pending.machoBrace = true;
+        pending.powerItem = null;
       } else {
-        store.setPowerItem(this._entry.uid, val);
+        pending.powerItem = val;
+        pending.machoBrace = false;
       }
+      pending.expShare = false; // picking a training item vacates Exp. Share's slot too
+      this._updateItemGrid();
     });
+    // Pokérus only previews here too, same as everything else in this
+    // dialog — applied on the footer Save button along with the rest.
     this.$pokerusToggle.addEventListener('pick', () => {
-      store.setPokerus(this._entry.uid, !this.$pokerusToggle.hasAttribute('active'));
+      this._pendingPokerus = !this.$pokerusToggle.hasAttribute('active');
+      this.$pokerusToggle.toggleAttribute('active', this._pendingPokerus);
     });
     this.$expShareToggle.addEventListener('pick', () => {
-      store.setExpShare(this._entry.uid, !this.$expShareToggle.hasAttribute('active'));
+      const pending = this._pendingHeldItem;
+      pending.expShare = !pending.expShare;
+      if (pending.expShare) {
+        pending.powerItem = null;
+        pending.machoBrace = false;
+      }
+      this._updateItemGrid();
     });
-    this.$vitaminGrid.addEventListener('item-pick', (e) => this._useVitamin(e.detail.id));
-    this.$wingGrid.addEventListener('item-pick', (e) => this._useFeather(e.detail.id));
-    this.$berryGrid.addEventListener('item-pick', (e) => this._useBerry(e.detail.id));
+    this.$itemDialogSaveBtn.addEventListener('click', () => this._saveItemDialog());
+    this.$vitaminGrid.addEventListener('item-pick', (e) => this._queueVitamin(e.detail.id));
+    this.$wingGrid.addEventListener('item-pick', (e) => this._queueFeather(e.detail.id));
+    this.$berryGrid.addEventListener('item-pick', (e) => this._queueBerry(e.detail.id));
     this.$search.addEventListener('pokemon-pick', (e) => {
       this._battle(e.detail.name, 'Looking up battle data…');
     });
@@ -824,11 +1056,99 @@ export class CaughtPokemonDetail extends HTMLElement {
     // styles.css's html:has(dialog[open]) scroll lock can't see into
     // this shadow root, so flag the open state on <html> ourselves.
     document.documentElement.dataset.modalOpen = '';
-    if (dialog === this.$moreDialog) this.$evoChain.load();
   }
 
   _onDialogClosed() {
     delete document.documentElement.dataset.modalOpen;
+  }
+
+  /**
+   * Seeds Nature from the entry (so a previous session's discarded edit
+   * never leaks into a fresh one), then opens. Nature has no history
+   * event of its own to undo (ADR 0006) — unlike Pokérus/Exp. Share/
+   * vitamins, a wrong pick has no cheap fix, which is exactly why it
+   * stays Save-gated instead of moving to the instant Items dialog.
+   */
+  _openNatureDialog() {
+    this.$nature.value = this._entry.nature || '';
+    this._renderNatureHint();
+    this._openDialog(this.$natureDialog);
+  }
+
+  /** Applies the pending Nature if it actually changed, then closes. */
+  _saveNatureDialog() {
+    const e = this._entry;
+    if (this.$nature.value !== (e.nature || '')) store.setNature(e.uid, this.$nature.value || null);
+    this.$natureDialog.close();
+  }
+
+  /**
+   * Seeds the held-item pending state from the entry (so a previous
+   * session's discarded pick never leaks into a fresh one — same
+   * reasoning as Nature/IVs, docs/adr/0017), clears the queued Vitamin/
+   * Wing/berry list, refreshes every grid from that, then opens.
+   */
+  _openItemDialog() {
+    const e = this._entry;
+    this._pendingHeldItem = { powerItem: e.powerItem, machoBrace: e.machoBrace, expShare: e.expShare };
+    this._pendingApplies = [];
+    this._pendingPokerus = e.pokerus;
+    this.$pokerusToggle.toggleAttribute('active', !!e.pokerus);
+    this._updateItemGrid();
+    this._updateVitaminGrid(e);
+    this._updateWingGrid(e);
+    this._updateBerryGrid(e);
+    this._openDialog(this.$itemDialog);
+  }
+
+  /**
+   * Applies everything staged in this dialog session, then closes:
+   * the held-item choice (Training item, Macho Brace, or Exp. Share —
+   * whichever ended up set), the Pokérus toggle, then every queued
+   * Vitamin/Wing/berry click in the exact order it was queued
+   * (`_simulatedEvs`'s own comment explains why order matters) —
+   * replayed through the real store.useVitamin/useFeather/useBerry, so
+   * the store's own capping logic is what actually runs, not the
+   * preview math a second time. Everything shares one batchId so
+   * ev-history-log.js collapses this Save into a single summarized
+   * entry, same as the Level popup's.
+   */
+  _saveItemDialog() {
+    const e = this._entry;
+    const p = this._pendingHeldItem;
+    const batchId = crypto.randomUUID();
+    if (p.expShare) store.setExpShare(e.uid, true, batchId);
+    else if (p.machoBrace) store.setMachoBrace(e.uid, true, batchId);
+    else store.setPowerItem(e.uid, p.powerItem, batchId);
+    store.setPokerus(e.uid, this._pendingPokerus, batchId);
+    for (const item of this._pendingApplies) {
+      if (item.kind === 'vitamin') store.useVitamin(e.uid, item.id, batchId);
+      else if (item.kind === 'feather') store.useFeather(e.uid, item.id, batchId);
+      else store.useBerry(e.uid, item.id, batchId);
+    }
+    this.$itemDialog.close();
+  }
+
+  /** Release is destructive and irreversible, so it's gated behind a native confirm() with no dialog of its own. */
+  _releasePokemon() {
+    const label = titleCase(this._entry.nickname || this._entry.speciesName);
+    if (confirm(`Release ${label}? Its EV log will be deleted.`)) store.releasePokemon(this._entry.uid);
+  }
+
+  /** Seeds pending IVs from the entry, then opens. */
+  _openIvsDialog() {
+    this._pendingIvs = { ...this._entry.ivs };
+    this._renderIvs(this._entry, store.usesStatExpSystem());
+    this._openDialog(this.$ivDialog);
+  }
+
+  /** Applies every stat whose pending IV actually changed, then closes. */
+  _saveIvs() {
+    const e = this._entry;
+    for (const { key } of STATS) {
+      if (this._pendingIvs[key] !== e.ivs[key]) store.setIv(e.uid, key, this._pendingIvs[key]);
+    }
+    this.$ivDialog.close();
   }
 
   set entry(e) {
@@ -850,42 +1170,77 @@ export class CaughtPokemonDetail extends HTMLElement {
     }
   }
 
-  /** Feeds one vitamin and reports exactly which stat moved and by how much. */
-  _useVitamin(vitaminId) {
-    const vitamin = VITAMINS.find((v) => v.id === vitaminId);
-    const result = store.useVitamin(this._entry.uid, vitaminId);
-    if (!result || !vitamin) return;
-    const statLabel = result.linkedStat ? 'SPC' : STAT_LABEL[vitamin.stat];
-    const noun = store.usesStatExpSystem() ? 'Stat Experience' : 'EVs';
-    if (result.applied) {
-      this.$vitaminStatus.textContent = `${vitamin.label}: +${result.applied} ${statLabel}`;
-    } else if (result.blockedByCutoff) {
-      this.$vitaminStatus.textContent = `${vitamin.label}: no ${noun} gained — this game stops vitamins once ${statLabel} has ${VITAMIN_STAT_CUTOFF}+ EVs`;
-    } else if (result.blockedByCeiling) {
-      this.$vitaminStatus.textContent = `${vitamin.label}: no ${noun} gained — vitamins stop working once ${statLabel} has ${STAT_EXP_VITAMIN_CEILING}+ Stat Experience`;
-    } else {
-      this.$vitaminStatus.textContent = `${vitamin.label}: no ${noun} gained — ${statLabel} is already maxed out`;
+  /**
+   * The entry's actual current EVs, folded forward through every
+   * Vitamin/Wing/berry click queued so far this dialog session, in
+   * click order — what Save would produce right now. Used both to
+   * preview one more queued click (would it still add/remove anything)
+   * and to label each button with what it would apply.
+   * @returns {EvMap}
+   */
+  _simulatedEvs() {
+    const evs = { ...this._entry.evs };
+    for (const item of this._pendingApplies) {
+      const y = this._previewYield(item.kind, item.id, evs);
+      if (!y) continue;
+      if (item.kind === 'berry') evs[y.stat] -= y.applied;
+      else {
+        evs[y.stat] += y.applied;
+        if (y.linkedStat) evs[y.linkedStat] += y.applied;
+      }
     }
+    return evs;
   }
 
-  /** Feeds one Wing and reports exactly which stat moved and by how much. */
-  _useFeather(featherId) {
-    const feather = FEATHERS.find((f) => f.id === featherId);
-    const result = store.useFeather(this._entry.uid, featherId);
-    if (!result || !feather) return;
-    this.$wingStatus.textContent = result.applied
-      ? `${feather.label}: +${result.applied} ${STAT_LABEL[feather.stat]}`
-      : `${feather.label}: no EVs gained — ${STAT_LABEL[feather.stat]} is already maxed out`;
+  /** @param {'vitamin'|'feather'|'berry'} kind @param {string} id @param {EvMap} evs */
+  _previewYield(kind, id, evs) {
+    const uid = this._entry.uid;
+    if (kind === 'vitamin') return store.previewVitamin(uid, id, evs);
+    if (kind === 'feather') return store.previewFeather(uid, id, evs);
+    return store.previewBerry(uid, id, evs);
   }
 
-  /** Feeds one EV-reducing berry and reports exactly which stat moved and by how much. */
-  _useBerry(berryId) {
-    const berry = EV_BERRIES.find((b) => b.id === berryId);
-    const result = store.useBerry(this._entry.uid, berryId);
-    if (!result || !berry) return;
-    this.$berryStatus.textContent = result.applied
-      ? `${berry.label}: −${result.applied} ${STAT_LABEL[berry.stat]}`
-      : `${berry.label}: no EVs removed — ${STAT_LABEL[berry.stat]} is already at 0`;
+  /**
+   * Queues one vitamin click (docs/adr/0017) — nothing is recorded until
+   * Save. No status line: the button itself already shows the queued
+   * count (`_updateVitaminGrid`'s boost text) and disables outright once
+   * another click genuinely couldn't add anything, so there's nothing a
+   * separate line would say that isn't already visible on the button.
+   */
+  _queueVitamin(vitaminId) {
+    const y = this._previewYield('vitamin', vitaminId, this._simulatedEvs());
+    if (!y?.applied) return;
+    this._pendingApplies.push({ kind: 'vitamin', id: vitaminId });
+    this._updateQueuedGrids();
+  }
+
+  /** Queues one Wing click — see `_queueVitamin`'s own comment. */
+  _queueFeather(featherId) {
+    const y = this._previewYield('feather', featherId, this._simulatedEvs());
+    if (!y?.applied) return;
+    this._pendingApplies.push({ kind: 'feather', id: featherId });
+    this._updateQueuedGrids();
+  }
+
+  /** Queues one EV-reducing berry click — see `_queueVitamin`'s own comment. */
+  _queueBerry(berryId) {
+    const y = this._previewYield('berry', berryId, this._simulatedEvs());
+    if (!y?.applied) return;
+    this._pendingApplies.push({ kind: 'berry', id: berryId });
+    this._updateQueuedGrids();
+  }
+
+  /**
+   * Refreshes every grid that reads through `_simulatedEvs()` — a click
+   * in any one of Vitamins/Wings/berries can change what's still room
+   * for in any *other* one too (they all draw from the same running EV
+   * total), so queuing in one must re-check every one of them, not just
+   * the grid the click happened in.
+   */
+  _updateQueuedGrids() {
+    this._updateVitaminGrid(this._entry);
+    this._updateWingGrid(this._entry);
+    this._updateBerryGrid(this._entry);
   }
 
   _render() {
@@ -894,6 +1249,9 @@ export class CaughtPokemonDetail extends HTMLElement {
     const modernSprite = e.sprite || FALLBACK_SPRITE;
     const versioned = versionedSpriteUrl(store.spriteBaseGame(), e.speciesId);
     this._spriteFallback.setVersionedSprite(versioned, modernSprite);
+    // Nickname is instant (not dialog-scoped, see _wireEvents), so this
+    // always reflects the real, current value — no pending state to
+    // preserve here the way Nature/Pokérus/Exp. Share below need to.
     this.$nickname.value = e.nickname || titleCase(e.speciesName);
     this.$speciesNum.textContent = `#${String(e.speciesId).padStart(3, '0')}`;
     // The species name only earns a second mention when a nickname is
@@ -902,15 +1260,13 @@ export class CaughtPokemonDetail extends HTMLElement {
     this.$species.hidden = !e.nickname;
     this.$species.textContent = e.nickname ? titleCase(e.speciesName) : '';
     this.$levelValue.textContent = `Lv. ${e.level}`;
-    this.$levelUpBtn.disabled = e.level >= MAX_LEVEL;
-    this.$levelInput.value = e.level;
     const natureAvailable = store.natureAvailable();
     this.$natureField.hidden = !natureAvailable;
-    if (natureAvailable) this.$nature.value = e.nature || '';
+    if (natureAvailable && !this.$natureDialog.open) this.$nature.value = e.nature || '';
     this._renderNatureHint();
     const nature = natureAvailable ? NATURES.find((n) => n.id === e.nature) : null;
     this._renderNatureBadge(nature, natureAvailable);
-    this._renderStatusBadges(e);
+    this._renderItemBadge(e);
     // Recently-defeated opponents, most recent first (history is
     // unshift-ordered already) — lets a grinding session re-pick the
     // same opponent without retyping it each time.
@@ -921,23 +1277,25 @@ export class CaughtPokemonDetail extends HTMLElement {
     const totalCap = store.totalCap();
     const mergedSpecial = store.specialStatMerged();
     this.$evSummary.evs = e.evs;
-    // The caught mon's own modern spa/spd isn't a 50/50 split of Gen I's
-    // single Special stat (see gen1-special-stats.js) — show the real
-    // historical value in the merged "Base SPC" label instead.
-    this.$evSummary.baseStats =
-      mergedSpecial && e.baseStats
-        ? { ...e.baseStats, spa: gen1SpecialStat(e.speciesId, e.baseStats.spa, e.baseStats.spd), spd: gen1SpecialStat(e.speciesId, e.baseStats.spa, e.baseStats.spd) }
-        : e.baseStats;
+    // The real current value per stat, not the species' base — a
+    // reference number that never actually changes isn't as useful next
+    // to a per-Pokémon EV tracker as what this specific one currently
+    // has (docs/adr note: base stats moved to the Competitive dialog,
+    // where min-maxing a build is the actual relevant use for them).
+    // Null (blank) under Stat Experience (Gen I/II — store.actualStat
+    // doesn't attempt that era's own rounding) or wherever this stat's
+    // IV isn't known yet, same as store.actualStat's own contract.
+    this.$evSummary.actualStats = e.baseStats
+      ? Object.fromEntries(STATS.map(({ key }) => [key, store.actualStat(e, key, e.baseStats[key])]))
+      : null;
     this.$evSummary.nature = nature;
     this.$evSummary.statCap = store.statCap();
     this.$evSummary.totalCap = totalCap;
     this.$evSummary.mergedSpecial = mergedSpecial;
+    this._renderBaseStats(e, mergedSpecial);
     this.$evHelpBtn.title = statExp
       ? "Stat Experience is this game's hidden bonus stat pool — up to 65,535 per stat, gained mainly from battling (equal to the defeated Pokémon's own base stat). Nature is fixed when a Pokémon is caught or hatched: it boosts one stat by 10% and lowers another. Nature doesn't change Stat Experience, but training the stat your nature already boosts gets the most out of your points."
       : "EVs (Effort Values) are hidden bonus stat points earned mainly from battling — up to 252 per stat, 510 total. Nature is fixed when a Pokémon is caught or hatched: it boosts one stat by 10% and lowers another. Nature doesn't change EVs, but training the stat your nature already boosts gets the most out of your points.";
-    this.$vitaminHelpBtn.title = statExp
-      ? `Vitamins (HP Up, Protein, Iron, Calcium, Carbos) instantly add ${STAT_EXP_VITAMIN_BONUS} Stat Experience to one stat without battling — but only work until that stat has ${STAT_EXP_VITAMIN_CEILING} Stat Experience from any source (battling included); after that, only battling can push it further toward the 65,535 cap.`
-      : 'Vitamins (HP Up, Protein, Iron, Calcium, Zinc, Carbos) instantly add EVs to one stat without battling — a quick way to top off a stat. Each only works until that stat has 100 EVs from any source; after that, only battling, items, or Pokérus can push it further toward the 252 cap.';
 
     const trained = totalCap != null && totalEvs(e.evs) >= totalCap;
     this.toggleAttribute('fully-trained', trained);
@@ -945,8 +1303,11 @@ export class CaughtPokemonDetail extends HTMLElement {
     this._renderIvs(e, statExp);
     this._updateItemGrid();
     const aids = store.effectiveAids(e);
-    const pokerusActive = !!e.pokerus;
-    this.$pokerusToggle.toggleAttribute('active', pokerusActive);
+    // Prefers the pending pick while the Items popup has one open and
+    // uncommitted (same reasoning as _updateItemGrid's own pending
+    // fallback) — the ambient ring/shimmer elsewhere on the card stays
+    // keyed to the entry's actual committed status, same as Nature/IVs.
+    this.$pokerusToggle.toggleAttribute('active', this._pendingPokerus ?? !!e.pokerus);
     const pokerusAvailable = store.pokerusAvailable();
     this.toggleAttribute('pokerus-infected', aids.pokerus);
     if (aids.pokerus) {
@@ -959,21 +1320,42 @@ export class CaughtPokemonDetail extends HTMLElement {
     }
     this.$pokerusToggle.toggleAttribute('disabled', !pokerusAvailable);
     this.$pokerusNote.hidden = pokerusAvailable;
-    const expShareActive = !!e.expShare;
-    this.$expShareToggle.toggleAttribute('active', expShareActive);
-    this.$vitaminStatus.textContent = '';
     this._updateVitaminGrid(e);
     const wingsAvailable = store.wingsAvailable();
     this.$wingsSection.hidden = !wingsAvailable;
-    this.$wingStatus.textContent = '';
     if (wingsAvailable) this._updateWingGrid(e);
     const berriesAvailable = store.berriesAvailable();
     this.$berriesSection.hidden = !berriesAvailable;
-    this.$berryStatus.textContent = '';
     if (berriesAvailable) this._updateBerryGrid(e);
-    this.$evoChain.entry = e;
     this.$histLog.entry = e;
     this._renderCompetitive(e);
+  }
+
+  /**
+   * Species base stats, in the Competitive dialog now rather than next
+   * to the EV bars — a fixed number that's the same for every one of
+   * this species is the relevant reference when planning which stats to
+   * invest EVs into against their own ceiling, not something to check
+   * repeatedly next to this specific Pokémon's own current progress.
+   * @param {RosterEntry} e @param {boolean} mergedSpecial
+   */
+  _renderBaseStats(e, mergedSpecial) {
+    if (!e.baseStats) {
+      this.$competitiveBaseStats.innerHTML = '';
+      return;
+    }
+    // Same Gen I real-Special-stat substitution as the EV bars used to
+    // show (gen1-special-stats.js) — the modern spa/spd split isn't a
+    // 50/50 divide of the real historical value.
+    const bs = mergedSpecial
+      ? { ...e.baseStats, spa: gen1SpecialStat(e.speciesId, e.baseStats.spa, e.baseStats.spd), spd: gen1SpecialStat(e.speciesId, e.baseStats.spa, e.baseStats.spd) }
+      : e.baseStats;
+    this.$competitiveBaseStats.innerHTML = STATS.filter(({ key }) => !(mergedSpecial && key === 'spd'))
+      .map(({ key, label }) => {
+        const shownLabel = mergedSpecial && key === 'spa' ? 'SPC' : label;
+        return `<div class="base-stat-row"><span class="base-stat-label">${escapeHtml(shownLabel)}</span><span class="base-stat-value">${bs[key]}</span></div>`;
+      })
+      .join('');
   }
 
   /**
@@ -1080,7 +1462,10 @@ export class CaughtPokemonDetail extends HTMLElement {
    * an earlier version of this feature: reaching it via the "More" menu
    * is the opt-in, the same as the Competitive dialog. Always computed
    * on every render (not just while the dialog happens to be open), so
-   * it's ready the instant the menu opens it.
+   * it's ready the instant the menu opens it. Values shown come from
+   * `_pendingIvs` while a dialog session is active (docs/adr/0017) —
+   * falling back to the entry's real ivs lets this render correctly
+   * before `_openIvsDialog` has ever seeded anything, too.
    * @param {RosterEntry} e @param {boolean} statExp
    */
   _renderIvs(e, statExp) {
@@ -1090,6 +1475,7 @@ export class CaughtPokemonDetail extends HTMLElement {
     // possibleIvsForStat doc comment).
     this.$ivCalc.hidden = statExp;
 
+    const ivs = this._pendingIvs || e.ivs;
     const { max, legacy } = store.ivRange();
     // Sp. Def's row is dropped entirely in Gen I/II — it isn't a second
     // input, it's the same stored value as Sp. Atk (ivRange()'s doc
@@ -1097,7 +1483,7 @@ export class CaughtPokemonDetail extends HTMLElement {
     const rows = STATS.filter(({ key }) => !(legacy && key === 'spd'));
     this.$ivGrid.innerHTML = rows
       .map(({ key, label }) => {
-        const value = e.ivs[key];
+        const value = ivs[key];
         const derived = legacy && key === 'hp';
         const displayLabel = legacy && key === 'spa' ? 'SPA/SPD' : label;
         const perfect = value === max;
@@ -1107,160 +1493,334 @@ export class CaughtPokemonDetail extends HTMLElement {
         return `<div class="iv-row${perfect ? ' iv-row--perfect' : ''}"><span class="iv-row-label">${escapeHtml(displayLabel)}</span>${control}</div>`;
       })
       .join('');
+    this.$ivSummary.hidden = false;
+    this._updateIvSummary();
+  }
 
-    const knownValues = rows.map(({ key }) => e.ivs[key]);
+  /**
+   * The "N/6 known, M perfect" summary line and each row's perfect
+   * highlight, kept live on every field's own change — split out of
+   * _renderIvs (which also rebuilds the grid's <input> elements from
+   * scratch) specifically so a per-field edit never touches any other
+   * field's DOM node; see the grid's 'change' listener for why that
+   * matters. Also refreshes the IV calculator hint, same as a full
+   * _renderIvs would.
+   */
+  _updateIvSummary() {
+    const e = this._entry;
+    const ivs = this._pendingIvs || e.ivs;
+    const { max, legacy } = store.ivRange();
+    const rows = STATS.filter(({ key }) => !(legacy && key === 'spd'));
+    for (const row of this.$ivGrid.children) {
+      const input = /** @type {HTMLElement} */ (row).querySelector('input[data-stat]');
+      const key = /** @type {HTMLInputElement|null} */ (input)?.dataset.stat;
+      if (key) row.classList.toggle('iv-row--perfect', ivs[key] === max);
+    }
+    const knownValues = rows.map(({ key }) => ivs[key]);
     const knownCount = knownValues.filter((v) => v != null).length;
     const perfectCount = knownValues.filter((v) => v === max).length;
-    this.$ivSummary.hidden = false;
     this.$ivSummary.textContent =
       knownCount === 0
         ? `Enter what you know — 0-${max} per stat.`
         : `${knownCount}/${rows.length} known${perfectCount > 0 ? `, ${perfectCount} perfect (${max})` : ''}.`;
-
     this._updateIvCalcHint();
   }
 
   _updateIvCalcHint() {
     const stat = STATS.find((s) => s.key === this.$ivCalcStat.value);
     this.$ivCalcStatName.textContent = stat ? stat.label : '';
+    this._renderIvCalcReadings();
+    this._renderIvCalcResults();
+  }
+
+  /** This stat's logged readings (level + observed value at the time), newest first, each deletable. */
+  _renderIvCalcReadings() {
+    const statKey = this.$ivCalcStat.value;
+    const readings = this._entry.events.filter((ev) => ev.kind === 'stat-reading' && ev.statKey === statKey).reverse();
+    this.$ivCalcReadings.innerHTML = readings
+      .map(
+        (r) =>
+          `<li><span>Lv. ${r.level} — ${r.observedStat}</span><button type="button" class="iv-calc-reading-delete" data-id="${r.id}" title="Delete this reading" aria-label="Delete this reading">✕</button></li>`
+      )
+      .join('');
   }
 
   /**
-   * Runs store.possibleIvsForStat against the typed observed stat and
-   * renders every candidate as a clickable chip — click one to actually
-   * set it as this stat's IV. A low level often can't distinguish
-   * several adjacent IVs at all (the stat formula's floor() rounds them
-   * to the same displayed number), so more than one chip is the normal
-   * case, not a bug — $ivCalcNote spells that out instead of leaving a
-   * bare wall of numbers to interpret, since a raw candidate list read
-   * as confusing/broken in testing without an explanation attached.
+   * Renders store.possibleIvsFromReadings as clickable chips — click one
+   * to actually set it as this stat's IV. A low level often can't
+   * distinguish several adjacent IVs at all (the stat formula's floor()
+   * rounds them to the same displayed number), so more than one chip is
+   * the normal case, not a bug — $ivCalcNote spells that out instead of
+   * leaving a bare wall of numbers to interpret, since a raw candidate
+   * list read as confusing/broken in testing without an explanation
+   * attached. Nothing to show until at least one reading is logged.
    */
-  _runIvCalculator() {
+  _renderIvCalcResults() {
     const e = this._entry;
     const statKey = /** @type {StatKey} */ (this.$ivCalcStat.value);
-    const observed = Number(this.$ivCalcObserved.value);
     this.$ivCalcResults.innerHTML = '';
     this.$ivCalcNote.hidden = true;
-    if (!observed || !e.baseStats) return;
-    const matches = store.possibleIvsForStat(e, statKey, observed, e.baseStats[statKey]);
+    const hasReadings = e.events.some((ev) => ev.kind === 'stat-reading' && ev.statKey === statKey);
+    if (!hasReadings || !e.baseStats) return;
+    const matches = store.possibleIvsFromReadings(e, statKey, e.baseStats[statKey]);
     this.$ivCalcNote.hidden = false;
     if (matches.length === 0) {
       this.$ivCalcNote.textContent =
-        "No IV 0-31 reproduces that stat at its current level/EVs — double check the number, and that you checked it just now (not from an earlier level).";
+        'No IV 0-31 fits every reading logged for this stat — one of them was probably mislogged (wrong level/EVs at the time, or a typo). Delete the wrong one below.';
     } else if (matches.length === 1) {
       this.$ivCalcNote.textContent = 'Only one IV fits — tap it to fill it in.';
       this.$ivCalcResults.innerHTML = `<button type="button" class="iv-calc-chip" data-iv="${matches[0]}">${matches[0]}</button>`;
     } else {
-      this.$ivCalcNote.textContent = `${matches.length} IVs all produce this exact stat at the current level — that's normal, not an error. Leveling up (more EVs) narrows it; tap one below if you already know which from elsewhere (breeding, the IV Judge).`;
+      this.$ivCalcNote.textContent = `${matches.length} IVs fit every reading logged so far — that's normal, not an error. Log another reading after this Pokémon levels up (or gains EVs) to narrow it further; tap one below if you already know which from elsewhere (breeding, the IV Judge).`;
       this.$ivCalcResults.innerHTML = matches
         .map((iv) => `<button type="button" class="iv-calc-chip" data-iv="${iv}">${iv}</button>`)
         .join('');
     }
   }
 
-  // The nature badge sits under the sprite, always visible (not tucked
-  // in the More dialog) since it's a fixed trait worth seeing at a
-  // glance, phrased the way the games do: "Adamant Slowpoke". Unset
-  // natures show nothing here — the More dialog's Nature select is
-  // where absence reads as a fact rather than a mystery word.
-  _renderNatureBadge(nature, natureAvailable) {
-    const show = natureAvailable && Boolean(nature);
-    this.$naturePrefix.hidden = !show;
-    if (!show) return;
-    this.$naturePrefix.textContent = nature.label;
-    this.$naturePrefix.title = `${nature.label} nature — ${natureEffectHint(nature)}`;
+  /** Logs the typed observed stat (at the entry's current level/EVs) as a new reading, then clears the input. */
+  _logIvReading() {
+    const e = this._entry;
+    const statKey = /** @type {StatKey} */ (this.$ivCalcStat.value);
+    const observed = Number(this.$ivCalcObserved.value);
+    if (!observed || !e.baseStats) return;
+    store.logStatReading(e.uid, statKey, observed);
+    this.$ivCalcObserved.value = '';
   }
 
-  // Badges next to the identity fields so the currently-held training
-  // item and Pokérus status are visible on the page itself, not just
-  // buried in the More dialog that hides them. Mirrors the modal's own
-  // item-button style — a sprite plus which EV it's boosting — so the
-  // same item reads the same way in both places. Reads through
-  // store.effectiveAids, so an item the party's rules don't support
-  // (e.g. a Macho Brace left over from before the game version was
-  // edited) shows as "No item" — matching the fact that it no longer
-  // applies — rather than claiming a bonus that isn't granted.
-  _renderStatusBadges(e) {
+  /**
+   * Opens the Level popup fresh each time, prefilled to the current
+   * level (not +1 — this is as much "log/fix stats now" as it is
+   * "level up"). Both the evolution chain and the stat-reading rows
+   * (Gen III+ only, same gate possibleIvsFromReadings/logStatReading
+   * use) are shown immediately rather than gated behind an actual
+   * increase — <evolution-chain> already only offers Evolve for a
+   * directly-reachable next stage regardless of level (same as it did
+   * in Training & EVs before it moved here), and logging or fixing a
+   * stat reading shouldn't require bumping the level first either.
+   * Nothing here touches the store yet — typing a level or a stat is
+   * only a preview until Save commits it all together.
+   */
+  _openLevelUpDialog() {
+    const e = this._entry;
+    this.$levelUpFromValue.textContent = String(e.level);
+    this.$levelUpInput.value = String(e.level);
+    this.$levelUpEvolve.hidden = false;
+    this.$levelUpEvoChain.entry = e;
+    this.$levelUpEvoChain.load();
+    if (store.usesStatExpSystem()) {
+      this.$levelUpStats.hidden = true;
+    } else {
+      // Cleared before rebuilding: _renderLevelUpStatsFields carries
+      // forward whatever's already in these inputs (for a mid-edit
+      // re-render, e.g. the level field changing while this dialog stays
+      // open), but a fresh open of the dialog should never inherit
+      // fields left over from a previous, already-closed session.
+      this.$levelUpStatsFields.innerHTML = '';
+      this._renderLevelUpStatsFields(e.level);
+      this.$levelUpStats.hidden = false;
+    }
+    this.$levelUpDoneBtn.hidden = false;
+    this._openDialog(this.$levelUpDialog);
+  }
+
+  /**
+   * Rebuilds the stat rows for `level`'s label, carrying forward
+   * whatever the user already typed into each one — this can run again
+   * mid-edit (the level field changing), so losing a half-entered
+   * reading just because the level was also adjusted would be hostile.
+   * @param {number} level
+   */
+  _renderLevelUpStatsFields(level) {
+    const existing = new Map(
+      [...this.$levelUpStatsFields.querySelectorAll('input[data-stat]')].map((input) => [input.dataset.stat, input.value])
+    );
+    this.$levelUpStatsLevel.textContent = String(level);
+    const e = this._entry;
+    this.$levelUpStatsFields.innerHTML = STATS.map(({ key, label }) => {
+      // The most recently logged reading for this stat, regardless of
+      // level — read-only context alongside the new-value input, the
+      // same "before → new" shape as the level field above it. Also
+      // prefills the input itself (same convention as the level field
+      // being prefilled to the current level) — a stat's real value
+      // does shift with level, so this is a starting point to correct
+      // after rechecking in-game, not assumed still accurate.
+      const last = e.events.filter((ev) => ev.kind === 'stat-reading' && ev.statKey === key).at(-1);
+      const lastNote = last ? `${last.observedStat} (Lv. ${last.level}) →` : '';
+      const prefill = last ? String(last.observedStat) : '';
+      const value = existing.get(key) ?? prefill;
+      // data-prefill lets Save (below) tell "still exactly what it was
+      // prefilled to" apart from "the user actually typed/confirmed
+      // this" — a stat's real value shifts with level, so an untouched
+      // prefill is a starting point to overwrite, not a reading to log.
+      return `<div class="iv-row level-up-stat-row"><span class="iv-row-label">${escapeHtml(label)}</span><span class="level-up-stat-last">${escapeHtml(lastNote)}</span><input type="number" inputmode="numeric" class="ds-field" data-stat="${key}" data-prefill="${escapeHtml(prefill)}" min="1" value="${escapeHtml(value)}" aria-label="${escapeHtml(label)} observed stat value" placeholder="Actual stat" /></div>`;
+    }).join('');
+  }
+
+  /** Clamps and previews the typed level against the stat rows' heading — nothing persists until Save. */
+  _previewLevelUpInput() {
+    const parsed = Math.round(Number(this.$levelUpInput.value));
+    const clamped = Number.isNaN(parsed) ? this._entry.level : Math.min(MAX_LEVEL, Math.max(MIN_LEVEL, parsed));
+    this.$levelUpInput.value = String(clamped);
+    if (!store.usesStatExpSystem()) this._renderLevelUpStatsFields(clamped);
+  }
+
+  /**
+   * Commits any pending Evolve/Undo choice first (the one network step
+   * here — see evolution-chain.js's `commit()`), then the level, then
+   * every filled-in stat row (at that now-current level), then closes.
+   * A failed commit leaves the dialog open with its own error message
+   * shown instead of closing over a Save that didn't fully apply. The
+   * level and every stat reading share one batchId (not the evolve,
+   * which stays its own prominent entry) so ev-history-log.js collapses
+   * them into a single summarized entry instead of one row per stat.
+   */
+  async _saveLevelUp() {
+    const e = this._entry;
+    try {
+      await this.$levelUpEvoChain.commit();
+    } catch {
+      return;
+    }
+    const batchId = crypto.randomUUID();
+    store.setLevel(e.uid, this.$levelUpInput.value, batchId);
+    for (const input of this.$levelUpStatsFields.querySelectorAll('input[data-stat]')) {
+      const observed = Number(input.value);
+      // Skip a field still sitting at its untouched prefill — see that
+      // attribute's own comment (_renderLevelUpStatsFields) for why an
+      // unconfirmed prefill must not get logged as if re-checked.
+      if (observed && input.value !== input.dataset.prefill) {
+        store.logStatReading(e.uid, /** @type {StatKey} */ (input.dataset.stat), observed, batchId);
+      }
+    }
+    this.$levelUpDialog.close();
+  }
+
+  // The nature badge sits in the title row, always visible, phrased the
+  // way the games do: "Adamant Slowpoke" — and is itself the button that
+  // opens .nature-dialog (docs/adr/0017), mirroring .level-up-btn/
+  // .held-item-btn's "the badge is the trigger" pattern. Unlike the
+  // held-item badge, an unset nature still needs a visible, tappable
+  // "Set nature" — there'd otherwise be no way to ever set one.
+  _renderNatureBadge(nature, natureAvailable) {
+    this.$natureBtn.hidden = !natureAvailable;
+    if (!natureAvailable) return;
+    this.$natureBtn.classList.toggle('nature-btn--empty', !nature);
+    this.$natureBtn.textContent = nature ? nature.label : 'Set nature';
+    this.$natureBtn.title = nature ? `${nature.label} nature — ${natureEffectHint(nature)}` : 'Nature';
+  }
+
+  // The header's held-item badge doubles as the button that opens the
+  // Items popup — mirrors .level-up-btn's own "the badge is the trigger"
+  // pattern. Never hidden: Vitamins/Pokérus/Exp. Share/EV-reducing
+  // berries live in that same popup now too (docs/adr/0017) and none of
+  // those are gated on held-item support, so this stays the one entry
+  // point regardless of generation. Exp. Share shows here rather than in
+  // a badge of its own, since it's mutually exclusive with a power item/
+  // the Macho Brace (store.js's setExpShare/setPowerItem/setMachoBrace)
+  // — one held item, one slot to show it in. Reads through
+  // store.effectiveAids for the power-item/Macho-Brace half, so an item
+  // the party's rules don't support (e.g. a Macho Brace left over from
+  // before the game version was edited) shows as "No item" — matching
+  // the fact that it no longer applies — rather than claiming a bonus
+  // that isn't granted. Pre-Gen III, where holding an item isn't a
+  // mechanic at all, falls back to the dialog's own generic "Items"
+  // label instead of a misleading "No item".
+  _renderItemBadge(e) {
+    this.$itemBtn.hidden = false;
     const aids = store.effectiveAids(e);
-    const badges = [];
-    if (aids.machoBrace) {
-      badges.push({ sprite: MACHO_BRACE_SPRITE, label: `Macho Brace — ×${MACHO_BRACE_MULTIPLIER} EVs`, kind: 'item' });
+    let sprite = null;
+    let label;
+    let empty = true;
+    if (e.expShare) {
+      sprite = EXP_SHARE_SPRITE;
+      label = 'Exp. Share';
+      empty = false;
+    } else if (aids.machoBrace) {
+      sprite = MACHO_BRACE_SPRITE;
+      label = `Macho Brace — ×${MACHO_BRACE_MULTIPLIER} EVs`;
+      empty = false;
     } else if (aids.powerItem) {
       const item = POWER_ITEMS.find((p) => p.id === aids.powerItem);
       if (item) {
-        const bonus = store.powerItemBonus();
-        badges.push({ sprite: item.sprite, label: `${item.label} — +${bonus} ${STAT_LABEL[item.stat]}`, kind: 'item' });
+        sprite = item.sprite;
+        label = `${item.label} — +${store.powerItemBonus()} ${STAT_LABEL[item.stat]}`;
+        empty = false;
       }
-    } else {
+    }
+    if (label == null) {
       const availability = store.trainingItemAvailability();
-      if (availability.machoBrace || availability.powerItems) {
-        badges.push({ sprite: null, label: 'No item', kind: 'empty' });
-      }
+      label = availability.machoBrace || availability.powerItems ? 'No item' : 'Items';
     }
-    // Not mutually exclusive with the item badge above — a Pokémon can
-    // hold a power item and also passively earn EVs from other battles.
-    if (e.expShare) {
-      badges.push({ sprite: EXP_SHARE_SPRITE, label: 'Exp. Share', kind: 'item' });
-    }
-    this.$statusRow.hidden = badges.length === 0;
-    this.$statusRow.innerHTML = badges
-      .map(
-        (b) =>
-          `<span class="ds-pill-badge status-pill status-pill--${b.kind}">${
-            b.sprite ? `<img src="${b.sprite}" alt="" ${FALLBACK_ONERROR} />` : ''
-          }${escapeHtml(b.label)}</span>`
-      )
-      .join('');
+    this.$itemBtn.classList.toggle('status-pill--item', !empty);
+    this.$itemBtn.classList.toggle('status-pill--empty', empty);
+    this.$itemBtnSprite.hidden = !sprite;
+    this.$itemBtnSprite.src = sprite || '';
+    this.$itemBtnLabel.textContent = label;
   }
 
   // Same template as the training item buttons — sprite, name, and the
   // stat it feeds in a lighter line underneath — so there's no need to
-  // remember which vitamin maps to which stat. Marks a button dim before
-  // it's even clicked when this game's rules mean it wouldn't gain
-  // anything — the Gen III-VII 100-EV vitamin cutoff, the Gen I-II
-  // 25,600-Stat-Experience ceiling, or the stat already sitting at its
-  // cap. Also badges each button with how many times it's already been
-  // fed, since that's otherwise invisible once EVs mix in with battle
-  // EVs. On Gen I, Zinc is dropped entirely — Special hasn't split into
-  // SpA/SpD yet.
+  // remember which vitamin maps to which stat. Marks a button dim (and,
+  // unlike a plain "capped" visual, genuinely unclickable — see
+  // item-button-grid.js's own comment) once queuing another click
+  // wouldn't add anything — the Gen III-VII 100-EV vitamin cutoff, the
+  // Gen I-II 25,600-Stat-Experience ceiling, the stat's own cap, or (with
+  // enough already queued this session) the running total from
+  // `_simulatedEvs` hitting one of those first. Also badges each button
+  // with how many times it's already been fed (history, permanent) and,
+  // separately, how many are queued this session (`_pendingApplies`,
+  // discarded if the dialog closes without Save) — the two are deliberately
+  // shown apart so "already happened" and "about to happen on Save" are
+  // never confused for one number. On Gen I, Zinc is dropped entirely —
+  // Special hasn't split into SpA/SpD yet.
   _updateVitaminGrid(e) {
     const statExp = store.usesStatExpSystem();
     const mergedSpecial = store.specialStatMerged();
     const cutoffApplies = !statExp && store.vitaminCutoffApplies();
     const bonus = statExp ? STAT_EXP_VITAMIN_BONUS : VITAMIN_BONUS;
     const statCap = store.statCap();
+    const simEvs = this._simulatedEvs();
     this.$vitaminGrid.items = SORTED_VITAMINS.filter((v) => !(mergedSpecial && v.id === 'zinc')).map((v) => {
       const statLabel = mergedSpecial && v.stat === 'spa' ? 'SPC' : STAT_LABEL[v.stat];
-      const stat = e.evs[v.stat];
+      const stat = simEvs[v.stat];
       const cappedByCutoff = cutoffApplies && stat >= VITAMIN_STAT_CUTOFF;
       const cappedByStatCap = stat >= statCap;
       const cappedByCeiling = statExp && stat >= STAT_EXP_VITAMIN_CEILING;
-      const count = e.history.filter((h) => h.kind === 'vitamin' && h.vitaminId === v.id).length;
+      const fedCount = e.history.filter((h) => h.kind === 'vitamin' && h.vitaminId === v.id).length;
+      const pendingCount = this._pendingApplies.filter((p) => p.kind === 'vitamin' && p.id === v.id).length;
       const capped = cappedByCutoff || cappedByCeiling || cappedByStatCap;
-      const fedNote = count ? ` — fed ${count}×` : '';
+      const fedNote = fedCount ? ` — fed ${fedCount}×` : '';
+      const pendingNote = pendingCount ? ` — ${pendingCount}× queued` : '';
       const title = capped
         ? (cappedByCutoff
             ? `This game stops vitamins once ${statLabel} has ${VITAMIN_STAT_CUTOFF}+ EVs`
             : cappedByCeiling
               ? `Vitamins stop working once ${statLabel} has ${STAT_EXP_VITAMIN_CEILING}+ Stat Experience`
-              : `${statLabel} is already at the ${statCap} cap`) + fedNote
-        : `Feed ${v.label} — raises ${statLabel} by up to ${bonus}` + fedNote;
-      return { id: v.id, label: v.label, sprite: v.sprite, boost: `+${bonus} ${statLabel}`, title, capped, count };
+              : `${statLabel} is already at the ${statCap} cap`) + fedNote + pendingNote
+        : `Feed ${v.label} — raises ${statLabel} by up to ${bonus}` + fedNote + pendingNote;
+      const boost = pendingCount ? `+${bonus} ${statLabel} · ${pendingCount}× queued` : `+${bonus} ${statLabel}`;
+      return { id: v.id, label: v.label, sprite: v.sprite, boost, title, capped, disabled: capped, count: fedCount };
     });
   }
 
   // Same shape as vitamins, minus the 100-EV-cutoff framing — Wings
-  // never have one.
+  // never have one. See `_updateVitaminGrid`'s own comment for the
+  // simulated-EVs/queued-count/disabled reasoning, shared here.
   _updateWingGrid(e) {
+    const simEvs = this._simulatedEvs();
     this.$wingGrid.items = SORTED_FEATHERS.map((f) => {
-      const stat = e.evs[f.stat];
+      const stat = simEvs[f.stat];
       const capped = stat >= 252;
-      const count = e.history.filter((h) => h.kind === 'feather' && h.featherId === f.id).length;
-      const fedNote = count ? ` — fed ${count}×` : '';
+      const fedCount = e.history.filter((h) => h.kind === 'feather' && h.featherId === f.id).length;
+      const pendingCount = this._pendingApplies.filter((p) => p.kind === 'feather' && p.id === f.id).length;
+      const fedNote = fedCount ? ` — fed ${fedCount}×` : '';
+      const pendingNote = pendingCount ? ` — ${pendingCount}× queued` : '';
       const title = capped
-        ? `${STAT_LABEL[f.stat]} is already at the 252 cap` + fedNote
-        : `Feed ${f.label} — raises ${STAT_LABEL[f.stat]} EVs by ${FEATHER_BONUS}` + fedNote;
-      return { id: f.id, label: f.label, sprite: f.sprite, boost: `+${FEATHER_BONUS} ${STAT_LABEL[f.stat]}`, title, capped, count };
+        ? `${STAT_LABEL[f.stat]} is already at the 252 cap` + fedNote + pendingNote
+        : `Feed ${f.label} — raises ${STAT_LABEL[f.stat]} EVs by ${FEATHER_BONUS}` + fedNote + pendingNote;
+      const boost = pendingCount ? `+${FEATHER_BONUS} ${STAT_LABEL[f.stat]} · ${pendingCount}× queued` : `+${FEATHER_BONUS} ${STAT_LABEL[f.stat]}`;
+      return { id: f.id, label: f.label, sprite: f.sprite, boost, title, capped, disabled: capped, count: fedCount };
     });
   }
 
@@ -1269,15 +1829,19 @@ export class CaughtPokemonDetail extends HTMLElement {
   // the boost reads as a reduction — these subtract EVs rather than add
   // them.
   _updateBerryGrid(e) {
+    const simEvs = this._simulatedEvs();
     this.$berryGrid.items = SORTED_EV_BERRIES.map((b) => {
-      const stat = e.evs[b.stat];
+      const stat = simEvs[b.stat];
       const capped = stat <= 0;
-      const count = e.history.filter((h) => h.kind === 'berry' && h.berryId === b.id).length;
-      const fedNote = count ? ` — fed ${count}×` : '';
+      const fedCount = e.history.filter((h) => h.kind === 'berry' && h.berryId === b.id).length;
+      const pendingCount = this._pendingApplies.filter((p) => p.kind === 'berry' && p.id === b.id).length;
+      const fedNote = fedCount ? ` — fed ${fedCount}×` : '';
+      const pendingNote = pendingCount ? ` — ${pendingCount}× queued` : '';
       const title = capped
-        ? `${STAT_LABEL[b.stat]} is already at 0` + fedNote
-        : `Feed ${b.label} — removes up to ${EV_BERRY_REDUCTION} ${STAT_LABEL[b.stat]} EVs` + fedNote;
-      return { id: b.id, label: b.label, sprite: b.sprite, boost: `−${EV_BERRY_REDUCTION} ${STAT_LABEL[b.stat]}`, title, capped, count };
+        ? `${STAT_LABEL[b.stat]} is already at 0` + fedNote + pendingNote
+        : `Feed ${b.label} — removes up to ${EV_BERRY_REDUCTION} ${STAT_LABEL[b.stat]} EVs` + fedNote + pendingNote;
+      const boost = pendingCount ? `−${EV_BERRY_REDUCTION} ${STAT_LABEL[b.stat]} · ${pendingCount}× queued` : `−${EV_BERRY_REDUCTION} ${STAT_LABEL[b.stat]}`;
+      return { id: b.id, label: b.label, sprite: b.sprite, boost, title, capped, disabled: capped, count: fedCount };
     });
   }
 }

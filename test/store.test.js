@@ -96,7 +96,7 @@ test('previewDefeat reports the same yield as logDefeat but applies nothing', ()
 
   const preview = store.previewDefeat(entry.uid, opp);
   assert.deepEqual(entry.evs, { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 });
-  assert.equal(entry.history.length, 2); // catch seed + pokerus toggle — preview logs nothing more
+  assert.equal(entry.history.length, 3); // catch seed + held-item + pokerus toggle — preview logs nothing more
 
   const logged = store.logDefeat(entry.uid, opp);
   assert.deepEqual(preview.applied, logged.applied);
@@ -1160,14 +1160,26 @@ test("a battling Pokémon's held item bonus does not transfer to an Exp.-Share r
   assert.equal(holder.history[0].powerItem, null);
 });
 
-test("an Exp.-Share recipient's own held item never applies to the EVs it receives passively", () => {
-  const battler = store.catchPokemon(mon());
-  const holder = store.catchPokemon(mon({ id: 2, name: 'charmander' }));
-  store.setExpShare(holder.uid, true);
-  store.setPowerItem(holder.uid, 'bracer'); // the holder's own item — irrelevant to passive EVs
+test('Exp. Share, a power item, and the Macho Brace are all mutually exclusive — one held item slot', () => {
+  const entry = store.catchPokemon(mon());
 
-  store.logDefeat(battler.uid, opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 }));
-  assert.equal(holder.evs.atk, 1); // no +8 — a held item never boosts passively-received EVs
+  store.setExpShare(entry.uid, true);
+  assert.equal(entry.expShare, true);
+  store.setPowerItem(entry.uid, 'bracer'); // equipping a power item unequips Exp. Share
+  assert.equal(entry.powerItem, 'bracer');
+  assert.equal(entry.expShare, false);
+
+  store.setExpShare(entry.uid, true); // and vice versa
+  assert.equal(entry.expShare, true);
+  assert.equal(entry.powerItem, null);
+
+  store.setMachoBrace(entry.uid, true); // same for the Macho Brace
+  assert.equal(entry.machoBrace, true);
+  assert.equal(entry.expShare, false);
+
+  store.setExpShare(entry.uid, true);
+  assert.equal(entry.expShare, true);
+  assert.equal(entry.machoBrace, false);
 });
 
 test("an Exp.-Share recipient's own Pokérus doubles the EVs it receives passively", () => {
@@ -1505,6 +1517,104 @@ test('possibleIvsForStat returns nothing for a Gen I/II (legacy) party — not i
   store.createParty('Yellow run', '', 'Yellow');
   const entry = store.catchPokemon(mon());
   assert.deepEqual(store.possibleIvsForStat(entry, 'atk', 50, 80), []);
+});
+
+test('logStatReading snapshots the current level/EVs into a stat-reading history entry', () => {
+  const entry = store.catchPokemon(mon());
+  store.setLevel(entry.uid, 50);
+  const evsAtReading = { ...entry.evs };
+  store.logStatReading(entry.uid, 'atk', 97);
+  const record = entry.history[0];
+  assert.equal(record.kind, 'stat-reading');
+  assert.equal(record.statKey, 'atk');
+  assert.equal(record.level, 50);
+  assert.equal(record.observedStat, 97);
+  assert.deepEqual(record.evs, evsAtReading);
+  // A later level change must not retroactively change what was logged.
+  store.setLevel(entry.uid, 80);
+  const stillTheSameRecord = entry.history.find((h) => h.kind === 'stat-reading');
+  assert.equal(stillTheSameRecord.level, 50);
+});
+
+test('logStatReading is a no-op on a Gen I/II (legacy) party', () => {
+  store.createParty('Yellow run', '', 'Yellow');
+  const entry = store.catchPokemon(mon());
+  store.logStatReading(entry.uid, 'atk', 50);
+  assert.equal(entry.events.length, 1); // only the catch event
+});
+
+test('actualStat returns null when neither a fresh reading nor a known IV exists', () => {
+  const entry = store.catchPokemon(mon({ baseStats: { hp: 45, atk: 80, def: 49, spa: 65, spd: 65, spe: 45 } }));
+  assert.equal(store.actualStat(entry, 'atk', 80), null);
+});
+
+test("actualStat prefers a logged reading snapshotted at the entry's current level/EVs over deriving from IV", () => {
+  const entry = store.catchPokemon(mon({ baseStats: { hp: 45, atk: 80, def: 49, spa: 65, spd: 65, spe: 45 } }));
+  store.setLevel(entry.uid, 50);
+  store.logStatReading(entry.uid, 'atk', 97); // observed directly — no IV entered at all
+  assert.equal(store.actualStat(entry, 'atk', 80), 97);
+});
+
+test('actualStat falls back to the IV-derived formula once the logged reading is stale (level or EVs changed since)', () => {
+  const entry = store.catchPokemon(mon({ baseStats: { hp: 45, atk: 80, def: 49, spa: 65, spd: 65, spe: 45 } }));
+  store.setLevel(entry.uid, 50);
+  store.logStatReading(entry.uid, 'atk', 97); // logged at Lv. 50
+  store.setLevel(entry.uid, 51); // now stale — no longer this entry's current level
+  assert.equal(store.actualStat(entry, 'atk', 80), null); // IV still unknown, so no derived value either
+  store.setIv(entry.uid, 'atk', 25);
+  // Level 51, base 80, IV 25, 0 EV, neutral nature: floor((2*80+25)*51/100)+5 = floor(185*0.51)+5 = 94+5 = 99.
+  assert.equal(store.actualStat(entry, 'atk', 80), 99);
+});
+
+test('actualStat returns null on a Gen I/II (legacy) party — Stat Experience rounding is not implemented', () => {
+  store.createParty('Yellow run', '', 'Yellow');
+  const entry = store.catchPokemon(mon({ baseStats: { hp: 45, atk: 80, def: 49, spa: 65, spd: 65, spe: 45 } }));
+  store.setIv(entry.uid, 'atk', 15);
+  assert.equal(store.actualStat(entry, 'atk', 80), null);
+});
+
+test('possibleIvsFromReadings returns [] until at least one reading is logged', () => {
+  const entry = store.catchPokemon(mon());
+  assert.deepEqual(store.possibleIvsFromReadings(entry, 'atk', 80), []);
+});
+
+test('possibleIvsFromReadings with one reading matches possibleIvsForStat at that reading\'s level', () => {
+  const entry = store.catchPokemon(mon());
+  store.setLevel(entry.uid, 50);
+  // Level 50, base 80, EV 0, neutral nature: IVs 24 and 25 both read 97 (see possibleIvsForStat's test above).
+  store.logStatReading(entry.uid, 'atk', 97);
+  assert.deepEqual(store.possibleIvsFromReadings(entry, 'atk', 80), [24, 25]);
+  assert.deepEqual(store.possibleIvsFromReadings(entry, 'atk', 80), store.possibleIvsForStat(entry, 'atk', 97, 80));
+});
+
+test('possibleIvsFromReadings intersects two readings at different levels down to the true IV', () => {
+  const entry = store.catchPokemon(mon());
+  store.setLevel(entry.uid, 50);
+  store.logStatReading(entry.uid, 'atk', 97); // IVs 24, 25 both read 97 at level 50
+  store.setLevel(entry.uid, 60);
+  store.logStatReading(entry.uid, 'atk', 116); // IVs 25, 26 both read 116 at level 60
+  assert.deepEqual(store.possibleIvsFromReadings(entry, 'atk', 80), [25]);
+});
+
+test('possibleIvsFromReadings returns [] when logged readings contradict each other', () => {
+  const entry = store.catchPokemon(mon());
+  store.setLevel(entry.uid, 50);
+  store.logStatReading(entry.uid, 'atk', 97); // IVs 24, 25
+  store.setLevel(entry.uid, 60);
+  store.logStatReading(entry.uid, 'atk', 101); // an IV near 0, no overlap with 24/25
+  assert.deepEqual(store.possibleIvsFromReadings(entry, 'atk', 80), []);
+});
+
+test('deleteHistoryEntry removes a stat-reading and possibleIvsFromReadings falls back to the remaining ones', () => {
+  const entry = store.catchPokemon(mon());
+  store.setLevel(entry.uid, 50);
+  store.logStatReading(entry.uid, 'atk', 97);
+  store.setLevel(entry.uid, 60);
+  store.logStatReading(entry.uid, 'atk', 116);
+  assert.deepEqual(store.possibleIvsFromReadings(entry, 'atk', 80), [25]);
+  const level60Reading = entry.history.find((h) => h.kind === 'stat-reading' && h.level === 60);
+  store.deleteHistoryEntry(entry.uid, level60Reading.id);
+  assert.deepEqual(store.possibleIvsFromReadings(entry, 'atk', 80), [24, 25]);
 });
 
 test('exportPayload includes ivs, and a fresh load defaults them for old saves missing the field', () => {

@@ -1,13 +1,18 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 import { createParty } from './support/party.js';
-import { catchPokemon, rosterRow, openDetail, openMoreOptions } from './support/pokemon.js';
+import { catchPokemon, rosterRow, openDetail, openItemDialog, openLevelUpDialog } from './support/pokemon.js';
 import { mockPokeApi } from './support/pokeapi-mock.js';
 
 // Evolving a caught Pokémon carries its EVs, nickname, training aids and
 // history forward — only its species identity changes (lib/store.js's
 // evolvePokemon, folded by projectEntry's 'evolve' handler). Undoing an
-// evolution just deletes that event and re-folds.
+// evolution just deletes that event and re-folds. The evolution chain
+// itself lives in the Level popup, always visible there (same as it was
+// in Training & EVs before it moved). Picking Evolve/Undo only stages it
+// — like every other field in this popup, nothing applies until the
+// popup's own Save is clicked (docs/adr/0017); there's no separate
+// native confirm() on top of that anymore.
 
 test.describe('Evolution', () => {
   test.beforeEach(async ({ page }) => {
@@ -19,16 +24,21 @@ test.describe('Evolution', () => {
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
     await catchPokemon(page, 'Bulbasaur', { level: 16 });
     const card = await openDetail(page, 'Bulbasaur');
-    const dialog = await openMoreOptions(card);
+    const itemDialog = await openItemDialog(card);
+    await itemDialog.locator('[data-id="protein"] button').click();
+    await itemDialog.locator('.item-dialog-save-btn').click();
 
-    await dialog.locator('[data-id="protein"] button').click();
-    page.once('dialog', (d) => d.accept());
-    await dialog.locator('evolution-chain [data-action="evolve"] button').first().click();
+    const dialog = await openLevelUpDialog(card);
+    await dialog.getByRole('heading', { name: 'Evolution' }).waitFor({ state: 'visible' });
+
+    await dialog.locator('.level-up-evo-chain [data-action="evolve"] button').first().click();
+    await expect(dialog.locator('.evolve-status')).toHaveText(/Will evolve into Ivysaur on Save/);
+    await dialog.locator('.level-up-done-btn').click();
+    await dialog.waitFor({ state: 'hidden' });
 
     await expect(card.getByRole('textbox', { name: 'Nickname' })).toHaveValue('Ivysaur');
     await expect(card.locator('ev-summary ev-bar[data-key="atk"]').locator('.value')).toHaveText('10/252');
 
-    await dialog.getByRole('button', { name: 'Close' }).click();
     await page.getByRole('link', { name: /^← / }).click();
     await expect(rosterRow(page, 'Ivysaur')).toBeVisible();
   });
@@ -38,14 +48,20 @@ test.describe('Evolution', () => {
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
     await catchPokemon(page, 'Bulbasaur', { level: 16 });
     const card = await openDetail(page, 'Bulbasaur');
-    const dialog = await openMoreOptions(card);
+    let dialog = await openLevelUpDialog(card);
+    await dialog.getByRole('heading', { name: 'Evolution' }).waitFor({ state: 'visible' });
 
-    page.once('dialog', (d) => d.accept());
-    await dialog.locator('evolution-chain [data-action="evolve"] button').first().click();
+    await dialog.locator('.level-up-evo-chain [data-action="evolve"] button').first().click();
+    await dialog.locator('.level-up-done-btn').click();
+    await dialog.waitFor({ state: 'hidden' });
     await expect(card.getByRole('textbox', { name: 'Nickname' })).toHaveValue('Ivysaur');
 
-    page.once('dialog', (d) => d.accept());
-    await dialog.locator('evolution-chain [data-action="undo"] button').first().click();
+    dialog = await openLevelUpDialog(card);
+    await dialog.getByRole('heading', { name: 'Evolution' }).waitFor({ state: 'visible' });
+    await dialog.locator('.level-up-evo-chain [data-action="undo"] button').first().click();
+    await expect(dialog.locator('.evolve-status')).toHaveText(/Will undo evolution on Save/);
+    await dialog.locator('.level-up-done-btn').click();
+    await dialog.waitFor({ state: 'hidden' });
 
     await expect(card.getByRole('textbox', { name: 'Nickname' })).toHaveValue('Bulbasaur');
   });

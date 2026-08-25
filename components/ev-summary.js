@@ -24,7 +24,7 @@ export class EvSummary extends HTMLElement {
     this.$bars = shadow.querySelector('.bars');
     this.$totalRow = shadow.querySelector('.total');
     this._evs = emptyEvs();
-    this._baseStats = null;
+    this._actualStats = null;
     this._nature = null;
     this._statCap = STAT_CAP;
     this._totalCap = TOTAL_CAP;
@@ -51,13 +51,13 @@ export class EvSummary extends HTMLElement {
   get evs() {
     return this._evs;
   }
-  /** The caught Pokémon's species base stats, `{ hp, atk, def, spa, spd, spe }`. Null hides the hint. */
-  set baseStats(v) {
-    this._baseStats = v || null;
+  /** The caught Pokémon's real current stat values, `{ hp, atk, def, spa, spd, spe }` (each entry null if that stat's IV isn't known yet — see store.js's actualStat). Null hides every hint. */
+  set actualStats(v) {
+    this._actualStats = v || null;
     this._render();
   }
-  get baseStats() {
-    return this._baseStats;
+  get actualStats() {
+    return this._actualStats;
   }
   /** The caught Pokémon's nature, `{ boost, hinder }` (either may be null). Null/unset colors nothing. */
   set nature(v) {
@@ -101,7 +101,7 @@ export class EvSummary extends HTMLElement {
       const val = this._evs[key] || 0;
       bar.max = this._statCap;
       bar.value = val;
-      bar.baseStat = this._baseStats ? this._baseStats[key] : null;
+      bar.actualStat = this._actualStats ? this._actualStats[key] : null;
       bar.natureEffect =
         this._nature?.boost === key ? 'boost' : this._nature?.hinder === key ? 'hinder' : null;
       if (!bar.hidden) total += val;
