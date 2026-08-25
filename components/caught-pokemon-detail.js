@@ -216,6 +216,10 @@ export class CaughtPokemonDetail extends HTMLElement {
            the same whether it's shown here or in the row next to it. */
         .held-item-btn { border: none; cursor: pointer; font-family: inherit; }
         .held-item-btn:hover { filter: brightness(0.97); }
+        /* .status-pill--empty's background is transparent, so the filter
+           above has nothing to darken — give the dashed/no-item state its
+           own visible hover instead of silently doing nothing. */
+        .held-item-btn.status-pill--empty:hover { background: var(--lcd); filter: none; }
 
         /* Dialog chrome comes from the shared .ds-dialog, its header
            from .ds-dialog-header; only the grid layout of this dialog's
@@ -491,13 +495,6 @@ export class CaughtPokemonDetail extends HTMLElement {
             <item-button-grid class="item-grid" columns="2"></item-button-grid>
           </section>
 
-          <section class="exp-share-section">
-            <h3 class="section-title">Exp. Share
-              <button type="button" class="help-btn" aria-expanded="false" aria-label="What does Exp. Share do?" title="While holding an Exp. Share, this Pokémon also earns EVs whenever any other Pokémon in this party has a battle logged — the same base amount that Pokémon got, doubled by this Pokémon's own Pokérus if it has any. It never inherits the other Pokémon's held item bonus.">?</button>
-            </h3>
-            <ds-item-button class="exp-share-toggle-btn" icon="${EXP_SHARE_SPRITE}" label="Exp. Share" boost="Shares other EVs"></ds-item-button>
-          </section>
-
           <section class="pokerus-section">
             <h3 class="section-title">Pokérus
               <button type="button" class="help-btn" aria-expanded="false" aria-label="What is Pokérus?" title="A rare, harmless in-game virus. While infected, every EV your Pokémon earns from battling is doubled — pure bonus, no downside. It can also spread to other party members over time. Once it cures (after a few days), the ×2 EV bonus stays forever — no need to toggle this off.">?</button>
@@ -506,6 +503,13 @@ export class CaughtPokemonDetail extends HTMLElement {
               <span slot="icon" class="pokerus-icon" aria-hidden="true">${POKERUS_ICON_SVG}</span>
             </ds-item-button>
             <p class="pokerus-note" hidden>Pokérus doesn't double EVs in this game.</p>
+          </section>
+
+          <section class="exp-share-section">
+            <h3 class="section-title">Exp. Share
+              <button type="button" class="help-btn" aria-expanded="false" aria-label="What does Exp. Share do?" title="While holding an Exp. Share, this Pokémon also earns EVs whenever any other Pokémon in this party has a battle logged — the same base amount that Pokémon got, doubled by this Pokémon's own Pokérus if it has any. It never inherits the other Pokémon's held item bonus.">?</button>
+            </h3>
+            <ds-item-button class="exp-share-toggle-btn" icon="${EXP_SHARE_SPRITE}" label="Exp. Share" boost="Shares other EVs"></ds-item-button>
           </section>
 
           <section class="vitamins">

@@ -1160,14 +1160,26 @@ test("a battling Pokémon's held item bonus does not transfer to an Exp.-Share r
   assert.equal(holder.history[0].powerItem, null);
 });
 
-test("an Exp.-Share recipient's own held item never applies to the EVs it receives passively", () => {
-  const battler = store.catchPokemon(mon());
-  const holder = store.catchPokemon(mon({ id: 2, name: 'charmander' }));
-  store.setExpShare(holder.uid, true);
-  store.setPowerItem(holder.uid, 'bracer'); // the holder's own item — irrelevant to passive EVs
+test('Exp. Share, a power item, and the Macho Brace are all mutually exclusive — one held item slot', () => {
+  const entry = store.catchPokemon(mon());
 
-  store.logDefeat(battler.uid, opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 }));
-  assert.equal(holder.evs.atk, 1); // no +8 — a held item never boosts passively-received EVs
+  store.setExpShare(entry.uid, true);
+  assert.equal(entry.expShare, true);
+  store.setPowerItem(entry.uid, 'bracer'); // equipping a power item unequips Exp. Share
+  assert.equal(entry.powerItem, 'bracer');
+  assert.equal(entry.expShare, false);
+
+  store.setExpShare(entry.uid, true); // and vice versa
+  assert.equal(entry.expShare, true);
+  assert.equal(entry.powerItem, null);
+
+  store.setMachoBrace(entry.uid, true); // same for the Macho Brace
+  assert.equal(entry.machoBrace, true);
+  assert.equal(entry.expShare, false);
+
+  store.setExpShare(entry.uid, true);
+  assert.equal(entry.expShare, true);
+  assert.equal(entry.machoBrace, false);
 });
 
 test("an Exp.-Share recipient's own Pokérus doubles the EVs it receives passively", () => {
