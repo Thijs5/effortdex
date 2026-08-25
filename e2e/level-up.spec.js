@@ -73,6 +73,34 @@ test.describe('Level popup', () => {
     await expect(ivDialog.getByText('Lv. 12 — 20')).toBeVisible();
   });
 
+  test('a stat row is prefilled with its last reading, but Save skips it untouched — only an edited value logs a new reading', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
+    await catchPokemon(page, 'Bulbasaur', { level: 10 });
+    const card = await openDetail(page, 'Bulbasaur');
+
+    let dialog = await openLevelUpDialog(card);
+    await dialog.getByLabel('ATK observed stat value').fill('20');
+    await dialog.getByRole('button', { name: 'Save' }).click();
+    await expect(dialog).toBeHidden();
+
+    // Reopening prefills ATK from that reading — a starting point, not
+    // assumed still accurate at a new level, so leaving it untouched
+    // must not silently log a second, stale reading.
+    dialog = await openLevelUpDialog(card);
+    await expect(dialog.getByLabel('ATK observed stat value')).toHaveValue('20');
+    await dialog.getByLabel('New level').fill('12');
+    await dialog.getByLabel('New level').blur();
+    await dialog.getByRole('button', { name: 'Save' }).click();
+    await expect(dialog).toBeHidden();
+
+    const ivDialog = await openIvs(card);
+    await ivDialog.getByText("Don't know an IV?").click();
+    await ivDialog.getByLabel('Stat', { exact: true }).selectOption('atk');
+    await expect(ivDialog.getByText('Lv. 10 — 20')).toBeVisible();
+    await expect(ivDialog.getByText('Lv. 12 — 20')).toBeHidden(); // untouched prefill, correctly not logged again
+  });
+
   test('Save groups the level change and its stat readings into one collapsible history entry', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
@@ -90,7 +118,7 @@ test.describe('Level popup', () => {
     await card.getByText(/History/).click();
     const histLog = card.locator('ev-history-log');
     const batch = histLog.locator('li.hist-batch');
-    await expect(batch.locator('summary')).toHaveText('Level up to Lv. 12 + 2 stat readings');
+    await expect(batch.locator('summary strong')).toHaveText('Level up to Lv. 12 + 2 stat readings');
     await expect(histLog.locator('.hist-batch-items')).toBeHidden(); // collapsed by default
 
     await batch.locator('summary').click();

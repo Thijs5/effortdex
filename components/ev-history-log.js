@@ -57,12 +57,26 @@ export class EvHistoryLog extends HTMLElement {
         }
         .delete-hist-btn:hover { color: var(--poke-red); }
         /* One Save committing several events at once (the Level popup's
-           level + every filled-in stat reading, typically) collapses
-           into one batch entry instead of flooding the log — display:
-           block overrides the plain-entry li's flex row, since this li
-           holds a <details> rather than the icon+text+actions layout. */
+           level + stat readings, or the Items popup's queued Vitamin/
+           Wing/berry clicks) collapses into one entry instead of
+           flooding the log — reads exactly like a plain entry (icon +
+           summary line) so it doesn't stand out as a different kind of
+           row, just an expandable one. The <details>/<summary> is only
+           the mechanism; no group-wide delete exists on purpose — only
+           the individual entries revealed inside can be deleted. */
         ul.hist-list li.hist-batch { display: block; }
-        ul.hist-list li.hist-batch summary { cursor: pointer; }
+        ul.hist-list li.hist-batch details { display: block; }
+        ul.hist-list li.hist-batch summary {
+          display: flex; align-items: center; gap: var(--space-2) var(--space-3);
+          cursor: pointer; list-style: none;
+        }
+        ul.hist-list li.hist-batch summary::-webkit-details-marker { display: none; }
+        ul.hist-list li.hist-batch summary > div { flex: 1 1 140px; min-width: 0; }
+        /* A chevron stands in for the delete button's column, so the
+           summary row lines up with every plain entry's icon/text/action
+           layout above and below it. */
+        .hist-batch-chevron { flex: 0 0 auto; color: var(--ink-soft); font-size: var(--font-size-input); padding: var(--space-2); }
+        ul.hist-list li.hist-batch details[open] .hist-batch-chevron { transform: rotate(90deg); }
         ul.hist-list .hist-batch-items {
           list-style: none; margin: var(--space-3) 0 0; padding-left: var(--space-4);
           border-left: 2px solid var(--lcd-line); display: grid; gap: var(--space-3);
@@ -152,11 +166,22 @@ export class EvHistoryLog extends HTMLElement {
     return html;
   }
 
-  /** One collapsible entry for a run of same-timestamp events — a summary line, then every individual entry nested (still each its own deletable item). @param {any[]} batch */
+  /**
+   * One collapsible entry for a run of same-batchId events — reads like
+   * any other entry (icon + summary line), with a chevron standing in
+   * for the usual delete button's column since there's no group-wide
+   * delete; expanding it reveals every individual entry nested, each
+   * still its own deletable item.
+   * @param {any[]} batch
+   */
   _batchHtml(batch) {
     return `<li class="hist-batch">
-      <details class="ds-disclosure">
-        <summary>${this._batchSummary(batch)}</summary>
+      <details>
+        <summary>
+          <img src="${this._entry.sprite || FALLBACK_SPRITE}" alt="" ${FALLBACK_ONERROR} />
+          <div><strong>${this._batchSummary(batch)}</strong></div>
+          <span class="hist-batch-chevron" aria-hidden="true">▸</span>
+        </summary>
         <ul class="hist-batch-items">${batch.map((h) => this._itemHtml(h)).join('')}</ul>
       </details>
     </li>`;
@@ -167,10 +192,18 @@ export class EvHistoryLog extends HTMLElement {
     const level = batch.find((h) => h.kind === 'level');
     const evolve = batch.find((h) => h.kind === 'evolve');
     const readings = batch.filter((h) => h.kind === 'stat-reading').length;
+    const vitamins = batch.filter((h) => h.kind === 'vitamin').length;
+    const feathers = batch.filter((h) => h.kind === 'feather').length;
+    const berries = batch.filter((h) => h.kind === 'berry').length;
+    const heldItems = batch.filter((h) => h.kind === 'held-item').length;
     const parts = [];
     if (level) parts.push(`${level.toLevel > level.fromLevel ? 'Level up' : 'Level correction'} to Lv. ${level.toLevel}`);
     if (evolve) parts.push(`Evolved into ${titleCase(evolve.toName)}`);
     if (readings) parts.push(`${readings} stat reading${readings === 1 ? '' : 's'}`);
+    if (vitamins) parts.push(`${vitamins} vitamin${vitamins === 1 ? '' : 's'}`);
+    if (feathers) parts.push(`${feathers} Wing${feathers === 1 ? '' : 's'}`);
+    if (berries) parts.push(`${berries} ${berries === 1 ? 'berry' : 'berries'}`);
+    if (heldItems) parts.push(`held item changed`);
     return escapeHtml(parts.length ? parts.join(' + ') : `${batch.length} events logged together`);
   }
 

@@ -142,4 +142,29 @@ test.describe('EV training', () => {
     await expect(proteinDialog2.locator('[data-id="protein"]')).toHaveAttribute('title', /fed 2×/);
     await expect(proteinDialog2.locator('[data-id="protein"] button')).not.toContainText('queued');
   });
+
+  test('Save groups every queued click into one history entry, styled like any other entry, with no group-wide delete', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
+    await catchPokemon(page, 'Bulbasaur');
+    const card = await openDetail(page, 'Bulbasaur');
+    const dialog = await openItemDialog(card);
+
+    await dialog.locator('[data-id="protein"] button').click();
+    await dialog.locator('[data-id="iron"] button').click();
+    await dialog.locator('.item-dialog-save-btn').click();
+    await expect(dialog).toBeHidden();
+
+    await card.getByText(/History/).click();
+    const histLog = card.locator('ev-history-log');
+    const batch = histLog.locator('li.hist-batch');
+    await expect(batch.locator('summary strong')).toHaveText('2 vitamins');
+    await expect(batch.locator('summary img')).toBeVisible(); // reads like any other entry: icon + summary
+    await expect(batch.getByRole('button', { name: 'Delete this log entry' })).toHaveCount(0); // no group-wide delete
+
+    await batch.locator('summary').click();
+    const nested = histLog.locator('.hist-batch-items li');
+    await expect(nested).toHaveCount(2);
+    await expect(nested.getByRole('button', { name: 'Delete this log entry' })).toHaveCount(2); // each nested entry still deletable on its own
+  });
 });

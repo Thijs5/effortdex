@@ -415,7 +415,6 @@ export class CaughtPokemonDetail extends HTMLElement {
         .iv-calc-reading-delete:hover { color: var(--poke-red); }
 
         .vitamins, .wings, .berries { display: grid; gap: var(--space-2); }
-        .vitamin-status, .wing-status, .berry-status { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--teal); min-height: 1em; }
 
         .pokerus-section { display: grid; gap: var(--space-2); justify-items: stretch; min-width: 0; }
         .pokerus-icon { width: 22px; height: 22px; flex: 0 0 auto; display: inline-flex; color: var(--pokerus-purple); }
@@ -553,19 +552,16 @@ export class CaughtPokemonDetail extends HTMLElement {
           <section class="vitamins">
             <h3 class="section-title">Vitamins</h3>
             <item-button-grid class="vitamin-grid"></item-button-grid>
-            <p class="vitamin-status" aria-live="polite"></p>
           </section>
 
           <section class="wings">
             <h3 class="section-title">Wings</h3>
             <item-button-grid class="wing-grid"></item-button-grid>
-            <p class="wing-status" aria-live="polite"></p>
           </section>
 
           <section class="berries">
             <h3 class="section-title">EV-reducing berries</h3>
             <item-button-grid class="berry-grid"></item-button-grid>
-            <p class="berry-status" aria-live="polite"></p>
           </section>
 
           <footer class="ds-dialog-footer">
@@ -584,9 +580,6 @@ export class CaughtPokemonDetail extends HTMLElement {
           </header>
           <div class="iv-grid"></div>
           <p class="iv-summary" hidden></p>
-          <footer class="ds-dialog-footer">
-            <button type="button" class="ds-btn ds-btn--primary iv-dialog-save-btn">Save</button>
-          </footer>
           <details class="iv-calc" hidden>
             <summary>Don't know an IV? Calculate it from a stat</summary>
             <p class="iv-calc-hint">Check this Pokémon's actual <em class="iv-calc-stat-name"></em> stat right now (its summary screen in-game) and log it below — uses its current level and EVs, so check it now rather than typing in an old reading. Logging another reading later (after it levels up or gains EVs) narrows the candidates further.</p>
@@ -599,6 +592,9 @@ export class CaughtPokemonDetail extends HTMLElement {
             <p class="iv-calc-note" aria-live="polite" hidden></p>
             <div class="iv-calc-results" aria-live="polite"></div>
           </details>
+          <footer class="ds-dialog-footer">
+            <button type="button" class="ds-btn ds-btn--primary iv-dialog-save-btn">Save</button>
+          </footer>
         </dialog>
 
         <dialog class="level-up-dialog ds-dialog" aria-labelledby="level-up-dialog-title">
@@ -722,14 +718,11 @@ export class CaughtPokemonDetail extends HTMLElement {
     this.$pokerusNote = shadow.querySelector('.pokerus-note');
     this.$expShareToggle = shadow.querySelector('.exp-share-toggle-btn');
     this.$vitaminGrid = shadow.querySelector('.vitamin-grid');
-    this.$vitaminStatus = shadow.querySelector('.vitamin-status');
     this.$evHelpBtn = shadow.querySelector('.nature-dialog .help-btn');
     this.$wingsSection = shadow.querySelector('.wings');
     this.$wingGrid = shadow.querySelector('.wing-grid');
-    this.$wingStatus = shadow.querySelector('.wing-status');
     this.$berriesSection = shadow.querySelector('.berries');
     this.$berryGrid = shadow.querySelector('.berry-grid');
-    this.$berryStatus = shadow.querySelector('.berry-status');
     this.$tierBadge = shadow.querySelector('.tier-badge');
     this.$competitiveSets = shadow.querySelector('.competitive-sets');
     this.$competitiveEmpty = shadow.querySelector('.competitive-empty');
@@ -964,8 +957,15 @@ export class CaughtPokemonDetail extends HTMLElement {
     this.shadowRoot.addEventListener('click', (e) => {
       const btn = e.target.closest('.help-btn');
       if (!btn) return;
-      const heading = btn.closest('.section-title');
-      const next = heading.nextElementSibling;
+      // A body sub-section's own heading (e.g. "Vitamins") anchors the
+      // note right after it, same as always. A dialog-header "?" (IVs,
+      // Nature, Competitive) has no .section-title ancestor — anchor to
+      // the header itself instead, so the note lands as the body's first
+      // element (right below the sticky header) rather than inside the
+      // header (too cramped) or, with no anchor at all, crashing.
+      const anchor = btn.closest('.section-title') || btn.closest('.ds-dialog-header');
+      if (!anchor) return;
+      const next = anchor.nextElementSibling;
       if (next?.classList.contains('help-note')) {
         next.remove();
         btn.setAttribute('aria-expanded', 'false');
@@ -973,7 +973,7 @@ export class CaughtPokemonDetail extends HTMLElement {
         const note = document.createElement('p');
         note.className = 'help-note';
         note.textContent = btn.title;
-        heading.after(note);
+        anchor.after(note);
         btn.setAttribute('aria-expanded', 'true');
       }
     });
@@ -1071,9 +1071,6 @@ export class CaughtPokemonDetail extends HTMLElement {
     this._updateVitaminGrid(e);
     this._updateWingGrid(e);
     this._updateBerryGrid(e);
-    this.$vitaminStatus.textContent = '';
-    this.$wingStatus.textContent = '';
-    this.$berryStatus.textContent = '';
     this._openDialog(this.$itemDialog);
   }
 
@@ -1085,17 +1082,20 @@ export class CaughtPokemonDetail extends HTMLElement {
    * explains why order matters) — replayed through the real
    * store.useVitamin/useFeather/useBerry, so the store's own capping
    * logic is what actually runs, not the preview math a second time.
+   * Everything shares one batchId so ev-history-log.js collapses this
+   * Save into a single summarized entry, same as the Level popup's.
    */
   _saveItemDialog() {
     const e = this._entry;
     const p = this._pendingHeldItem;
-    if (p.expShare) store.setExpShare(e.uid, true);
-    else if (p.machoBrace) store.setMachoBrace(e.uid, true);
-    else store.setPowerItem(e.uid, p.powerItem);
+    const batchId = crypto.randomUUID();
+    if (p.expShare) store.setExpShare(e.uid, true, batchId);
+    else if (p.machoBrace) store.setMachoBrace(e.uid, true, batchId);
+    else store.setPowerItem(e.uid, p.powerItem, batchId);
     for (const item of this._pendingApplies) {
-      if (item.kind === 'vitamin') store.useVitamin(e.uid, item.id);
-      else if (item.kind === 'feather') store.useFeather(e.uid, item.id);
-      else store.useBerry(e.uid, item.id);
+      if (item.kind === 'vitamin') store.useVitamin(e.uid, item.id, batchId);
+      else if (item.kind === 'feather') store.useFeather(e.uid, item.id, batchId);
+      else store.useBerry(e.uid, item.id, batchId);
     }
     this.$itemDialog.close();
   }
@@ -1171,51 +1171,33 @@ export class CaughtPokemonDetail extends HTMLElement {
     return store.previewBerry(uid, id, evs);
   }
 
-  /** Queues one vitamin click (docs/adr/0017) — nothing is recorded until Save. Reports what it would apply, simulated against every click already queued. */
+  /**
+   * Queues one vitamin click (docs/adr/0017) — nothing is recorded until
+   * Save. No status line: the button itself already shows the queued
+   * count (`_updateVitaminGrid`'s boost text) and disables outright once
+   * another click genuinely couldn't add anything, so there's nothing a
+   * separate line would say that isn't already visible on the button.
+   */
   _queueVitamin(vitaminId) {
-    const vitamin = VITAMINS.find((v) => v.id === vitaminId);
     const y = this._previewYield('vitamin', vitaminId, this._simulatedEvs());
-    if (!y || !vitamin) return;
-    const statLabel = y.linkedStat ? 'SPC' : STAT_LABEL[vitamin.stat];
-    const noun = store.usesStatExpSystem() ? 'Stat Experience' : 'EVs';
-    if (y.applied) {
-      this._pendingApplies.push({ kind: 'vitamin', id: vitaminId });
-      this.$vitaminStatus.textContent = `${vitamin.label}: +${y.applied} ${statLabel} queued — applies on Save`;
-    } else if (y.blockedByCutoff) {
-      this.$vitaminStatus.textContent = `${vitamin.label}: no ${noun} left to queue — this game stops vitamins once ${statLabel} has ${VITAMIN_STAT_CUTOFF}+ EVs`;
-    } else if (y.blockedByCeiling) {
-      this.$vitaminStatus.textContent = `${vitamin.label}: no ${noun} left to queue — vitamins stop working once ${statLabel} has ${STAT_EXP_VITAMIN_CEILING}+ Stat Experience`;
-    } else {
-      this.$vitaminStatus.textContent = `${vitamin.label}: no ${noun} left to queue — ${statLabel} is already maxed out`;
-    }
+    if (!y?.applied) return;
+    this._pendingApplies.push({ kind: 'vitamin', id: vitaminId });
     this._updateVitaminGrid(this._entry);
   }
 
   /** Queues one Wing click — see `_queueVitamin`'s own comment. */
   _queueFeather(featherId) {
-    const feather = FEATHERS.find((f) => f.id === featherId);
     const y = this._previewYield('feather', featherId, this._simulatedEvs());
-    if (!y || !feather) return;
-    if (y.applied) {
-      this._pendingApplies.push({ kind: 'feather', id: featherId });
-      this.$wingStatus.textContent = `${feather.label}: +${y.applied} ${STAT_LABEL[feather.stat]} queued — applies on Save`;
-    } else {
-      this.$wingStatus.textContent = `${feather.label}: nothing left to queue — ${STAT_LABEL[feather.stat]} is already maxed out`;
-    }
+    if (!y?.applied) return;
+    this._pendingApplies.push({ kind: 'feather', id: featherId });
     this._updateWingGrid(this._entry);
   }
 
   /** Queues one EV-reducing berry click — see `_queueVitamin`'s own comment. */
   _queueBerry(berryId) {
-    const berry = EV_BERRIES.find((b) => b.id === berryId);
     const y = this._previewYield('berry', berryId, this._simulatedEvs());
-    if (!y || !berry) return;
-    if (y.applied) {
-      this._pendingApplies.push({ kind: 'berry', id: berryId });
-      this.$berryStatus.textContent = `${berry.label}: −${y.applied} ${STAT_LABEL[berry.stat]} queued — applies on Save`;
-    } else {
-      this.$berryStatus.textContent = `${berry.label}: nothing left to queue — ${STAT_LABEL[berry.stat]} is already at 0`;
-    }
+    if (!y?.applied) return;
+    this._pendingApplies.push({ kind: 'berry', id: berryId });
     this._updateBerryGrid(this._entry);
   }
 
@@ -1287,15 +1269,12 @@ export class CaughtPokemonDetail extends HTMLElement {
     }
     this.$pokerusToggle.toggleAttribute('disabled', !pokerusAvailable);
     this.$pokerusNote.hidden = pokerusAvailable;
-    this.$vitaminStatus.textContent = '';
     this._updateVitaminGrid(e);
     const wingsAvailable = store.wingsAvailable();
     this.$wingsSection.hidden = !wingsAvailable;
-    this.$wingStatus.textContent = '';
     if (wingsAvailable) this._updateWingGrid(e);
     const berriesAvailable = store.berriesAvailable();
     this.$berriesSection.hidden = !berriesAvailable;
-    this.$berryStatus.textContent = '';
     if (berriesAvailable) this._updateBerryGrid(e);
     this.$histLog.entry = e;
     this._renderCompetitive(e);
@@ -1534,6 +1513,12 @@ export class CaughtPokemonDetail extends HTMLElement {
     if (store.usesStatExpSystem()) {
       this.$levelUpStats.hidden = true;
     } else {
+      // Cleared before rebuilding: _renderLevelUpStatsFields carries
+      // forward whatever's already in these inputs (for a mid-edit
+      // re-render, e.g. the level field changing while this dialog stays
+      // open), but a fresh open of the dialog should never inherit
+      // fields left over from a previous, already-closed session.
+      this.$levelUpStatsFields.innerHTML = '';
       this._renderLevelUpStatsFields(e.level);
       this.$levelUpStats.hidden = false;
     }
@@ -1555,13 +1540,22 @@ export class CaughtPokemonDetail extends HTMLElement {
     this.$levelUpStatsLevel.textContent = String(level);
     const e = this._entry;
     this.$levelUpStatsFields.innerHTML = STATS.map(({ key, label }) => {
-      const value = existing.get(key) || '';
       // The most recently logged reading for this stat, regardless of
       // level — read-only context alongside the new-value input, the
-      // same "before → new" shape as the level field above it.
+      // same "before → new" shape as the level field above it. Also
+      // prefills the input itself (same convention as the level field
+      // being prefilled to the current level) — a stat's real value
+      // does shift with level, so this is a starting point to correct
+      // after rechecking in-game, not assumed still accurate.
       const last = e.events.filter((ev) => ev.kind === 'stat-reading' && ev.statKey === key).at(-1);
       const lastNote = last ? `${last.observedStat} (Lv. ${last.level}) →` : '';
-      return `<div class="iv-row level-up-stat-row"><span class="iv-row-label">${escapeHtml(label)}</span><span class="level-up-stat-last">${escapeHtml(lastNote)}</span><input type="number" inputmode="numeric" class="ds-field" data-stat="${key}" min="1" value="${escapeHtml(value)}" aria-label="${escapeHtml(label)} observed stat value" placeholder="Actual stat" /></div>`;
+      const prefill = last ? String(last.observedStat) : '';
+      const value = existing.get(key) ?? prefill;
+      // data-prefill lets Save (below) tell "still exactly what it was
+      // prefilled to" apart from "the user actually typed/confirmed
+      // this" — a stat's real value shifts with level, so an untouched
+      // prefill is a starting point to overwrite, not a reading to log.
+      return `<div class="iv-row level-up-stat-row"><span class="iv-row-label">${escapeHtml(label)}</span><span class="level-up-stat-last">${escapeHtml(lastNote)}</span><input type="number" inputmode="numeric" class="ds-field" data-stat="${key}" data-prefill="${escapeHtml(prefill)}" min="1" value="${escapeHtml(value)}" aria-label="${escapeHtml(label)} observed stat value" placeholder="Actual stat" /></div>`;
     }).join('');
   }
 
@@ -1594,7 +1588,12 @@ export class CaughtPokemonDetail extends HTMLElement {
     store.setLevel(e.uid, this.$levelUpInput.value, batchId);
     for (const input of this.$levelUpStatsFields.querySelectorAll('input[data-stat]')) {
       const observed = Number(input.value);
-      if (observed) store.logStatReading(e.uid, /** @type {StatKey} */ (input.dataset.stat), observed, batchId);
+      // Skip a field still sitting at its untouched prefill — see that
+      // attribute's own comment (_renderLevelUpStatsFields) for why an
+      // unconfirmed prefill must not get logged as if re-checked.
+      if (observed && input.value !== input.dataset.prefill) {
+        store.logStatReading(e.uid, /** @type {StatKey} */ (input.dataset.stat), observed, batchId);
+      }
     }
     this.$levelUpDialog.close();
   }
