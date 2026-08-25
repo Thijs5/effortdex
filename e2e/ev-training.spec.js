@@ -169,6 +169,25 @@ test.describe('EV training', () => {
     await expect(nested.getByRole('button', { name: 'Delete this log entry' })).toHaveCount(2); // each nested entry still deletable on its own
   });
 
+  test('10 of the same vitamin collapses to one summed total, not ten repeated lines, with that vitamin\'s own icon', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
+    await catchPokemon(page, 'Bulbasaur');
+    const card = await openDetail(page, 'Bulbasaur');
+    const dialog = await openItemDialog(card);
+    const calciumBtn = dialog.locator('[data-id="calcium"] button');
+
+    for (let i = 0; i < 10; i++) await calciumBtn.click();
+    await dialog.locator('.item-dialog-save-btn').click();
+    await expect(dialog).toBeHidden();
+
+    await card.getByText(/History/).click();
+    const batch = card.locator('ev-history-log li.hist-batch');
+    await expect(batch.locator('summary strong')).toHaveText('10 vitamins');
+    await expect(batch.locator('summary .gain')).toHaveText('Calcium +100 SPA'); // one summed line, not ten "+10 SPA"s
+    await expect(batch.locator('summary img')).toHaveAttribute('src', /calcium/); // the specific item's own icon, not the species sprite
+  });
+
   test('a Save mixing multiple item kinds groups each kind into its own entry, not one mixed blob', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });

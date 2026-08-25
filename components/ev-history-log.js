@@ -190,7 +190,7 @@ export class EvHistoryLog extends HTMLElement {
     return `<li class="hist-batch">
       <details>
         <summary>
-          <img src="${this._entry.sprite || FALLBACK_SPRITE}" alt="" ${FALLBACK_ONERROR} />
+          <img src="${this._batchIcon(batch)}" alt="" ${FALLBACK_ONERROR} />
           <div>
             <strong>${escapeHtml(title)}</strong>
             ${gain ? `<span class="gain">${escapeHtml(gain)}</span>` : ''}
@@ -200,6 +200,44 @@ export class EvHistoryLog extends HTMLElement {
         <ul class="hist-batch-items">${batch.map((h) => this._itemHtml(h)).join('')}</ul>
       </details>
     </li>`;
+  }
+
+  // A Vitamin/Wing/berry/held-item batch is always the *same* item (or,
+  // for held-item, the one thing it ended up set to) — show its own
+  // icon instead of the generic species sprite, since it reads as "here
+  // is what was fed/equipped" rather than "here is what happened to this
+  // Pokémon" the way the level/evolve groups do.
+  /** @param {any[]} batch @returns {string} */
+  _batchIcon(batch) {
+    const kind = this._batchGroupKey(batch[0]);
+    if (kind === 'vitamin') return VITAMINS.find((v) => v.id === batch[0].vitaminId)?.sprite || FALLBACK_SPRITE;
+    if (kind === 'feather') return FEATHERS.find((f) => f.id === batch[0].featherId)?.sprite || FALLBACK_SPRITE;
+    if (kind === 'berry') return EV_BERRIES.find((b) => b.id === batch[0].berryId)?.sprite || FALLBACK_SPRITE;
+    if (kind === 'held-item') {
+      const h = batch[0];
+      if (h.machoBrace) return MACHO_BRACE_SPRITE;
+      if (h.powerItem) return POWER_ITEMS.find((p) => p.id === h.powerItem)?.sprite || FALLBACK_SPRITE;
+      return FALLBACK_SPRITE; // cleared to no item — nothing specific to show
+    }
+    return this._entry.sprite || FALLBACK_SPRITE; // level/evolve group
+  }
+
+  // Same id (e.g. every "Calcium" in the batch) collapses into one row
+  // with its `applied` amounts summed — "10 vitamins" as a title but
+  // "Calcium +100 SPA" as the gain, not ten repeated "+10 SPA"s.
+  /** @param {any[]} chronological @param {string} idKey @returns {any[]} */
+  _mergeByItem(chronological, idKey) {
+    const order = [];
+    const totals = new Map();
+    for (const h of chronological) {
+      const id = h[idKey];
+      if (!totals.has(id)) {
+        totals.set(id, { ...h, applied: 0 });
+        order.push(id);
+      }
+      totals.get(id).applied += h.applied || 0;
+    }
+    return order.map((id) => totals.get(id));
   }
 
   /** @param {any[]} batch @returns {{ title: string, gain: string }} */
@@ -223,7 +261,7 @@ export class EvHistoryLog extends HTMLElement {
       return { title, gain };
     }
     if (batch[0].kind === 'vitamin') {
-      const gain = chronological
+      const gain = this._mergeByItem(chronological, 'vitaminId')
         .map((h) => {
           const vitamin = VITAMINS.find((v) => v.id === h.vitaminId);
           const label = h.linkedStat ? 'SPC' : STAT_LABEL[h.stat];
@@ -233,7 +271,7 @@ export class EvHistoryLog extends HTMLElement {
       return { title: `${count} vitamin${count === 1 ? '' : 's'}`, gain };
     }
     if (batch[0].kind === 'feather') {
-      const gain = chronological
+      const gain = this._mergeByItem(chronological, 'featherId')
         .map((h) => {
           const feather = FEATHERS.find((f) => f.id === h.featherId);
           return `${feather?.label ?? h.featherId} ${h.applied ? `+${h.applied} ${STAT_LABEL[h.stat]}` : '(no gain)'}`;
@@ -242,7 +280,7 @@ export class EvHistoryLog extends HTMLElement {
       return { title: `${count} Wing${count === 1 ? '' : 's'}`, gain };
     }
     if (batch[0].kind === 'berry') {
-      const gain = chronological
+      const gain = this._mergeByItem(chronological, 'berryId')
         .map((h) => {
           const berry = EV_BERRIES.find((b) => b.id === h.berryId);
           return `${berry?.label ?? h.berryId} ${h.applied ? `−${h.applied} ${STAT_LABEL[h.stat]}` : '(no change)'}`;
