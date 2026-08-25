@@ -56,9 +56,13 @@ export class CaughtPokemonDetail extends HTMLElement {
     // still adds anything depends on every earlier one already queued
     // (the same stat's cap gets closer with each), so replay order has
     // to match click order exactly, for both the live "would this next
-    // click still do anything" preview and the real Save. Pokérus stays
-    // instant/unqueued (a plain reversible toggle, not a counted action).
+    // click still do anything" preview and the real Save.
     this._pendingApplies = [];
+    // Pokérus's own pending toggle state — null while the dialog isn't
+    // open (or has no uncommitted change), a real boolean once it does.
+    // Not folded into `_pendingApplies`: it's a plain on/off flag, not a
+    // repeatable/counted action, same shape as `_pendingHeldItem`.
+    this._pendingPokerus = null;
 
     const shadow = this.attachShadow({ mode: 'open' });
     attachDesignSystem(shadow);
@@ -423,11 +427,7 @@ export class CaughtPokemonDetail extends HTMLElement {
         .exp-share-section { display: grid; gap: var(--space-2); justify-items: stretch; min-width: 0; }
         .pokerus-note { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--ink-soft); }
 
-        /* This dialog has no footer, unlike its siblings — .ds-dialog no
-           longer carries its own bottom padding (the footer owns that
-           inset elsewhere), so this panel, as the last row, provides
-           its own instead. */
-        .competitive-panel { display: grid; gap: var(--space-2); padding-bottom: var(--space-5); }
+        .competitive-panel { display: grid; gap: var(--space-2); }
         /* Base stats: a fixed reference for min-maxing a build (which
            stats are worth EVs against a species' own ceiling) — moved
            here from next to the EV bars, where a number that never
@@ -929,6 +929,7 @@ export class CaughtPokemonDetail extends HTMLElement {
       this._onDialogClosed();
       this._pendingHeldItem = null; // discard any uncommitted picks/queue — harmless no-op if Save already applied and closed
       this._pendingApplies = [];
+      this._pendingPokerus = null;
     });
     this.$itemDialogClose.addEventListener('click', () => this.$itemDialog.close());
     this.$itemDialog.addEventListener('click', (e) => {
@@ -997,10 +998,10 @@ export class CaughtPokemonDetail extends HTMLElement {
       }
     });
     // Everything in this dialog only previews here (docs/adr/0017) —
-    // Training item/Exp. Share write into `_pendingHeldItem`, Vitamins/
-    // Wings/berries queue into `_pendingApplies`; both apply together
-    // only on the dialog's own footer Save button. Pokérus (below) is
-    // the one exception — a plain reversible toggle, it stays instant.
+    // Training item/Exp. Share write into `_pendingHeldItem`, Pokérus
+    // into `_pendingPokerus`, Vitamins/Wings/berries queue into
+    // `_pendingApplies`; all of it applies together only on the
+    // dialog's own footer Save button.
     this.$itemGrid.addEventListener('item-pick', (e) => {
       const val = e.detail.id;
       const pending = this._pendingHeldItem;
@@ -1018,10 +1019,11 @@ export class CaughtPokemonDetail extends HTMLElement {
       pending.expShare = false; // picking a training item vacates Exp. Share's slot too
       this._updateItemGrid();
     });
-    // Pokérus stays instant, alongside Vitamins/Wings/berries — same
-    // "cheap to undo via History" reasoning (docs/adr/0017).
+    // Pokérus only previews here too, same as everything else in this
+    // dialog — applied on the footer Save button along with the rest.
     this.$pokerusToggle.addEventListener('pick', () => {
-      store.setPokerus(this._entry.uid, !this.$pokerusToggle.hasAttribute('active'));
+      this._pendingPokerus = !this.$pokerusToggle.hasAttribute('active');
+      this.$pokerusToggle.toggleAttribute('active', this._pendingPokerus);
     });
     this.$expShareToggle.addEventListener('pick', () => {
       const pending = this._pendingHeldItem;
@@ -1086,6 +1088,8 @@ export class CaughtPokemonDetail extends HTMLElement {
     const e = this._entry;
     this._pendingHeldItem = { powerItem: e.powerItem, machoBrace: e.machoBrace, expShare: e.expShare };
     this._pendingApplies = [];
+    this._pendingPokerus = e.pokerus;
+    this.$pokerusToggle.toggleAttribute('active', !!e.pokerus);
     this._updateItemGrid();
     this._updateVitaminGrid(e);
     this._updateWingGrid(e);
@@ -1096,13 +1100,14 @@ export class CaughtPokemonDetail extends HTMLElement {
   /**
    * Applies everything staged in this dialog session, then closes:
    * the held-item choice (Training item, Macho Brace, or Exp. Share —
-   * whichever ended up set), then every queued Vitamin/Wing/berry click
-   * in the exact order it was queued (`_simulatedEvs`'s own comment
-   * explains why order matters) — replayed through the real
-   * store.useVitamin/useFeather/useBerry, so the store's own capping
-   * logic is what actually runs, not the preview math a second time.
-   * Everything shares one batchId so ev-history-log.js collapses this
-   * Save into a single summarized entry, same as the Level popup's.
+   * whichever ended up set), the Pokérus toggle, then every queued
+   * Vitamin/Wing/berry click in the exact order it was queued
+   * (`_simulatedEvs`'s own comment explains why order matters) —
+   * replayed through the real store.useVitamin/useFeather/useBerry, so
+   * the store's own capping logic is what actually runs, not the
+   * preview math a second time. Everything shares one batchId so
+   * ev-history-log.js collapses this Save into a single summarized
+   * entry, same as the Level popup's.
    */
   _saveItemDialog() {
     const e = this._entry;
@@ -1111,6 +1116,7 @@ export class CaughtPokemonDetail extends HTMLElement {
     if (p.expShare) store.setExpShare(e.uid, true, batchId);
     else if (p.machoBrace) store.setMachoBrace(e.uid, true, batchId);
     else store.setPowerItem(e.uid, p.powerItem, batchId);
+    store.setPokerus(e.uid, this._pendingPokerus, batchId);
     for (const item of this._pendingApplies) {
       if (item.kind === 'vitamin') store.useVitamin(e.uid, item.id, batchId);
       else if (item.kind === 'feather') store.useFeather(e.uid, item.id, batchId);
@@ -1293,7 +1299,11 @@ export class CaughtPokemonDetail extends HTMLElement {
     this._renderIvs(e, statExp);
     this._updateItemGrid();
     const aids = store.effectiveAids(e);
-    this.$pokerusToggle.toggleAttribute('active', !!e.pokerus);
+    // Prefers the pending pick while the Items popup has one open and
+    // uncommitted (same reasoning as _updateItemGrid's own pending
+    // fallback) — the ambient ring/shimmer elsewhere on the card stays
+    // keyed to the entry's actual committed status, same as Nature/IVs.
+    this.$pokerusToggle.toggleAttribute('active', this._pendingPokerus ?? !!e.pokerus);
     const pokerusAvailable = store.pokerusAvailable();
     this.toggleAttribute('pokerus-infected', aids.pokerus);
     if (aids.pokerus) {

@@ -7,7 +7,7 @@ import { mockPokeApi } from './support/pokeapi-mock.js';
 // Pokérus (Gen II+) doubles a Pokémon's own battle EVs. Exp. Share (Gen I+
 // in this app's model) lets a Pokémon earn EVs passively whenever any other
 // party member's battle is logged — see lib/store.js's _applyExpShare. Both
-// toggles live in the Items popup (docs/adr/0017) and apply instantly.
+// toggles live in the Items popup (docs/adr/0017), applied via its Save.
 
 test.describe('Pokérus and Exp. Share', () => {
   test.beforeEach(async ({ page }) => {
@@ -22,7 +22,7 @@ test.describe('Pokérus and Exp. Share', () => {
     const dialog = await openItemDialog(card);
 
     await dialog.locator('.pokerus-toggle-btn button').click();
-    await dialog.locator('.item-dialog-close').click();
+    await dialog.locator('.item-dialog-save-btn').click();
     await logBattle(card, 'Caterpie'); // base +1 HP, doubled to +2 by Pokérus
 
     await expect(card.locator('ev-summary ev-bar[data-key="hp"]').locator('.value')).toHaveText('2/252');
