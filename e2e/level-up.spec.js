@@ -118,7 +118,8 @@ test.describe('Level popup', () => {
     await card.getByText(/History/).click();
     const histLog = card.locator('ev-history-log');
     const batch = histLog.locator('li.hist-batch');
-    await expect(batch.locator('summary strong')).toHaveText('Level up to Lv. 12 + 2 stat readings');
+    await expect(batch.locator('summary strong')).toHaveText('Level up to Lv. 12');
+    await expect(batch.locator('summary .gain')).toHaveText('2 stat readings logged');
     await expect(histLog.locator('.hist-batch-items')).toBeHidden(); // collapsed by default
 
     await batch.locator('summary').click();

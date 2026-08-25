@@ -137,11 +137,12 @@ export class EvHistoryLog extends HTMLElement {
   // `history` is already newest-first (each store mutation unshifts), so
   // grouping in place — without re-sorting — keeps both the day order and
   // the entries within each day newest-first. Within a day, a further run
-  // of consecutive entries sharing the same batchId — everything one Save
-  // committed together as a single user action, most commonly the Level
-  // popup's level change plus every filled-in stat reading (lib/store.js's
-  // makeEvent/setLevel/logStatReading) — collapses into one collapsible
-  // entry instead of flooding the list with what reads as one action.
+  // of consecutive entries sharing both the same batchId — everything one
+  // Save committed together as a single user action (lib/store.js's
+  // makeEvent) — *and* the same `_batchGroupKey` collapses into one
+  // collapsible entry, so e.g. a Level popup Save's level change and its
+  // stat readings group together, but an Items popup Save's vitamins and
+  // berries get their own separate group each rather than one mixed blob.
   // Entries with no batchId (most kinds — it's opt-in per call site) are
   // never grouped, each staying its own top-level entry as before.
   _listHtml(history) {
@@ -157,7 +158,8 @@ export class EvHistoryLog extends HTMLElement {
       }
       let j = i + 1;
       if (h.batchId) {
-        while (j < history.length && history[j].batchId === h.batchId) j++;
+        const groupKey = this._batchGroupKey(h);
+        while (j < history.length && history[j].batchId === h.batchId && this._batchGroupKey(history[j]) === groupKey) j++;
       }
       const batch = history.slice(i, j);
       html += batch.length > 1 ? this._batchHtml(batch) : this._itemHtml(h);
@@ -166,20 +168,33 @@ export class EvHistoryLog extends HTMLElement {
     return html;
   }
 
+  // 'level' and 'stat-reading' share one group (a level-up's readings
+  // belong with it); every other kind groups only with its own kind, so
+  // Vitamins/Wings/berries queued together in one Items-popup Save still
+  // get their own separate entry each instead of one mixed "5 things".
+  /** @param {any} h @returns {string} */
+  _batchGroupKey(h) {
+    return h.kind === 'level' || h.kind === 'stat-reading' ? 'level' : h.kind;
+  }
+
   /**
-   * One collapsible entry for a run of same-batchId events — reads like
-   * any other entry (icon + summary line), with a chevron standing in
-   * for the usual delete button's column since there's no group-wide
-   * delete; expanding it reveals every individual entry nested, each
-   * still its own deletable item.
+   * One collapsible entry for a run of same-batchId, same-kind-group
+   * events — reads like any other entry (icon + title + gain line), with
+   * a chevron standing in for the usual delete button's column since
+   * there's no group-wide delete; expanding it reveals every individual
+   * entry nested, each still its own deletable item.
    * @param {any[]} batch
    */
   _batchHtml(batch) {
+    const { title, gain } = this._batchContent(batch);
     return `<li class="hist-batch">
       <details>
         <summary>
           <img src="${this._entry.sprite || FALLBACK_SPRITE}" alt="" ${FALLBACK_ONERROR} />
-          <div><strong>${this._batchSummary(batch)}</strong></div>
+          <div>
+            <strong>${escapeHtml(title)}</strong>
+            ${gain ? `<span class="gain">${escapeHtml(gain)}</span>` : ''}
+          </div>
           <span class="hist-batch-chevron" aria-hidden="true">▸</span>
         </summary>
         <ul class="hist-batch-items">${batch.map((h) => this._itemHtml(h)).join('')}</ul>
@@ -187,24 +202,58 @@ export class EvHistoryLog extends HTMLElement {
     </li>`;
   }
 
-  /** @param {any[]} batch @returns {string} */
-  _batchSummary(batch) {
-    const level = batch.find((h) => h.kind === 'level');
-    const evolve = batch.find((h) => h.kind === 'evolve');
-    const readings = batch.filter((h) => h.kind === 'stat-reading').length;
-    const vitamins = batch.filter((h) => h.kind === 'vitamin').length;
-    const feathers = batch.filter((h) => h.kind === 'feather').length;
-    const berries = batch.filter((h) => h.kind === 'berry').length;
-    const heldItems = batch.filter((h) => h.kind === 'held-item').length;
-    const parts = [];
-    if (level) parts.push(`${level.toLevel > level.fromLevel ? 'Level up' : 'Level correction'} to Lv. ${level.toLevel}`);
-    if (evolve) parts.push(`Evolved into ${titleCase(evolve.toName)}`);
-    if (readings) parts.push(`${readings} stat reading${readings === 1 ? '' : 's'}`);
-    if (vitamins) parts.push(`${vitamins} vitamin${vitamins === 1 ? '' : 's'}`);
-    if (feathers) parts.push(`${feathers} Wing${feathers === 1 ? '' : 's'}`);
-    if (berries) parts.push(`${berries} ${berries === 1 ? 'berry' : 'berries'}`);
-    if (heldItems) parts.push(`held item changed`);
-    return escapeHtml(parts.length ? parts.join(' + ') : `${batch.length} events logged together`);
+  /** @param {any[]} batch @returns {{ title: string, gain: string }} */
+  _batchContent(batch) {
+    const count = batch.length;
+    // batch is newest-first (like the rest of history) — reverse to the
+    // order they were actually clicked/applied in for the summary line,
+    // which reads more naturally left-to-right than newest-first would.
+    const chronological = [...batch].reverse();
+    if (this._batchGroupKey(batch[0]) === 'level') {
+      const level = batch.find((h) => h.kind === 'level');
+      const readings = chronological.filter((h) => h.kind === 'stat-reading');
+      const title = level
+        ? `${level.toLevel > level.fromLevel ? 'Level up' : 'Level correction'} to Lv. ${level.toLevel}`
+        : `${readings.length} stat reading${readings.length === 1 ? '' : 's'} logged`;
+      const gain = level
+        ? readings.length
+          ? `${readings.length} stat reading${readings.length === 1 ? '' : 's'} logged`
+          : ''
+        : readings.map((r) => `${STAT_LABEL[r.statKey]} ${r.observedStat}`).join(', ');
+      return { title, gain };
+    }
+    if (batch[0].kind === 'vitamin') {
+      const gain = chronological
+        .map((h) => {
+          const vitamin = VITAMINS.find((v) => v.id === h.vitaminId);
+          const label = h.linkedStat ? 'SPC' : STAT_LABEL[h.stat];
+          return `${vitamin?.label ?? h.vitaminId} ${h.applied ? `+${h.applied} ${label}` : '(no gain)'}`;
+        })
+        .join(', ');
+      return { title: `${count} vitamin${count === 1 ? '' : 's'}`, gain };
+    }
+    if (batch[0].kind === 'feather') {
+      const gain = chronological
+        .map((h) => {
+          const feather = FEATHERS.find((f) => f.id === h.featherId);
+          return `${feather?.label ?? h.featherId} ${h.applied ? `+${h.applied} ${STAT_LABEL[h.stat]}` : '(no gain)'}`;
+        })
+        .join(', ');
+      return { title: `${count} Wing${count === 1 ? '' : 's'}`, gain };
+    }
+    if (batch[0].kind === 'berry') {
+      const gain = chronological
+        .map((h) => {
+          const berry = EV_BERRIES.find((b) => b.id === h.berryId);
+          return `${berry?.label ?? h.berryId} ${h.applied ? `−${h.applied} ${STAT_LABEL[h.stat]}` : '(no change)'}`;
+        })
+        .join(', ');
+      return { title: `${count} ${count === 1 ? 'berry' : 'berries'}`, gain };
+    }
+    if (batch[0].kind === 'held-item') {
+      return { title: `${count} held item change${count === 1 ? '' : 's'}`, gain: '' };
+    }
+    return { title: `${count} events logged together`, gain: '' };
   }
 
   _itemHtml(h) {

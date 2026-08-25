@@ -1197,7 +1197,7 @@ export class CaughtPokemonDetail extends HTMLElement {
     const y = this._previewYield('vitamin', vitaminId, this._simulatedEvs());
     if (!y?.applied) return;
     this._pendingApplies.push({ kind: 'vitamin', id: vitaminId });
-    this._updateVitaminGrid(this._entry);
+    this._updateQueuedGrids();
   }
 
   /** Queues one Wing click — see `_queueVitamin`'s own comment. */
@@ -1205,7 +1205,7 @@ export class CaughtPokemonDetail extends HTMLElement {
     const y = this._previewYield('feather', featherId, this._simulatedEvs());
     if (!y?.applied) return;
     this._pendingApplies.push({ kind: 'feather', id: featherId });
-    this._updateWingGrid(this._entry);
+    this._updateQueuedGrids();
   }
 
   /** Queues one EV-reducing berry click — see `_queueVitamin`'s own comment. */
@@ -1213,6 +1213,19 @@ export class CaughtPokemonDetail extends HTMLElement {
     const y = this._previewYield('berry', berryId, this._simulatedEvs());
     if (!y?.applied) return;
     this._pendingApplies.push({ kind: 'berry', id: berryId });
+    this._updateQueuedGrids();
+  }
+
+  /**
+   * Refreshes every grid that reads through `_simulatedEvs()` — a click
+   * in any one of Vitamins/Wings/berries can change what's still room
+   * for in any *other* one too (they all draw from the same running EV
+   * total), so queuing in one must re-check every one of them, not just
+   * the grid the click happened in.
+   */
+  _updateQueuedGrids() {
+    this._updateVitaminGrid(this._entry);
+    this._updateWingGrid(this._entry);
     this._updateBerryGrid(this._entry);
   }
 

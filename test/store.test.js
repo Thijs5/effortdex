@@ -1543,6 +1543,36 @@ test('logStatReading is a no-op on a Gen I/II (legacy) party', () => {
   assert.equal(entry.events.length, 1); // only the catch event
 });
 
+test('actualStat returns null when neither a fresh reading nor a known IV exists', () => {
+  const entry = store.catchPokemon(mon({ baseStats: { hp: 45, atk: 80, def: 49, spa: 65, spd: 65, spe: 45 } }));
+  assert.equal(store.actualStat(entry, 'atk', 80), null);
+});
+
+test("actualStat prefers a logged reading snapshotted at the entry's current level/EVs over deriving from IV", () => {
+  const entry = store.catchPokemon(mon({ baseStats: { hp: 45, atk: 80, def: 49, spa: 65, spd: 65, spe: 45 } }));
+  store.setLevel(entry.uid, 50);
+  store.logStatReading(entry.uid, 'atk', 97); // observed directly — no IV entered at all
+  assert.equal(store.actualStat(entry, 'atk', 80), 97);
+});
+
+test('actualStat falls back to the IV-derived formula once the logged reading is stale (level or EVs changed since)', () => {
+  const entry = store.catchPokemon(mon({ baseStats: { hp: 45, atk: 80, def: 49, spa: 65, spd: 65, spe: 45 } }));
+  store.setLevel(entry.uid, 50);
+  store.logStatReading(entry.uid, 'atk', 97); // logged at Lv. 50
+  store.setLevel(entry.uid, 51); // now stale — no longer this entry's current level
+  assert.equal(store.actualStat(entry, 'atk', 80), null); // IV still unknown, so no derived value either
+  store.setIv(entry.uid, 'atk', 25);
+  // Level 51, base 80, IV 25, 0 EV, neutral nature: floor((2*80+25)*51/100)+5 = floor(185*0.51)+5 = 94+5 = 99.
+  assert.equal(store.actualStat(entry, 'atk', 80), 99);
+});
+
+test('actualStat returns null on a Gen I/II (legacy) party — Stat Experience rounding is not implemented', () => {
+  store.createParty('Yellow run', '', 'Yellow');
+  const entry = store.catchPokemon(mon({ baseStats: { hp: 45, atk: 80, def: 49, spa: 65, spd: 65, spe: 45 } }));
+  store.setIv(entry.uid, 'atk', 15);
+  assert.equal(store.actualStat(entry, 'atk', 80), null);
+});
+
 test('possibleIvsFromReadings returns [] until at least one reading is logged', () => {
   const entry = store.catchPokemon(mon());
   assert.deepEqual(store.possibleIvsFromReadings(entry, 'atk', 80), []);

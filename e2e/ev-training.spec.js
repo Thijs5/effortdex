@@ -159,6 +159,7 @@ test.describe('EV training', () => {
     const histLog = card.locator('ev-history-log');
     const batch = histLog.locator('li.hist-batch');
     await expect(batch.locator('summary strong')).toHaveText('2 vitamins');
+    await expect(batch.locator('summary .gain')).toHaveText('Protein +10 ATK, Iron +10 DEF'); // second line, like any other entry
     await expect(batch.locator('summary img')).toBeVisible(); // reads like any other entry: icon + summary
     await expect(batch.getByRole('button', { name: 'Delete this log entry' })).toHaveCount(0); // no group-wide delete
 
@@ -166,5 +167,27 @@ test.describe('EV training', () => {
     const nested = histLog.locator('.hist-batch-items li');
     await expect(nested).toHaveCount(2);
     await expect(nested.getByRole('button', { name: 'Delete this log entry' })).toHaveCount(2); // each nested entry still deletable on its own
+  });
+
+  test('a Save mixing multiple item kinds groups each kind into its own entry, not one mixed blob', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
+    await catchPokemon(page, 'Bulbasaur');
+    const card = await openDetail(page, 'Bulbasaur');
+    const dialog = await openItemDialog(card);
+
+    await dialog.locator('[data-id="protein"] button').click();
+    await dialog.locator('[data-id="iron"] button').click();
+    await dialog.locator('[data-id="kelpsy"] button').click(); // reduces ATK — must see the queued Protein via the shared simulated EVs
+    await dialog.locator('.item-dialog-save-btn').click();
+    await expect(dialog).toBeHidden();
+
+    await card.getByText(/History/).click();
+    const histLog = card.locator('ev-history-log');
+    // Two vitamins group together; the lone berry doesn't need batch
+    // treatment at all and stays a plain top-level entry.
+    await expect(histLog.locator('li.hist-batch')).toHaveCount(1);
+    await expect(histLog.locator('li.hist-batch summary strong')).toHaveText('2 vitamins');
+    await expect(histLog.locator('ul.hist-list > li').filter({ hasText: 'Kelpsy Berry' })).toBeVisible();
   });
 });
