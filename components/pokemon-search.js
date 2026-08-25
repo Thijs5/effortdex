@@ -203,6 +203,11 @@ export class PokemonSearch extends HTMLElement {
 
   connectedCallback() {
     this.$input.placeholder = this.getAttribute('placeholder') || 'Search Pokémon…';
+    // Some browser/AT combinations don't compute a placeholder as an
+    // accessible name at all — every caller here omits a wrapping
+    // <label>, so mirror the placeholder into aria-label explicitly
+    // (or an explicit aria-label the caller set, if more descriptive).
+    this.$input.setAttribute('aria-label', this.getAttribute('aria-label') || this.$input.placeholder);
     this.$sheetTitle.textContent = 'Search Pokémon';
     this.$input.addEventListener('focus', () => {
       this._ensureSpecies();
