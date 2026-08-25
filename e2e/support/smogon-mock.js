@@ -10,7 +10,8 @@
 const FORMATS_DATA_TEXT =
   'exports.BattleFormatsData = {' +
   'chansey:{tier:"PU"},' +
-  'bulbasaur:{tier:"LC"}' +
+  'bulbasaur:{tier:"LC"},' +
+  'mewtwo:{tier:"Illegal"}' +
   '};';
 
 const SETS_GEN9 = {

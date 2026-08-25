@@ -56,6 +56,34 @@ test.describe('Smogon competitive data', () => {
     await expect(dialog.locator('.competitive-set')).toHaveCount(0);
   });
 
+  test('tapping the tier badge shows what the tier means, in plain English', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Scarlet Run', baseGame: 'Scarlet' });
+    await catchPokemon(page, 'Chansey');
+    const card = await openDetail(page, 'Chansey');
+    const dialog = await openCompetitive(card);
+
+    const badge = dialog.getByRole('button', { name: 'What does this tier mean?' });
+    await expect(badge).toHaveText('PU');
+    await badge.click();
+    await expect(dialog.getByText('The lowest official tier, below NU.')).toBeVisible();
+  });
+
+  test('an explicitly Illegal tier is shown, distinct from having no tier data at all', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Scarlet Run', baseGame: 'Scarlet' });
+    await catchPokemon(page, 'Mewtwo');
+    const card = await openDetail(page, 'Mewtwo');
+    const dialog = await openCompetitive(card);
+
+    const badge = dialog.locator('.tier-badge');
+    await expect(badge).toBeVisible();
+    await expect(badge).toHaveText('Illegal');
+    await expect(badge).toHaveClass(/tier-badge--illegal/);
+    await badge.click();
+    await expect(dialog.getByText(/Not usable in this generation's competitive formats/)).toBeVisible();
+  });
+
   test('a fetch failure (offline) fails quietly into the empty state, not an error', async ({ page }) => {
     await page.unroute('**/play.pokemonshowdown.com/data/formats-data.js');
     await page.route('**/play.pokemonshowdown.com/data/formats-data.js', (route) => route.abort());

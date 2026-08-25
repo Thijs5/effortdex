@@ -3,7 +3,7 @@ import { gen1SpecialStat } from '../lib/gen1-special-stats.js';
 import { titleCase, totalEvs, natureEffectHint, natureOptionsHtml, dayLabel, escapeHtml, sortByLabel } from '../lib/utils.js';
 import { api, store, smogon } from '../lib/services.js';
 import { versionedSpriteUrl } from '../lib/pokeapi-client.js';
-import { toShowdownId, smogonSetsKey } from '../lib/smogon-client.js';
+import { toShowdownId, smogonSetsKey, TIER_DESCRIPTIONS } from '../lib/smogon-client.js';
 import { matchGameVersion } from '../lib/game-versions.js';
 import { attachDesignSystem } from '../lib/design-system.js';
 import { wireSpriteFallback } from '../lib/sprite-fallback.js';
@@ -19,6 +19,11 @@ import './item-button-grid.js';
 const SORTED_VITAMINS = sortByLabel(VITAMINS);
 const SORTED_FEATHERS = sortByLabel(FEATHERS);
 const SORTED_EV_BERRIES = sortByLabel(EV_BERRIES);
+
+// Tier badge color grouping — see .tier-badge's own CSS comment for why
+// this is three loose groups, not a per-tier rainbow.
+const TIER_DANGER = new Set(['Uber', 'AG']);
+const TIER_SPECIAL = new Set(['LC', 'NFE']);
 
 /**
  * <caught-pokemon-detail> — a caught Pokémon's full detail page: identity,
@@ -291,11 +296,30 @@ export class CaughtPokemonDetail extends HTMLElement {
         .evolve-panel { display: grid; gap: var(--space-2); }
 
         .competitive-panel { display: grid; gap: var(--space-2); }
+        /* Three loose groups, not a full per-tier rainbow — a 14-color
+           gradient would just be a new scale to learn. Default (teal):
+           every ordinary ranked tier (OU down through PU/ZU and their
+           banlists). --danger: Uber/AG, the "banned for being too
+           strong" case, worth a visual heads-up. --special: LC/NFE,
+           flagged as a different color on purpose since it's a
+           different *axis* (evolution stage, not a power ranking) —
+           the mix-up a newcomer is likeliest to make seeing a two-letter
+           code next to ranked ones. */
         .tier-badge {
           font-family: var(--font-mono); font-size: var(--font-size-2xs); font-weight: 700;
           letter-spacing: 0.04em; color: var(--teal-strong); background: var(--teal-soft);
           border-radius: var(--radius-pill); padding: 0.15em 0.6em; text-transform: none;
+          border: none; cursor: pointer;
         }
+        .tier-badge--danger { color: var(--poke-red-dark); background: var(--danger-soft); }
+        .tier-badge--special { color: var(--pokerus-purple); background: var(--pokerus-purple-soft); }
+        /* Deliberately the plainest of the four — Illegal isn't "worse"
+           than a ranked tier the way the danger/special groups carry
+           their own meaning, it's "not applicable here at all", so it
+           gets the same neutral treatment as an unset value elsewhere
+           (e.g. the roster's "no held item" pill) rather than a color
+           that implies it belongs on the same scale. */
+        .tier-badge--illegal { color: var(--ink-soft); background: var(--lcd); border: 1px dashed var(--lcd-line); }
         .competitive-sets { display: grid; gap: var(--space-3); }
         .competitive-set {
           display: grid; gap: 0.2em; padding: var(--space-3); background: var(--lcd);
@@ -456,7 +480,7 @@ export class CaughtPokemonDetail extends HTMLElement {
           <div class="competitive-panel">
             <h3 class="section-title">Tier &amp; common sets
               <button type="button" class="help-btn" aria-expanded="false" aria-label="Where does this come from?" title="Tier via Pokémon Showdown, common sets via Smogon University's strategy dex — both fetched live and cached locally for about a week. Shown for this party's own generation. Not every species has a published competitive analysis.">?</button>
-              <span class="tier-badge" hidden></span>
+              <button type="button" class="tier-badge help-btn" aria-expanded="false" aria-label="What does this tier mean?" hidden></button>
             </h3>
             <div class="competitive-sets"></div>
             <p class="competitive-empty" hidden>No published competitive data for this Pokémon in this generation.</p>
@@ -879,6 +903,15 @@ export class CaughtPokemonDetail extends HTMLElement {
   async _renderCompetitive(e) {
     const token = ++this._competitiveToken;
     this.$tierBadge.hidden = true;
+    this.$tierBadge.classList.remove('tier-badge--danger', 'tier-badge--special', 'tier-badge--illegal');
+    // A stale open help-note (from this same badge, on a previous
+    // species) would otherwise show that species' tier description
+    // after switching — close it rather than let it linger.
+    if (this.$tierBadge.getAttribute('aria-expanded') === 'true') {
+      const heading = this.$tierBadge.closest('.section-title');
+      if (heading?.nextElementSibling?.classList.contains('help-note')) heading.nextElementSibling.remove();
+      this.$tierBadge.setAttribute('aria-expanded', 'false');
+    }
     this.$competitiveSets.innerHTML = '';
     this.$competitiveEmpty.hidden = true;
     const gen = Math.min(9, Math.max(1, matchGameVersion(store.activeParty?.baseGame)?.gen ?? 9));
@@ -886,8 +919,17 @@ export class CaughtPokemonDetail extends HTMLElement {
       const [tiers, sets] = await Promise.all([smogon.getTiers(), smogon.getSets(gen)]);
       if (token !== this._competitiveToken) return; // a newer species/render already owns the UI
       const tierInfo = tiers[toShowdownId(e.speciesName)];
-      if (tierInfo?.tier && tierInfo.tier !== 'Illegal') {
+      // "No badge" should only ever mean "no data for this species" — an
+      // explicit Illegal tier (banned outright, or not yet released in
+      // this format) is itself meaningful information, not the same
+      // silence as "we don't know." Shown in its own muted color so it
+      // doesn't read as just another ranked tier.
+      if (tierInfo?.tier) {
         this.$tierBadge.textContent = tierInfo.tier;
+        this.$tierBadge.title = TIER_DESCRIPTIONS[tierInfo.tier] || 'A Pokémon Showdown competitive tier.';
+        this.$tierBadge.classList.toggle('tier-badge--danger', TIER_DANGER.has(tierInfo.tier));
+        this.$tierBadge.classList.toggle('tier-badge--special', TIER_SPECIAL.has(tierInfo.tier));
+        this.$tierBadge.classList.toggle('tier-badge--illegal', tierInfo.tier === 'Illegal');
         this.$tierBadge.hidden = false;
       }
       const speciesSets = sets[smogonSetsKey(e.speciesName)];
