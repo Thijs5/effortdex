@@ -89,6 +89,19 @@ export async function openCompetitive(card) {
 }
 
 /**
+ * Opens the IVs dialog — its own "More" menu item, not gated by any
+ * toggle (party or per-Pokémon): reaching it via the menu is the opt-in.
+ * @param {import('@playwright/test').Locator} card
+ */
+export async function openIvs(card) {
+  await card.getByRole('button', { name: 'More' }).click();
+  await card.getByRole('menuitem', { name: 'IVs' }).click();
+  const dialog = card.locator('dialog.iv-dialog');
+  await dialog.waitFor({ state: 'visible' });
+  return dialog;
+}
+
+/**
  * Logs a battle against `opponentSpecies` from the detail card's "Log a
  * battle" search — the one entry point for both a direct fight and Exp.
  * Share's passive gain.

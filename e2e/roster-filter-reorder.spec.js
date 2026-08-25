@@ -80,7 +80,7 @@ test.describe('Roster filters, manual reorder, and URL state', () => {
     await expect(pokerusToggle).toHaveAttribute('aria-pressed', 'true');
     await page.getByRole('button', { name: 'Clear filters' }).click();
 
-    await expect(page.getByLabel('All')).toBeChecked();
+    await expect(page.getByRole('radio', { name: 'All' })).toBeChecked();
     await expect(pokerusToggle).toHaveAttribute('aria-pressed', 'false');
   });
 

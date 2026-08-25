@@ -1,4 +1,4 @@
-import { POWER_ITEMS, MACHO_BRACE_SPRITE, EXP_SHARE_SPRITE, VITAMINS, FEATHERS, FEATHER_BONUS, EV_BERRIES, EV_BERRY_REDUCTION, NATURES, STAT_LABEL, MACHO_BRACE_MULTIPLIER, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, STAT_EXP_VITAMIN_BONUS, STAT_EXP_VITAMIN_CEILING, FALLBACK_SPRITE, FALLBACK_ONERROR, MIN_LEVEL, MAX_LEVEL } from '../lib/constants.js';
+import { POWER_ITEMS, MACHO_BRACE_SPRITE, EXP_SHARE_SPRITE, VITAMINS, FEATHERS, FEATHER_BONUS, EV_BERRIES, EV_BERRY_REDUCTION, NATURES, STATS, STAT_LABEL, MACHO_BRACE_MULTIPLIER, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, STAT_EXP_VITAMIN_BONUS, STAT_EXP_VITAMIN_CEILING, FALLBACK_SPRITE, FALLBACK_ONERROR, MIN_LEVEL, MAX_LEVEL } from '../lib/constants.js';
 import { gen1SpecialStat } from '../lib/gen1-special-stats.js';
 import { titleCase, totalEvs, natureEffectHint, natureOptionsHtml, dayLabel, escapeHtml, sortByLabel } from '../lib/utils.js';
 import { api, store, smogon } from '../lib/services.js';
@@ -225,6 +225,11 @@ export class CaughtPokemonDetail extends HTMLElement {
         .competitive-dialog[open] { display: grid; }
         .competitive-dialog.ds-dialog { width: min(420px, calc(100vw - 2.4rem)); }
         .competitive-dialog .ds-dialog-header { margin-bottom: 0; }
+        .iv-dialog { gap: var(--space-4); }
+        .iv-dialog:not([open]) { display: none; }
+        .iv-dialog[open] { display: grid; }
+        .iv-dialog.ds-dialog { width: min(420px, calc(100vw - 2.4rem)); }
+        .iv-dialog .ds-dialog-header { margin-bottom: 0; }
         .release {
           display: inline-flex; align-items: center; justify-content: center; gap: 0.35em;
           border: 1px solid var(--lcd-line); background: transparent; cursor: pointer; width: 100%;
@@ -274,6 +279,37 @@ export class CaughtPokemonDetail extends HTMLElement {
           font-size: var(--font-size-2xs); color: var(--ink-soft); text-align: right;
         }
         .nature-hint:empty { display: none; }
+
+        .ivs { display: grid; gap: var(--space-2); }
+        .iv-grid { display: grid; gap: var(--space-2); }
+        .iv-row {
+          display: grid; grid-template-columns: 3.5em 1fr; align-items: center; gap: var(--space-2);
+          font-size: var(--font-size-xs); color: var(--ink-soft);
+        }
+        .iv-row-label { font-family: var(--font-mono); }
+        .iv-row input { width: auto; }
+        .iv-row-derived {
+          font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--ink-soft);
+          text-align: right; padding-right: var(--space-2);
+        }
+        .iv-row--perfect .iv-row-label { color: var(--teal); }
+        .iv-summary { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--ink-soft); }
+        .iv-calc {
+          display: grid; gap: var(--space-2); margin-top: var(--space-1);
+          padding: var(--space-3); background: var(--lcd); border-radius: var(--radius-sm);
+        }
+        .iv-calc > summary { cursor: pointer; font-size: var(--font-size-2xs); color: var(--ink-soft); }
+        .iv-calc-hint, .iv-calc-note { margin: var(--space-2) 0 0; font-size: var(--font-size-2xs); color: var(--ink-soft); }
+        .iv-calc-fields { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+        .iv-calc-fields select,
+        .iv-calc-fields input { width: auto; flex: 1 1 6em; }
+        .iv-calc-results { display: flex; flex-wrap: wrap; gap: var(--space-2); min-height: 1.5em; }
+        .iv-calc-chip {
+          border: 1px solid var(--lcd-line); border-radius: var(--radius-pill); background: var(--surface);
+          padding: var(--space-1) var(--space-3); font-family: var(--font-mono); font-size: var(--font-size-2xs);
+          cursor: pointer;
+        }
+        .iv-calc-chip:hover { border-color: var(--teal); color: var(--teal); }
 
         .aids { display: grid; gap: var(--space-2); }
 
@@ -362,6 +398,7 @@ export class CaughtPokemonDetail extends HTMLElement {
             </button>
             <div class="more-menu" role="menu" aria-label="More" hidden>
               <button class="more-menu-item" type="button" role="menuitem" data-open="training">Training &amp; EVs</button>
+              <button class="more-menu-item" type="button" role="menuitem" data-open="ivs">IVs</button>
               <button class="more-menu-item" type="button" role="menuitem" data-open="competitive">Competitive</button>
             </div>
           </div>
@@ -399,6 +436,7 @@ export class CaughtPokemonDetail extends HTMLElement {
             </label>
             <p class="nature-hint" aria-live="polite"></p>
           </section>
+
 
           <section class="vitamins">
             <h3 class="section-title">Vitamins
@@ -470,6 +508,30 @@ export class CaughtPokemonDetail extends HTMLElement {
           </button>
         </dialog>
 
+        <dialog class="iv-dialog ds-dialog">
+          <header class="ds-dialog-header">
+            <h2>IVs
+              <button type="button" class="help-btn" aria-expanded="false" aria-label="What are IVs?" title="Individual Values (IVs) are hidden, randomly-rolled bonus stat points fixed the moment this Pokémon was caught or hatched — 0-31 each (0-15 in Gen I/II, called DVs, with HP derived from the other four rather than stored on its own). Unlike EVs, they never change from training or leveling up. Enter them if you already know them (breeding, the in-game IV Judge), or use the calculator below to narrow one down from an observed stat.">?</button>
+            </h2>
+            <button class="iv-dialog-close ds-dialog-close" type="button" aria-label="Close">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
+          </header>
+          <div class="iv-grid"></div>
+          <p class="iv-summary" hidden></p>
+          <details class="iv-calc" hidden>
+            <summary>Don't know an IV? Calculate it from a stat</summary>
+            <p class="iv-calc-hint">Check this Pokémon's actual <em class="iv-calc-stat-name"></em> stat right now (its summary screen in-game) and enter it below — uses its current level and EVs, so check it now rather than typing in an old reading.</p>
+            <div class="iv-calc-fields">
+              <select class="iv-calc-stat ds-field" aria-label="Stat"></select>
+              <input type="number" inputmode="numeric" class="iv-calc-observed ds-field" min="1" aria-label="Observed stat value" placeholder="Actual stat" />
+              <button type="button" class="ds-btn ds-btn--ghost iv-calc-btn">Find IV</button>
+            </div>
+            <p class="iv-calc-note" aria-live="polite" hidden></p>
+            <div class="iv-calc-results" aria-live="polite"></div>
+          </details>
+        </dialog>
+
         <dialog class="competitive-dialog ds-dialog">
           <header class="ds-dialog-header">
             <h2>Competitive</h2>
@@ -520,6 +582,18 @@ export class CaughtPokemonDetail extends HTMLElement {
     this.$nature = shadow.querySelector('.nature-select');
     this.$natureHint = shadow.querySelector('.nature-hint');
     this.$naturePrefix = shadow.querySelector('.nature-prefix');
+    this.$ivDialog = shadow.querySelector('.iv-dialog');
+    this.$ivDialogClose = shadow.querySelector('.iv-dialog-close');
+    this.$ivGrid = shadow.querySelector('.iv-grid');
+    this.$ivSummary = shadow.querySelector('.iv-summary');
+    this.$ivCalc = shadow.querySelector('.iv-calc');
+    this.$ivCalcStatName = shadow.querySelector('.iv-calc-stat-name');
+    this.$ivCalcStat = shadow.querySelector('.iv-calc-stat');
+    this.$ivCalcObserved = shadow.querySelector('.iv-calc-observed');
+    this.$ivCalcBtn = shadow.querySelector('.iv-calc-btn');
+    this.$ivCalcNote = shadow.querySelector('.iv-calc-note');
+    this.$ivCalcResults = shadow.querySelector('.iv-calc-results');
+    this.$ivCalcStat.innerHTML = STATS.map(({ key, label }) => `<option value="${key}">${label}</option>`).join('');
     this.$statusRow = shadow.querySelector('.status-row');
     this.$moreBtnWrap = shadow.querySelector('.more-btn-wrap');
     this.$moreBtn = shadow.querySelector('.more-btn');
@@ -617,6 +691,24 @@ export class CaughtPokemonDetail extends HTMLElement {
       store.setNature(this._entry.uid, this.$nature.value || null);
       this._renderNatureHint();
     });
+    // Delegated: the grid's number inputs are rebuilt every render (one
+    // per stat, fewer in Gen I/II — see _renderIvs), so a single listener
+    // here outlives any individual input the way the per-field ones above
+    // can't.
+    this.$ivGrid.addEventListener('change', (e) => {
+      const input = /** @type {HTMLInputElement} */ (e.target);
+      const statKey = input?.dataset?.stat;
+      if (!statKey) return;
+      store.setIv(this._entry.uid, /** @type {StatKey} */ (statKey), input.value === '' ? null : Number(input.value));
+    });
+    this.$ivCalcStat.addEventListener('change', () => this._updateIvCalcHint());
+    this.$ivCalcBtn.addEventListener('click', () => this._runIvCalculator());
+    this.$ivCalcResults.addEventListener('click', (e) => {
+      const chip = /** @type {HTMLElement} */ (e.target).closest('.iv-calc-chip');
+      if (!chip) return;
+      store.setIv(this._entry.uid, /** @type {StatKey} */ (this.$ivCalcStat.value), Number(chip.dataset.iv));
+    });
+
     // The "More" button opens a small menu (Training & EVs / Competitive)
     // rather than a dialog directly — the combined dialog got long enough
     // (Level & nature through Release, now Competitive on top) that
@@ -636,6 +728,7 @@ export class CaughtPokemonDetail extends HTMLElement {
       if (!item) return;
       setMoreMenuOpen(false);
       if (item.dataset.open === 'training') this._openDialog(this.$moreDialog);
+      else if (item.dataset.open === 'ivs') this._openDialog(this.$ivDialog);
       else if (item.dataset.open === 'competitive') this._openDialog(this.$competitiveDialog);
     });
     // A click anywhere outside the menu closes it — listened on
@@ -674,6 +767,11 @@ export class CaughtPokemonDetail extends HTMLElement {
     this.$competitiveDialogClose.addEventListener('click', () => this.$competitiveDialog.close());
     this.$competitiveDialog.addEventListener('click', (e) => {
       if (e.target === this.$competitiveDialog) this.$competitiveDialog.close();
+    });
+    this.$ivDialog.addEventListener('close', () => this._onDialogClosed());
+    this.$ivDialogClose.addEventListener('click', () => this.$ivDialog.close());
+    this.$ivDialog.addEventListener('click', (e) => {
+      if (e.target === this.$ivDialog) this.$ivDialog.close();
     });
     // The "?" buttons toggle their explanation inline: title tooltips are
     // hover-only, which leaves them unreachable on touch devices. Listens
@@ -854,6 +952,7 @@ export class CaughtPokemonDetail extends HTMLElement {
     const trained = totalCap != null && totalEvs(e.evs) >= totalCap;
     this.toggleAttribute('fully-trained', trained);
 
+    this._renderIvs(e, statExp);
     this._updateItemGrid();
     const aids = store.effectiveAids(e);
     const pokerusActive = !!e.pokerus;
@@ -986,6 +1085,89 @@ export class CaughtPokemonDetail extends HTMLElement {
   _renderNatureHint() {
     const nature = NATURES.find((n) => n.id === this.$nature.value);
     this.$natureHint.textContent = nature ? natureEffectHint(nature) : '';
+  }
+
+  /**
+   * The IVs dialog's contents — no toggle of any kind gates this, unlike
+   * an earlier version of this feature: reaching it via the "More" menu
+   * is the opt-in, the same as the Competitive dialog. Always computed
+   * on every render (not just while the dialog happens to be open), so
+   * it's ready the instant the menu opens it.
+   * @param {RosterEntry} e @param {boolean} statExp
+   */
+  _renderIvs(e, statExp) {
+    // The stat-formula calculator below is only implemented for the
+    // modern (Gen III+) IV system so far — Gen I/II's Stat Experience
+    // rounding is a distinct, less-documented formula (see store.js's
+    // possibleIvsForStat doc comment).
+    this.$ivCalc.hidden = statExp;
+
+    const { max, legacy } = store.ivRange();
+    // Sp. Def's row is dropped entirely in Gen I/II — it isn't a second
+    // input, it's the same stored value as Sp. Atk (ivRange()'s doc
+    // comment), so showing both would look editable when only one is.
+    const rows = STATS.filter(({ key }) => !(legacy && key === 'spd'));
+    this.$ivGrid.innerHTML = rows
+      .map(({ key, label }) => {
+        const value = e.ivs[key];
+        const derived = legacy && key === 'hp';
+        const displayLabel = legacy && key === 'spa' ? 'SPA/SPD' : label;
+        const perfect = value === max;
+        const control = derived
+          ? `<span class="iv-row-derived">${value == null ? 'unknown' : value} (derived)</span>`
+          : `<input type="number" inputmode="numeric" class="ds-field" data-stat="${key}" min="0" max="${max}" value="${value == null ? '' : value}" placeholder="?" aria-label="${escapeHtml(displayLabel)} IV" />`;
+        return `<div class="iv-row${perfect ? ' iv-row--perfect' : ''}"><span class="iv-row-label">${escapeHtml(displayLabel)}</span>${control}</div>`;
+      })
+      .join('');
+
+    const knownValues = rows.map(({ key }) => e.ivs[key]);
+    const knownCount = knownValues.filter((v) => v != null).length;
+    const perfectCount = knownValues.filter((v) => v === max).length;
+    this.$ivSummary.hidden = false;
+    this.$ivSummary.textContent =
+      knownCount === 0
+        ? `Enter what you know — 0-${max} per stat.`
+        : `${knownCount}/${rows.length} known${perfectCount > 0 ? `, ${perfectCount} perfect (${max})` : ''}.`;
+
+    this._updateIvCalcHint();
+  }
+
+  _updateIvCalcHint() {
+    const stat = STATS.find((s) => s.key === this.$ivCalcStat.value);
+    this.$ivCalcStatName.textContent = stat ? stat.label : '';
+  }
+
+  /**
+   * Runs store.possibleIvsForStat against the typed observed stat and
+   * renders every candidate as a clickable chip — click one to actually
+   * set it as this stat's IV. A low level often can't distinguish
+   * several adjacent IVs at all (the stat formula's floor() rounds them
+   * to the same displayed number), so more than one chip is the normal
+   * case, not a bug — $ivCalcNote spells that out instead of leaving a
+   * bare wall of numbers to interpret, since a raw candidate list read
+   * as confusing/broken in testing without an explanation attached.
+   */
+  _runIvCalculator() {
+    const e = this._entry;
+    const statKey = /** @type {StatKey} */ (this.$ivCalcStat.value);
+    const observed = Number(this.$ivCalcObserved.value);
+    this.$ivCalcResults.innerHTML = '';
+    this.$ivCalcNote.hidden = true;
+    if (!observed || !e.baseStats) return;
+    const matches = store.possibleIvsForStat(e, statKey, observed, e.baseStats[statKey]);
+    this.$ivCalcNote.hidden = false;
+    if (matches.length === 0) {
+      this.$ivCalcNote.textContent =
+        "No IV 0-31 reproduces that stat at its current level/EVs — double check the number, and that you checked it just now (not from an earlier level).";
+    } else if (matches.length === 1) {
+      this.$ivCalcNote.textContent = 'Only one IV fits — tap it to fill it in.';
+      this.$ivCalcResults.innerHTML = `<button type="button" class="iv-calc-chip" data-iv="${matches[0]}">${matches[0]}</button>`;
+    } else {
+      this.$ivCalcNote.textContent = `${matches.length} IVs all produce this exact stat at the current level — that's normal, not an error. Leveling up (more EVs) narrows it; tap one below if you already know which from elsewhere (breeding, the IV Judge).`;
+      this.$ivCalcResults.innerHTML = matches
+        .map((iv) => `<button type="button" class="iv-calc-chip" data-iv="${iv}">${iv}</button>`)
+        .join('');
+    }
   }
 
   // The nature badge sits under the sprite, always visible (not tucked
