@@ -90,6 +90,14 @@ export class GameVersionPicker extends HTMLElement {
   connectedCallback() {
     this.$input.placeholder = this.getAttribute('placeholder') || 'e.g. Emerald';
     if (this.hasAttribute('maxlength')) this.$input.maxLength = Number(this.getAttribute('maxlength'));
+    // The visible <label> wrapping this element in the light DOM doesn't
+    // auto-associate — a custom element isn't "labelable" the way a
+    // native input is, and an id-based aria-labelledby can't cross the
+    // shadow boundary to a light-DOM label reliably — so callers set a
+    // plain aria-label on the host and it's mirrored onto the shadow
+    // input, which is what actually carries the combobox role assistive
+    // tech reads.
+    if (this.hasAttribute('aria-label')) this.$input.setAttribute('aria-label', this.getAttribute('aria-label'));
     this._lastValid = this.$input.value;
 
     this.$input.addEventListener('focus', () => this._showList());

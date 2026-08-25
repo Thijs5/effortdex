@@ -404,9 +404,9 @@ export class CaughtPokemonDetail extends HTMLElement {
           </div>
         </header>
 
-        <dialog class="more-dialog ds-dialog">
+        <dialog class="more-dialog ds-dialog" aria-labelledby="more-dialog-title">
           <header class="ds-dialog-header">
-            <h2>Training &amp; EVs</h2>
+            <h2 id="more-dialog-title">Training &amp; EVs</h2>
             <button class="more-dialog-close ds-dialog-close" type="button" aria-label="Close">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
             </button>
@@ -498,9 +498,9 @@ export class CaughtPokemonDetail extends HTMLElement {
           </button>
         </dialog>
 
-        <dialog class="iv-dialog ds-dialog">
+        <dialog class="iv-dialog ds-dialog" aria-labelledby="iv-dialog-title">
           <header class="ds-dialog-header">
-            <h2>IVs
+            <h2 id="iv-dialog-title">IVs
               <button type="button" class="help-btn" aria-expanded="false" aria-label="What are IVs?" title="Individual Values (IVs) are hidden, randomly-rolled bonus stat points fixed the moment this Pokémon was caught or hatched — 0-31 each (0-15 in Gen I/II, called DVs, with HP derived from the other four rather than stored on its own). Unlike EVs, they never change from training or leveling up. Enter them if you already know them (breeding, the in-game IV Judge), or use the calculator below to narrow one down from an observed stat.">?</button>
             </h2>
             <button class="iv-dialog-close ds-dialog-close" type="button" aria-label="Close">
@@ -522,9 +522,9 @@ export class CaughtPokemonDetail extends HTMLElement {
           </details>
         </dialog>
 
-        <dialog class="competitive-dialog ds-dialog">
+        <dialog class="competitive-dialog ds-dialog" aria-labelledby="competitive-dialog-title">
           <header class="ds-dialog-header">
-            <h2>Competitive</h2>
+            <h2 id="competitive-dialog-title">Competitive</h2>
             <button class="competitive-dialog-close ds-dialog-close" type="button" aria-label="Close">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
             </button>

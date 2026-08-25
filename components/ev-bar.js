@@ -118,13 +118,14 @@ export class EvBar extends HTMLElement {
       <div class="row">
         <span class="label"><span class="label-text"></span></span>
         <span class="base-stat"></span>
-        <div class="track"><div class="fill"></div></div>
+        <div class="track" role="progressbar" aria-valuemin="0"><div class="fill"></div></div>
         <span class="value"></span>
         <span class="badge" hidden title="Maxed out"></span>
       </div>
     `;
     this.$label = shadow.querySelector('.label-text');
     this.$baseStat = shadow.querySelector('.base-stat');
+    this.$track = shadow.querySelector('.track');
     this.$fill = shadow.querySelector('.fill');
     this.$value = shadow.querySelector('.value');
     this.$badge = shadow.querySelector('.badge');
@@ -183,6 +184,9 @@ export class EvBar extends HTMLElement {
     const pct = Math.max(0, Math.min(100, (this._value / this._max) * 100));
     this.$fill.style.width = pct + '%';
     this.$value.textContent = `${this._value}/${this._max}`;
+    this.$track.setAttribute('aria-valuenow', String(this._value));
+    this.$track.setAttribute('aria-valuemax', String(this._max));
+    this.$track.setAttribute('aria-label', this._label ? `${this._label} EVs` : 'EVs');
     const maxed = this._value >= this._max;
     this.toggleAttribute('maxed', maxed);
     this.$badge.hidden = !maxed;
