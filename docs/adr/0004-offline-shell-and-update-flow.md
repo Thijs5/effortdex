@@ -56,29 +56,42 @@ localStorage-backed cache with different rules (see ADR 0001).
    fetches app infrastructure (same-origin `version.json`), not
    external data, and caching it through `_cached` would defeat its
    purpose.
-6. **Caching is ON by default everywhere, localhost included** —
-   `lib/shell.js` registers the service worker unconditionally. This is
-   a reversal of this ADR's original point 6 (caching *off* on
-   localhost, no override at all): local dev now exercises the exact
-   same offline/caching behavior a real deploy has, by default, with no
-   LAN IP or tunnel needed to see it. The tradeoff the original default
-   existed to avoid — a reload can now serve a cached copy from a few
-   edits ago instead of the file on disk — is accepted; turning caching
-   *off* is the explicit action instead, via the "Developer: disable
-   caching" toggle on the Storage page (`#/settings/cache`,
-   `pages/sprite-cache.js`), which persists a flag to `localStorage`
-   (`effortdex:dev-no-cache`) that disables service-worker registration
-   and unregisters/wipes any existing worker and caches. `lib/shell.js`
-   and the toggle read/write that one key through a small shared module,
-   `lib/dev-cache.js` — a single source of truth, not two copies of the
-   same string. (An earlier version of this also accepted a `?noCache=1`
-   query param as a second way to set the same flag, before the UI
-   toggle existed to make it discoverable; removed once the toggle
-   shipped, since it was then just a redundant second entry point to
-   the exact same mechanism.) The toggle reloads the page immediately on
-   change, since the flag is only ever consulted once, at load, to
-   decide whether to register the service worker at all — there's no
-   live register/unregister path to switch into instead.
+6. **Caching is off by default on localhost/127.0.0.1, on everywhere
+   else** — `lib/dev-cache.js`'s `isCachingDisabled()` checks
+   `location.hostname` directly, unconditionally, alongside the stored
+   flag described below. This is this ADR's *second* reversal of its
+   own point 6: an earlier version turned caching on by default even on
+   localhost, reasoning that local dev should exercise the exact same
+   offline/caching behavior a real deploy has, with no LAN IP or tunnel
+   needed to see it, and accepting the tradeoff that a reload could
+   serve a cached copy from a few edits ago instead of the file on
+   disk. In practice that tradeoff undersold the pain: `sw.js` itself
+   never changes on a local dev machine (only the deploy workflow stamps
+   a new `CACHE_NAME`, on a real tag push), so once a dev profile
+   caches the shell once, it stays cached *indefinitely* — every
+   subsequent edit to any source file needs a manual hard reset or the
+   toggle below to ever show up. Back to off-by-default on localhost
+   fixes that outright, since PokéAPI data was never part of this
+   system anyway (its own cache, ADR 0001, is untouched either way).
+   A manual "Developer: disable caching" toggle still exists on the
+   Storage page (`#/settings/cache`, `pages/sprite-cache.js`), persisting
+   a flag to `localStorage` (`effortdex:dev-no-cache`) that force-disables
+   service-worker registration and unregisters/wipes any existing worker
+   and caches — useful e.g. to kill caching on a real deployed origin for
+   debugging — but it's a one-way override (only ever forces *off*): on
+   localhost it has nothing to add, since the hostname check already
+   wins there, and there's no way to force caching back *on* on
+   localhost through this toggle. `lib/shell.js` and the toggle read/
+   write that one key through a small shared module, `lib/dev-cache.js`
+   — a single source of truth, not two copies of the same string. (An
+   earlier version of this also accepted a `?noCache=1` query param as a
+   second way to set the same flag, before the UI toggle existed to make
+   it discoverable; removed once the toggle shipped, since it was then
+   just a redundant second entry point to the exact same mechanism.) The
+   toggle reloads the page immediately on change, since the flag is only
+   ever consulted once, at load, to decide whether to register the
+   service worker at all — there's no live register/unregister path to
+   switch into instead.
 7. **A manual escape hatch exists**: the Settings page's "Clear cache"
    button calls the same wipe (`clearAppCache`) for anyone stuck on a
    stale shell despite the automatic paths. User data is unaffected —

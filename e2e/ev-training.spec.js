@@ -1,7 +1,7 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 import { createParty } from './support/party.js';
-import { catchPokemon, openDetail, openMoreOptions, logBattle } from './support/pokemon.js';
+import { catchPokemon, openDetail, openItemDialog, logBattle } from './support/pokemon.js';
 import { mockPokeApi } from './support/pokeapi-mock.js';
 
 // EV training mechanics — how the six per-stat values fill up, per
@@ -36,7 +36,7 @@ test.describe('EV training', () => {
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
     await catchPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
-    const dialog = await openMoreOptions(card);
+    const dialog = await openItemDialog(card);
 
     await dialog.locator('[data-id="protein"] button').click();
 
@@ -48,7 +48,7 @@ test.describe('EV training', () => {
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
     await catchPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
-    const dialog = await openMoreOptions(card);
+    const dialog = await openItemDialog(card);
 
     // 10 Proteins reach exactly 100 Atk EVs — the cutoff threshold.
     for (let i = 0; i < 10; i++) await dialog.locator('[data-id="protein"] button').click();
@@ -64,7 +64,7 @@ test.describe('EV training', () => {
     await createParty(page, { name: 'Shield Playthrough', baseGame: 'Shield' });
     await catchPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
-    const dialog = await openMoreOptions(card);
+    const dialog = await openItemDialog(card);
 
     for (let i = 0; i < 11; i++) await dialog.locator('[data-id="protein"] button').click();
 
@@ -76,10 +76,10 @@ test.describe('EV training', () => {
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
     await catchPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
-    const dialog = await openMoreOptions(card);
+    const itemDialog = await openItemDialog(card);
 
-    await dialog.locator('.item-grid [data-id="macho-brace"] button').click();
-    await dialog.getByRole('button', { name: 'Close' }).click();
+    await itemDialog.locator('.item-grid [data-id="macho-brace"] button').click();
+    await itemDialog.locator('.item-dialog-close').click();
     await logBattle(card, 'Caterpie'); // base +1 HP, doubled to +2
 
     await expect(card.locator('ev-summary ev-bar[data-key="hp"]').locator('.value')).toHaveText('2/252');
@@ -90,7 +90,7 @@ test.describe('EV training', () => {
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
     await catchPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
-    const dialog = await openMoreOptions(card);
+    const dialog = await openItemDialog(card);
 
     await dialog.locator('[data-id="protein"] button').click();
     await expect(card.locator('ev-summary ev-bar[data-key="atk"]').locator('.value')).toHaveText('10/252');
@@ -104,7 +104,7 @@ test.describe('EV training', () => {
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Black' });
     await catchPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
-    const dialog = await openMoreOptions(card);
+    const dialog = await openItemDialog(card);
 
     for (let i = 0; i < 3; i++) await dialog.locator('[data-id="genius-wing"] button').click();
 

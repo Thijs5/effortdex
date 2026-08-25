@@ -1,13 +1,13 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 import { createParty } from './support/party.js';
-import { catchPokemon, openDetail, openMoreOptions, logBattle } from './support/pokemon.js';
+import { catchPokemon, openDetail, openItemDialog, logBattle } from './support/pokemon.js';
 import { mockPokeApi } from './support/pokeapi-mock.js';
 
 // Pokérus (Gen II+) doubles a Pokémon's own battle EVs. Exp. Share (Gen I+
 // in this app's model) lets a Pokémon earn EVs passively whenever any other
-// party member's battle is logged — see lib/store.js's _applyExpShare.
-// Both toggles live in a caught Pokémon's "More options" dialog.
+// party member's battle is logged — see lib/store.js's _applyExpShare. Both
+// toggles live in the Items popup (docs/adr/0017) and apply instantly.
 
 test.describe('Pokérus and Exp. Share', () => {
   test.beforeEach(async ({ page }) => {
@@ -19,10 +19,10 @@ test.describe('Pokérus and Exp. Share', () => {
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
     await catchPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
-    const dialog = await openMoreOptions(card);
+    const dialog = await openItemDialog(card);
 
     await dialog.locator('.pokerus-toggle-btn button').click();
-    await dialog.getByRole('button', { name: 'Close' }).click();
+    await dialog.locator('.item-dialog-close').click();
     await logBattle(card, 'Caterpie'); // base +1 HP, doubled to +2 by Pokérus
 
     await expect(card.locator('ev-summary ev-bar[data-key="hp"]').locator('.value')).toHaveText('2/252');
@@ -35,9 +35,9 @@ test.describe('Pokérus and Exp. Share', () => {
     await catchPokemon(page, 'Charmander');
 
     const charmanderCard = await openDetail(page, 'Charmander');
-    const charmanderDialog = await openMoreOptions(charmanderCard);
+    const charmanderDialog = await openItemDialog(charmanderCard);
     await charmanderDialog.locator('.exp-share-toggle-btn button').click();
-    await charmanderDialog.getByRole('button', { name: 'Close' }).click();
+    await charmanderDialog.locator('.item-dialog-close').click();
 
     await page.getByRole('link', { name: /^← / }).click();
     const bulbasaurCard = await openDetail(page, 'Bulbasaur');

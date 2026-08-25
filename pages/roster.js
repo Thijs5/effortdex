@@ -34,6 +34,7 @@ import { openEditDialog } from './party-dialog.js';
 import '../components/game-ball.js';
 import '../components/pokemon-search.js';
 import '../components/ev-bar.js';
+import '../components/level-input.js';
 
 export const view = document.getElementById('party-view');
 const backToParties = document.getElementById('back-to-parties');

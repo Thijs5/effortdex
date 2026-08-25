@@ -1,7 +1,7 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 import { createParty } from './support/party.js';
-import { catchPokemon, rosterRow, openDetail, openMoreOptions } from './support/pokemon.js';
+import { catchPokemon, rosterRow, openDetail } from './support/pokemon.js';
 import { mockPokeApi } from './support/pokeapi-mock.js';
 
 // Catching adds a Pokémon to the active party's roster. The level is set at
@@ -55,9 +55,9 @@ test.describe('Catching', () => {
     await catchPokemon(page, 'Bulbasaur');
 
     const card = await openDetail(page, 'Bulbasaur');
-    const dialog = await openMoreOptions(card);
+    await card.getByRole('button', { name: 'More' }).click();
     page.once('dialog', (d) => d.accept());
-    await dialog.getByRole('button', { name: /Release/ }).click();
+    await card.getByRole('menuitem', { name: 'Release' }).click();
 
     await expect(rosterRow(page, 'Bulbasaur')).toBeHidden();
   });

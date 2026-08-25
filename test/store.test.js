@@ -1507,6 +1507,74 @@ test('possibleIvsForStat returns nothing for a Gen I/II (legacy) party — not i
   assert.deepEqual(store.possibleIvsForStat(entry, 'atk', 50, 80), []);
 });
 
+test('logStatReading snapshots the current level/EVs into a stat-reading history entry', () => {
+  const entry = store.catchPokemon(mon());
+  store.setLevel(entry.uid, 50);
+  const evsAtReading = { ...entry.evs };
+  store.logStatReading(entry.uid, 'atk', 97);
+  const record = entry.history[0];
+  assert.equal(record.kind, 'stat-reading');
+  assert.equal(record.statKey, 'atk');
+  assert.equal(record.level, 50);
+  assert.equal(record.observedStat, 97);
+  assert.deepEqual(record.evs, evsAtReading);
+  // A later level change must not retroactively change what was logged.
+  store.setLevel(entry.uid, 80);
+  const stillTheSameRecord = entry.history.find((h) => h.kind === 'stat-reading');
+  assert.equal(stillTheSameRecord.level, 50);
+});
+
+test('logStatReading is a no-op on a Gen I/II (legacy) party', () => {
+  store.createParty('Yellow run', '', 'Yellow');
+  const entry = store.catchPokemon(mon());
+  store.logStatReading(entry.uid, 'atk', 50);
+  assert.equal(entry.events.length, 1); // only the catch event
+});
+
+test('possibleIvsFromReadings returns [] until at least one reading is logged', () => {
+  const entry = store.catchPokemon(mon());
+  assert.deepEqual(store.possibleIvsFromReadings(entry, 'atk', 80), []);
+});
+
+test('possibleIvsFromReadings with one reading matches possibleIvsForStat at that reading\'s level', () => {
+  const entry = store.catchPokemon(mon());
+  store.setLevel(entry.uid, 50);
+  // Level 50, base 80, EV 0, neutral nature: IVs 24 and 25 both read 97 (see possibleIvsForStat's test above).
+  store.logStatReading(entry.uid, 'atk', 97);
+  assert.deepEqual(store.possibleIvsFromReadings(entry, 'atk', 80), [24, 25]);
+  assert.deepEqual(store.possibleIvsFromReadings(entry, 'atk', 80), store.possibleIvsForStat(entry, 'atk', 97, 80));
+});
+
+test('possibleIvsFromReadings intersects two readings at different levels down to the true IV', () => {
+  const entry = store.catchPokemon(mon());
+  store.setLevel(entry.uid, 50);
+  store.logStatReading(entry.uid, 'atk', 97); // IVs 24, 25 both read 97 at level 50
+  store.setLevel(entry.uid, 60);
+  store.logStatReading(entry.uid, 'atk', 116); // IVs 25, 26 both read 116 at level 60
+  assert.deepEqual(store.possibleIvsFromReadings(entry, 'atk', 80), [25]);
+});
+
+test('possibleIvsFromReadings returns [] when logged readings contradict each other', () => {
+  const entry = store.catchPokemon(mon());
+  store.setLevel(entry.uid, 50);
+  store.logStatReading(entry.uid, 'atk', 97); // IVs 24, 25
+  store.setLevel(entry.uid, 60);
+  store.logStatReading(entry.uid, 'atk', 101); // an IV near 0, no overlap with 24/25
+  assert.deepEqual(store.possibleIvsFromReadings(entry, 'atk', 80), []);
+});
+
+test('deleteHistoryEntry removes a stat-reading and possibleIvsFromReadings falls back to the remaining ones', () => {
+  const entry = store.catchPokemon(mon());
+  store.setLevel(entry.uid, 50);
+  store.logStatReading(entry.uid, 'atk', 97);
+  store.setLevel(entry.uid, 60);
+  store.logStatReading(entry.uid, 'atk', 116);
+  assert.deepEqual(store.possibleIvsFromReadings(entry, 'atk', 80), [25]);
+  const level60Reading = entry.history.find((h) => h.kind === 'stat-reading' && h.level === 60);
+  store.deleteHistoryEntry(entry.uid, level60Reading.id);
+  assert.deepEqual(store.possibleIvsFromReadings(entry, 'atk', 80), [24, 25]);
+});
+
 test('exportPayload includes ivs, and a fresh load defaults them for old saves missing the field', () => {
   const entry = store.catchPokemon(mon());
   store.setIv(entry.uid, 'spe', 31);

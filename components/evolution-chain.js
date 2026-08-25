@@ -32,8 +32,9 @@ export class EvolutionChain extends HTMLElement {
       <style>
         :host { display: grid; gap: var(--space-2); }
         .evo-note { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--ink-soft); }
-        .evo-chain { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+        .evo-chain { display: flex; align-items: center; gap: var(--space-3) var(--space-4); flex-wrap: wrap; row-gap: var(--space-4); }
         .evo-stage { display: flex; flex-direction: column; gap: var(--space-2); }
+        .evo-link { display: flex; align-items: center; gap: var(--space-3); }
         .evo-arrow { color: var(--ink-soft); font-size: var(--font-size-md); }
         .evolve-status { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--teal); min-height: 1em; }
       </style>
@@ -99,13 +100,17 @@ export class EvolutionChain extends HTMLElement {
     const prevName = currentNode?.parent ?? null;
     const maxDepth = Math.max(...nodes.map((n) => n.depth));
 
+    // Each arrow is grouped into the same wrapping unit as the stage it
+    // points at (rather than a sibling flex item of its own) — otherwise
+    // a narrow/mobile wrap can strand the arrow alone at the end of one
+    // line with its stage orphaned onto the next, which reads as broken.
     let html = '';
     for (let depth = 0; depth <= maxDepth; depth++) {
-      if (depth > 0) html += `<span class="evo-arrow" aria-hidden="true">→</span>`;
       const stage = nodes.filter((n) => n.depth === depth);
-      html += `<span class="evo-stage">${stage
+      const stageHtml = `<span class="evo-stage">${stage
         .map((n) => this._nodeHtml(n, currentName, prevName, nextNames, spriteByName))
         .join('')}</span>`;
+      html += depth === 0 ? stageHtml : `<span class="evo-link"><span class="evo-arrow" aria-hidden="true">→</span>${stageHtml}</span>`;
     }
     this.$chain.innerHTML = html;
   }

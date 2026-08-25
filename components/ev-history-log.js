@@ -239,6 +239,18 @@ export class EvHistoryLog extends HTMLElement {
         </span>
       </li>`;
     }
+    if (h.kind === 'stat-reading') {
+      return `<li>
+        <img src="${this._entry.sprite || FALLBACK_SPRITE}" alt="" ${FALLBACK_ONERROR} />
+        <div>
+          <strong>${STAT_LABEL[h.statKey]} reading logged</strong>
+          <span class="gain">${h.observedStat} at Lv. ${h.level}</span>
+        </div>
+        <span class="hist-actions">
+          <button class="delete-hist-btn" type="button" data-id="${h.id}" title="Delete this log entry" aria-label="Delete this log entry">✕</button>
+        </span>
+      </li>`;
+    }
     if (h.kind === 'level') {
       return `<li>
         <img src="${this._entry.sprite || FALLBACK_SPRITE}" alt="" ${FALLBACK_ONERROR} />
