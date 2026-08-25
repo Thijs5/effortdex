@@ -25,7 +25,8 @@ test.describe('Level popup', () => {
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openLevelUpDialog(card);
 
-    await expect(dialog.getByLabel('Level')).toHaveValue('10');
+    await expect(dialog.locator('.level-up-from')).toHaveText('Lv. 10 →'); // read-only — only the new-level field is editable
+    await expect(dialog.getByLabel('New level')).toHaveValue('10');
     await expect(dialog.getByRole('heading', { name: 'Evolution' })).toBeVisible();
     await expect(dialog.getByText('Log stat readings at Lv. 10')).toBeVisible();
     await expect(dialog.getByRole('button', { name: 'Save' })).toBeVisible();
@@ -38,8 +39,8 @@ test.describe('Level popup', () => {
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openLevelUpDialog(card);
 
-    await dialog.getByLabel('Level').fill('12');
-    await dialog.getByLabel('Level').blur();
+    await dialog.getByLabel('New level').fill('12');
+    await dialog.getByLabel('New level').blur();
     await expect(dialog.getByText('Log stat readings at Lv. 12')).toBeVisible(); // the heading previews it
     await dialog.getByLabel('ATK observed stat value').fill('20');
 
@@ -59,8 +60,8 @@ test.describe('Level popup', () => {
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openLevelUpDialog(card);
 
-    await dialog.getByLabel('Level').fill('12');
-    await dialog.getByLabel('Level').blur();
+    await dialog.getByLabel('New level').fill('12');
+    await dialog.getByLabel('New level').blur();
     await dialog.getByLabel('ATK observed stat value').fill('20');
     await dialog.getByRole('button', { name: 'Save' }).click();
     await expect(dialog).toBeHidden();
@@ -72,6 +73,19 @@ test.describe('Level popup', () => {
     await expect(ivDialog.getByText('Lv. 12 — 20')).toBeVisible();
   });
 
+  test('pressing Enter in a field saves the dialog, same as clicking Save', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
+    await catchPokemon(page, 'Bulbasaur', { level: 10 });
+    const card = await openDetail(page, 'Bulbasaur');
+    const dialog = await openLevelUpDialog(card);
+
+    await dialog.getByLabel('New level').fill('12');
+    await dialog.getByLabel('New level').press('Enter');
+    await expect(dialog).toBeHidden();
+    await expect(card.getByTitle('Set level')).toContainText('Lv. 12');
+  });
+
   test('adjusting the level after typing a stat keeps the typed value, just relabels it', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
@@ -80,8 +94,8 @@ test.describe('Level popup', () => {
     const dialog = await openLevelUpDialog(card);
 
     await dialog.getByLabel('ATK observed stat value').fill('20');
-    await dialog.getByLabel('Level').fill('13');
-    await dialog.getByLabel('Level').blur();
+    await dialog.getByLabel('New level').fill('13');
+    await dialog.getByLabel('New level').blur();
 
     await expect(dialog.getByText('Log stat readings at Lv. 13')).toBeVisible();
     await expect(dialog.getByLabel('ATK observed stat value')).toHaveValue('20');

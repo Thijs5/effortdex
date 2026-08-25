@@ -96,7 +96,7 @@ test('previewDefeat reports the same yield as logDefeat but applies nothing', ()
 
   const preview = store.previewDefeat(entry.uid, opp);
   assert.deepEqual(entry.evs, { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 });
-  assert.equal(entry.history.length, 2); // catch seed + pokerus toggle — preview logs nothing more
+  assert.equal(entry.history.length, 3); // catch seed + held-item + pokerus toggle — preview logs nothing more
 
   const logged = store.logDefeat(entry.uid, opp);
   assert.deepEqual(preview.applied, logged.applied);

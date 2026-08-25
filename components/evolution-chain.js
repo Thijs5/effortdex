@@ -16,15 +16,23 @@ import './ds-item-button.js';
  * when the chain becomes visible (e.g. its dialog opens) — loading is
  * explicit so the fetch doesn't fire for a chain nobody is looking at.
  *
- * Evolving/undoing is handled internally (confirm + api lookup +
- * store.evolvePokemon/revertEvolution); the store's change event drives
- * the parent to re-assign `.entry`, and the chain reloads itself.
+ * Picking Evolve/Undo only stages a pending choice (status line + no
+ * store mutation yet) — this only ever lives inside the Level popup now,
+ * which is itself preview-then-Save (docs/adr/0017), so a second,
+ * separate native `confirm()` on top of that Save button was redundant
+ * friction, not an extra safety net. The parent calls `commit()` from its
+ * own Save handler to actually apply the pending choice (the species
+ * lookup for an Evolve happens here, not at pick time, so a Save that's
+ * never reached never fires the request), or `discard()` when the
+ * dialog is closed any other way.
  */
 export class EvolutionChain extends HTMLElement {
   constructor() {
     super();
     /** @type {RosterEntry|null} */
     this._entry = null;
+    /** @type {{ action: 'evolve', name: string } | { action: 'undo' } | null} */
+    this._pending = null;
 
     const shadow = this.attachShadow({ mode: 'open' });
     attachDesignSystem(shadow);
@@ -49,9 +57,64 @@ export class EvolutionChain extends HTMLElement {
     this.$chain.addEventListener('pick', (e) => {
       const btn = /** @type {HTMLElement} */ (e.target).closest('[data-action]');
       if (!(btn instanceof HTMLElement)) return;
-      if (btn.dataset.action === 'evolve') this._evolveInto(/** @type {string} */ (btn.dataset.name));
-      else if (btn.dataset.action === 'undo') this._undoEvolve();
+      if (btn.dataset.action === 'evolve') this._setPending({ action: 'evolve', name: /** @type {string} */ (btn.dataset.name) });
+      else if (btn.dataset.action === 'undo' && this._entry?.evolutions.length) this._setPending({ action: 'undo' });
     });
+  }
+
+  /** Whether a pick is staged and waiting on the parent's Save. @returns {boolean} */
+  get hasPending() {
+    return this._pending !== null;
+  }
+
+  /**
+   * Stages `next` as the pending choice, or clears it if `next` is the
+   * choice that's already pending (a second click on the same button
+   * cancels it — the same toggle-to-clear affordance the Items popup's
+   * grids use). Picking the other action (or a different Evolve target,
+   * for a multi-branch family like Eevee) replaces whatever was pending.
+   * @param {{ action: 'evolve', name: string } | { action: 'undo' }} next
+   */
+  _setPending(next) {
+    const same = this._pending?.action === next.action && /** @type {any} */ (this._pending).name === /** @type {any} */ (next).name;
+    this._pending = same ? null : next;
+    this.$status.textContent = !this._pending
+      ? ''
+      : this._pending.action === 'evolve'
+        ? `Will evolve into ${titleCase(this._pending.name)} on Save`
+        : 'Will undo evolution on Save';
+  }
+
+  /**
+   * Applies the pending choice (if any) — called by the parent's own
+   * Save handler. The species lookup for an Evolve happens here, not at
+   * pick time, so a pick that's later discarded never fires the request.
+   * Throws (leaving `_pending` and the status line's error message in
+   * place, so Save can be retried) if the lookup fails — the parent
+   * should not close its dialog out from under a failed commit.
+   * @returns {Promise<void>}
+   */
+  async commit() {
+    if (!this._pending) return;
+    const entry = /** @type {RosterEntry} */ (this._entry);
+    try {
+      if (this._pending.action === 'evolve') {
+        const mon = await api.getPokemon(this._pending.name);
+        store.evolvePokemon(entry.uid, mon);
+      } else {
+        store.revertEvolution(entry.uid);
+      }
+      this._pending = null;
+    } catch (err) {
+      this.$status.textContent = err instanceof Error ? err.message : 'Could not evolve.';
+      throw err;
+    }
+  }
+
+  /** Clears any pending choice without applying it — called when the dialog closes any other way than Save. */
+  discard() {
+    this._pending = null;
+    this.$status.textContent = '';
   }
 
   /** @param {RosterEntry|null} e */
@@ -144,34 +207,5 @@ export class EvolutionChain extends HTMLElement {
     return `<ds-item-button ${attrs} disabled title="${label} — not directly reachable from here"></ds-item-button>`;
   }
 
-  /** @param {string} name */
-  async _evolveInto(name) {
-    const entry = /** @type {RosterEntry} */ (this._entry);
-    const from = titleCase(entry.nickname || entry.speciesName);
-    if (!confirm(`Evolve ${from} into ${titleCase(name)}?`)) return;
-    this.$status.textContent = `Evolving into ${titleCase(name)}…`;
-    try {
-      const mon = await api.getPokemon(name);
-      store.evolvePokemon(entry.uid, mon);
-      await this.load(); // species changed — the chain shown needs to move with it
-    } catch (err) {
-      this.$status.textContent = err instanceof Error ? err.message : 'Could not evolve.';
-    }
-  }
-
-  /**
-   * Undoes the most recent evolution — for an accidental click on the
-   * wrong option. No network needed: the evolve event snapshots the
-   * previous identity, so the store restores it by deleting the event
-   * and re-folding (ADR 0006).
-   */
-  async _undoEvolve() {
-    const entry = /** @type {RosterEntry} */ (this._entry);
-    const last = entry.evolutions[0];
-    if (!last) return;
-    if (!confirm(`Undo evolution and revert to ${titleCase(last.fromName)}?`)) return;
-    store.revertEvolution(entry.uid);
-    await this.load();
-  }
 }
 customElements.define('evolution-chain', EvolutionChain);

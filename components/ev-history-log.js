@@ -1,4 +1,4 @@
-import { POWER_ITEMS, VITAMINS, FEATHERS, EV_BERRIES, EXP_SHARE_SPRITE, STAT_LABEL, VITAMIN_STAT_CUTOFF, STAT_EXP_VITAMIN_CEILING, FALLBACK_SPRITE, FALLBACK_ONERROR } from '../lib/constants.js';
+import { POWER_ITEMS, MACHO_BRACE_SPRITE, VITAMINS, FEATHERS, EV_BERRIES, EXP_SHARE_SPRITE, STAT_LABEL, VITAMIN_STAT_CUTOFF, STAT_EXP_VITAMIN_CEILING, FALLBACK_SPRITE, FALLBACK_ONERROR } from '../lib/constants.js';
 import { titleCase, formatEvYield, escapeHtml, dayKey, dayLabel } from '../lib/utils.js';
 import { store } from '../lib/services.js';
 import { attachDesignSystem } from '../lib/design-system.js';
@@ -233,6 +233,20 @@ export class EvHistoryLog extends HTMLElement {
         <div>
           <strong>${h.active ? 'Exp. Share equipped' : 'Exp. Share removed'}</strong>
           <span class="gain">${h.active ? 'Now earns EVs from other battles' : 'No longer earns EVs from other battles'}</span>
+        </div>
+        <span class="hist-actions">
+          <button class="delete-hist-btn" type="button" data-id="${h.id}" title="Delete this log entry" aria-label="Delete this log entry">✕</button>
+        </span>
+      </li>`;
+    }
+    if (h.kind === 'held-item') {
+      const item = h.powerItem ? POWER_ITEMS.find((p) => p.id === h.powerItem) : null;
+      const sprite = h.machoBrace ? MACHO_BRACE_SPRITE : item?.sprite;
+      const label = h.machoBrace ? 'Macho Brace' : item?.label;
+      return `<li>
+        <img src="${sprite || FALLBACK_SPRITE}" alt="" ${FALLBACK_ONERROR} />
+        <div>
+          <strong>${label ? `${label} equipped` : 'Held item removed'}</strong>
         </div>
         <span class="hist-actions">
           <button class="delete-hist-btn" type="button" data-id="${h.id}" title="Delete this log entry" aria-label="Delete this log entry">✕</button>

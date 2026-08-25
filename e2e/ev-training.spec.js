@@ -79,6 +79,7 @@ test.describe('EV training', () => {
     const itemDialog = await openItemDialog(card);
 
     await itemDialog.locator('.item-grid [data-id="macho-brace"] button').click();
+    await itemDialog.locator('.held-item-save-btn').click();
     await itemDialog.locator('.item-dialog-close').click();
     await logBattle(card, 'Caterpie'); // base +1 HP, doubled to +2
 

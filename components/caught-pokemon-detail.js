@@ -43,6 +43,13 @@ export class CaughtPokemonDetail extends HTMLElement {
     // means "unchanged", seeded from the entry when each dialog opens,
     // applied to the store only on that dialog's Save.
     this._pendingIvs = null;
+    // Same idea for the Items dialog's held-item slot (Training item /
+    // Exp. Share — mutually exclusive, docs/adr/0017): { powerItem,
+    // machoBrace, expShare }, seeded when the dialog opens, applied only
+    // by the held-item section's own Save button. Vitamins/Wings/
+    // berries/Pokérus in the same dialog are unaffected — those stay
+    // instant.
+    this._pendingHeldItem = null;
 
     const shadow = this.attachShadow({ mode: 'open' });
     attachDesignSystem(shadow);
@@ -193,9 +200,6 @@ export class CaughtPokemonDetail extends HTMLElement {
         .more-menu-item--danger { color: var(--poke-red-dark); }
         .more-menu-item--danger:hover { background: var(--danger-soft); color: var(--poke-red); }
 
-        /* An inline item in .meta now, not its own row — flex-wrap here
-           lets its own pills wrap independently if they run out of room. */
-        .status-row { display: inline-flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
         .status-pill {
           display: inline-flex; align-items: center; gap: 0.35em;
           text-transform: none; letter-spacing: normal; padding: 0.3em 0.65em;
@@ -211,9 +215,6 @@ export class CaughtPokemonDetail extends HTMLElement {
           background: transparent; color: var(--ink-soft);
           border: 1px dashed var(--lcd-line);
         }
-        /* Reuses .status-pill's exact look (a button, not a span, unlike
-           the read-only badges in .status-row) so equipping an item reads
-           the same whether it's shown here or in the row next to it. */
         .held-item-btn { border: none; cursor: pointer; font-family: inherit; }
         .held-item-btn:hover { filter: brightness(0.97); }
         /* .status-pill--empty's background is transparent, so the filter
@@ -246,6 +247,12 @@ export class CaughtPokemonDetail extends HTMLElement {
         .item-dialog[open] { display: grid; }
         .item-dialog.ds-dialog { width: min(420px, calc(100vw - 2.4rem)); }
         .item-dialog .ds-dialog-header { margin-bottom: 0; }
+        /* Training item + Exp. Share share one held-item slot and are
+           preview-then-Save, unlike everything else in this dialog
+           (Vitamins/Wings/berries/Pokérus), which stays instant — see
+           the Save handler's own comment. */
+        .held-item-save-row { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); }
+        .held-item-save-hint { margin: 0; font-size: var(--font-size-2xs); color: var(--ink-soft); }
         .level-up-dialog { gap: var(--space-4); }
         .level-up-dialog:not([open]) { display: none; }
         .level-up-dialog[open] { display: grid; }
@@ -260,6 +267,9 @@ export class CaughtPokemonDetail extends HTMLElement {
           font-size: var(--font-size-xs); color: var(--ink-soft);
         }
         .level-up-dialog .field-inline level-input { flex: 1 1 auto; max-width: 14em; }
+        /* The current level is read-only context, not part of what Save
+           applies — only the level-input to its right is editable. */
+        .level-up-from { font-family: var(--font-mono); white-space: nowrap; }
         /* .ds-dialog's own mobile breakpoint (design-system.js) turns
            every dialog into a full-height edge-to-edge sheet by zeroing
            margin/border-radius and forcing height:100dvh — meant for the
@@ -448,7 +458,6 @@ export class CaughtPokemonDetail extends HTMLElement {
                 <img class="held-item-btn-sprite" alt="" hidden ${FALLBACK_ONERROR} />
                 <span class="held-item-btn-label"></span>
               </button>
-              <div class="status-row" hidden></div>
             </div>
           </div>
           <div class="more-btn-wrap">
@@ -512,26 +521,25 @@ export class CaughtPokemonDetail extends HTMLElement {
             <ds-item-button class="exp-share-toggle-btn" icon="${EXP_SHARE_SPRITE}" label="Exp. Share" boost="Shares other EVs"></ds-item-button>
           </section>
 
+          <div class="held-item-save-row">
+            <p class="held-item-save-hint">Training item / Exp. Share — nothing above applies until Save</p>
+            <button type="button" class="ds-btn ds-btn--primary held-item-save-btn">Save</button>
+          </div>
+
           <section class="vitamins">
-            <h3 class="section-title">Vitamins
-              <button type="button" class="help-btn" aria-expanded="false" aria-label="What do vitamins do?" title="Vitamins (HP Up, Protein, Iron, Calcium, Zinc, Carbos) instantly add EVs to one stat without battling — a quick way to top off a stat. Each only works until that stat has 100 EVs from any source; after that, only battling, items, or Pokérus can push it further toward the 252 cap.">?</button>
-            </h3>
+            <h3 class="section-title">Vitamins</h3>
             <item-button-grid class="vitamin-grid"></item-button-grid>
             <p class="vitamin-status" aria-live="polite"></p>
           </section>
 
           <section class="wings">
-            <h3 class="section-title">Wings
-              <button type="button" class="help-btn" aria-expanded="false" aria-label="What do Wings do?" title="Wings (Health, Muscle, Resist, Genius, Clever, Swift) instantly add 1 EV to one stat without battling. Unlike vitamins, there's no 100-EV cutoff — they work all the way to the 252 cap.">?</button>
-            </h3>
+            <h3 class="section-title">Wings</h3>
             <item-button-grid class="wing-grid"></item-button-grid>
             <p class="wing-status" aria-live="polite"></p>
           </section>
 
           <section class="berries">
-            <h3 class="section-title">EV-reducing berries
-              <button type="button" class="help-btn" aria-expanded="false" aria-label="What do EV-reducing berries do?" title="Pomeg, Kelpsy, Qualot, Hondew, Grepa and Tamato berries remove 10 EVs from one stat — useful for undoing a mis-trained stat. Floors at 0.">?</button>
-            </h3>
+            <h3 class="section-title">EV-reducing berries</h3>
             <item-button-grid class="berry-grid"></item-button-grid>
             <p class="berry-status" aria-live="polite"></p>
           </section>
@@ -570,8 +578,9 @@ export class CaughtPokemonDetail extends HTMLElement {
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
             </button>
           </header>
-          <label class="field-inline">Level
-            <level-input class="level-up-input" aria-label="Level"></level-input>
+          <label class="field-inline level-up-field">Level
+            <span class="level-up-from">Lv. <span class="level-up-from-value"></span> →</span>
+            <level-input class="level-up-input" aria-label="New level"></level-input>
           </label>
 
           <section class="level-up-evolve" hidden>
@@ -657,13 +666,13 @@ export class CaughtPokemonDetail extends HTMLElement {
     this.$levelUpDialog = shadow.querySelector('.level-up-dialog');
     this.$levelUpDialogClose = shadow.querySelector('.level-up-dialog-close');
     this.$levelUpInput = shadow.querySelector('.level-up-input');
+    this.$levelUpFromValue = shadow.querySelector('.level-up-from-value');
     this.$levelUpEvolve = shadow.querySelector('.level-up-evolve');
     this.$levelUpEvoChain = shadow.querySelector('.level-up-evo-chain');
     this.$levelUpStats = shadow.querySelector('.level-up-stats');
     this.$levelUpStatsLevel = shadow.querySelector('.level-up-stats-level');
     this.$levelUpStatsFields = shadow.querySelector('.level-up-stats-fields');
     this.$levelUpDoneBtn = shadow.querySelector('.level-up-done-btn');
-    this.$statusRow = shadow.querySelector('.status-row');
     this.$moreBtnWrap = shadow.querySelector('.more-btn-wrap');
     this.$moreBtn = shadow.querySelector('.more-btn');
     this.$moreMenu = shadow.querySelector('.more-menu');
@@ -676,13 +685,13 @@ export class CaughtPokemonDetail extends HTMLElement {
     this.$competitiveDialogClose = shadow.querySelector('.competitive-dialog-close');
     this.$evSummary = shadow.querySelector('ev-summary');
     this.$itemGrid = shadow.querySelector('.item-grid');
+    this.$heldItemSaveBtn = shadow.querySelector('.held-item-save-btn');
     this.$pokerusToggle = shadow.querySelector('.pokerus-toggle-btn');
     this.$pokerusNote = shadow.querySelector('.pokerus-note');
     this.$expShareToggle = shadow.querySelector('.exp-share-toggle-btn');
     this.$vitaminGrid = shadow.querySelector('.vitamin-grid');
     this.$vitaminStatus = shadow.querySelector('.vitamin-status');
     this.$evHelpBtn = shadow.querySelector('.nature-dialog .help-btn');
-    this.$vitaminHelpBtn = shadow.querySelector('.vitamins .help-btn');
     this.$wingsSection = shadow.querySelector('.wings');
     this.$wingGrid = shadow.querySelector('.wing-grid');
     this.$wingStatus = shadow.querySelector('.wing-status');
@@ -713,13 +722,20 @@ export class CaughtPokemonDetail extends HTMLElement {
   // Rebuilt on every render (not just once) because which items are even
   // offered — and the Power item bonus shown — depends on the entry's
   // party's game version, and this one component instance is reused
-  // across different parties as the user navigates. Each button applies
-  // its item immediately on click (clicking the active one again clears
-  // it) — there's no separate "None" option or save step.
+  // across different parties as the user navigates. Reads through
+  // `_pendingHeldItem` while the Items dialog has an uncommitted pick
+  // (docs/adr/0017) — falling back to the entry's actual committed
+  // values the rest of the time (dialog closed, or an unrelated store
+  // change re-rendering everything while it's open) — so an in-progress
+  // pick survives a re-render it didn't cause. Also drives the Exp.
+  // Share toggle's `active` state, since it shares this same pending
+  // held-item slot.
   _updateItemGrid() {
     const bonus = store.powerItemBonus();
     const availability = store.trainingItemAvailability();
-    const selected = this._entry.machoBrace ? 'macho-brace' : this._entry.powerItem || '';
+    const pending = this._pendingHeldItem || this._entry;
+    const selected = pending.machoBrace ? 'macho-brace' : pending.powerItem || '';
+    this.$expShareToggle.toggleAttribute('active', !!pending.expShare);
 
     const offered = [];
     if (availability.machoBrace) {
@@ -758,7 +774,10 @@ export class CaughtPokemonDetail extends HTMLElement {
     this.$levelUpBtn.addEventListener('click', () => this._openLevelUpDialog());
     this.$levelUpInput.addEventListener('change', () => this._previewLevelUpInput());
     this.$levelUpDoneBtn.addEventListener('click', () => this._saveLevelUp());
-    this.$levelUpDialog.addEventListener('close', () => this._onDialogClosed());
+    this.$levelUpDialog.addEventListener('close', () => {
+      this._onDialogClosed();
+      this.$levelUpEvoChain.discard(); // no-op if Save already committed it
+    });
     this.$levelUpDialogClose.addEventListener('click', () => this.$levelUpDialog.close());
     this.$levelUpDialog.addEventListener('click', (e) => {
       if (e.target === this.$levelUpDialog) this.$levelUpDialog.close();
@@ -862,7 +881,10 @@ export class CaughtPokemonDetail extends HTMLElement {
     });
     this.$natureDialogSaveBtn.addEventListener('click', () => this._saveNatureDialog());
     this.$natureBtn.addEventListener('click', () => this._openNatureDialog());
-    this.$itemDialog.addEventListener('close', () => this._onDialogClosed());
+    this.$itemDialog.addEventListener('close', () => {
+      this._onDialogClosed();
+      this._pendingHeldItem = null; // discard any uncommitted held-item pick — Save doesn't close this dialog
+    });
     this.$itemDialogClose.addEventListener('click', () => this.$itemDialog.close());
     this.$itemDialog.addEventListener('click', (e) => {
       if (e.target === this.$itemDialog) this.$itemDialog.close();
@@ -882,6 +904,26 @@ export class CaughtPokemonDetail extends HTMLElement {
       if (e.target === this.$ivDialog) this.$ivDialog.close();
     });
     this.$ivDialogSaveBtn.addEventListener('click', () => this._saveIvs());
+    // Enter anywhere in a preview-then-Save dialog (Nature/IVs/Level —
+    // docs/adr/0017) commits the same way clicking its own Save button
+    // does, matching ordinary form expectations — without this, a native
+    // <dialog> with no <form> wrapper just swallows Enter and does
+    // nothing. Excluded: a <textarea> (Enter means "new line" there) and
+    // a button (Enter/Space already activates it natively — re-clicking
+    // Save here too would be a harmless but pointless double-fire).
+    for (const [dialog, saveBtn] of /** @type {[HTMLDialogElement, HTMLButtonElement][]} */ ([
+      [this.$natureDialog, this.$natureDialogSaveBtn],
+      [this.$ivDialog, this.$ivDialogSaveBtn],
+      [this.$levelUpDialog, this.$levelUpDoneBtn],
+    ])) {
+      dialog.addEventListener('keydown', (e) => {
+        if (e.key !== 'Enter') return;
+        const target = /** @type {HTMLElement} */ (e.target);
+        if (target.tagName === 'TEXTAREA' || target.tagName === 'BUTTON') return;
+        e.preventDefault();
+        saveBtn.click();
+      });
+    }
     // The "?" buttons toggle their explanation inline: title tooltips are
     // hover-only, which leaves them unreachable on touch devices. Listens
     // on the shadow root, since these help buttons are spread across
@@ -902,26 +944,42 @@ export class CaughtPokemonDetail extends HTMLElement {
         btn.setAttribute('aria-expanded', 'true');
       }
     });
+    // Training item + Exp. Share only preview here (docs/adr/0017) —
+    // they write into `_pendingHeldItem`, applied only by the held-item
+    // Save button below. Everything else in this dialog (Pokérus/
+    // Vitamins/Wings/berries) stays instant.
     this.$itemGrid.addEventListener('item-pick', (e) => {
       const val = e.detail.id;
-      const selected = this._entry.machoBrace ? 'macho-brace' : this._entry.powerItem || '';
+      const pending = this._pendingHeldItem;
+      const selected = pending.machoBrace ? 'macho-brace' : pending.powerItem || '';
       if (val === selected) {
-        store.setPowerItem(this._entry.uid, null); // clicking the active item again clears it
+        pending.powerItem = null; // clicking the active item again clears it
+        pending.machoBrace = false;
       } else if (val === 'macho-brace') {
-        store.setMachoBrace(this._entry.uid, true);
+        pending.machoBrace = true;
+        pending.powerItem = null;
       } else {
-        store.setPowerItem(this._entry.uid, val);
+        pending.powerItem = val;
+        pending.machoBrace = false;
       }
+      pending.expShare = false; // picking a training item vacates Exp. Share's slot too
+      this._updateItemGrid();
     });
-    // Pokérus moved to the Items dialog and stays instant, alongside Exp.
-    // Share/Vitamins/Wings/berries/held item — same "cheap to undo via
-    // History" reasoning (docs/adr/0017).
+    // Pokérus stays instant, alongside Vitamins/Wings/berries — same
+    // "cheap to undo via History" reasoning (docs/adr/0017).
     this.$pokerusToggle.addEventListener('pick', () => {
       store.setPokerus(this._entry.uid, !this.$pokerusToggle.hasAttribute('active'));
     });
     this.$expShareToggle.addEventListener('pick', () => {
-      store.setExpShare(this._entry.uid, !this.$expShareToggle.hasAttribute('active'));
+      const pending = this._pendingHeldItem;
+      pending.expShare = !pending.expShare;
+      if (pending.expShare) {
+        pending.powerItem = null;
+        pending.machoBrace = false;
+      }
+      this._updateItemGrid();
     });
+    this.$heldItemSaveBtn.addEventListener('click', () => this._saveHeldItem());
     this.$vitaminGrid.addEventListener('item-pick', (e) => this._useVitamin(e.detail.id));
     this.$wingGrid.addEventListener('item-pick', (e) => this._useFeather(e.detail.id));
     this.$berryGrid.addEventListener('item-pick', (e) => this._useBerry(e.detail.id));
@@ -965,10 +1023,27 @@ export class CaughtPokemonDetail extends HTMLElement {
     this.$natureDialog.close();
   }
 
-  /** Refreshes the item grid from the entry's current selection, then opens. */
+  /**
+   * Seeds the held-item pending state from the entry (so a previous
+   * session's discarded pick never leaks into a fresh one — same
+   * reasoning as Nature/IVs, docs/adr/0017), refreshes the item grid
+   * from it, then opens.
+   */
   _openItemDialog() {
+    const e = this._entry;
+    this._pendingHeldItem = { powerItem: e.powerItem, machoBrace: e.machoBrace, expShare: e.expShare };
     this._updateItemGrid();
     this._openDialog(this.$itemDialog);
+  }
+
+  /** Applies the pending held-item choice (Training item, Macho Brace, or Exp. Share — whichever ended up set), then re-seeds pending from the now-current entry. Doesn't close the dialog: Vitamins/Wings/berries/Pokérus below stay usable afterward. */
+  _saveHeldItem() {
+    const e = this._entry;
+    const p = this._pendingHeldItem;
+    if (p.expShare) store.setExpShare(e.uid, true);
+    else if (p.machoBrace) store.setMachoBrace(e.uid, true);
+    else store.setPowerItem(e.uid, p.powerItem);
+    this._pendingHeldItem = { powerItem: e.powerItem, machoBrace: e.machoBrace, expShare: e.expShare };
   }
 
   /** Release is destructive and irreversible, so it's gated behind a native confirm() with no dialog of its own. */
@@ -1073,7 +1148,6 @@ export class CaughtPokemonDetail extends HTMLElement {
     this._renderNatureHint();
     const nature = natureAvailable ? NATURES.find((n) => n.id === e.nature) : null;
     this._renderNatureBadge(nature, natureAvailable);
-    this._renderStatusBadges(e);
     this._renderItemBadge(e);
     // Recently-defeated opponents, most recent first (history is
     // unshift-ordered already) — lets a grinding session re-pick the
@@ -1099,9 +1173,6 @@ export class CaughtPokemonDetail extends HTMLElement {
     this.$evHelpBtn.title = statExp
       ? "Stat Experience is this game's hidden bonus stat pool — up to 65,535 per stat, gained mainly from battling (equal to the defeated Pokémon's own base stat). Nature is fixed when a Pokémon is caught or hatched: it boosts one stat by 10% and lowers another. Nature doesn't change Stat Experience, but training the stat your nature already boosts gets the most out of your points."
       : "EVs (Effort Values) are hidden bonus stat points earned mainly from battling — up to 252 per stat, 510 total. Nature is fixed when a Pokémon is caught or hatched: it boosts one stat by 10% and lowers another. Nature doesn't change EVs, but training the stat your nature already boosts gets the most out of your points.";
-    this.$vitaminHelpBtn.title = statExp
-      ? `Vitamins (HP Up, Protein, Iron, Calcium, Carbos) instantly add ${STAT_EXP_VITAMIN_BONUS} Stat Experience to one stat without battling — but only work until that stat has ${STAT_EXP_VITAMIN_CEILING} Stat Experience from any source (battling included); after that, only battling can push it further toward the 65,535 cap.`
-      : 'Vitamins (HP Up, Protein, Iron, Calcium, Zinc, Carbos) instantly add EVs to one stat without battling — a quick way to top off a stat. Each only works until that stat has 100 EVs from any source; after that, only battling, items, or Pokérus can push it further toward the 252 cap.';
 
     const trained = totalCap != null && totalEvs(e.evs) >= totalCap;
     this.toggleAttribute('fully-trained', trained);
@@ -1122,7 +1193,6 @@ export class CaughtPokemonDetail extends HTMLElement {
     }
     this.$pokerusToggle.toggleAttribute('disabled', !pokerusAvailable);
     this.$pokerusNote.hidden = pokerusAvailable;
-    this.$expShareToggle.toggleAttribute('active', !!e.expShare);
     this.$vitaminStatus.textContent = '';
     this._updateVitaminGrid(e);
     const wingsAvailable = store.wingsAvailable();
@@ -1362,6 +1432,7 @@ export class CaughtPokemonDetail extends HTMLElement {
    */
   _openLevelUpDialog() {
     const e = this._entry;
+    this.$levelUpFromValue.textContent = String(e.level);
     this.$levelUpInput.value = String(e.level);
     this.$levelUpEvolve.hidden = false;
     this.$levelUpEvoChain.entry = e;
@@ -1402,9 +1473,20 @@ export class CaughtPokemonDetail extends HTMLElement {
     if (!store.usesStatExpSystem()) this._renderLevelUpStatsFields(clamped);
   }
 
-  /** Commits the level, then every filled-in stat row (at that now-current level), then closes. */
-  _saveLevelUp() {
+  /**
+   * Commits any pending Evolve/Undo choice first (the one network step
+   * here — see evolution-chain.js's `commit()`), then the level, then
+   * every filled-in stat row (at that now-current level), then closes.
+   * A failed commit leaves the dialog open with its own error message
+   * shown instead of closing over a Save that didn't fully apply.
+   */
+  async _saveLevelUp() {
     const e = this._entry;
+    try {
+      await this.$levelUpEvoChain.commit();
+    } catch {
+      return;
+    }
     store.setLevel(e.uid, this.$levelUpInput.value);
     for (const input of this.$levelUpStatsFields.querySelectorAll('input[data-stat]')) {
       const observed = Number(input.value);
@@ -1427,28 +1509,20 @@ export class CaughtPokemonDetail extends HTMLElement {
     this.$natureBtn.title = nature ? `${nature.label} nature — ${natureEffectHint(nature)}` : 'Nature';
   }
 
-  // Exp. Share badge next to the identity fields, so it's visible on the
-  // page itself without opening a dialog. The held-item badge used to
-  // live in this same row but is now its own clickable .held-item-btn (see
-  // _renderItemBadge) — the item popup it opens is where held-item
-  // status actually lives now, docs/adr/0017.
-  _renderStatusBadges(e) {
-    this.$statusRow.hidden = !e.expShare;
-    this.$statusRow.innerHTML = e.expShare
-      ? `<span class="ds-pill-badge status-pill status-pill--item"><img src="${EXP_SHARE_SPRITE}" alt="" ${FALLBACK_ONERROR} />Exp. Share</span>`
-      : '';
-  }
-
   // The header's held-item badge doubles as the button that opens the
   // Items popup — mirrors .level-up-btn's own "the badge is the trigger"
   // pattern. Never hidden: Vitamins/Pokérus/Exp. Share/EV-reducing
   // berries live in that same popup now too (docs/adr/0017) and none of
   // those are gated on held-item support, so this stays the one entry
-  // point regardless of generation. Reads through store.effectiveAids,
-  // so an item the party's rules don't support (e.g. a Macho Brace left
-  // over from before the game version was edited) shows as "No item" —
-  // matching the fact that it no longer applies — rather than claiming a
-  // bonus that isn't granted. Pre-Gen III, where holding an item isn't a
+  // point regardless of generation. Exp. Share shows here rather than in
+  // a badge of its own, since it's mutually exclusive with a power item/
+  // the Macho Brace (store.js's setExpShare/setPowerItem/setMachoBrace)
+  // — one held item, one slot to show it in. Reads through
+  // store.effectiveAids for the power-item/Macho-Brace half, so an item
+  // the party's rules don't support (e.g. a Macho Brace left over from
+  // before the game version was edited) shows as "No item" — matching
+  // the fact that it no longer applies — rather than claiming a bonus
+  // that isn't granted. Pre-Gen III, where holding an item isn't a
   // mechanic at all, falls back to the dialog's own generic "Items"
   // label instead of a misleading "No item".
   _renderItemBadge(e) {
@@ -1457,7 +1531,11 @@ export class CaughtPokemonDetail extends HTMLElement {
     let sprite = null;
     let label;
     let empty = true;
-    if (aids.machoBrace) {
+    if (e.expShare) {
+      sprite = EXP_SHARE_SPRITE;
+      label = 'Exp. Share';
+      empty = false;
+    } else if (aids.machoBrace) {
       sprite = MACHO_BRACE_SPRITE;
       label = `Macho Brace — ×${MACHO_BRACE_MULTIPLIER} EVs`;
       empty = false;
