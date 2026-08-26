@@ -6,11 +6,13 @@
   "scripts": {
     "test": "node --test \"test/**/*.test.js\"",
     "test:e2e": "playwright test",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "build": "node scripts/build.mjs"
   },
   "devDependencies": {
     "@playwright/test": "^1.62.1",
     "@types/node": "^26.2.0",
+    "esbuild": "^0.28.2",
     "typescript": "^5.9.3",
     "uuidv7": "^1.2.1"
   }

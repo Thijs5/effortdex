@@ -86,8 +86,16 @@ for the reasoning.
 
 ## Technical details
 
-Built with native Web Components: no framework, no build step, no
-bundler. Open `index.html` (or serve the directory) and it runs.
+Built with native Web Components: no framework, no bundler, no
+transpilation — every file runs in the browser exactly as written. Open
+`index.html` (or serve the directory) and it runs, straight from
+source, with no build step required for local development. The
+deployed site (GitHub Pages, `.github/workflows/deploy.yml`) is built
+first (`npm run build`) — a minify-only pass (`scripts/build.mjs`,
+esbuild) that shrinks the shipped JS/CSS without bundling/concatenating
+or touching source: one minified output file per input file, same
+directory layout, so dev and prod both run the same unmodified
+`index.html`/`sw.js` against files at the same relative paths.
 
 ### Running it locally
 
