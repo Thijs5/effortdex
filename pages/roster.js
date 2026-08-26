@@ -30,6 +30,7 @@ import { versionedSpriteUrl } from '../lib/pokeapi-client.js';
 import { wireSpriteFallback } from '../lib/sprite-fallback.js';
 import * as router from '../lib/router.js';
 import { interceptLinkClick } from '../lib/dom.js';
+import { wireDragHandle } from '../lib/drag-reorder.js';
 import { openEditDialog } from './party-dialog.js';
 import '../components/game-ball.js';
 import '../components/pokemon-search.js';
@@ -390,87 +391,20 @@ function renderRoster(party) {
     evBar.max = totalCap;
     evBar.value = totalEvs(entry.evs);
     interceptLinkClick(link, () => router.navigateToPokemon(party.slug, entry.uid));
-    if (reorderable) wireDragHandle(row.querySelector('.roster-card-handle'), row);
+    if (reorderable) {
+      wireDragHandle({
+        handle: row.querySelector('.roster-card-handle'),
+        item: row,
+        container: roster,
+        itemSelector: '.roster-card',
+        draggingClass: 'roster-card--dragging',
+        dropTargetClass: 'roster-card--drop-target',
+        onDrop: (item, endIndex) => store.reorderPokemon(item.dataset.uid, endIndex),
+      });
+    }
     roster.appendChild(row);
   }
   writeRosterStateToQuery();
-}
-
-/**
- * Pointer-driven drag-to-reorder (not native HTML5 drag-and-drop, which
- * doesn't fire from touch on mobile browsers) — press the handle, drag
- * up/down, and whichever neighbor the pointer is nearest gets highlighted
- * as the drop target. Only on release does the card actually move: a
- * single DOM reorder plus a single store.reorderPokemon call, since only
- * the dragged card needs to move, everything else just shifts to make
- * room, same as the in-game party-reorder screen.
- *
- * Deliberately doesn't move the card in the DOM live, for two reasons.
- * First, the roster is a CSS Grid, not a single-column list (auto-fill
- * puts several cards per row on anything wider than ~520px) — reordering
- * live would change which grid column a neighbor falls into, changing
- * its measured position, which can immediately reverse the very decision
- * that just moved it: an oscillation instead of a settled drop. Second,
- * moving the dragged card's own subtree — which contains the handle that
- * has pointer capture — mid-gesture silently drops that capture in
- * Chromium, ending the drag after a single move event.
- * @param {HTMLButtonElement} handle @param {HTMLElement} row
- */
-function wireDragHandle(handle, row) {
-  handle.addEventListener('pointerdown', (e) => {
-    if (e.pointerType === 'mouse' && e.button !== 0) return;
-    e.preventDefault();
-    handle.setPointerCapture(e.pointerId);
-    const cardsNow = () => [...roster.querySelectorAll('.roster-card')];
-    const startIndex = cardsNow().indexOf(row);
-    row.classList.add('roster-card--dragging');
-
-    // Snapshot once, not re-measured per move — see the doc comment above.
-    const others = cardsNow()
-      .filter((card) => card !== row)
-      .map((card) => {
-        const rect = card.getBoundingClientRect();
-        return { card, rect, cx: rect.left + rect.width / 2, cy: rect.top + rect.height / 2 };
-      });
-
-    /** @type {{ card: Element, before: boolean } | null} */
-    let dropTarget = null;
-
-    const onMove = (moveEvent) => {
-      const { clientX: x, clientY: y } = moveEvent;
-      let closest = null;
-      let closestDist = Infinity;
-      for (const candidate of others) {
-        const dist = (x - candidate.cx) ** 2 + (y - candidate.cy) ** 2;
-        if (dist < closestDist) {
-          closestDist = dist;
-          closest = candidate;
-        }
-      }
-      if (!closest) return;
-      const { card, rect, cx, cy } = closest;
-      const sameRow = y >= rect.top && y <= rect.bottom;
-      const before = sameRow ? x < cx : y < cy;
-      for (const other of others) other.card.classList.remove('roster-card--drop-target');
-      card.classList.add('roster-card--drop-target');
-      dropTarget = { card, before };
-    };
-    const onEnd = () => {
-      row.classList.remove('roster-card--dragging');
-      for (const other of others) other.card.classList.remove('roster-card--drop-target');
-      handle.removeEventListener('pointermove', onMove);
-      handle.removeEventListener('pointerup', onEnd);
-      handle.removeEventListener('pointercancel', onEnd);
-      if (dropTarget) {
-        roster.insertBefore(row, dropTarget.before ? dropTarget.card : dropTarget.card.nextSibling);
-      }
-      const endIndex = cardsNow().indexOf(row);
-      if (endIndex !== startIndex) store.reorderPokemon(row.dataset.uid, endIndex);
-    };
-    handle.addEventListener('pointermove', onMove);
-    handle.addEventListener('pointerup', onEnd);
-    handle.addEventListener('pointercancel', onEnd);
-  });
 }
 
 /* ------------------------------------------------------------------ */
