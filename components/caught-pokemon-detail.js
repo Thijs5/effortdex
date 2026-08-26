@@ -8,6 +8,7 @@ import { matchGameVersion } from '../lib/game-versions.js';
 import { attachDesignSystem } from '../lib/design-system.js';
 import { wireSpriteFallback } from '../lib/sprite-fallback.js';
 import { POKERUS_ICON_SVG } from '../lib/icons.js';
+import { wireDisclosureMenu } from '../lib/dom.js';
 import './ev-summary.js';
 import './ev-history-log.js';
 import './evolution-chain.js';
@@ -908,17 +909,17 @@ export class CaughtPokemonDetail extends HTMLElement {
     // The "More" button opens a small menu (Training & EVs / Competitive)
     // rather than a dialog directly — the combined dialog got long enough
     // (Level & nature through Release, now Competitive on top) that
-    // splitting by "what am I here to do" beat one long scroll. Mirrors
-    // the app shell's own header menu (lib/shell.js) — open/outside-
-    // click/Escape/arrow-key behavior all match it, reimplemented locally
-    // since shadow DOM can't reuse that light-DOM listener setup.
-    const moreMenuItems = () => [...this.$moreMenu.querySelectorAll('.more-menu-item')];
-    const setMoreMenuOpen = (open) => {
-      this.$moreMenu.hidden = !open;
-      this.$moreBtn.setAttribute('aria-expanded', String(open));
-      if (open) moreMenuItems()[0].focus();
-    };
-    this.$moreBtn.addEventListener('click', () => setMoreMenuOpen(this.$moreMenu.hidden));
+    // splitting by "what am I here to do" beat one long scroll. Shares its
+    // open/outside-click/Escape/arrow-key behavior with the app shell's own
+    // header menu (lib/shell.js) via wireDisclosureMenu — shadow DOM just
+    // needs its own shadowRoot passed as the active-element root.
+    const setMoreMenuOpen = wireDisclosureMenu({
+      button: this.$moreBtn,
+      menu: this.$moreMenu,
+      itemSelector: '.more-menu-item',
+      boundary: this.$moreBtnWrap,
+      activeRoot: this.shadowRoot,
+    });
     this.$moreMenu.addEventListener('click', (e) => {
       const item = /** @type {HTMLElement} */ (e.target).closest('.more-menu-item');
       if (!item) return;
@@ -926,30 +927,6 @@ export class CaughtPokemonDetail extends HTMLElement {
       if (item.dataset.open === 'ivs') this._openIvsDialog();
       else if (item.dataset.open === 'competitive') this._openDialog(this.$competitiveDialog);
       else if (item.dataset.action === 'release') this._releasePokemon();
-    });
-    // A click anywhere outside the menu closes it — listened on
-    // `document`, not this.shadowRoot, since a click that lands outside
-    // the whole component (e.g. the page background) never reaches a
-    // shadow-root-scoped listener at all. e.target retargets to the host
-    // element from outside the shadow boundary, so composedPath() (which
-    // doesn't) is what actually finds .more-btn-wrap when the click was
-    // inside it.
-    document.addEventListener('click', (e) => {
-      if (!this.$moreMenu.hidden && !e.composedPath().includes(this.$moreBtnWrap)) setMoreMenuOpen(false);
-    });
-    this.shadowRoot.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && !this.$moreMenu.hidden) {
-        setMoreMenuOpen(false);
-        this.$moreBtn.focus();
-      }
-    });
-    this.$moreMenu.addEventListener('keydown', (e) => {
-      if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
-      e.preventDefault();
-      const items = moreMenuItems();
-      const current = items.indexOf(/** @type {HTMLElement} */ (this.shadowRoot.activeElement));
-      const step = e.key === 'ArrowDown' ? 1 : -1;
-      items[(current + step + items.length) % items.length].focus();
     });
 
     // 'close' catches every path a dialog can close by: the ✕, Esc, and
@@ -1839,20 +1816,18 @@ export class CaughtPokemonDetail extends HTMLElement {
       const cappedByCutoff = cutoffApplies && stat >= VITAMIN_STAT_CUTOFF;
       const cappedByStatCap = stat >= statCap;
       const cappedByCeiling = statExp && stat >= STAT_EXP_VITAMIN_CEILING;
-      const fedCount = e.history.filter((h) => h.kind === 'vitamin' && h.vitaminId === v.id).length;
-      const pendingCount = this._pendingApplies.filter((p) => p.kind === 'vitamin' && p.id === v.id).length;
       const capped = cappedByCutoff || cappedByCeiling || cappedByStatCap;
-      const fedNote = fedCount ? ` — fed ${fedCount}×` : '';
-      const pendingNote = pendingCount ? ` — ${pendingCount}× queued` : '';
-      const title = capped
-        ? (cappedByCutoff
-            ? `This game stops vitamins once ${statLabel} has ${VITAMIN_STAT_CUTOFF}+ EVs`
-            : cappedByCeiling
-              ? `Vitamins stop working once ${statLabel} has ${STAT_EXP_VITAMIN_CEILING}+ Stat Experience`
-              : `${statLabel} is already at the ${statCap} cap`) + fedNote + pendingNote
-        : `Feed ${v.label} — raises ${statLabel} by up to ${bonus}` + fedNote + pendingNote;
-      const boost = pendingCount ? `+${bonus} ${statLabel} · ${pendingCount}× queued` : `+${bonus} ${statLabel}`;
-      return { id: v.id, label: v.label, sprite: v.sprite, boost, title, capped, disabled: capped, count: fedCount };
+      const cappedReason = cappedByCutoff
+        ? `This game stops vitamins once ${statLabel} has ${VITAMIN_STAT_CUTOFF}+ EVs`
+        : cappedByCeiling
+          ? `Vitamins stop working once ${statLabel} has ${STAT_EXP_VITAMIN_CEILING}+ Stat Experience`
+          : `${statLabel} is already at the ${statCap} cap`;
+      return this._buildItemGridRow(e, 'vitamin', v, {
+        capped,
+        cappedReason,
+        activeText: `Feed ${v.label} — raises ${statLabel} by up to ${bonus}`,
+        boostText: `+${bonus} ${statLabel}`,
+      });
     });
   }
 
@@ -1860,19 +1835,17 @@ export class CaughtPokemonDetail extends HTMLElement {
   // never have one. See `_updateVitaminGrid`'s own comment for the
   // simulated-EVs/queued-count/disabled reasoning, shared here.
   _updateWingGrid(e) {
+    const statCap = store.statCap();
     const simEvs = this._simulatedEvs();
     this.$wingGrid.items = SORTED_FEATHERS.map((f) => {
       const stat = simEvs[f.stat];
-      const capped = stat >= 252;
-      const fedCount = e.history.filter((h) => h.kind === 'feather' && h.featherId === f.id).length;
-      const pendingCount = this._pendingApplies.filter((p) => p.kind === 'feather' && p.id === f.id).length;
-      const fedNote = fedCount ? ` — fed ${fedCount}×` : '';
-      const pendingNote = pendingCount ? ` — ${pendingCount}× queued` : '';
-      const title = capped
-        ? `${STAT_LABEL[f.stat]} is already at the 252 cap` + fedNote + pendingNote
-        : `Feed ${f.label} — raises ${STAT_LABEL[f.stat]} EVs by ${FEATHER_BONUS}` + fedNote + pendingNote;
-      const boost = pendingCount ? `+${FEATHER_BONUS} ${STAT_LABEL[f.stat]} · ${pendingCount}× queued` : `+${FEATHER_BONUS} ${STAT_LABEL[f.stat]}`;
-      return { id: f.id, label: f.label, sprite: f.sprite, boost, title, capped, disabled: capped, count: fedCount };
+      const capped = stat >= statCap;
+      return this._buildItemGridRow(e, 'feather', f, {
+        capped,
+        cappedReason: `${STAT_LABEL[f.stat]} is already at the ${statCap} cap`,
+        activeText: `Feed ${f.label} — raises ${STAT_LABEL[f.stat]} EVs by ${FEATHER_BONUS}`,
+        boostText: `+${FEATHER_BONUS} ${STAT_LABEL[f.stat]}`,
+      });
     });
   }
 
@@ -1885,16 +1858,30 @@ export class CaughtPokemonDetail extends HTMLElement {
     this.$berryGrid.items = SORTED_EV_BERRIES.map((b) => {
       const stat = simEvs[b.stat];
       const capped = stat <= 0;
-      const fedCount = e.history.filter((h) => h.kind === 'berry' && h.berryId === b.id).length;
-      const pendingCount = this._pendingApplies.filter((p) => p.kind === 'berry' && p.id === b.id).length;
-      const fedNote = fedCount ? ` — fed ${fedCount}×` : '';
-      const pendingNote = pendingCount ? ` — ${pendingCount}× queued` : '';
-      const title = capped
-        ? `${STAT_LABEL[b.stat]} is already at 0` + fedNote + pendingNote
-        : `Feed ${b.label} — removes up to ${EV_BERRY_REDUCTION} ${STAT_LABEL[b.stat]} EVs` + fedNote + pendingNote;
-      const boost = pendingCount ? `−${EV_BERRY_REDUCTION} ${STAT_LABEL[b.stat]} · ${pendingCount}× queued` : `−${EV_BERRY_REDUCTION} ${STAT_LABEL[b.stat]}`;
-      return { id: b.id, label: b.label, sprite: b.sprite, boost, title, capped, disabled: capped, count: fedCount };
+      return this._buildItemGridRow(e, 'berry', b, {
+        capped,
+        cappedReason: `${STAT_LABEL[b.stat]} is already at 0`,
+        activeText: `Feed ${b.label} — removes up to ${EV_BERRY_REDUCTION} ${STAT_LABEL[b.stat]} EVs`,
+        boostText: `−${EV_BERRY_REDUCTION} ${STAT_LABEL[b.stat]}`,
+      });
     });
+  }
+
+  // Shared shape behind _updateVitaminGrid/_updateWingGrid/_updateBerryGrid:
+  // each grid differs only in its cap rule and its wording (computed by the
+  // caller above and passed in), but all three feed the same fed-count
+  // (permanent, from history) / pending-count (queued this session, from
+  // `_pendingApplies`) / disabled-when-capped row shape into <item-button-grid>.
+  // `kind` is the history/pending-apply discriminator ('vitamin'/'feather'/
+  // 'berry'); history entries key the target id as `${kind}Id`.
+  _buildItemGridRow(e, kind, item, { capped, cappedReason, activeText, boostText }) {
+    const fedCount = e.history.filter((h) => h.kind === kind && h[`${kind}Id`] === item.id).length;
+    const pendingCount = this._pendingApplies.filter((p) => p.kind === kind && p.id === item.id).length;
+    const fedNote = fedCount ? ` — fed ${fedCount}×` : '';
+    const pendingNote = pendingCount ? ` — ${pendingCount}× queued` : '';
+    const title = (capped ? cappedReason : activeText) + fedNote + pendingNote;
+    const boost = pendingCount ? `${boostText} · ${pendingCount}× queued` : boostText;
+    return { id: item.id, label: item.label, sprite: item.sprite, boost, title, capped, disabled: capped, count: fedCount };
   }
 }
 customElements.define('caught-pokemon-detail', CaughtPokemonDetail);
