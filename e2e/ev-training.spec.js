@@ -217,6 +217,7 @@ test.describe('EV training', () => {
     const card = await openDetail(page, 'Bulbasaur');
 
     await logBattle(card, 'Caterpie');
+    await card.locator('.battle-dialog-close').click();
     const dialog = await openItemDialog(card);
     await dialog.locator('[data-id="protein"] button').click();
     await dialog.locator('.item-dialog-save-btn').click();

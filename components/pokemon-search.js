@@ -208,7 +208,7 @@ export class PokemonSearch extends HTMLElement {
     // <label>, so mirror the placeholder into aria-label explicitly
     // (or an explicit aria-label the caller set, if more descriptive).
     this.$input.setAttribute('aria-label', this.getAttribute('aria-label') || this.$input.placeholder);
-    this.$sheetTitle.textContent = 'Search Pokémon';
+    this.$sheetTitle.textContent = this.getAttribute('sheet-title') || 'Search Pokémon';
     this.$input.addEventListener('focus', () => {
       this._ensureSpecies();
       if (this._isMobile() && !this._sheetOpen) this._openSheet();
@@ -288,8 +288,18 @@ export class PokemonSearch extends HTMLElement {
     }
   }
 
+  // `force-sheet`: always use the full-screen sheet, regardless of
+  // viewport/pointer — for a caller that already lives inside its own
+  // modal (the detail page's "Log a battle" dialog). The inline dropdown
+  // is `position: fixed`, so it never contributes to that modal's own
+  // fit-content sizing — on any device, a longer suggestions/recents list
+  // simply hangs off the bottom of the small dialog card past its edge,
+  // detached from it, rather than actually being contained by it. The
+  // sheet is the one layout here that's actually built to hold the whole
+  // list (in-flow, not floating), so it's the only fit for "inside
+  // another dialog", not just a narrow-viewport nicety.
   _isMobile() {
-    return window.matchMedia(MOBILE_QUERY).matches;
+    return this.hasAttribute('force-sheet') || window.matchMedia(MOBILE_QUERY).matches;
   }
 
   _openSheet() {
@@ -521,6 +531,15 @@ export class PokemonSearch extends HTMLElement {
   clear() {
     this.$input.value = '';
     this._hideList();
+  }
+
+  // Overrides HTMLElement's no-op focus() (the shadow input is the real
+  // focusable element, not the host) — callers use this to jump straight
+  // into the field (and, via the 'focus' listener above, its full-screen
+  // sheet on mobile with recents already showing) without the user
+  // needing an extra tap on the input itself.
+  focus() {
+    this.$input.focus();
   }
 
   // Overrides HTMLElement's no-op blur() — the host itself is never the
