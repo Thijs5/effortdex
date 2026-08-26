@@ -71,6 +71,14 @@ const SPECIES = [
     baseStats: { hp: 106, atk: 110, def: 90, spa: 154, spd: 90, spe: 130 },
     evYield: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 3 },
   },
+  {
+    // The Emerald curated set's own HP-training recommendation
+    // (lib/ev-training-locations.js) — used by ev-training-guide.spec.js.
+    id: 293,
+    name: 'whismur',
+    baseStats: { hp: 64, atk: 51, def: 23, spa: 51, spd: 23, spe: 28 },
+    evYield: { hp: 1, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
+  },
 ];
 
 const STAT_ORDER = /** @type {const} */ ([

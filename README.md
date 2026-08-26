@@ -49,6 +49,9 @@ separate Sp. Atk/Sp. Def, since that split didn't happen until Gen II.
 - **Evolutions**: evolve a caught Pokémon with its EVs, nickname,
   training aids and history carried over, with an undo for accidental
   clicks.
+- **Where to train**: a short, curated list of good spots to grind each
+  stat's EVs in the party's own game (Gen III onward), with one tap to
+  log a battle against a recommended Pokémon.
 
 ### Other features
 
@@ -128,7 +131,10 @@ every pull request.
   segment), `game-versions.js` (official titles and the generation each
   belongs to), `gen1-special-stats.js` (the real Gen I Special stat per
   species, sourced from Bulbapedia — modern PokéAPI's Sp. Atk/Sp. Def
-  split can't reconstruct it), `version-check.js` (deploy/update detection),
+  split can't reconstruct it), `ev-training-locations.js` (curated,
+  per-game EV-training hotspots, bundled rather than fetched — see
+  [`docs/adr/0018`](docs/adr/0018-curated-bundled-ev-training-locations.md)),
+  `version-check.js` (deploy/update detection),
   `combobox.js` (shared suggestion-dropdown behavior),
   `services.js` (composition root), `constants.js`/`utils.js`.
 - `components/`: one custom element per piece of UI, each owning its
