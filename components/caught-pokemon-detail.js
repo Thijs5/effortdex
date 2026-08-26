@@ -5,11 +5,13 @@ import { api, store, smogon } from '../lib/services.js';
 import { versionedSpriteUrl } from '../lib/pokeapi-client.js';
 import { toShowdownId, smogonSetsKey, TIER_DESCRIPTIONS } from '../lib/smogon-client.js';
 import { matchGameVersion } from '../lib/game-versions.js';
+import { evTrainingLocations } from '../lib/ev-training-locations.js';
 import { attachDesignSystem } from '../lib/design-system.js';
 import { wireSpriteFallback } from '../lib/sprite-fallback.js';
 import { POKERUS_ICON_SVG } from '../lib/icons.js';
 import './ev-summary.js';
 import './ev-history-log.js';
+import './ev-training-guide.js';
 import './evolution-chain.js';
 import './pokemon-search.js';
 import './item-button-grid.js';
@@ -268,6 +270,11 @@ export class CaughtPokemonDetail extends HTMLElement {
         .battle-dialog[open] { display: grid; }
         .battle-dialog.ds-dialog { width: min(420px, calc(100vw - 2.4rem)); }
         .battle-dialog .ds-dialog-header { margin-bottom: 0; }
+        .training-guide-dialog { gap: var(--space-4); }
+        .training-guide-dialog:not([open]) { display: none; }
+        .training-guide-dialog[open] { display: grid; }
+        .training-guide-dialog.ds-dialog { width: min(420px, calc(100vw - 2.4rem)); }
+        .training-guide-dialog .ds-dialog-header { margin-bottom: 0; }
         /* Everything in this dialog previews only, applied together by
            the one footer Save button (docs/adr/0017) — except Pokérus,
            which stays instant (a plain reversible toggle, not a
@@ -320,7 +327,8 @@ export class CaughtPokemonDetail extends HTMLElement {
           .iv-dialog.ds-dialog,
           .item-dialog.ds-dialog,
           .level-up-dialog.ds-dialog,
-          .nature-dialog.ds-dialog {
+          .nature-dialog.ds-dialog,
+          .training-guide-dialog.ds-dialog {
             margin: auto;
             height: fit-content;
             max-height: calc(100dvh - 2.4rem);
@@ -333,6 +341,10 @@ export class CaughtPokemonDetail extends HTMLElement {
 
         .card-body { display: grid; gap: var(--space-5); }
         .card-col { display: grid; gap: var(--space-4); align-content: start; max-width: 360px; }
+        /* Doesn't stretch across the column the way a full-width block
+           would — this is a single secondary action, not the section's
+           main content. */
+        .training-guide-btn { justify-self: start; }
 
         /* Log a battle moved off the page and behind this FAB (issue #17):
            it's the single most repeated action here, so it stays reachable
@@ -499,6 +511,7 @@ export class CaughtPokemonDetail extends HTMLElement {
         .competitive-empty { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--ink-soft); }
         .competitive-attribution { margin: 0; font-size: var(--font-size-2xs); color: var(--ink-soft); }
         .competitive-attribution a { color: inherit; }
+        .training-guide-attribution { margin: var(--space-3) 0 0; font-size: var(--font-size-2xs); color: var(--ink-soft); }
 
         .status { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--poke-red-dark); min-height: 1em; }
       </style>
@@ -682,10 +695,24 @@ export class CaughtPokemonDetail extends HTMLElement {
           </div>
         </dialog>
 
+        <dialog class="training-guide-dialog ds-dialog" aria-labelledby="training-guide-dialog-title">
+          <header class="ds-dialog-header">
+            <h2 id="training-guide-dialog-title">Where to train
+              <button type="button" class="help-btn" aria-expanded="false" aria-label="About this list" title="A short, hand-picked list of good spots to grind each stat's EVs in this game — not an exhaustive list. Tap a Pokémon to log a battle against it.">?</button>
+            </h2>
+            <button class="training-guide-dialog-close ds-dialog-close" type="button" aria-label="Close">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
+          </header>
+          <ev-training-guide></ev-training-guide>
+          <p class="training-guide-attribution">Locations via Bulbapedia &amp; Marriland's EV training guides</p>
+        </dialog>
+
         <div class="card-body">
           <div class="card-col card-col--left">
             <h3 class="section-title">EV values</h3>
             <ev-summary></ev-summary>
+            <button type="button" class="training-guide-btn ds-btn ds-btn--outline ds-btn--sm" hidden aria-haspopup="dialog">Where to train</button>
           </div>
         </div>
 
@@ -790,6 +817,10 @@ export class CaughtPokemonDetail extends HTMLElement {
     this.$battleFab = shadow.querySelector('.battle-fab');
     this.$battleDialog = shadow.querySelector('.battle-dialog');
     this.$battleDialogClose = shadow.querySelector('.battle-dialog-close');
+    this.$trainingGuideBtn = shadow.querySelector('.training-guide-btn');
+    this.$trainingGuideDialog = shadow.querySelector('.training-guide-dialog');
+    this.$trainingGuideDialogClose = shadow.querySelector('.training-guide-dialog-close');
+    this.$trainingGuide = shadow.querySelector('ev-training-guide');
 
     this._spriteFallback = wireSpriteFallback(this.$sprite);
 
@@ -1100,6 +1131,22 @@ export class CaughtPokemonDetail extends HTMLElement {
       this._openDialog(this.$battleDialog);
       this._battle(e.detail.name, `Re-logging battle vs ${titleCase(e.detail.name)}…`);
     });
+    this.$trainingGuideDialog.addEventListener('close', () => this._onDialogClosed());
+    this.$trainingGuideDialogClose.addEventListener('click', () => this.$trainingGuideDialog.close());
+    this.$trainingGuideDialog.addEventListener('click', (e) => {
+      if (e.target === this.$trainingGuideDialog) this.$trainingGuideDialog.close();
+    });
+    this.$trainingGuideBtn.addEventListener('click', () => this._openDialog(this.$trainingGuideDialog));
+    // Reuses the battle dialog for status, same precedent as the history
+    // log's own 'redefeat' handler above — its status line is the only
+    // place "logging…"/an error would show. Closes the guide first: a
+    // native <dialog>.showModal() call from inside another open modal is
+    // otherwise a dead end (docs/adr/0007's own modal-on-modal note).
+    this.$trainingGuide.addEventListener('spot-pick', (e) => {
+      this.$trainingGuideDialog.close();
+      this._openDialog(this.$battleDialog);
+      this._battle(e.detail.name, `Logging battle vs ${titleCase(e.detail.name)}…`);
+    });
   }
 
   /** @param {HTMLDialogElement} dialog */
@@ -1379,6 +1426,13 @@ export class CaughtPokemonDetail extends HTMLElement {
     const berriesAvailable = store.berriesAvailable();
     this.$berriesSection.hidden = !berriesAvailable;
     if (berriesAvailable) this._updateBerryGrid(e);
+    // Curated per-game data (lib/ev-training-locations.js), not a party
+    // rule — no override, so read straight off the party's own baseGame
+    // rather than through an effective-aids-style helper.
+    const locations = evTrainingLocations(store.activeParty?.baseGame);
+    this.$trainingGuideBtn.hidden = !locations;
+    this.$trainingGuide.spriteGame = store.spriteBaseGame();
+    this.$trainingGuide.locations = locations;
     this.$histLog.entry = e;
     this._renderCompetitive(e);
   }
