@@ -130,6 +130,21 @@ export async function openLevelUpDialog(card) {
 }
 
 /**
+ * Opens the "Where to train" dialog from under the EV bars — curated
+ * per-stat grinding spots for the party's own base game (docs/adr/0018).
+ * Hidden entirely on a Gen I/II party (Stat Experience) or an
+ * unrecognized base game, so a spec asserting the hidden case must check
+ * the button directly rather than calling this.
+ * @param {import('@playwright/test').Locator} card
+ */
+export async function openTrainingGuide(card) {
+  await card.locator('.training-guide-btn').click();
+  const dialog = card.locator('dialog.training-guide-dialog');
+  await dialog.waitFor({ state: 'visible' });
+  return dialog;
+}
+
+/**
  * Logs a battle against `opponentSpecies` from the "Log a battle" FAB's
  * dialog — the one entry point for both a direct fight and Exp. Share's
  * passive gain. Opens the dialog first if it isn't already open (it's
