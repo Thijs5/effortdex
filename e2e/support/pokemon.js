@@ -130,13 +130,16 @@ export async function openLevelUpDialog(card) {
 }
 
 /**
- * Logs a battle against `opponentSpecies` from the detail card's "Log a
- * battle" search — the one entry point for both a direct fight and Exp.
- * Share's passive gain.
+ * Logs a battle against `opponentSpecies` from the "Log a battle" FAB's
+ * dialog — the one entry point for both a direct fight and Exp. Share's
+ * passive gain. Opens the dialog first if it isn't already open (it's
+ * left open afterwards, same as the old always-visible inline search).
  * @param {import('@playwright/test').Locator} card
  * @param {string} opponentSpecies
  */
 export async function logBattle(card, opponentSpecies) {
-  await card.getByRole('combobox', { name: 'Defeated Pokémon…' }).fill(opponentSpecies);
+  const dialog = card.locator('dialog.battle-dialog');
+  if (!(await dialog.isVisible())) await card.locator('.battle-fab').click();
+  await dialog.getByRole('combobox', { name: 'Defeated Pokémon…' }).fill(opponentSpecies);
   await card.page().getByRole('option').filter({ hasText: new RegExp(opponentSpecies, 'i') }).first().click();
 }

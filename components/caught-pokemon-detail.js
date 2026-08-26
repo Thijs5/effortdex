@@ -263,6 +263,11 @@ export class CaughtPokemonDetail extends HTMLElement {
         .item-dialog[open] { display: grid; }
         .item-dialog.ds-dialog { width: min(420px, calc(100vw - 2.4rem)); }
         .item-dialog .ds-dialog-header { margin-bottom: 0; }
+        .battle-dialog { gap: var(--space-4); }
+        .battle-dialog:not([open]) { display: none; }
+        .battle-dialog[open] { display: grid; }
+        .battle-dialog.ds-dialog { width: min(420px, calc(100vw - 2.4rem)); }
+        .battle-dialog .ds-dialog-header { margin-bottom: 0; }
         /* Everything in this dialog previews only, applied together by
            the one footer Save button (docs/adr/0017) — except Pokérus,
            which stays instant (a plain reversible toggle, not a
@@ -310,6 +315,7 @@ export class CaughtPokemonDetail extends HTMLElement {
            is an explicit (non-auto) value, so it isn't subject to that
            fill-the-gap resolution and genuinely shrink-wraps instead. */
         @media (max-width: 640px) {
+          .battle-dialog.ds-dialog,
           .competitive-dialog.ds-dialog,
           .iv-dialog.ds-dialog,
           .item-dialog.ds-dialog,
@@ -326,10 +332,26 @@ export class CaughtPokemonDetail extends HTMLElement {
         .level-up-stats-fields { display: grid; gap: var(--space-2); }
 
         .card-body { display: grid; gap: var(--space-5); }
-        @media (min-width: 760px) {
-          .card-body { grid-template-columns: minmax(240px, 360px) 1fr; align-items: start; }
+        .card-col { display: grid; gap: var(--space-4); align-content: start; max-width: 360px; }
+
+        /* Log a battle moved off the page and behind this FAB (issue #17):
+           it's the single most repeated action here, so it stays reachable
+           from anywhere on a page that can now run long (history log fills
+           the rest of the width) instead of scrolling out of view with the
+           rest of card-body. Fixed to the viewport, not the card, on
+           purpose — sticky would still leave it behind once the card's own
+           box ends. */
+        /* Cleared above index.html's own .bezel-footer (~66px tall), which
+           sits at the true viewport bottom on any page shorter than the
+           viewport — the same corner a fixed FAB would otherwise land on
+           top of. */
+        .battle-fab {
+          position: fixed; right: var(--space-4); bottom: calc(66px + var(--space-4)); z-index: 5;
+          display: inline-flex; align-items: center; gap: var(--space-2);
+          box-shadow: 0 3px 0 var(--poke-red-dark), var(--shadow-panel);
         }
-        .card-col { display: grid; gap: var(--space-4); align-content: start; }
+        .battle-fab svg { width: 18px; height: 18px; flex: 0 0 auto; }
+        .battle-dialog .battle-dialog-body { display: grid; gap: var(--space-3); min-width: min(320px, 80vw); }
 
         .section-title {
           margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs);
@@ -478,7 +500,6 @@ export class CaughtPokemonDetail extends HTMLElement {
         .competitive-attribution { margin: 0; font-size: var(--font-size-2xs); color: var(--ink-soft); }
         .competitive-attribution a { color: inherit; }
 
-        .battle { display: grid; gap: var(--space-2); }
         .status { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--poke-red-dark); min-height: 1em; }
       </style>
       <article class="card">
@@ -666,19 +687,29 @@ export class CaughtPokemonDetail extends HTMLElement {
             <h3 class="section-title">EV values</h3>
             <ev-summary></ev-summary>
           </div>
-
-          <div class="card-col card-col--right">
-            <section class="battle">
-              <h3 class="section-title">Log a battle
-                <button type="button" class="help-btn" aria-expanded="false" aria-label="What about Exp. Share?" title="Holding an Exp. Share doesn't change how EVs work here — a Pokémon that gets EVs via Exp. Share earns exactly what it would from fighting directly. Just log the defeat here for this Pokémon too, whether or not it was the one that actually battled.">?</button>
-              </h3>
-              <pokemon-search placeholder="Defeated Pokémon…" show-ev-yield></pokemon-search>
-              <p class="status" aria-live="polite"></p>
-            </section>
-
-            <ev-history-log></ev-history-log>
-          </div>
         </div>
+
+        <ev-history-log></ev-history-log>
+
+        <button type="button" class="battle-fab ds-btn ds-btn--primary" aria-haspopup="dialog">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg>
+          Log a battle
+        </button>
+
+        <dialog class="battle-dialog ds-dialog" aria-labelledby="battle-dialog-title">
+          <header class="ds-dialog-header">
+            <h2 id="battle-dialog-title">Log a battle
+              <button type="button" class="help-btn" aria-expanded="false" aria-label="What about Exp. Share?" title="Holding an Exp. Share doesn't change how EVs work here — a Pokémon that gets EVs via Exp. Share earns exactly what it would from fighting directly. Just log the defeat here for this Pokémon too, whether or not it was the one that actually battled.">?</button>
+            </h2>
+            <button class="battle-dialog-close ds-dialog-close" type="button" aria-label="Close">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+            </button>
+          </header>
+          <div class="battle-dialog-body">
+            <pokemon-search placeholder="Defeated Pokémon…" show-ev-yield sheet-title="Log a battle" force-sheet></pokemon-search>
+            <p class="status" aria-live="polite"></p>
+          </div>
+        </dialog>
       </article>
     `;
 
@@ -756,6 +787,9 @@ export class CaughtPokemonDetail extends HTMLElement {
     this.$search.evModifier = (mon) => store.previewDefeat(this._entry.uid, mon)?.applied;
     this.$status = shadow.querySelector('.status');
     this.$histLog = shadow.querySelector('ev-history-log');
+    this.$battleFab = shadow.querySelector('.battle-fab');
+    this.$battleDialog = shadow.querySelector('.battle-dialog');
+    this.$battleDialogClose = shadow.querySelector('.battle-dialog-close');
 
     this._spriteFallback = wireSpriteFallback(this.$sprite);
 
@@ -929,6 +963,20 @@ export class CaughtPokemonDetail extends HTMLElement {
     });
     this.$natureDialogSaveBtn.addEventListener('click', () => this._saveNatureDialog());
     this.$natureBtn.addEventListener('click', () => this._openNatureDialog());
+    this.$battleDialog.addEventListener('close', () => this._onDialogClosed());
+    this.$battleDialogClose.addEventListener('click', () => this.$battleDialog.close());
+    this.$battleDialog.addEventListener('click', (e) => {
+      if (e.target === this.$battleDialog) this.$battleDialog.close();
+    });
+    this.$battleFab.addEventListener('click', () => {
+      this.$status.textContent = '';
+      this._openDialog(this.$battleDialog);
+      // Focusing immediately (rather than waiting for a tap on the field)
+      // is what actually triggers pokemon-search's own recent-picks
+      // list/full-screen sheet — the point of the FAB is one tap to a
+      // ready-to-pick list, not one tap to an empty field.
+      this.$search.focus();
+    });
     this.$itemDialog.addEventListener('close', () => {
       this._onDialogClosed();
       this._pendingHeldItem = null; // discard any uncommitted picks/queue — harmless no-op if Save already applied and closed
@@ -1046,6 +1094,10 @@ export class CaughtPokemonDetail extends HTMLElement {
       this._battle(e.detail.name, 'Looking up battle data…');
     });
     this.$histLog.addEventListener('redefeat', (e) => {
+      // Opens the battle dialog too — its status line is the only place
+      // "re-logging…"/an error would be visible now that it's not always
+      // on-page (the FAB rework, issue #17).
+      this._openDialog(this.$battleDialog);
       this._battle(e.detail.name, `Re-logging battle vs ${titleCase(e.detail.name)}…`);
     });
   }
