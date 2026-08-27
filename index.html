@@ -407,6 +407,12 @@
           <game-version-picker id="override-sprite-version" maxlength="40" placeholder="Auto (from base game)" aria-label="Sprite style"></game-version-picker>
         </label>
         <p class="hint sprite-style-hint">Shows this title's sprites for the roster instead of the base game's &mdash; e.g. play a Ruby ROM hack but see Emerald's sprites. Any species missing from that title's sprites falls back to the modern default.</p>
+        <label class="field-label">
+          Available Pok&eacute;mon
+          <pokemon-search id="override-available-species-search" placeholder="Add a Pok&eacute;mon from your run…"></pokemon-search>
+        </label>
+        <ul class="chip-list" id="override-available-species-list" aria-label="Available Pok&eacute;mon"></ul>
+        <p class="hint">Leave empty to use every species from this game's generation (and earlier ones) automatically. Add species here to restrict the battle-log and add-Pok&eacute;mon pickers to exactly this list &mdash; for a randomizer or dex-limited run where real availability doesn't match a normal game's.</p>
       </details>
 
       <div class="party-dialog-actions">
