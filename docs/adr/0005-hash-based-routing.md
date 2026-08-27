@@ -6,9 +6,11 @@ Accepted
 
 ## Context
 
-The app has four page states — party picker (`/`), a party's roster
-(`/<party-slug>`), one caught Pokémon (`/<party-slug>/<uid>`), and
-settings (`/settings`) — and users should be able to bookmark, share,
+The app has several page states — party picker (`/`), a party's roster
+(`/<party-slug>`), one caught Pokémon (`/<party-slug>/<uid>`),
+settings (`/settings`), plus later additions transfer (`/transfer`),
+sprite cache management (`/settings/cache`), and roster import
+(`/import/<payload>`) — and users should be able to bookmark, share,
 and use back/forward between them. The app is a static site with no
 server (GitHub Pages, or any file server), is installable, and must
 work offline (ADR 0004).

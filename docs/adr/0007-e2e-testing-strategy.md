@@ -33,7 +33,12 @@ shared rendering code).
 2. **Specs are organized per feature, not per layer or per generation**:
    `e2e/party-management.spec.js`, `catching.spec.js`, `ev-training.spec.js`,
    `pokerus-and-exp-share.spec.js`, `evolution.spec.js`, `transfer.spec.js`,
-   `settings.spec.js`. Each file's `test()` titles are written to be read
+   `settings.spec.js`, and (added later, same principle) `nature.spec.js`,
+   `level-up.spec.js`, `detail-more-menu.spec.js`, `ev-training-guide.spec.js`,
+   `iv-tracking.spec.js`, `smogon-integration.spec.js`, `sprite-cache.spec.js`,
+   `roster-search.spec.js`, `roster-filter-reorder.spec.js`, and
+   `stat-experience.spec.js` (see point 4 below). Each file's `test()`
+   titles are written to be read
    as a feature list — a developer unfamiliar with the app can run
    `npx playwright test --list` and get a table of contents of what
    Effortdex actually does, not just "does the code work."

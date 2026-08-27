@@ -109,7 +109,7 @@ localStorage-backed cache with different rules (see ADR 0001).
   which adds a second, sprite-specific cache to `sw.js` — the fallback
   image still exists and still matters for a species that was never
   cached at all (e.g. one outside every party's generation).
-- The 15-minute poll costs one tiny same-origin request; acceptable.
+- The once-a-day poll costs one tiny same-origin request; acceptable.
 - Two update mechanisms (SW lifecycle + version probe) overlap by
   design — belt and suspenders for the installed-app case where the
   browser's own SW update heuristics can lag by days.

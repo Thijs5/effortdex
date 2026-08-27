@@ -320,3 +320,12 @@ roster.
   ever request the modern-default path — so asserting on that specific
   URL pattern proves this checkbox's own effect regardless of whatever
   else might also be running.
+- **All three entry points share one global kill switch.**
+  `PrefetchService.start()`, `prefetchGame()`, `prefetchGeneration()`,
+  and `resumeInterrupted()` all no-op when `lib/dev-cache.js`'s
+  `isCachingDisabled()` is true — set automatically on localhost, or
+  manually via this page's own "disable caching" checkbox. So the
+  per-row/per-generation buttons, the automatic scan, and the
+  party-creation checkbox above are all silently inert whenever caching
+  is disabled, not just the service worker registration ADR 0004
+  describes.
