@@ -50,6 +50,12 @@ GitHub's auto-generated `**Full Changelog**: vX...vY` compare link
 stays appended at the end of every release, regardless of which
 sections are present above it.
 
+Where a bullet closes out a tracked GitHub issue, link it — `(#24)` is
+enough; GitHub auto-links a bare `#<number>` within the same repo, no
+full URL needed. Not every bullet has one (plenty of work isn't
+tracked via an issue first), so only add it when an issue actually
+exists.
+
 ## Not covered
 
 Releases published before this convention (v0.1.0–v1.0.0) are not
