@@ -22,7 +22,7 @@ written to prevent, just at the view layer instead of the domain layer.
 
 1. **One page, one module.** Each route's view gets its own file under
    `pages/`: `picker.js`, `roster.js`, `pokemon.js`, `settings.js`,
-   `transfer.js`, `import.js`. Each exports a `view` (its root DOM
+   `transfer.js`, `import.js`, `sprite-cache.js`. Each exports a `view` (its root DOM
    element, for `app.js`'s show/hide) and a `render(...)` function. A
    page module owns its own DOM refs and event wiring — no other module
    reaches into its elements.

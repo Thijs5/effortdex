@@ -52,12 +52,23 @@ separate Sp. Atk/Sp. Def, since that split didn't happen until Gen II.
 - **Where to train**: a short, curated list of good spots to grind each
   stat's EVs in the party's own game (Gen III onward), with one tap to
   log a battle against a recommended Pokémon.
+- **IVs**: record a caught Pokémon's Individual Values alongside its EVs.
+- **Competitive data**: pull up Smogon's competitive sets/analysis for a
+  species right from its detail page.
+- **Transfer**: move a caught Pokémon from one party to another, carrying
+  its EVs/IVs, nickname and history along with it.
+- **Roster search, filter & reorder**: find a Pokémon in a large roster
+  quickly, filter the list down (gen-gated to what applies to the
+  party's game), and drag to reorder.
 
 ### Other features
 
 - **Installable / offline**: a web app manifest and service worker let
   it be installed and used without a network connection; species data
-  already looked up stays available offline too.
+  already looked up stays available offline too, including a per-game
+  sprite cache with its own management page (see
+  [`docs/adr/0011`](docs/adr/0011-background-sprite-prefetch.md) and
+  [`docs/adr/0012`](docs/adr/0012-manual-per-game-sprite-cache-management.md)).
 - **Dark mode**: follows the system preference by default; a header
   toggle cycles auto → dark → light and remembers the choice.
 
@@ -94,8 +105,11 @@ secure context.)
 
 ### Testing
 
-Domain logic (`lib/store.js`) has a unit test suite using Node's
-built-in test runner, so there are no extra dependencies to install:
+Domain logic in `lib/` has a unit test suite (`test/`, one file per
+module — `store.js`, `router.js`, `slug.js`, `game-versions.js`,
+`pokeapi-client.js`, `smogon-client.js`, `prefetch-service.js`,
+`transfer.js`, and more) using Node's built-in test runner, so there
+are no extra dependencies to install:
 
 ```sh
 npm test
@@ -116,9 +130,18 @@ organized this way — Gen I/II's Stat Experience system has its own spec
 file (`e2e/stat-experience.spec.js`), separate from the Gen III+ specs.
 
 CI (`.github/workflows/test.yml`) runs both suites plus a JSDoc-based
-typecheck (`npm run typecheck`, which runs `tsc --noEmit` over `lib/` and
-`e2e/`, no build step; see `tsconfig.json`) on every push to `main` and
+typecheck (`npm run typecheck`, which runs `tsc` in no-emit mode — set
+via `compilerOptions.noEmit` in `tsconfig.json` — over `lib/`, `e2e/`,
+`playwright.config.js` and a handful of individually opted-in
+`components/*.js` files, no build step) on every push to `main` and
 every pull request.
+
+### Git workflow
+
+Feature/fix work happens on a branch, not directly on `main`. Before
+merging, rebase the branch onto the latest `main` (`git fetch && git
+rebase origin/main`) rather than merging `main` into the branch — keep
+history linear and resolve conflicts at rebase time, not merge time.
 
 ### Architecture
 
@@ -134,8 +157,21 @@ every pull request.
   split can't reconstruct it), `ev-training-locations.js` (curated,
   per-game EV-training hotspots, bundled rather than fetched — see
   [`docs/adr/0018`](docs/adr/0018-curated-bundled-ev-training-locations.md)),
-  `version-check.js` (deploy/update detection),
-  `combobox.js` (shared suggestion-dropdown behavior),
+  `version-check.js` / `app-version.js` (deploy/update detection and
+  polling), `combobox.js` (shared suggestion-dropdown behavior),
+  `smogon-client.js` (Smogon competitive-data fetch/cache; see
+  [`docs/adr/0015`](docs/adr/0015-smogon-competitive-data-client-side-ttl-cached.md)),
+  `prefetch-service.js` / `sprite-cache.js` / `sprite-fallback.js` /
+  `dev-cache.js` (background sprite prefetching and the per-game sprite
+  cache, including its manual-management/disable-caching controls; see
+  [`docs/adr/0011`](docs/adr/0011-background-sprite-prefetch.md) and
+  [`docs/adr/0012`](docs/adr/0012-manual-per-game-sprite-cache-management.md)),
+  `schema-version.js` (storage schema version + migrations; see
+  [`docs/adr/0009`](docs/adr/0009-automatic-breaking-storage-migrations.md)),
+  `transfer.js` (moving a caught Pokémon between parties),
+  `network-activity.js` (in-flight request tracking for UI indicators),
+  `drag-reorder.js` (roster drag-to-reorder), `dom.js`/`icons.js`/
+  `memo-cache.js` (small shared helpers),
   `services.js` (composition root), `constants.js`/`utils.js`.
 - `components/`: one custom element per piece of UI, each owning its
   own shadow-DOM rendering.
