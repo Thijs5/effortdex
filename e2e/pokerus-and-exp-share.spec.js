@@ -1,7 +1,7 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 import { createParty } from './support/party.js';
-import { catchPokemon, openDetail, openItemDialog, logBattle } from './support/pokemon.js';
+import { addPokemon, openDetail, openItemDialog, logBattle } from './support/pokemon.js';
 import { mockPokeApi } from './support/pokeapi-mock.js';
 
 // Pokérus (Gen II+) doubles a Pokémon's own battle EVs. Exp. Share (Gen I+
@@ -17,7 +17,7 @@ test.describe('Pokérus and Exp. Share', () => {
   test('Pokérus doubles the EVs a direct battle earns', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    await catchPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openItemDialog(card);
 
@@ -31,8 +31,8 @@ test.describe('Pokérus and Exp. Share', () => {
   test('an Exp.-Share-holding Pokémon earns EVs from another party member\'s logged battle', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    await catchPokemon(page, 'Bulbasaur');
-    await catchPokemon(page, 'Charmander');
+    await addPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Charmander');
 
     const charmanderCard = await openDetail(page, 'Charmander');
     const charmanderDialog = await openItemDialog(charmanderCard);

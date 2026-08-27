@@ -427,7 +427,7 @@ test('prefetchGame() does NOT route through withoutTracking — manual work stay
 // Unlike prefetchGame (which needs a whole game's cumulative Pokédex —
 // see the remake test above), this is deliberately scoped to exactly
 // gen 4's own introduced species — it backs the per-generation cache
-// controls in pages/sprite-cache.js ("Generation IV" meaning Sinnoh's
+// controls in components/pages/settings/cache.js ("Generation IV" meaning Sinnoh's
 // own species only, not everything up to it).
 test("prefetchGeneration() fetches only that generation's own species, not earlier generations too", async () => {
   const api = fakeApi({

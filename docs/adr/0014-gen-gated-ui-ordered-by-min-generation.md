@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-Effortdex already gates individual *mechanics* by generation (e.g. `store.pokerusAvailable()`, `store.natureAvailable()`, `store.trainingItemAvailability()`) — a party's game version decides which rules actually apply, and the UI hides what doesn't. The roster's Filter & sort dialog (`pages/roster.js`, issue #2's follow-ups) is the first place several independently gen-gated *controls* sit in one fixed list together: Level, Exp. Share, Pokérus, Trained status, Holding a training item, and Nature, each hidden or shown per `renderRoster()` based on the active party's generation.
+Effortdex already gates individual *mechanics* by generation (e.g. `store.pokerusAvailable()`, `store.natureAvailable()`, `store.trainingItemAvailability()`) — a party's game version decides which rules actually apply, and the UI hides what doesn't. The roster's Filter & sort dialog (`components/pages/roster.js`, issue #2's follow-ups) is the first place several independently gen-gated *controls* sit in one fixed list together: Level, Exp. Share, Pokérus, Trained status, Holding a training item, and Nature, each hidden or shown per `renderRoster()` based on the active party's generation.
 
 Left in arrival order (the order each filter happened to be added), a party's generation would change *which* controls disappear from the middle of the list, not just how many — e.g. adding a Gen II-only filter between two Gen I-available ones would shift everything below it every time the party's generation crossed that threshold. That reads as the dialog rearranging itself for no reason the player can see, and makes "muscle memory" tap targets (the fourth control down, say) unreliable across parties.
 

@@ -34,18 +34,26 @@ async function main() {
   await mkdir(outDir, { recursive: true });
 
   const jsEntryPoints = (
-    await Promise.all([findJsFiles(path.join(root, 'lib')), findJsFiles(path.join(root, 'components')), findJsFiles(path.join(root, 'pages'))])
+    await Promise.all([findJsFiles(path.join(root, 'lib')), findJsFiles(path.join(root, 'components'))])
   ).flat();
   jsEntryPoints.push(path.join(root, 'app.js'));
 
   // No `bundle: true` — a transform-only minify per file, so import
   // specifiers (and the directory layout they point at) pass through
-  // unchanged rather than getting inlined/rewritten.
+  // unchanged rather than getting inlined/rewritten. `sourcemap: true`
+  // (a real .map file per output, referenced via a trailing
+  // `//# sourceMappingURL=` comment, not inlined) is deliberate for a
+  // fully open-source app with nothing to hide in its minified output —
+  // a live bug report is debuggable against original file/line numbers
+  // and comments in DevTools without reproducing locally first. Browsers
+  // only fetch a .map when DevTools is actually open, so this costs
+  // ordinary visitors nothing.
   await build({
     entryPoints: jsEntryPoints,
     outdir: outDir,
     outbase: root,
     minify: true,
+    sourcemap: true,
     format: 'esm',
     target: 'esnext',
     platform: 'browser',
@@ -57,6 +65,7 @@ async function main() {
     outdir: outDir,
     outbase: root,
     minify: true,
+    sourcemap: true,
     logLevel: 'info',
   });
 

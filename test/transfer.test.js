@@ -19,7 +19,7 @@ function sampleParties() {
           nature: 'adamant',
           powerItem: null,
           machoBrace: false,
-          events: [{ id: 'ev-1', kind: 'catch', timestamp: 1, speciesName: 'bulbasaur', speciesId: 1, sprite: null, baseStats: null, level: 5 }],
+          events: [{ id: 'ev-1', kind: 'add', timestamp: 1, speciesName: 'bulbasaur', speciesId: 1, sprite: null, baseStats: null, level: 5 }],
         },
       ],
     },

@@ -31,7 +31,7 @@ shared rendering code).
    `typescript` devDependency from `docs/adr/`'s type-checking pass, not
    the same category as Lit or real `.ts` files.
 2. **Specs are organized per feature, not per layer or per generation**:
-   `e2e/party-management.spec.js`, `catching.spec.js`, `ev-training.spec.js`,
+   `e2e/party-management.spec.js`, `add-pokemon.spec.js`, `ev-training.spec.js`,
    `pokerus-and-exp-share.spec.js`, `evolution.spec.js`, `transfer.spec.js`,
    `settings.spec.js`, and (added later, same principle) `nature.spec.js`,
    `level-up.spec.js`, `detail-more-menu.spec.js`, `ev-training-guide.spec.js`,
@@ -50,7 +50,7 @@ shared rendering code).
    follow-up once that work lands — writing it now against Store's current
    (soon-to-change) EV model would mean rewriting it twice.
 4. **Shared flows live in `e2e/support/`** (`party.js`, `pokemon.js`) —
-   creating a party, catching a Pokémon, opening a caught Pokémon's "More
+   creating a party, adding a Pokémon, opening a roster Pokémon's "More
    options" dialog, logging a battle — so each spec file reads as
    feature-level intent, not combobox plumbing.
 5. **This suite complements `lib/store.test.js`, it doesn't replace it.**

@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-A caught Pokémon's record used to dual-write two representations of the
+A roster Pokémon's record used to dual-write two representations of the
 same truth: an append-only `history` list of everything that happened
 (battles, vitamins, Pokérus toggles, level changes) *and* mutable
 derived fields (`evs`, `level`, `pokerus`, species identity) updated
@@ -25,14 +25,17 @@ pattern](https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sou
 
 ## Decision
 
-1. **The aggregate is one caught Pokémon; its `events` array is the
+1. **The aggregate is one roster Pokémon; its `events` array is the
    sole source of truth for everything that happened to it.** Events
    are appended in chronological order, each with an `id`, `kind`, and
-   `timestamp`. Kinds: `catch`, `battle`, `vitamin`, `pokerus`,
-   `level`, `evolve`, `imported` (migration baseline — see 7).
+   `timestamp`. Kinds: `add`, `battle`, `vitamin`, `pokerus`,
+   `level`, `evolve`, `imported` (migration baseline — see 7). `add`
+   (originally `catch`, renamed by [docs/adr/0021](0021-catch-to-add-event-rename.md)
+   since a Pokémon can enter the roster by breeding or transferring in
+   too, not just catching) is the one event kind every entry starts with.
 2. **Derived state is computed by one pure fold** (`projectEntry`):
    `evs`, `level`, `pokerus`, the species identity
-   (`speciesName`/`speciesId`/`sprite`/`baseStats` — from the `catch`
+   (`speciesName`/`speciesId`/`sprite`/`baseStats` — from the `add`
    snapshot and any `evolve` events), the `evolutions` list, and the
    newest-first display `history`. Nothing else ever writes those
    fields; the fold runs after every event mutation and at load.
@@ -62,7 +65,7 @@ pattern](https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sou
    event would leave both the typo and its correction cluttering the
    very screen the feature exists to clean. Deletion + re-fold gives
    the user the semantics they expect ("that never happened") with
-   consistency guaranteed by construction. The `catch` event is the
+   consistency guaranteed by construction. The `add` event is the
    origin record and is never deletable. Undoing an evolution *is*
    deleting its `evolve` event — one mechanism, not two.
 6. **Attributes without history stay plain state.** `nickname`,
@@ -73,7 +76,7 @@ pattern](https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sou
    kind then.
 7. **Storage schema is versioned** (`schema: 2` at the state root).
    The previous dual-write shape is migrated once at load: identity,
-   attributes and level become a synthesized `catch` event, non-zero
+   attributes and level become a synthesized `add` event, non-zero
    EVs become one `imported` baseline event, an active Pokérus flag
    becomes a `pokerus` event. Per-record history from the old shape is
    dropped rather than losslessly converted (pre-production, breaking

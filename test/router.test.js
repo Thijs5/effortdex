@@ -40,9 +40,14 @@ test('currentRoute treats the reserved settings slug as the settings page', () =
   assert.deepEqual(router.currentRoute(), { page: 'settings', partySlug: null, pokemonUid: null, payload: null });
 });
 
-test('currentRoute treats the reserved transfer slug as the transfer page', () => {
+test('currentRoute treats the reserved transfer slug as the Transfer hub page', () => {
   window.location.hash = '#/transfer';
   assert.deepEqual(router.currentRoute(), { page: 'transfer', partySlug: null, pokemonUid: null, payload: null });
+});
+
+test('currentRoute treats "transfer/export" as the export page, nested under the hub', () => {
+  window.location.hash = '#/transfer/export';
+  assert.deepEqual(router.currentRoute(), { page: 'transfer-export', partySlug: null, pokemonUid: null, payload: null });
 });
 
 test('currentRoute treats "settings/cache" as the sprite cache manager page, nested under settings', () => {
@@ -60,11 +65,11 @@ test('currentRoute treats a bare "cache" as an ordinary (unknown) party slug, no
   assert.deepEqual(router.currentRoute(), { page: null, partySlug: 'cache', pokemonUid: null, payload: null });
 });
 
-test('currentRoute treats the reserved import slug as the import page, with its payload', () => {
-  window.location.hash = '#/import/abc123';
+test('currentRoute treats "transfer/import" as the import page, with its payload, nested under the hub', () => {
+  window.location.hash = '#/transfer/import/abc123';
   assert.deepEqual(router.currentRoute(), { page: 'import', partySlug: null, pokemonUid: null, payload: 'abc123' });
 
-  window.location.hash = '#/import';
+  window.location.hash = '#/transfer/import';
   assert.deepEqual(router.currentRoute(), { page: 'import', partySlug: null, pokemonUid: null, payload: null });
 });
 
@@ -74,8 +79,9 @@ test('path builders produce the hashes currentRoute parses back', () => {
   assert.equal(router.pokemonPath('emerald-run', 'abc'), '#/emerald-run/abc');
   assert.equal(router.settingsPath(), '#/settings');
   assert.equal(router.transferPath(), '#/transfer');
+  assert.equal(router.transferExportPath(), '#/transfer/export');
   assert.equal(router.cachePath(), '#/settings/cache');
-  assert.equal(router.importPath('abc123'), '#/import/abc123');
+  assert.equal(router.importPath('abc123'), '#/transfer/import/abc123');
 });
 
 test('navigate helpers set the hash', () => {
@@ -85,10 +91,12 @@ test('navigate helpers set the hash', () => {
   assert.equal(window.location.hash, '#/settings');
   router.navigateToTransfer();
   assert.equal(window.location.hash, '#/transfer');
+  router.navigateToTransferExport();
+  assert.equal(window.location.hash, '#/transfer/export');
   router.navigateToCache();
   assert.equal(window.location.hash, '#/settings/cache');
   router.navigateToImport();
-  assert.equal(window.location.hash, '#/import');
+  assert.equal(window.location.hash, '#/transfer/import');
   router.navigateToPath(router.pokemonPath('emerald-run', 'abc'));
   assert.equal(window.location.hash, '#/emerald-run/abc');
   router.navigateHome();

@@ -1,7 +1,7 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 import { createParty } from './support/party.js';
-import { catchPokemon, openDetail, openIvs, openLevelUpDialog } from './support/pokemon.js';
+import { addPokemon, openDetail, openIvs, openLevelUpDialog } from './support/pokemon.js';
 import { mockPokeApi } from './support/pokeapi-mock.js';
 
 // IV tracking (issue #4): its own "More" menu item, not gated by any
@@ -16,7 +16,7 @@ test.describe('IV tracking', () => {
   test('the IVs dialog is reachable directly from the "More" menu, with inputs already visible', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    await catchPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openIvs(card);
 
@@ -27,7 +27,7 @@ test.describe('IV tracking', () => {
   test('entering an IV persists it and marks a perfect (31) stat', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    await catchPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openIvs(card);
 
@@ -54,7 +54,7 @@ test.describe('IV tracking', () => {
   test('typing into several IV fields in a row keeps every one of them, not just the last', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    await catchPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openIvs(card);
 
@@ -89,7 +89,7 @@ test.describe('IV tracking', () => {
   test("next to the EV bars, a stat shows its actual current value once its IV is known, base stat otherwise blank", async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    await catchPokemon(page, 'Bulbasaur', { level: 5 });
+    await addPokemon(page, 'Bulbasaur', { level: 5 });
     const card = await openDetail(page, 'Bulbasaur');
 
     const hpBar = card.locator('ev-summary ev-bar[data-key="hp"]');
@@ -107,7 +107,7 @@ test.describe('IV tracking', () => {
   test('on a Gen I/II party, HP is shown as derived (not an input) and Sp. Atk/Sp. Def merge into one field', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Gold Run', baseGame: 'Gold' });
-    await catchPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openIvs(card);
 
@@ -120,7 +120,7 @@ test.describe('IV tracking', () => {
   test('the IV calculator finds a candidate IV from a logged reading and applies it on click', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    await catchPokemon(page, 'Bulbasaur', { level: 50 });
+    await addPokemon(page, 'Bulbasaur', { level: 50 });
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openIvs(card);
 
@@ -141,7 +141,7 @@ test.describe('IV tracking', () => {
   test('a calculator result with multiple candidate IVs explains why, instead of just listing numbers', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    await catchPokemon(page, 'Bulbasaur', { level: 5 }); // low level: many IVs round to the same HP stat
+    await addPokemon(page, 'Bulbasaur', { level: 5 }); // low level: many IVs round to the same HP stat
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openIvs(card);
 
@@ -157,7 +157,7 @@ test.describe('IV tracking', () => {
   test('logging a second reading after leveling up narrows the candidates, and deleting a reading widens them back', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    await catchPokemon(page, 'Bulbasaur', { level: 50 });
+    await addPokemon(page, 'Bulbasaur', { level: 50 });
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openIvs(card);
 

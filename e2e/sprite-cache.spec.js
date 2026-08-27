@@ -1,7 +1,7 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 
-// The sprite cache manager ("/settings/cache", pages/sprite-cache.js,
+// The sprite cache manager ("/settings/cache", components/pages/settings/cache.js,
 // ADR 0012) — per-generation, per-game control over the offline sprite
 // cache. Caching is ON by default everywhere now, localhost included
 // (ADR 0004) — but this whole suite runs with it explicitly disabled
@@ -228,7 +228,7 @@ test.describe('Sprite cache manager', () => {
     // comment) — lib/prefetch-service.js refuses to do anything under
     // that flag (a real service worker was never even given a chance
     // to register, so nothing could actually land in Cache Storage
-    // anyway), and pages/sprite-cache.js disables the Cache/Cache-all
+    // anyway), and components/pages/settings/cache.js disables the Cache/Cache-all
     // buttons to match, rather than leaving a clickable button that
     // silently does nothing.
     await mockGenerationOne(page);

@@ -2,9 +2,9 @@
 // No frameworks, no build step. This file is the composition root: it
 // wires the design system into the light DOM, initializes app-wide
 // chrome (lib/shell.js, lib/app-version.js), and dispatches each route
-// to its page module (pages/*.js) — no page-specific DOM or rendering
-// lives here. All domain logic lives in lib/, and each custom element
-// owns its own rendering.
+// to its page module (components/pages/*.js) — no page-specific DOM or
+// rendering lives here. All domain logic lives in lib/, and each custom
+// element owns its own rendering.
 
 import { store, prefetchService } from './lib/services.js';
 import { attachDesignSystem } from './lib/design-system.js';
@@ -12,13 +12,14 @@ import { wireDialogCloseButtons } from './lib/dom.js';
 import * as router from './lib/router.js';
 import './lib/shell.js';
 import './lib/app-version.js';
-import * as picker from './pages/picker.js';
-import * as roster from './pages/roster.js';
-import * as pokemon from './pages/pokemon.js';
-import * as settings from './pages/settings.js';
-import * as transfer from './pages/transfer.js';
-import * as spriteCache from './pages/sprite-cache.js';
-import * as importPage from './pages/import.js';
+import * as picker from './components/pages/picker.js';
+import * as roster from './components/pages/roster.js';
+import * as pokemon from './components/pages/pokemon.js';
+import * as settings from './components/pages/settings/settings.js';
+import * as transferHub from './components/pages/transfer/transfer.js';
+import * as transferExport from './components/pages/transfer/export.js';
+import * as spriteCache from './components/pages/settings/cache.js';
+import * as importPage from './components/pages/transfer/import.js';
 
 // Let light-DOM markup (the party dialog) use the same .ds-field/.ds-btn
 // primitives every shadow-DOM component uses — one shared stylesheet.
@@ -29,7 +30,7 @@ wireDialogCloseButtons();
 /* Router <-> page                                                     */
 /* ------------------------------------------------------------------ */
 
-const VIEWS = [picker.view, roster.view, pokemon.view, settings.view, transfer.view, spriteCache.view, importPage.view];
+const VIEWS = [picker.view, roster.view, pokemon.view, settings.view, transferHub.view, transferExport.view, spriteCache.view, importPage.view];
 function showView(view) {
   for (const v of VIEWS) v.hidden = v !== view;
 }
@@ -52,8 +53,14 @@ function render() {
   }
 
   if (page === 'transfer') {
-    showView(transfer.view);
-    transfer.render(lastContentPath);
+    showView(transferHub.view);
+    transferHub.render(lastContentPath);
+    return;
+  }
+
+  if (page === 'transfer-export') {
+    showView(transferExport.view);
+    transferExport.render();
     return;
   }
 
@@ -89,7 +96,7 @@ function render() {
   if (pokemonUid) {
     const entry = party.pokemon.find((e) => e.uid === pokemonUid);
     if (!entry) {
-      router.navigateToParty(party.slug); // stale link, or this Pokémon was just released
+      router.navigateToParty(party.slug); // stale link, or this Pokémon was just removed
       return;
     }
     lastContentPath = router.pokemonPath(party.slug, pokemonUid);
