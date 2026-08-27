@@ -255,4 +255,68 @@ test.describe('Sprite cache manager', () => {
     await page.waitForTimeout(500); // long enough that a wrongly-fired fetch would have started
     expect(requestsSeen).toEqual([]);
   });
+
+  test('the "Notify me when caching finishes" checkbox requests permission and persists once granted', async ({
+    page,
+  }) => {
+    // Headless Chromium's real permission prompt isn't something a test
+    // can click through, and `context.grantPermissions()` doesn't
+    // reliably flip the synchronous `Notification.permission` getter the
+    // checkbox's handler reads (a known Chromium/CDP quirk) — stub the
+    // API directly instead, same technique as the "denied" test below.
+    await page.addInitScript(() => {
+      // Headless Chromium starts every origin's Notification permission
+      // already 'denied' rather than the undecided 'default' a real
+      // browser profile would show a first-time visitor — reset that
+      // too, or `ensureNotificationPermission`'s short-circuit for an
+      // already-decided 'denied' would never even call
+      // `requestPermission` below.
+      Object.defineProperty(window.Notification, 'permission', { value: 'default', configurable: true });
+      // @ts-ignore — deliberately reassigning the built-in for this one test
+      window.Notification.requestPermission = async () => {
+        Object.defineProperty(window.Notification, 'permission', { value: 'granted', configurable: true });
+        return 'granted';
+      };
+    });
+    await openSpriteCacheManager(page);
+
+    const toggle = page.getByRole('checkbox', { name: 'Notify me when caching finishes' });
+    await expect(toggle).not.toBeChecked();
+
+    await toggle.click();
+    await expect(toggle).toBeChecked();
+    const flag = await page.evaluate(() => localStorage.getItem('effortdex:notify-on-cache-done'));
+    expect(flag).toBe('1');
+
+    // Round-trips through a fresh visit to the page, reflecting the
+    // stored preference back rather than only the moment it was set.
+    await page.getByRole('button', { name: 'Menu' }).click();
+    await page.getByRole('menuitem', { name: 'Settings' }).click();
+    await page.getByRole('button', { name: 'Manage storage' }).click();
+    await expect(page.getByRole('checkbox', { name: 'Notify me when caching finishes' })).toBeChecked();
+
+    await page.getByRole('checkbox', { name: 'Notify me when caching finishes' }).click();
+    await expect(page.getByRole('checkbox', { name: 'Notify me when caching finishes' })).not.toBeChecked();
+    expect(await page.evaluate(() => localStorage.getItem('effortdex:notify-on-cache-done'))).toBeNull();
+  });
+
+  test('denying the notification permission leaves the checkbox off and explains why', async ({ page }) => {
+    // No context.grantPermissions() call here — stub the API call
+    // directly instead of relying on Chromium's actual default-deny
+    // prompt behavior, which isn't something a headless run can click
+    // through either way.
+    await page.addInitScript(() => {
+      // @ts-ignore — deliberately reassigning the built-in for this one test
+      window.Notification.requestPermission = async () => 'denied';
+      Object.defineProperty(window.Notification, 'permission', { value: 'denied', configurable: true });
+    });
+    await openSpriteCacheManager(page);
+
+    const toggle = page.getByRole('checkbox', { name: 'Notify me when caching finishes' });
+    await toggle.click();
+
+    await expect(toggle).not.toBeChecked();
+    await expect(page.getByText(/Notifications are blocked/)).toBeVisible();
+    expect(await page.evaluate(() => localStorage.getItem('effortdex:notify-on-cache-done'))).toBeNull();
+  });
 });
