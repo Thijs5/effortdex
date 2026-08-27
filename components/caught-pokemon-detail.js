@@ -292,10 +292,6 @@ export class CaughtPokemonDetail extends HTMLElement {
 
         .card-body { display: grid; gap: var(--space-5); }
         .card-col { display: grid; gap: var(--space-4); align-content: start; max-width: 360px; }
-        /* Doesn't stretch across the column the way a full-width block
-           would — this is a single secondary action, not the section's
-           main content. */
-        .training-guide-btn { justify-self: start; }
 
         /* Log a battle moved off the page and behind this FAB (issue #17):
            it's the single most repeated action here, so it stays reachable
@@ -400,6 +396,7 @@ export class CaughtPokemonDetail extends HTMLElement {
             <div class="more-menu" role="menu" aria-label="More" hidden>
               <button class="more-menu-item" type="button" role="menuitem" data-open="ivs">IVs</button>
               <button class="more-menu-item" type="button" role="menuitem" data-open="competitive">Competitive</button>
+              <button class="more-menu-item training-guide-menu-item" type="button" role="menuitem" data-open="training-guide" hidden>Where to train</button>
               <button class="more-menu-item more-menu-item--danger" type="button" role="menuitem" data-action="release">Release</button>
             </div>
           </div>
@@ -474,7 +471,6 @@ export class CaughtPokemonDetail extends HTMLElement {
           <div class="card-col card-col--left">
             <h3 class="section-title">EV values</h3>
             <ev-summary></ev-summary>
-            <button type="button" class="training-guide-btn ds-btn ds-btn--outline ds-btn--sm" hidden aria-haspopup="dialog">Where to train</button>
           </div>
         </div>
 
@@ -549,7 +545,7 @@ export class CaughtPokemonDetail extends HTMLElement {
     this.$battleFab = shadow.querySelector('.battle-fab');
     this.$battleDialog = shadow.querySelector('.battle-dialog');
     this.$battleDialogClose = shadow.querySelector('.battle-dialog-close');
-    this.$trainingGuideBtn = shadow.querySelector('.training-guide-btn');
+    this.$trainingGuideBtn = shadow.querySelector('.training-guide-menu-item');
     this.$trainingGuideDialog = shadow.querySelector('.training-guide-dialog');
     this.$trainingGuideDialogClose = shadow.querySelector('.training-guide-dialog-close');
     this.$trainingGuide = shadow.querySelector('ev-training-guide');
@@ -604,6 +600,7 @@ export class CaughtPokemonDetail extends HTMLElement {
       setMoreMenuOpen(false);
       if (item.dataset.open === 'ivs') this.$ivDialog.open();
       else if (item.dataset.open === 'competitive') this.$competitiveDialog.open();
+      else if (item.dataset.open === 'training-guide') openShadowDialog(this.$trainingGuideDialog);
       else if (item.dataset.action === 'release') this._releasePokemon();
     });
 
@@ -698,7 +695,6 @@ export class CaughtPokemonDetail extends HTMLElement {
     this.$trainingGuideDialog.addEventListener('click', (e) => {
       if (e.target === this.$trainingGuideDialog) this.$trainingGuideDialog.close();
     });
-    this.$trainingGuideBtn.addEventListener('click', () => openShadowDialog(this.$trainingGuideDialog));
     // Reuses the battle dialog for status, same precedent as the history
     // log's own 'redefeat' handler above — its status line is the only
     // place "logging…"/an error would show. Closes the guide first: a
@@ -924,22 +920,21 @@ export class CaughtPokemonDetail extends HTMLElement {
   }
 
   /**
-   * Commits any pending Evolve/Undo choice first (the one network step
-   * here — see evolution-chain.js's `commit()`), then the level, then
-   * every filled-in stat row (at that now-current level), then closes.
-   * A failed commit leaves the dialog open with its own error message
-   * shown instead of closing over a Save that didn't fully apply. The
-   * level and every stat reading share one batchId (not the evolve,
-   * which stays its own prominent entry) so ev-history-log.js collapses
-   * them into a single summarized entry instead of one row per stat.
+   * Records the level (and every filled-in stat row, at that now-current
+   * level) first, then commits any pending Evolve/Undo choice (the one
+   * network step here — see evolution-chain.js's `commit()`), then
+   * closes — so history reads level-up-then-evolve, matching how the
+   * games narrate it, rather than evolve-then-level. A failed evolve
+   * commit leaves the dialog open with its own error message shown
+   * instead of closing over a Save that didn't fully apply; the level
+   * and stat readings it already recorded stay recorded, since a failed
+   * evolve doesn't invalidate them. The level and every stat reading
+   * share one batchId (not the evolve, which stays its own prominent
+   * entry) so ev-history-log.js collapses them into a single summarized
+   * entry instead of one row per stat.
    */
   async _saveLevelUp() {
     const e = this._entry;
-    try {
-      await this.$levelUpEvoChain.commit();
-    } catch {
-      return;
-    }
     const batchId = crypto.randomUUID();
     store.setLevel(e.uid, this.$levelUpInput.value, batchId);
     for (const input of this.$levelUpStatsFields.querySelectorAll('input[data-stat]')) {
@@ -950,6 +945,11 @@ export class CaughtPokemonDetail extends HTMLElement {
       if (observed && input.value !== input.dataset.prefill) {
         store.logStatReading(e.uid, /** @type {StatKey} */ (input.dataset.stat), observed, batchId);
       }
+    }
+    try {
+      await this.$levelUpEvoChain.commit();
+    } catch {
+      return;
     }
     this.$levelUpDialog.close();
   }
