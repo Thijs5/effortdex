@@ -319,13 +319,13 @@ function writeRosterStateToQuery() {
 }
 
 // Restricts addSearch's suggestions to species actually reachable in the
-// active party's game (or its explicit dex) — GitHub issue #31. Keyed by
-// a signature so the frequent, keystroke-driven renderRoster() calls
-// (search/filter inputs) don't re-derive this on every call; only an
-// actual party/game/override change does.
+// active party's generation — GitHub issue #31. Keyed by a signature so
+// the frequent, keystroke-driven renderRoster() calls (search/filter
+// inputs) don't re-derive this on every call; only an actual
+// party/game/override change does.
 let addSearchAllowedFor = null;
 function refreshAddSearchAllowedSpecies(party) {
-  const signature = `${party.id}|${party.baseGame}|${JSON.stringify(party.overrides?.availableSpecies ?? null)}`;
+  const signature = `${party.id}|${party.baseGame}|${party.overrides?.availableGeneration ?? ''}`;
   if (signature === addSearchAllowedFor) return;
   addSearchAllowedFor = signature;
   availableSpeciesFor(party, api).then((allowed) => {

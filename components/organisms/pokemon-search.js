@@ -295,8 +295,8 @@ export class PokemonSearch extends HTMLElement {
 
   /**
    * Restricts suggestions/direct-pick to this set of species names —
-   * e.g. a party's own generation-scoped or explicit dex (GitHub issue
-   * #31, `lib/species-availability.js`). `null` (the default) means
+   * e.g. a party's own generation-scoped dex (GitHub issue #31,
+   * `lib/species-availability.js`). `null` (the default) means
    * unrestricted: per docs/adr/0024, a caller that couldn't resolve the
    * restriction (offline, a failed fetch) should pass `null` rather than
    * an empty set, so a lookup failure never hides species that are
