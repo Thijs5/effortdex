@@ -26,13 +26,20 @@ function sleep(ms) {
 // species (what a real `getGenerationSpecies` call returns); `getPokemon`
 // looks up the id from whichever generation list it appeared in, so
 // sprite-URL resolution (which needs the id) works the same as it would
-// against the real client.
-function fakeApi({ generations = {}, fail = [] } = {}) {
+// against the real client. `getEvolutionChain` is a no-op success by
+// default (tracked separately in `evolutionChainCalls`) so every
+// existing sprite-focused test below — which never asserts on it — isn't
+// affected by the evolution-chain warming every species-scan entry point
+// now also enqueues alongside sprite fetches; `failEvolution` lets a test
+// exercise the failure path for that warming specifically.
+function fakeApi({ generations = {}, fail = [], failEvolution = [] } = {}) {
   const calls = [];
+  const evolutionChainCalls = [];
   const idByName = new Map();
   for (const list of Object.values(generations)) for (const s of list) idByName.set(s.name, s.id);
   return {
     calls,
+    evolutionChainCalls,
     async getGenerationSpecies(gen) {
       return generations[gen] || [];
     },
@@ -40,6 +47,11 @@ function fakeApi({ generations = {}, fail = [] } = {}) {
       calls.push(name);
       if (fail.includes(name)) throw new Error(`unknown: ${name}`);
       return { id: idByName.get(name) ?? null, sprite: `https://sprites.example/${name}.png` };
+    },
+    async getEvolutionChain(name) {
+      evolutionChainCalls.push(name);
+      if (failEvolution.includes(name)) throw new Error(`no evolution data: ${name}`);
+      return [];
     },
   };
 }
@@ -203,7 +215,9 @@ test('a failed species lookup is skipped, not fatal to the rest of the run', asy
   await svc.start();
 
   assert.deepEqual(api.calls.sort(), ['bulbasaur', 'ivysaur', 'missingno']);
-  assert.deepEqual(events.at(-1), { done: 3, total: 3 }); // missingno counted as "done", just not cached
+  // 3 species x 2 kinds of work (sprite + evolution-chain warming, both
+  // sharing this one queue/progress stream) = 6 total tasks.
+  assert.deepEqual(events.at(-1), { done: 6, total: 6 }); // missingno counted as "done", just not cached
 });
 
 test('emits progress events in concurrency-sized batches', async () => {
@@ -215,8 +229,9 @@ test('emits progress events in concurrency-sized batches', async () => {
   svc.addEventListener('progress', (e) => events.push(e.detail));
   await svc.start();
 
-  assert.deepEqual(events.map((d) => d.done).slice(-1), [5]);
-  assert.ok(events.every((d) => d.total === 5));
+  // 5 species x 2 kinds of work (sprite + evolution-chain warming) = 10.
+  assert.deepEqual(events.map((d) => d.done).slice(-1), [10]);
+  assert.ok(events.every((d) => d.total === 10));
 });
 
 test('a party-less store runs cleanly with no prefetch traffic', async () => {
@@ -275,6 +290,65 @@ test('an already-cached item icon is not re-fetched', async () => {
   await waitForIdle(svc);
 
   assert.equal(fetchCalls.length, 0);
+});
+
+/* ---------------- evolution-chain warming (docs/adr/0011 addendum) ---------------- */
+
+test("start()'s automatic scan also warms every scanned species' evolution chain", async () => {
+  const api = fakeApi({ generations: { 1: [{ name: 'bulbasaur', id: 1 }, { name: 'ivysaur', id: 2 }] } });
+  const svc = service({ api });
+  await svc.start();
+  await waitForIdle(svc);
+
+  assert.deepEqual(api.evolutionChainCalls.sort(), ['bulbasaur', 'ivysaur']);
+});
+
+test('evolution-chain warming is silent, same as the species scan', async () => {
+  const api = fakeApi({ generations: { 1: [{ name: 'bulbasaur', id: 1 }] } });
+  const spy = withoutTrackingSpy();
+  const svc = service({ api, withoutTracking: spy.fn });
+  await svc.start();
+
+  // getPokemon + sprite fetch + evolution-chain warm, all three silent.
+  assert.deepEqual(spy.calls, ['enter', 'exit', 'enter', 'exit', 'enter', 'exit']);
+});
+
+test('a failed evolution-chain lookup is skipped, not fatal to the rest of the scan', async () => {
+  const api = fakeApi({
+    generations: { 1: [{ name: 'bulbasaur', id: 1 }, { name: 'ivysaur', id: 2 }] },
+    failEvolution: ['bulbasaur'],
+  });
+  const svc = service({ api });
+  await svc.start();
+  await waitForIdle(svc);
+
+  assert.deepEqual(api.evolutionChainCalls.sort(), ['bulbasaur', 'ivysaur']);
+  // the sprite side of the scan is unaffected by the evolution failure
+  assert.deepEqual(api.calls.sort(), ['bulbasaur', 'ivysaur']);
+});
+
+test('prefetchGame() also warms evolution chains for every species it caches sprites for', async () => {
+  const api = fakeApi({ generations: { 1: [{ name: 'bulbasaur', id: 1 }] } });
+  const svc = service({ api });
+  await svc.prefetchGame('Red');
+
+  assert.deepEqual(api.evolutionChainCalls, ['bulbasaur']);
+});
+
+test('prefetchGeneration() also warms evolution chains for that generation', async () => {
+  const api = fakeApi({ generations: { 4: [{ name: 'turtwig', id: 387 }] } });
+  const svc = service({ api });
+  await svc.prefetchGeneration(4);
+
+  assert.deepEqual(api.evolutionChainCalls, ['turtwig']);
+});
+
+test('automatic scan and a manual game share one evolution-chain warm per species, not two', async () => {
+  const api = fakeApi({ generations: { 1: [{ name: 'bulbasaur', id: 1 }] } });
+  const svc = service({ api });
+  await Promise.all([svc.start(), svc.prefetchGame('Red')]);
+
+  assert.deepEqual(api.evolutionChainCalls, ['bulbasaur']); // deduped under the shared 'evo' tag
 });
 
 /* ---------------- prefetchGame() — the manual trigger ---------------- */
@@ -410,8 +484,10 @@ test('start()\'s automatic scan routes every fetch through withoutTracking', asy
   const svc = service({ api, withoutTracking: spy.fn });
   await svc.start();
 
-  // One species = one getPokemon call + one sprite fetch, each wrapped.
-  assert.deepEqual(spy.calls, ['enter', 'exit', 'enter', 'exit']);
+  // One species = one getPokemon call + one sprite fetch, each wrapped,
+  // plus its evolution-chain warm (always silent — see the evolution-
+  // chain section below) = three wrapped calls.
+  assert.deepEqual(spy.calls, ['enter', 'exit', 'enter', 'exit', 'enter', 'exit']);
 });
 
 test('prefetchGame() does NOT route through withoutTracking — manual work stays visible', async () => {
@@ -420,8 +496,12 @@ test('prefetchGame() does NOT route through withoutTracking — manual work stay
   const svc = service({ api, withoutTracking: spy.fn });
   await svc.prefetchGame('Red');
 
-  assert.deepEqual(spy.calls, []);
-  assert.deepEqual(api.calls, ['bulbasaur']); // the work still happened, just not silenced
+  // The sprite work itself stays visible (unwrapped) — but the
+  // evolution-chain warming it also triggers alongside is always
+  // silent, regardless of entry point (see the evolution-chain section
+  // below), so one wrapped pair from that still shows up here.
+  assert.deepEqual(spy.calls, ['enter', 'exit']);
+  assert.deepEqual(api.calls, ['bulbasaur']); // the sprite work still happened, just not silenced
 });
 
 // Unlike prefetchGame (which needs a whole game's cumulative Pokédex —
@@ -447,7 +527,9 @@ test('prefetchGeneration() also does not route through withoutTracking', async (
   const svc = service({ api, withoutTracking: spy.fn });
   await svc.prefetchGeneration(1);
 
-  assert.deepEqual(spy.calls, []);
+  // Same as prefetchGame() above: the sprite work stays visible, but its
+  // evolution-chain warming is always silent.
+  assert.deepEqual(spy.calls, ['enter', 'exit']);
 });
 
 test('a species already warmed silently by the automatic scan is not re-silenced when a manual click later joins the same pending task', async () => {
@@ -464,7 +546,10 @@ test('a species already warmed silently by the automatic scan is not re-silenced
   const manual = svc.prefetchGeneration(1); // same sourceTag+name -> joins the existing (silent) task
   await Promise.all([auto, manual]);
 
-  assert.deepEqual(spy.calls, ['enter', 'exit', 'enter', 'exit']); // still silent — created first by start()
+  // still silent — created first by start(); plus one more wrapped pair
+  // for the evolution-chain warm both calls share under the 'evo'
+  // source tag (always silent, and deduped the same way sprite work is).
+  assert.deepEqual(spy.calls, ['enter', 'exit', 'enter', 'exit', 'enter', 'exit']);
   assert.equal(api.calls.length, 1); // and only fetched once, per the existing dedup guarantee
 });
 
@@ -580,6 +665,9 @@ test('backs off after failureThreshold consecutive failures, pausing the queue i
       calls.push(name);
       throw new Error('simulated failure');
     },
+    async getEvolutionChain() {
+      return []; // this test's circuit-breaker assertions are scoped to getPokemon/sprite calls
+    },
   };
   const backoffEvents = [];
   // Long enough that it can't fire within this test's own assertion
@@ -612,6 +700,9 @@ test('automatically resumes after the backoff delay and retries the remaining wo
       if (shouldFail) throw new Error('simulated failure');
       return { id: /** @type {any} */ (species.find((s) => s.name === name)).id, sprite: `https://sprites.example/${name}.png` };
     },
+    async getEvolutionChain() {
+      return []; // this test's circuit-breaker assertions are scoped to getPokemon/sprite calls
+    },
   };
   const svc = service({ api, concurrency: 1, batchDelayMs: 0, failureThreshold: 2, initialBackoffMs: 15 });
   // Simulates "the outage clears" right as the circuit breaker notices —
@@ -639,6 +730,9 @@ test('a success resets the failure count and the backoff delay back to their sta
       calls.push(name);
       if (outcomes[name] === 'fail') throw new Error('simulated failure');
       return { id: 2, sprite: 'https://sprites.example/b.png' };
+    },
+    async getEvolutionChain() {
+      return []; // this test's circuit-breaker assertions are scoped to getPokemon/sprite calls
     },
   };
   // failureThreshold 2: a fails (1), b succeeds (resets to 0), c fails (1) — never reaches 2, so no backoff at all.
@@ -672,6 +766,9 @@ test('never exceeds the configured concurrency, even with the automatic scan and
       await sleep(5);
       active--;
       return { id: species.find((s) => s.name === name).id, sprite: `https://sprites.example/${name}.png` };
+    },
+    async getEvolutionChain() {
+      return [];
     },
   };
   const svc = service({ api, concurrency: 2 });
