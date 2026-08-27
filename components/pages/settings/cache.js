@@ -27,6 +27,13 @@ import { prefetchService } from '../../../lib/services.js';
 import { SPRITE_CACHE_NAME } from '../../../lib/sprite-cache.js';
 import { clearAppCache, estimateCacheSize } from '../../../lib/version-check.js';
 import { isCachingDisabled, setCachingDisabled } from '../../../lib/dev-cache.js';
+import {
+  isNotificationSupported,
+  isCacheDoneNotifyEnabled,
+  setCacheDoneNotifyEnabled,
+  ensureNotificationPermission,
+  notifyCacheDone,
+} from '../../../lib/notifications.js';
 import { escapeHtml, formatBytes } from '../../../lib/utils.js';
 import * as router from '../../../lib/router.js';
 
@@ -36,6 +43,31 @@ const generationsEl = document.getElementById('sprite-cache-generations');
 const clearCacheBtn = /** @type {HTMLButtonElement} */ (document.getElementById('clear-cache-btn'));
 const clearCacheStatus = /** @type {HTMLElement} */ (document.getElementById('clear-cache-status'));
 const disableCachingInput = /** @type {HTMLInputElement} */ (document.getElementById('disable-caching-input'));
+const notifyCacheDoneInput = /** @type {HTMLInputElement} */ (document.getElementById('notify-cache-done-input'));
+const notifyCacheDoneStatus = /** @type {HTMLElement} */ (document.getElementById('notify-cache-done-status'));
+
+// Turning the checkbox on is the only moment this ever prompts for
+// permission — never on page load, and never just from `render()`
+// reflecting a previously-enabled preference. Denying (or dismissing)
+// the browser prompt leaves the preference off and explains why, rather
+// than silently reverting the checkbox with no feedback.
+if (!isNotificationSupported()) {
+  notifyCacheDoneInput.disabled = true;
+  notifyCacheDoneInput.title = "Notifications aren't supported in this browser";
+}
+notifyCacheDoneInput.addEventListener('change', async () => {
+  if (!notifyCacheDoneInput.checked) {
+    setCacheDoneNotifyEnabled(false);
+    notifyCacheDoneStatus.textContent = '';
+    return;
+  }
+  notifyCacheDoneInput.disabled = true;
+  const granted = await ensureNotificationPermission();
+  notifyCacheDoneInput.disabled = false;
+  setCacheDoneNotifyEnabled(granted);
+  notifyCacheDoneInput.checked = granted;
+  notifyCacheDoneStatus.textContent = granted ? '' : "Notifications are blocked — allow them for this site in your browser's settings.";
+});
 
 // lib/shell.js reads this same flag (lib/dev-cache.js) once, at load, to
 // decide whether to register the service worker at all — so toggling it
@@ -251,6 +283,7 @@ function buildRow(row, gen, onCachingChange) {
       };
       if (isDefault) await prefetchService.prefetchGeneration(gen, onCacheProgress);
       else await prefetchService.prefetchGame(primaryGame, onCacheProgress);
+      notifyCacheDone('Effortdex', { body: `${joinNames(row.games)} sprites are cached.` });
     } finally {
       cachingInFlight = false;
       cacheBtn.textContent = 'Cache';
@@ -355,6 +388,7 @@ function buildGeneration(gen) {
       await prefetchService.prefetchGeneration(gen, ({ done, total }) => {
         cacheAllBtn.textContent = `Caching… ${done}/${total}`;
       });
+      notifyCacheDone('Effortdex', { body: `${genLabel}'s sprites are cached.` });
     } finally {
       cacheAllInFlight = false;
       cacheAllBtn.textContent = cacheAllLabel;
@@ -374,6 +408,13 @@ export function render() {
   renderClearCacheSize();
   clearCacheStatus.textContent = '';
   disableCachingInput.checked = isCachingDisabled();
+  // Permission can be revoked from outside the app (browser/OS settings)
+  // between visits — reflect that, not just the stored preference, so
+  // the checkbox never shows "on" when a completed run would actually
+  // stay silent.
+  notifyCacheDoneInput.checked =
+    isCacheDoneNotifyEnabled() && isNotificationSupported() && Notification.permission === 'granted';
+  notifyCacheDoneStatus.textContent = '';
   if (!generationBlocks.length) {
     for (let gen = 1; gen <= 9; gen++) {
       const block = buildGeneration(gen);
