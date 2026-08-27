@@ -1,7 +1,7 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 import { createParty } from './support/party.js';
-import { catchPokemon, openDetail, openTrainingGuide } from './support/pokemon.js';
+import { addPokemon, openDetail, openTrainingGuide } from './support/pokemon.js';
 import { mockPokeApi } from './support/pokeapi-mock.js';
 
 // The "Where to train" guide (docs/adr/0018, lib/ev-training-locations.js)
@@ -18,7 +18,7 @@ test.describe('EV-training location guide', () => {
   test('a Gen III+ party sees curated EV-training spots for its own game, one section per stat', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    await catchPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openTrainingGuide(card);
 
@@ -32,7 +32,7 @@ test.describe('EV-training location guide', () => {
   test('tapping a recommended Pokémon logs a battle against it', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    await catchPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openTrainingGuide(card);
 
@@ -46,7 +46,7 @@ test.describe('EV-training location guide', () => {
   test('the guide is hidden on a Gen I/II party — Stat Experience makes a per-stat route list meaningless', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Red Solo Run', baseGame: 'Red' });
-    await catchPokemon(page, 'Charmander');
+    await addPokemon(page, 'Charmander');
     const card = await openDetail(page, 'Charmander');
 
     await card.getByRole('button', { name: 'More' }).click();

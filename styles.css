@@ -240,7 +240,7 @@ html[data-modal-open] body {
 
 @media (max-width: 860px) {
   .layout { grid-template-columns: 1fr; }
-  .catch-panel { position: static; }
+  .add-panel { position: static; }
 }
 
 .panel h2 {
@@ -260,16 +260,16 @@ html[data-modal-open] body {
    as plastic buttons and lift on hover) get the LCD treatment: a faint
    dot-matrix pixel grid plus an inset under-glass shadow — the texture
    and depth that make the green read as a display, not a tint. */
-.catch-panel,
+.add-panel,
 .empty-state,
-.catch-dialog-identity {
+.add-pokemon-dialog-identity {
   background-image:
     repeating-linear-gradient(0deg, var(--lcd-grid) 0 1px, transparent 1px 4px),
     repeating-linear-gradient(90deg, var(--lcd-grid) 0 1px, transparent 1px 4px);
   box-shadow: var(--shadow-lcd);
 }
 
-.catch-panel {
+.add-panel {
   background-color: var(--lcd);
   border: 1px solid var(--lcd-line);
   border-radius: var(--radius-md);
@@ -279,14 +279,14 @@ html[data-modal-open] body {
   top: clamp(1rem, 3vw, 2.5rem);
 }
 
-.catch-form {
+.add-form {
   display: flex;
   gap: var(--space-3);
   flex-wrap: wrap;
 }
 
 @media (max-width: 420px) {
-  .catch-form { flex-direction: column; align-items: stretch; }
+  .add-form { flex-direction: column; align-items: stretch; }
 }
 
 .status-line {
@@ -298,7 +298,7 @@ html[data-modal-open] body {
 }
 
 /* Collapsed by default — a cheat sheet on demand, not a permanent
-   tenant of the catch panel. */
+   tenant of the add panel. */
 .legend {
   margin-top: var(--space-4);
   padding-top: var(--space-3);
@@ -698,14 +698,14 @@ html[data-modal-open] body {
 }
 
 /* Same purple ring as the detail page's sprite for an active Pokérus
-   infection (see caught-pokemon-detail.js's :host([pokerus-infected])). */
+   infection (see pokemon-detail.js's :host([pokerus-infected])). */
 .roster-card-sprite--pokerus {
   border-color: var(--pokerus-purple);
   box-shadow: 0 0 0 3px var(--pokerus-purple-soft);
 }
 
 /* Same gold-shimmer treatment as the detail page's sprite (see
-   caught-pokemon-detail.js) — a class here instead of an attribute
+   pokemon-detail.js) — a class here instead of an attribute
    selector, since this markup is plain light-DOM HTML, not a component
    with its own :host. */
 .roster-card-sprite--trained {
@@ -744,7 +744,7 @@ html[data-modal-open] body {
   display: grid;
   gap: var(--space-4);
 }
-.pokemon-view caught-pokemon-detail {
+.pokemon-view pokemon-detail {
   max-width: 980px;
 }
 
@@ -877,7 +877,7 @@ html[data-modal-open] body {
    section packs a label plus a fairly wide control (the sprite-style
    picker, "Auto (from base game)" selects) on one row each, and 420px
    left them cramped against each other. Scoped by id, not the
-   `.party-dialog` class — that class is shared with #catch-dialog,
+   `.party-dialog` class — that class is shared with #add-pokemon-dialog,
    which is short-content and fine at the shared default width. Gated to
    above .ds-dialog's own mobile breakpoint (640px, design-system.js) —
    an id selector's specificity would otherwise beat that media query's
@@ -888,7 +888,7 @@ html[data-modal-open] body {
   }
 }
 
-.catch-dialog-identity {
+.add-pokemon-dialog-identity {
   display: flex;
   align-items: center;
   gap: var(--space-3);
@@ -898,7 +898,7 @@ html[data-modal-open] body {
   border: 1px solid var(--lcd-line);
   border-radius: var(--radius-md);
 }
-.catch-dialog-sprite {
+.add-pokemon-dialog-sprite {
   flex: 0 0 auto;
   width: 56px;
   height: 56px;
@@ -907,15 +907,15 @@ html[data-modal-open] body {
   border-radius: var(--radius-sm);
   object-fit: contain;
 }
-.catch-dialog-identity-text { min-width: 0; }
-.catch-dialog-name {
+.add-pokemon-dialog-identity-text { min-width: 0; }
+.add-pokemon-dialog-name {
   display: block;
   font-family: var(--font-display);
   font-weight: 600;
   font-size: var(--font-size-lg);
   text-transform: capitalize;
 }
-.catch-dialog-ev-yield {
+.add-pokemon-dialog-status {
   margin: 0.15rem 0 0;
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);

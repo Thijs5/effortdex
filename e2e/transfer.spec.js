@@ -1,12 +1,12 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 import { createParty } from './support/party.js';
-import { catchPokemon, rosterRow } from './support/pokemon.js';
+import { addPokemon, rosterRow } from './support/pokemon.js';
 import { mockPokeApi } from './support/pokeapi-mock.js';
 
 // Device-to-device transfer: exports every party as a link encoding a
 // snapshot of local state (lib/transfer.js), which another browser can open
-// to review and selectively import (components/import-review.js). Nothing
+// to review and selectively import (components/organisms/import-review.js). Nothing
 // is written until "Import selected" is pressed. Simulated here with two
 // separate browser contexts, since that's what "another device" actually
 // means — two independent localStorage stores.
@@ -14,16 +14,17 @@ import { mockPokeApi } from './support/pokeapi-mock.js';
 test.describe('Transfer', () => {
   test('a transfer link opens on a second device and imports the party and its Pokémon', async ({ page, browser }) => {
     // The import flow itself (below, on `otherPage`) makes no PokéAPI
-    // calls — only the first device's catch does — so only this page
+    // calls — only the first device's add does — so only this page
     // needs mocking.
     await mockPokeApi(page);
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    await catchPokemon(page, 'Bulbasaur', { level: 12 });
+    await addPokemon(page, 'Bulbasaur', { level: 12 });
 
     await page.getByRole('button', { name: 'Menu' }).click();
     await page.getByRole('menuitem', { name: 'Settings' }).click();
     await page.getByRole('button', { name: 'Transfer to another device' }).click();
+    await page.getByRole('button', { name: 'Export' }).click();
 
     const linkField = page.getByLabel('Shareable transfer link');
     await expect(linkField).not.toHaveValue('');

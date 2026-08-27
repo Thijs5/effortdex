@@ -1,10 +1,10 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 import { createParty } from './support/party.js';
-import { catchPokemon, rosterRow, openDetail, openItemDialog, openLevelUpDialog } from './support/pokemon.js';
+import { addPokemon, rosterRow, openDetail, openItemDialog, openLevelUpDialog } from './support/pokemon.js';
 import { mockPokeApi } from './support/pokeapi-mock.js';
 
-// Evolving a caught Pokémon carries its EVs, nickname, training aids and
+// Evolving a roster Pokémon carries its EVs, nickname, training aids and
 // history forward — only its species identity changes (lib/store.js's
 // evolvePokemon, folded by projectEntry's 'evolve' handler). Undoing an
 // evolution just deletes that event and re-folds. The evolution chain
@@ -19,10 +19,10 @@ test.describe('Evolution', () => {
     await mockPokeApi(page);
   });
 
-  test('evolving a caught Pokémon updates its species while keeping its EVs', async ({ page }) => {
+  test('evolving a roster Pokémon updates its species while keeping its EVs', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    await catchPokemon(page, 'Bulbasaur', { level: 16 });
+    await addPokemon(page, 'Bulbasaur', { level: 16 });
     const card = await openDetail(page, 'Bulbasaur');
     const itemDialog = await openItemDialog(card);
     await itemDialog.locator('[data-id="protein"] button').click();
@@ -53,7 +53,7 @@ test.describe('Evolution', () => {
   test('reverting an evolution restores the previous species', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    await catchPokemon(page, 'Bulbasaur', { level: 16 });
+    await addPokemon(page, 'Bulbasaur', { level: 16 });
     const card = await openDetail(page, 'Bulbasaur');
     let dialog = await openLevelUpDialog(card);
     await dialog.getByRole('heading', { name: 'Evolution' }).waitFor({ state: 'visible' });

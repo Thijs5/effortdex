@@ -1,7 +1,7 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 import { createParty } from './support/party.js';
-import { catchPokemon, openDetail, openIvs, openLevelUpDialog } from './support/pokemon.js';
+import { addPokemon, openDetail, openIvs, openLevelUpDialog } from './support/pokemon.js';
 import { mockPokeApi } from './support/pokeapi-mock.js';
 
 // The Level field lives only in this popup now (moved out of Training &
@@ -21,7 +21,7 @@ test.describe('Level popup', () => {
   test('opens prefilled to the current level, with stats already visible', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    await catchPokemon(page, 'Bulbasaur', { level: 10 });
+    await addPokemon(page, 'Bulbasaur', { level: 10 });
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openLevelUpDialog(card);
 
@@ -35,7 +35,7 @@ test.describe('Level popup', () => {
   test('nothing is applied until Save: typing a level or a stat is only a preview', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    await catchPokemon(page, 'Bulbasaur', { level: 10 });
+    await addPokemon(page, 'Bulbasaur', { level: 10 });
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openLevelUpDialog(card);
 
@@ -56,7 +56,7 @@ test.describe('Level popup', () => {
   test('Save commits the level and every filled-in stat row together', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    await catchPokemon(page, 'Bulbasaur', { level: 10 });
+    await addPokemon(page, 'Bulbasaur', { level: 10 });
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openLevelUpDialog(card);
 
@@ -76,7 +76,7 @@ test.describe('Level popup', () => {
   test('a stat row is prefilled with its last reading, but Save skips it untouched — only an edited value logs a new reading', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    await catchPokemon(page, 'Bulbasaur', { level: 10 });
+    await addPokemon(page, 'Bulbasaur', { level: 10 });
     const card = await openDetail(page, 'Bulbasaur');
 
     let dialog = await openLevelUpDialog(card);
@@ -104,7 +104,7 @@ test.describe('Level popup', () => {
   test('Save groups the level change and its stat readings into one collapsible history entry', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    await catchPokemon(page, 'Bulbasaur', { level: 10 });
+    await addPokemon(page, 'Bulbasaur', { level: 10 });
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openLevelUpDialog(card);
 
@@ -130,7 +130,7 @@ test.describe('Level popup', () => {
   test('pressing Enter in a field saves the dialog, same as clicking Save', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    await catchPokemon(page, 'Bulbasaur', { level: 10 });
+    await addPokemon(page, 'Bulbasaur', { level: 10 });
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openLevelUpDialog(card);
 
@@ -143,7 +143,7 @@ test.describe('Level popup', () => {
   test('adjusting the level after typing a stat keeps the typed value, just relabels it', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    await catchPokemon(page, 'Bulbasaur', { level: 10 });
+    await addPokemon(page, 'Bulbasaur', { level: 10 });
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openLevelUpDialog(card);
 
@@ -173,7 +173,7 @@ test.describe('Level popup', () => {
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    await catchPokemon(page, 'Bulbasaur', { level: 10 });
+    await addPokemon(page, 'Bulbasaur', { level: 10 });
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openLevelUpDialog(card);
 

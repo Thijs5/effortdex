@@ -6,14 +6,16 @@ Accepted
 
 ## Context
 
-The app has several page states — party picker (`/`), a party's roster
-(`/<party-slug>`), one caught Pokémon (`/<party-slug>/<uid>`),
-settings (`/settings`), plus later additions transfer (`/transfer`),
-sprite cache management (`/settings/cache`), and roster import
-(`/import/<payload>`) — and users should be able to bookmark, share,
-and use back/forward between them. The app is a static site with no
-server (GitHub Pages, or any file server), is installable, and must
-work offline (ADR 0004).
+The app has several page states — the party picker (`/parties`), a
+party's roster (`/parties/<slug>`), one roster Pokémon
+(`/parties/<slug>/<uid>`), settings (`/settings`), plus later additions
+the Transfer hub (`/transfer`) and its two nested pages, export
+(`/transfer/export`) and roster import (`/transfer/import/<payload>`),
+sprite cache management (`/settings/cache`), and the create/edit-party
+dialog routes (`/parties/create`, `/parties/<slug>/edit`, ADR 0022) —
+and users should be able to bookmark, share, and use back/forward
+between them. The app is a static site with no server (GitHub Pages, or
+any file server), is installable, and must work offline (ADR 0004).
 
 Path-based routing (`history.pushState` on real paths) requires the
 server to rewrite every path to `index.html`, or every deep link and
@@ -24,7 +26,7 @@ path.
 
 ## Decision
 
-1. **Routes live in the URL hash** (`#/emerald-run/abc-123`), parsed by
+1. **Routes live in the URL hash** (`#/parties/emerald-run/abc-123`), parsed by
    `lib/router.js` — the hash never reaches the server, so the same
    URLs work identically online, offline, served from a subpath, and in
    the installed app, with zero server configuration.
@@ -38,10 +40,14 @@ path.
    the party name once at creation (`lib/slug.js`), never change on
    rename (URLs stay stable), and are disambiguated with numeric
    suffixes.
-4. **App pages reserve their slugs.** `settings` is a reserved slug —
-   `uniqueSlug` refuses to hand it to a party, so `#/settings` can
-   never be shadowed by user data. Any future app page must add its
-   segment to `RESERVED_SLUGS` *before* shipping the route.
+4. **App pages reserve their slugs where a real collision exists.**
+   `create` is a reserved slug (`lib/slug.js`) — `uniqueSlug` refuses to
+   hand it to a party, so `#/parties/create` can never be shadowed by a
+   party literally named that. `settings`/`transfer` don't need
+   reserving: parties live fully under `#/parties/<slug>` now, a
+   separate namespace (ADR 0022). Any future segment that *would*
+   collide (a new top-level route, or a new fixed word one level under
+   `#/parties/`) must be added to `RESERVED_SLUGS` before shipping.
 5. Unknown or stale routes degrade by redirecting up one level: an
    unknown slug bounces to the picker, an unknown Pokémon uid bounces
    to its party's roster (see `app.js`'s `render`).

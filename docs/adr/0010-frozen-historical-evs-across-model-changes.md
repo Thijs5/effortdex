@@ -73,7 +73,7 @@ recomputing it needs zero network calls.
      (a new synchronous, cache-only lookup — memory tier then
      `localStorage`, **never** a network call) for the opponent's base
      stats, applying the same Gen I merged-Special and Pokérus-doubling
-     logic `logDefeat` itself uses.
+     logic `logBattle` itself uses.
    - Leaves a `battle` event's `applied` **untouched** if its opponent
      isn't cached (cleared site data, private browsing) — best-effort,
      not all-or-nothing. This is the one place this decision accepts

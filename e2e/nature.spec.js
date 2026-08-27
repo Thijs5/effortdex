@@ -1,7 +1,7 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 import { createParty } from './support/party.js';
-import { catchPokemon, openDetail, openNatureDialog } from './support/pokemon.js';
+import { addPokemon, openDetail, openNatureDialog } from './support/pokemon.js';
 import { mockPokeApi } from './support/pokeapi-mock.js';
 
 // Nature has its own popup off the header badge (docs/adr/0017) — unlike
@@ -16,7 +16,7 @@ test.describe('Nature', () => {
   test('the header badge shows "Set nature" until one is picked, and opens the popup', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    await catchPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
 
     await expect(card.getByRole('button', { name: 'Set nature' })).toBeVisible();
@@ -27,7 +27,7 @@ test.describe('Nature', () => {
   test('picking a nature previews it, discards on close without Save, and persists once Saved', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    await catchPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
 
     const dialog = await openNatureDialog(card);

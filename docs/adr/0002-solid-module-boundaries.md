@@ -6,9 +6,13 @@ Accepted
 
 ## Context
 
-Effortdex has no framework and no build step (see `package.json`'s
-description and every module's own "no frameworks, no build step"
-comments). Without a framework imposing structure, module boundaries
+Effortdex has no framework (see `package.json`'s description and every
+module's own "no frameworks" comments) — that's the decision this ADR
+is actually about. It also had no build *step* at all until a later,
+separate decision added a minify-only production build
+(`scripts/build.mjs`, esbuild — see the README's "Technical details");
+that's a tooling question, not a framework one, and doesn't touch
+anything below. Without a framework imposing structure, module boundaries
 have to be chosen and held deliberately, or the codebase drifts into a
 tangle of DOM code that also knows about PokéAPI shapes, state that also
 knows about rendering, and so on. The boundaries already in place —

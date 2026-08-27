@@ -6,7 +6,7 @@ Accepted
 
 ## Context
 
-The detail page's Competitive section shows a caught Pokémon's current
+The detail page's Competitive section shows a roster Pokémon's current
 tier (OU/UU/RU/.../Uber/LC/...) and up to three common competitive sets
 (item, nature, EV spread, moves) for the active party's own generation.
 This is genuinely useful for a competitive player deciding whether a

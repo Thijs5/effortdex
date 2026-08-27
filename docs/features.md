@@ -9,17 +9,17 @@ pointers to the code and the e2e spec that covers each one.
 
 ## Parties
 
-A **party** is a named roster of caught Pokémon tied to one game version
+A **party** is a named roster of Pokémon tied to one game version
 (e.g. "Emerald", "Scarlet"). Everything else in the app — which training
 items exist, whether natures apply, the EV/Stat-Exp cap, Pokérus, Exp.
 Share — is a rule derived from a party's game version and generation, so
 picking the base game correctly is the one thing that determines almost
 all downstream behavior (`lib/game-versions.js`, `lib/store.js`).
 
-- **Party picker ("/")** — `pages/picker.js` lists every party as a card
-  (name, base game, caught count, trained count) and is the app's home
+- **Party picker ("/parties")** — `components/pages/parties/parties.js` lists every party as a card
+  (name, base game, roster count, trained count) and is the app's home
   route.
-- **Create/edit a party** — `pages/party-dialog.js` drives a shared
+- **Create/edit a party** (`/parties/create`, `/parties/<slug>/edit` — `docs/adr/0022`) — `components/pages/parties/party-dialog.js` drives a shared
   create/edit `<dialog>`: name, description, base game (via
   `<game-version-picker>`, which validates against the known
   `GAME_VERSIONS` table and rejects an unrecognized typed name rather than
@@ -36,22 +36,23 @@ all downstream behavior (`lib/game-versions.js`, `lib/store.js`).
 
 Covered by `e2e/party-management.spec.js`.
 
-## Catching a Pokémon
+## Adding a Pokémon
 
 From a party's roster page, a `<pokemon-search>` autocomplete (backed by
-`PokeApiClient.getAllSpecies()`, fuzzy-matched client-side) opens a catch
-`<dialog>`: sprite preview, a level field, and — only on a Gen III+
-party — a nature picker, since natures didn't exist before Generation
-III. Submitting calls `store.catchPokemon()`, which creates a roster
-entry with empty EVs. Releasing a Pokémon (from its detail page's "More"
-menu) asks for confirmation via the native `<dialog>` and removes it from
-the roster.
+`PokeApiClient.getAllSpecies()`, fuzzy-matched client-side) opens an
+add-Pokémon `<dialog>`: sprite preview, a level field, and — only on a
+Gen III+ party — a nature picker, since natures didn't exist before
+Generation III. Submitting calls `store.addPokemon()`, which creates a
+roster entry with empty EVs — the same regardless of how the Pokémon was
+actually obtained in-game (caught, bred, or transferred in). Removing a
+Pokémon (from its detail page's "More" menu) asks for confirmation via
+the native `<dialog>` and removes it from the roster.
 
-Covered by `e2e/catching.spec.js`.
+Covered by `e2e/add-pokemon.spec.js`.
 
-## Roster (a party's Pokémon list, `#/<party-slug>`)
+## Roster (a party's Pokémon list, `#/parties/<slug>`)
 
-`pages/roster.js` renders:
+`components/pages/parties/roster.js` renders:
 
 - An identity header for the party (name, base game).
 - A **rules legend** (`renderLegend`) generated directly from `Store`'s
@@ -61,7 +62,7 @@ Covered by `e2e/catching.spec.js`.
   that generation.
 - The roster list itself, each row showing sprite, nickname/species,
   level, nature, held item, and an EV summary bar.
-- **Search** (by name/nickname), **sort** (catch order / name / level /
+- **Search** (by name/nickname), **sort** (add order / name / level /
   total EVs), and a **filter dialog** (level range, Exp. Share held,
   Pokérus active, still-training vs. fully-trained, held item, nature).
   Filters that only apply to some generations (Pokérus, Exp. Share) are
@@ -77,14 +78,14 @@ Covered by `e2e/catching.spec.js`.
 
 Covered by `e2e/roster-filter-reorder.spec.js`, `e2e/roster-search.spec.js`.
 
-## Pokémon detail page (`#/<party-slug>/<uid>`)
+## Pokémon detail page (`#/parties/<slug>/<uid>`)
 
-`pages/pokemon.js` is a thin wrapper; nearly everything lives in
-`<caught-pokemon-detail>` (`components/caught-pokemon-detail.js`), the
+`components/pages/parties/pokemon.js` is a thin wrapper; nearly everything lives in
+`<pokemon-detail>` (`components/organisms/pokemon-detail.js`), the
 app's largest component. The header shows sprite, an instantly-editable
 nickname, a nature badge, a level button, a held-item badge, EV bars
 (`<ev-summary>`/`<ev-bar>`), and a "More" menu (IVs / Competitive /
-Release) — split out of the main dialogs because the combined dialog had
+Remove) — split out of the main dialogs because the combined dialog had
 grown too long for one scroll.
 
 Five dialogs cover the rest, each following the "preview, then Save"
@@ -122,7 +123,7 @@ way (✕, Escape, backdrop click) discards the pending edit.
   sourced from Pokémon Showdown/Smogon data (see below).
 
 A **"Log a battle" FAB** opens a battle-search dialog; picking a result
-calls `store.logDefeat()`, applying that opponent's EV yield (or, on a
+calls `store.logBattle()`, applying that opponent's EV yield (or, on a
 Gen I/II party, its base Special-Experience-era stat) immediately — no
 separate Save step, since a single battle is already one atomic action.
 
@@ -133,7 +134,7 @@ Covered by `e2e/ev-training.spec.js`, `e2e/nature.spec.js`,
 
 ## EV / Stat Experience history log
 
-`<ev-history-log>` (`components/ev-history-log.js`), embedded on the
+`<ev-history-log>` (`components/organisms/ev-history-log.js`), embedded on the
 detail page, lists every recorded event (battles, vitamins/wings/
 berries, held-item changes, Pokérus/Exp. Share toggles, level changes,
 stat readings, evolutions) grouped by day, each with its own icon and
@@ -149,7 +150,7 @@ internally consistent.
 
 ## Evolution
 
-`<evolution-chain>` (`components/evolution-chain.js`), embedded in the
+`<evolution-chain>` (`components/organisms/evolution-chain.js`), embedded in the
 Level dialog, fetches a species' full evolution family from PokéAPI and
 renders it as a clickable chain: the current form highlighted, the
 reachable next stage(s) offered as Evolve buttons, and the previous stage
@@ -163,14 +164,18 @@ Covered by `e2e/evolution.spec.js`.
 ## Transfer & Import (moving a roster between devices)
 
 Since everything lives in `localStorage`, moving data to another device
-or browser needs an explicit export/import flow:
+or browser needs an explicit export/import flow, gathered under a
+Transfer hub (`components/pages/transfer/transfer.js`, `#/transfer`) with
+two nested pages:
 
-- **Transfer** (`pages/transfer.js` + `<transfer-panel>`) encodes the
-  whole device's state (`store.exportPayload()`) via `lib/transfer.js`
-  (gzip, then base64url — chosen so the whole payload is one URL path
-  segment, since base64url contains no `/`) into a shareable
-  `#/import/<payload>` link, with Share/Copy/Save-as-file options.
-- **Import review** (`pages/import.js` + `<import-review>`) is what a
+- **Export** (`components/pages/transfer/export.js`, `#/transfer/export`,
+  + `<transfer-panel>`) encodes the whole device's state
+  (`store.exportPayload()`) via `lib/transfer.js` (gzip, then base64url —
+  chosen so the whole payload is one URL path segment, since base64url
+  contains no `/`) into a shareable `#/transfer/import/<payload>` link,
+  with Share/Copy/Save-as-file options.
+- **Import review** (`components/pages/transfer/import.js`,
+  `#/transfer/import[/<payload>]`, + `<import-review>`) is what a
   shared link, a pasted link, or a loaded file opens into. It decodes the
   payload and diffs it against local state via `store.previewImport()`
   (flagging new parties, new Pokémon, and per-Pokémon new-event counts),
@@ -183,7 +188,7 @@ Covered by `e2e/transfer.spec.js`.
 
 ## Settings
 
-`pages/settings.js` shows the installed app version, and links out to
+`components/pages/settings/settings.js` shows the installed app version, and links out to
 Transfer and Storage management (the sprite cache page below). When a
 pre-migration backup exists (see "Storage migrations" below) it also
 offers a one-click "copy to clipboard" of that raw backup, for attaching
@@ -193,7 +198,7 @@ Covered by `e2e/settings.spec.js`.
 
 ## Sprite cache manager (`#/settings/cache`)
 
-`pages/sprite-cache.js` lists every generation, collapsed by default;
+`components/pages/settings/cache.js` lists every generation, collapsed by default;
 opening one shows its titles grouped by which ones actually share sprite
 artwork (e.g. Ruby and Sapphire), each row showing "N of M sprites
 cached" with manual **Cache**/**Clear** buttons. Caching work is
