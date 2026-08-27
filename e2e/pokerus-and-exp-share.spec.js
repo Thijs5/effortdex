@@ -42,7 +42,6 @@ test.describe('Pokérus and Exp. Share', () => {
     await page.getByRole('link', { name: /^← / }).click();
     const bulbasaurCard = await openDetail(page, 'Bulbasaur');
     await logBattle(bulbasaurCard, 'Caterpie'); // +1 HP for Bulbasaur directly
-    await bulbasaurCard.locator('.battle-dialog-close').click();
 
     await page.getByRole('link', { name: /^← / }).click();
     const charmanderCardAgain = await openDetail(page, 'Charmander');
