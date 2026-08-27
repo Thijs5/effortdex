@@ -1,7 +1,7 @@
-import { STATS } from '../../lib/constants.js';
-import { escapeHtml } from '../../lib/utils.js';
-import { store } from '../../lib/services.js';
-import { BaseDialog } from '../atoms/base-dialog.js';
+import { STATS } from '../../../../lib/constants.js';
+import { escapeHtml } from '../../../../lib/utils.js';
+import { store } from '../../../../lib/services.js';
+import { BaseDialog } from '../../../atoms/base-dialog.js';
 
 /** @typedef {import('../lib/store.js').RosterEntry} RosterEntry */
 /** @typedef {import('../lib/constants.js').StatKey} StatKey */
@@ -12,7 +12,7 @@ import { BaseDialog } from '../atoms/base-dialog.js';
  * out of pokemon-detail.js (docs/adr/0008's own note that it was
  * still oversized even after item-button-grid.js) — same "own
  * dialog, own pending state, own store calls" shape as
- * items-dialog.js/competitive-dialog.js, built on the shared dialog
+ * items.js/competitive.js, built on the shared dialog
  * chrome in atoms/base-dialog.js.
  *
  * Set `.entry` to a Store roster entry — kept live on every assignment
@@ -21,6 +21,10 @@ import { BaseDialog } from '../atoms/base-dialog.js';
  * shows it. Call `open()` to seed a fresh pending-edit session (docs/
  * adr/0017: nothing commits to the store until this dialog's own Save)
  * and show it.
+ *
+ * Routed under "#/parties/<slug>/<uid>/ivs" (docs/adr/0023) — still
+ * instantiated and owned by pokemon-detail.js's own shadow DOM, same as
+ * before; the route only decides when `open()`/`close()` get called.
  */
 export class IvDialog extends BaseDialog {
   constructor() {

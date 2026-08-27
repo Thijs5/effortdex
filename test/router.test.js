@@ -6,7 +6,7 @@ import * as router from '../lib/router.js';
 
 /** @param {Partial<import('../lib/router.js').Route>} overrides */
 function route(overrides = {}) {
-  return { page: null, partySlug: null, pokemonUid: null, payload: null, dialog: null, returnTo: null, ...overrides };
+  return { page: null, partySlug: null, pokemonUid: null, payload: null, dialog: null, pokemonDialog: null, returnTo: null, ...overrides };
 }
 
 beforeEach(() => {
@@ -51,6 +51,21 @@ test('currentRoute treats "parties/create" as the create-party dialog, layered o
 test('currentRoute treats "parties/<slug>/edit" as the edit-party dialog, layered on that party\'s roster', () => {
   window.location.hash = '#/parties/emerald-run/edit';
   assert.deepEqual(router.currentRoute(), route({ partySlug: 'emerald-run', dialog: 'edit-party' }));
+});
+
+test('currentRoute treats "parties/<slug>/<uid>/<segment>" as one of a roster Pokémon\'s own dialogs', () => {
+  for (const segment of ['nature', 'level', 'ivs', 'items', 'competitive', 'training-guide']) {
+    window.location.hash = `#/parties/emerald-run/abc-123/${segment}`;
+    assert.deepEqual(
+      router.currentRoute(),
+      route({ partySlug: 'emerald-run', pokemonUid: 'abc-123', pokemonDialog: /** @type {any} */ (segment) })
+    );
+  }
+});
+
+test('currentRoute treats an unrecognized third segment as unrecognized, degrading to the bare Pokémon page', () => {
+  window.location.hash = '#/parties/emerald-run/abc-123/not-a-real-dialog';
+  assert.deepEqual(router.currentRoute(), route({ partySlug: 'emerald-run', pokemonUid: 'abc-123' }));
 });
 
 test('currentRoute treats the reserved settings slug as the settings page', () => {
@@ -111,6 +126,7 @@ test('path builders produce the hashes currentRoute parses back', () => {
   assert.equal(router.partyCreatePath(), '#/parties/create');
   assert.equal(router.partyEditPath('emerald-run'), '#/parties/emerald-run/edit');
   assert.equal(router.pokemonPath('emerald-run', 'abc'), '#/parties/emerald-run/abc');
+  assert.equal(router.pokemonDialogPath('emerald-run', 'abc', 'ivs'), '#/parties/emerald-run/abc/ivs');
   assert.equal(router.settingsPath(), '#/settings');
   assert.equal(router.transferPath(), '#/transfer');
   assert.equal(router.transferExportPath(), '#/transfer/export');
@@ -127,6 +143,8 @@ test('navigate helpers set the hash', () => {
   assert.equal(window.location.hash, '#/parties/emerald-run/edit');
   router.navigateToPath(router.pokemonPath('emerald-run', 'abc'));
   assert.equal(window.location.hash, '#/parties/emerald-run/abc');
+  router.navigateToPokemonDialog('emerald-run', 'abc', 'competitive');
+  assert.equal(window.location.hash, '#/parties/emerald-run/abc/competitive');
   router.navigateHome();
   assert.equal(window.location.hash, '#/parties');
 });

@@ -1,10 +1,10 @@
-import { POWER_ITEMS, MACHO_BRACE_SPRITE, EXP_SHARE_SPRITE, VITAMINS, FEATHERS, FEATHER_BONUS, EV_BERRIES, EV_BERRY_REDUCTION, MACHO_BRACE_MULTIPLIER, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, STAT_EXP_VITAMIN_BONUS, STAT_EXP_VITAMIN_CEILING, STAT_LABEL } from '../../lib/constants.js';
-import { sortByLabel } from '../../lib/utils.js';
-import { store } from '../../lib/services.js';
-import { POKERUS_ICON_SVG } from '../../lib/icons.js';
-import { BaseDialog } from '../atoms/base-dialog.js';
-import '../atoms/item-button-grid.js';
-import '../atoms/ds-item-button.js';
+import { POWER_ITEMS, MACHO_BRACE_SPRITE, EXP_SHARE_SPRITE, VITAMINS, FEATHERS, FEATHER_BONUS, EV_BERRIES, EV_BERRY_REDUCTION, MACHO_BRACE_MULTIPLIER, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, STAT_EXP_VITAMIN_BONUS, STAT_EXP_VITAMIN_CEILING, STAT_LABEL } from '../../../../lib/constants.js';
+import { sortByLabel } from '../../../../lib/utils.js';
+import { store } from '../../../../lib/services.js';
+import { POKERUS_ICON_SVG } from '../../../../lib/icons.js';
+import { BaseDialog } from '../../../atoms/base-dialog.js';
+import '../../../atoms/item-button-grid.js';
+import '../../../atoms/ds-item-button.js';
 
 /** @typedef {import('../lib/store.js').RosterEntry} RosterEntry */
 /** @typedef {import('../lib/store.js').EvMap} EvMap */
@@ -21,7 +21,7 @@ const SORTED_EV_BERRIES = sortByLabel(EV_BERRIES);
  * EV-reducing berries. Extracted out of pokemon-detail.js (docs/
  * adr/0008's own note that it was still oversized even after
  * item-button-grid.js) — same "own dialog, own pending state, own
- * store calls" shape as iv-dialog.js/competitive-dialog.js.
+ * store calls" shape as ivs.js/competitive.js.
  *
  * Set `.entry` to a Store roster entry — kept live on every assignment
  * (mirrors pokemon-detail's own "rebuild is cheap" render, ADR
@@ -30,6 +30,10 @@ const SORTED_EV_BERRIES = sortByLabel(EV_BERRIES);
  * Exp. Share-linked battle) fires a re-render. Call `open()` to seed a
  * fresh pending-edit session (docs/adr/0017: nothing commits to the
  * store until this dialog's own Save) and show it.
+ *
+ * Routed under "#/parties/<slug>/<uid>/items" (docs/adr/0023) — still
+ * instantiated and owned by pokemon-detail.js's own shadow DOM, same as
+ * before; the route only decides when `open()`/`close()` get called.
  */
 export class ItemsDialog extends BaseDialog {
   constructor() {
@@ -231,7 +235,7 @@ export class ItemsDialog extends BaseDialog {
   /**
    * Seeds the held-item pending state from the entry (so a previous
    * session's discarded pick never leaks into a fresh one — same
-   * reasoning as iv-dialog.js's own pending IVs, docs/adr/0017), clears
+   * reasoning as ivs.js's own pending IVs, docs/adr/0017), clears
    * the queued Vitamin/Wing/berry list, refreshes every grid from that,
    * then opens.
    */

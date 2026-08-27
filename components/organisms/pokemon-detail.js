@@ -1,20 +1,20 @@
-import { POWER_ITEMS, MACHO_BRACE_SPRITE, EXP_SHARE_SPRITE, NATURES, STATS, STAT_LABEL, MACHO_BRACE_MULTIPLIER, FALLBACK_SPRITE, FALLBACK_ONERROR, MIN_LEVEL, MAX_LEVEL } from '../../lib/constants.js';
-import { titleCase, totalEvs, natureEffectHint, natureOptionsHtml, dayLabel, escapeHtml } from '../../lib/utils.js';
+import { POWER_ITEMS, MACHO_BRACE_SPRITE, EXP_SHARE_SPRITE, NATURES, STATS, STAT_LABEL, MACHO_BRACE_MULTIPLIER, FALLBACK_SPRITE, FALLBACK_ONERROR } from '../../lib/constants.js';
+import { titleCase, totalEvs, natureEffectHint, dayLabel } from '../../lib/utils.js';
 import { api, store } from '../../lib/services.js';
 import { versionedSpriteUrl } from '../../lib/pokeapi-client.js';
-import { evTrainingLocations } from '../../lib/ev-training-locations.js';
 import { attachDesignSystem } from '../../lib/design-system.js';
 import { wireSpriteFallback } from '../../lib/sprite-fallback.js';
-import { wireDisclosureMenu, openShadowDialog, clearShadowDialogFlag } from '../../lib/dom.js';
+import { wireDisclosureMenu } from '../../lib/dom.js';
+import * as router from '../../lib/router.js';
 import '../molecules/ev-summary.js';
 import './ev-history-log.js';
-import '../molecules/ev-training-guide.js';
-import './evolution-chain.js';
 import './pokemon-search.js';
-import '../atoms/level-input.js';
-import './iv-dialog.js';
-import './items-dialog.js';
-import './competitive-dialog.js';
+import '../pages/parties/pokemon/nature.js';
+import '../pages/parties/pokemon/level.js';
+import '../pages/parties/pokemon/ivs.js';
+import '../pages/parties/pokemon/items.js';
+import '../pages/parties/pokemon/competitive.js';
+import '../pages/parties/pokemon/training-guide.js';
 
 /**
  * <pokemon-detail> — a roster Pokémon's full detail page: identity,
@@ -209,81 +209,6 @@ export class PokemonDetail extends HTMLElement {
            own visible hover instead of silently doing nothing. */
         .held-item-btn.status-pill--empty:hover { background: var(--lcd); filter: none; }
 
-        /* Dialog chrome comes from the shared .ds-dialog, its header
-           from .ds-dialog-header; only the grid layout of this dialog's
-           own sections lives here. The grid's gap already spaces the
-           header from the first section, so the shared bottom margin
-           would double up. */
-        .nature-dialog { gap: var(--space-4); }
-        .nature-dialog:not([open]) { display: none; }
-        .nature-dialog[open] { display: grid; }
-        .nature-dialog .ds-dialog-header { margin-bottom: 0; }
-        .nature-dialog.ds-dialog { width: min(420px, calc(100vw - 2.4rem)); }
-        .training-guide-dialog { gap: var(--space-4); }
-        .training-guide-dialog:not([open]) { display: none; }
-        .training-guide-dialog[open] { display: grid; }
-        .training-guide-dialog.ds-dialog { width: min(420px, calc(100vw - 2.4rem)); }
-        .training-guide-dialog .ds-dialog-header { margin-bottom: 0; }
-        /* Everything in this dialog previews only, applied together by
-           the one footer Save button (docs/adr/0017) — except Pokérus,
-           which stays instant (a plain reversible toggle, not a
-           queued/counted action). */
-        .level-up-dialog { gap: var(--space-4); }
-        .level-up-dialog:not([open]) { display: none; }
-        .level-up-dialog[open] { display: grid; }
-        /* Wider than the other compact dialogs (420px) — this is the one
-           that embeds <evolution-chain>, and three stages (current + two
-           evolutions) plus arrows routinely need more than 420px to fit
-           on one row before wrapping. */
-        .level-up-dialog.ds-dialog { width: min(560px, calc(100vw - 2.4rem)); }
-        .level-up-dialog .ds-dialog-header { margin-bottom: 0; }
-        /* min-width: 0 overrides a grid/flex item's default min-width:
-           auto — without it, this row (itself a grid child of
-           .level-up-dialog[open]) refuses to shrink past its own
-           children's combined intrinsic content width, so on a narrow
-           phone it overflows .ds-dialog's own right padding instead of
-           actually shrinking to fit. */
-        .level-up-dialog .field-inline {
-          display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
-          font-size: var(--font-size-xs); color: var(--ink-soft); min-width: 0;
-        }
-        .level-up-dialog .field-inline level-input { flex: 1 1 auto; min-width: 0; max-width: 14em; }
-        /* The current level is read-only context, not part of what Save
-           applies — only the level-input to its right is editable. */
-        .level-up-from { font-family: var(--font-mono); white-space: nowrap; }
-        /* .ds-dialog's own mobile breakpoint (design-system.js) turns
-           every dialog into a full-height edge-to-edge sheet by zeroing
-           margin/border-radius and forcing height:100dvh — meant for the
-           long, scrolly Training & EVs dialog. These three stay small
-           floating cards instead (their content is short), which the
-           width overrides above already enforce on their own, but width
-           alone left margin:0 in place: with an explicit width narrower
-           than the viewport and inset:0 from the dialog's own centering,
-           margin:0 over-constrains the box and it resolves flush against
-           the left edge rather than centered. Restoring margin/height/
-           radius here at the same breakpoint fixes that — height uses
-           fit-content, not auto: a <dialog>'s UA box is fixed-positioned
-           with top/bottom both pinned (inset:0), and for an abspos box
-           with top and bottom both constrained, height:auto resolves to
-           fill the remaining space rather than shrink to content (CSS2.1
-           10.6.4) — which this grid's default align-content:stretch then
-           spreads across the visible row tracks as a huge gap. fit-content
-           is an explicit (non-auto) value, so it isn't subject to that
-           fill-the-gap resolution and genuinely shrink-wraps instead. */
-        @media (max-width: 640px) {
-          .level-up-dialog.ds-dialog,
-          .nature-dialog.ds-dialog,
-          .training-guide-dialog.ds-dialog {
-            margin: auto;
-            height: fit-content;
-            max-height: calc(100dvh - 2.4rem);
-            border-radius: var(--radius-md);
-          }
-        }
-        .level-up-evolve, .level-up-stats { display: grid; gap: var(--space-2); min-width: 0; }
-        .level-up-stats-hint { margin: 0; font-size: var(--font-size-2xs); color: var(--ink-soft); }
-        .level-up-stats-fields { display: grid; gap: var(--space-2); }
-
         .card-body { display: grid; gap: var(--space-5); }
         .card-col { display: grid; gap: var(--space-4); align-content: start; max-width: 360px; }
 
@@ -328,36 +253,6 @@ export class PokemonDetail extends HTMLElement {
           text-transform: none; letter-spacing: normal;
         }
 
-        .nature-dialog .field-inline {
-          display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
-          font-size: var(--font-size-xs); color: var(--ink-soft);
-        }
-        .nature-dialog .field-inline select { width: auto; flex: 1 1 auto; max-width: 14em; }
-        .nature-hint {
-          margin: calc(-1 * var(--space-2)) 0 0; font-family: var(--font-mono);
-          font-size: var(--font-size-2xs); color: var(--ink-soft); text-align: right;
-        }
-        .nature-hint:empty { display: none; }
-
-        /* min-width: 0 on the row and its 1fr column's input — see the
-           Level field's own min-width comment above for why a grid/flex
-           item's default min-width: auto matters here (a narrow phone
-           otherwise overflows past the dialog's own right edge instead
-           of the input actually shrinking to fit). */
-        .iv-row {
-          display: grid; grid-template-columns: 3.5em 1fr; align-items: center; gap: var(--space-2);
-          font-size: var(--font-size-xs); color: var(--ink-soft); min-width: 0;
-        }
-        .iv-row-label { font-family: var(--font-mono); }
-        .iv-row input { width: auto; min-width: 0; }
-        /* One extra column for the last-logged-reading note, read-only
-           context before the new-value input (mirrors the level field's
-           own "Lv. X →" shape) — blank (no note) when nothing's been
-           logged for this stat yet, same width either way. */
-        .level-up-stat-row { grid-template-columns: 3.5em auto 1fr; }
-        .level-up-stat-last { font-family: var(--font-mono); font-size: var(--font-size-2xs); white-space: nowrap; }
-        .training-guide-attribution { margin: var(--space-3) 0 0; font-size: var(--font-size-2xs); color: var(--ink-soft); }
-
         .battle-status { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--poke-red-dark); min-height: 1em; }
       </style>
       <article class="card">
@@ -395,70 +290,12 @@ export class PokemonDetail extends HTMLElement {
           </div>
         </header>
 
-        <dialog class="nature-dialog ds-dialog" aria-labelledby="nature-dialog-title">
-          <header class="ds-dialog-header">
-            <h2 id="nature-dialog-title">Nature
-              <button type="button" class="help-btn" aria-expanded="false" aria-label="What is EV training?" title="EVs (Effort Values) are hidden bonus stat points earned mainly from battling — up to 252 per stat, 510 total. Nature is fixed when a Pokémon is caught or hatched: it boosts one stat by 10% and lowers another. Nature doesn't change EVs, but training the stat your nature already boosts gets the most out of your points.">?</button>
-            </h2>
-            <button class="nature-dialog-close ds-dialog-close" type="button" aria-label="Close">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
-            </button>
-          </header>
-          <label class="field-inline nature-field" hidden>Nature
-            <select class="nature-select ds-field" aria-label="Nature"></select>
-          </label>
-          <p class="nature-hint" aria-live="polite"></p>
-          <footer class="ds-dialog-footer">
-            <button type="button" class="ds-btn ds-btn--primary nature-dialog-save-btn">Save</button>
-          </footer>
-        </dialog>
-
+        <nature-dialog></nature-dialog>
+        <level-up-dialog></level-up-dialog>
         <items-dialog></items-dialog>
-
         <iv-dialog></iv-dialog>
-
-        <dialog class="level-up-dialog ds-dialog" aria-labelledby="level-up-dialog-title">
-          <header class="ds-dialog-header">
-            <h2 id="level-up-dialog-title">Level</h2>
-            <button class="level-up-dialog-close ds-dialog-close" type="button" aria-label="Close">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
-            </button>
-          </header>
-          <label class="field-inline level-up-field">Level
-            <span class="level-up-from">Lv. <span class="level-up-from-value"></span> →</span>
-            <level-input class="level-up-input" aria-label="New level"></level-input>
-          </label>
-
-          <section class="level-up-evolve" hidden>
-            <h3 class="section-title">Evolution</h3>
-            <evolution-chain class="level-up-evo-chain"></evolution-chain>
-          </section>
-
-          <section class="level-up-stats" hidden>
-            <h3 class="section-title">Log stat readings at Lv. <span class="level-up-stats-level"></span> (optional)</h3>
-            <p class="level-up-stats-hint">Check any of this Pokémon's stats on its summary screen right now and enter them below — narrows its IVs. Leave any blank to skip.</p>
-            <div class="level-up-stats-fields"></div>
-          </section>
-
-          <footer class="ds-dialog-footer">
-            <button type="button" class="ds-btn ds-btn--primary level-up-done-btn" hidden>Save</button>
-          </footer>
-        </dialog>
-
         <competitive-dialog></competitive-dialog>
-
-        <dialog class="training-guide-dialog ds-dialog" aria-labelledby="training-guide-dialog-title">
-          <header class="ds-dialog-header">
-            <h2 id="training-guide-dialog-title">Where to train
-              <button type="button" class="help-btn" aria-expanded="false" aria-label="About this list" title="A short, hand-picked list of good spots to grind each stat's EVs in this game — not an exhaustive list. Tap a Pokémon to log a battle against it.">?</button>
-            </h2>
-            <button class="training-guide-dialog-close ds-dialog-close" type="button" aria-label="Close">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
-            </button>
-          </header>
-          <ev-training-guide></ev-training-guide>
-          <p class="training-guide-attribution">Locations via Bulbapedia &amp; Marriland's EV training guides</p>
-        </dialog>
+        <training-guide-dialog></training-guide-dialog>
 
         <div class="card-body">
           <div class="card-col card-col--left">
@@ -498,24 +335,10 @@ export class PokemonDetail extends HTMLElement {
     this.$species = shadow.querySelector('.species');
     this.$levelValue = shadow.querySelector('.level-value');
     this.$levelUpBtn = shadow.querySelector('.level-up-btn');
-    this.$natureField = shadow.querySelector('.nature-field');
-    this.$nature = shadow.querySelector('.nature-select');
-    this.$natureHint = shadow.querySelector('.nature-hint');
     this.$natureBtn = shadow.querySelector('.nature-btn');
-    this.$natureDialog = shadow.querySelector('.nature-dialog');
-    this.$natureDialogClose = shadow.querySelector('.nature-dialog-close');
-    this.$natureDialogSaveBtn = shadow.querySelector('.nature-dialog-save-btn');
+    this.$natureDialog = shadow.querySelector('nature-dialog');
+    this.$levelDialog = shadow.querySelector('level-up-dialog');
     this.$ivDialog = shadow.querySelector('iv-dialog');
-    this.$levelUpDialog = shadow.querySelector('.level-up-dialog');
-    this.$levelUpDialogClose = shadow.querySelector('.level-up-dialog-close');
-    this.$levelUpInput = shadow.querySelector('.level-up-input');
-    this.$levelUpFromValue = shadow.querySelector('.level-up-from-value');
-    this.$levelUpEvolve = shadow.querySelector('.level-up-evolve');
-    this.$levelUpEvoChain = shadow.querySelector('.level-up-evo-chain');
-    this.$levelUpStats = shadow.querySelector('.level-up-stats');
-    this.$levelUpStatsLevel = shadow.querySelector('.level-up-stats-level');
-    this.$levelUpStatsFields = shadow.querySelector('.level-up-stats-fields');
-    this.$levelUpDoneBtn = shadow.querySelector('.level-up-done-btn');
     this.$moreBtnWrap = shadow.querySelector('.more-btn-wrap');
     this.$moreBtn = shadow.querySelector('.more-btn');
     this.$moreMenu = shadow.querySelector('.more-menu');
@@ -525,7 +348,6 @@ export class PokemonDetail extends HTMLElement {
     this.$itemsDialog = shadow.querySelector('items-dialog');
     this.$competitiveDialog = shadow.querySelector('competitive-dialog');
     this.$evSummary = shadow.querySelector('ev-summary');
-    this.$evHelpBtn = shadow.querySelector('.nature-dialog .help-btn');
     this.$search = shadow.querySelector('pokemon-search');
     // Shows what battling this opponent would actually add right now —
     // held item, Pokérus and the 252/510 caps folded in — rather than
@@ -538,13 +360,16 @@ export class PokemonDetail extends HTMLElement {
     this.$histLog = shadow.querySelector('ev-history-log');
     this.$battleFab = shadow.querySelector('.battle-fab');
     this.$trainingGuideBtn = shadow.querySelector('.training-guide-menu-item');
-    this.$trainingGuideDialog = shadow.querySelector('.training-guide-dialog');
-    this.$trainingGuideDialogClose = shadow.querySelector('.training-guide-dialog-close');
-    this.$trainingGuide = shadow.querySelector('ev-training-guide');
+    this.$trainingGuideDialog = shadow.querySelector('training-guide-dialog');
 
     this._spriteFallback = wireSpriteFallback(this.$sprite);
 
-    this.$nature.innerHTML = natureOptionsHtml();
+    // Which of the six dialog routes (docs/adr/0023), if any, is
+    // currently shown — set by syncDialog(), read there and in
+    // closeDialogs() to avoid a redundant close+reopen of the same
+    // dialog on a re-render that doesn't actually change the route
+    // (showModal() throws on an already-open <dialog>).
+    this._openSegment = null;
     this._wireEvents();
   }
 
@@ -556,21 +381,28 @@ export class PokemonDetail extends HTMLElement {
     this.$nickname.addEventListener('change', () => {
       store.renamePokemon(this._entry.uid, this.$nickname.value.trim());
     });
-    this.$levelUpBtn.addEventListener('click', () => this._openLevelUpDialog());
-    this.$levelUpInput.addEventListener('change', () => this._previewLevelUpInput());
-    this.$levelUpDoneBtn.addEventListener('click', () => this._saveLevelUp());
-    this.$levelUpDialog.addEventListener('close', () => {
-      clearShadowDialogFlag();
-      this.$levelUpEvoChain.discard(); // no-op if Save already committed it
-    });
-    this.$levelUpDialogClose.addEventListener('click', () => this.$levelUpDialog.close());
-    this.$levelUpDialog.addEventListener('click', (e) => {
-      if (e.target === this.$levelUpDialog) this.$levelUpDialog.close();
-    });
-    // Nature also commits only on Save — the select already holds its
-    // own pending value; the hint below is a pure display computation,
-    // not a mutation, so it still updates live.
-    this.$nature.addEventListener('change', () => this._renderNatureHint());
+    this.$levelUpBtn.addEventListener('click', () => this._navigateToDialog('level'));
+
+    // Every dialog route (docs/adr/0023) closes the same way regardless
+    // of how it actually closed (Save, Cancel, ✕, Escape, backdrop
+    // click) — each dialog already navigated nowhere on its own, so this
+    // is the one place that syncs the URL back down to the bare Pokémon
+    // page. Reading the route fresh (not a value captured at open time)
+    // is what makes this a no-op if something else already navigated
+    // away (e.g. a route change via Back/Forward already closed this
+    // dialog through syncDialog()). base-dialog.js re-dispatches its
+    // inner <dialog>'s own 'close' on the host element for exactly this
+    // — the inner event doesn't cross the shadow boundary on its own.
+    for (const [dialogEl, segment] of /** @type {[any, import('../../lib/router.js').PokemonDialog][]} */ ([
+      [this.$natureDialog, 'nature'],
+      [this.$levelDialog, 'level'],
+      [this.$ivDialog, 'ivs'],
+      [this.$itemsDialog, 'items'],
+      [this.$competitiveDialog, 'competitive'],
+      [this.$trainingGuideDialog, 'training-guide'],
+    ])) {
+      dialogEl.addEventListener('close', () => this._syncRouteOnClose(segment));
+    }
 
     // The "More" button opens a small menu (Training & EVs / Competitive)
     // rather than a dialog directly — the combined dialog got long enough
@@ -590,23 +422,13 @@ export class PokemonDetail extends HTMLElement {
       const item = /** @type {HTMLElement} */ (e.target).closest('.more-menu-item');
       if (!item) return;
       setMoreMenuOpen(false);
-      if (item.dataset.open === 'ivs') this.$ivDialog.open();
-      else if (item.dataset.open === 'competitive') this.$competitiveDialog.open();
-      else if (item.dataset.open === 'training-guide') openShadowDialog(this.$trainingGuideDialog);
+      if (item.dataset.open === 'ivs') this._navigateToDialog('ivs');
+      else if (item.dataset.open === 'competitive') this._navigateToDialog('competitive');
+      else if (item.dataset.open === 'training-guide') this._navigateToDialog('training-guide');
       else if (item.dataset.action === 'remove') this._removePokemon();
     });
 
-    // 'close' catches every path a dialog can close by: the ✕, Esc, and
-    // a backdrop click — also, harmlessly, a Save button's own .close()
-    // call, since by then the pending fields it reset are already
-    // applied to the store (docs/adr/0017).
-    this.$natureDialog.addEventListener('close', () => clearShadowDialogFlag());
-    this.$natureDialogClose.addEventListener('click', () => this.$natureDialog.close());
-    this.$natureDialog.addEventListener('click', (e) => {
-      if (e.target === this.$natureDialog) this.$natureDialog.close();
-    });
-    this.$natureDialogSaveBtn.addEventListener('click', () => this._saveNatureDialog());
-    this.$natureBtn.addEventListener('click', () => this._openNatureDialog());
+    this.$natureBtn.addEventListener('click', () => this._navigateToDialog('nature'));
     // One modal layer, not two — <pokemon-search force-sheet> owns its
     // own full-screen sheet, so this element's plain `hidden` attribute
     // (not a wrapping <dialog>) is the only other state to manage: show
@@ -625,46 +447,19 @@ export class PokemonDetail extends HTMLElement {
       // ready-to-pick list, not one tap to an empty field.
       this.$search.focus();
     });
-    this.$itemBtn.addEventListener('click', () => this.$itemsDialog.open());
-    // Enter anywhere in a preview-then-Save dialog (Nature/Level —
-    // docs/adr/0017) commits the same way clicking its own Save button
-    // does, matching ordinary form expectations — without this, a native
-    // <dialog> with no <form> wrapper just swallows Enter and does
-    // nothing. Excluded: a <textarea> (Enter means "new line" there) and
-    // a button (Enter/Space already activates it natively — re-clicking
-    // Save here too would be a harmless but pointless double-fire).
-    // iv-dialog.js wires this same behavior for its own dialog itself.
-    for (const [dialog, saveBtn] of /** @type {[HTMLDialogElement, HTMLButtonElement][]} */ ([
-      [this.$natureDialog, this.$natureDialogSaveBtn],
-      [this.$levelUpDialog, this.$levelUpDoneBtn],
-    ])) {
-      dialog.addEventListener('keydown', (e) => {
-        if (e.key !== 'Enter') return;
-        const target = /** @type {HTMLElement} */ (e.target);
-        if (target.tagName === 'TEXTAREA' || target.tagName === 'BUTTON') return;
-        e.preventDefault();
-        saveBtn.click();
-      });
-    }
-    // The "?" buttons toggle their explanation inline: title tooltips are
-    // hover-only, which leaves them unreachable on touch devices. Listens
-    // on the shadow root, since these help buttons are spread across
-    // several separate dialogs (Nature, Where to train) plus the battle
-    // search's own slotted "Exp. Share" note — a click on a light-DOM
-    // child of <pokemon-search> still bubbles up through here regardless
-    // of which shadow tree it's slotted into for rendering. Items/IVs/
-    // Competitive each wire their own identical delegation in their own
-    // shadow root now (iv-dialog.js/items-dialog.js/competitive-dialog.js).
+    this.$itemBtn.addEventListener('click', () => this._navigateToDialog('items'));
+    // The "?" toggle for the battle search's own slotted "Exp. Share"
+    // note — the only help-btn left in this shadow root's own light DOM;
+    // every dialog (Nature/Level/IVs/Items/Competitive/Where to train)
+    // now wires this identical delegation in its own shadow root
+    // instead (nature.js/level.js/ivs.js/items.js/competitive.js/
+    // training-guide.js), since a click inside one of those retargets to
+    // the dialog's host element by the time it reaches here and this
+    // listener could no longer find the real .help-btn it came from.
     this.shadowRoot.addEventListener('click', (e) => {
       const btn = e.target.closest('.help-btn');
       if (!btn) return;
-      // A body sub-section's own heading (e.g. "Vitamins") anchors the
-      // note right after it, same as always. A dialog-header "?" (IVs,
-      // Nature, Competitive) has no .section-title ancestor — anchor to
-      // the header itself instead, so the note lands as the body's first
-      // element (right below the sticky header) rather than inside the
-      // header (too cramped) or, with no anchor at all, crashing.
-      const anchor = btn.closest('.section-title') || btn.closest('.ds-dialog-header');
+      const anchor = btn.closest('.section-title');
       if (!anchor) return;
       const next = anchor.nextElementSibling;
       if (next?.classList.contains('help-note')) {
@@ -686,39 +481,24 @@ export class PokemonDetail extends HTMLElement {
       // all, just the always-on-page status line.
       this._battle(e.detail.name, `Re-logging battle vs ${titleCase(e.detail.name)}…`);
     });
-    this.$trainingGuideDialog.addEventListener('close', () => clearShadowDialogFlag());
-    this.$trainingGuideDialogClose.addEventListener('click', () => this.$trainingGuideDialog.close());
-    this.$trainingGuideDialog.addEventListener('click', (e) => {
-      if (e.target === this.$trainingGuideDialog) this.$trainingGuideDialog.close();
-    });
-    // Same precedent as the history log's own 'redefeat' handler above —
-    // already knows the opponent's name, so no search UI needed, just the
-    // always-on-page status line. Closes the guide first so it's not left
-    // sitting open behind the rest of the page.
-    this.$trainingGuide.addEventListener('spot-pick', (e) => {
-      this.$trainingGuideDialog.close();
+    // Already knows the opponent's name — no search UI needed, just the
+    // always-on-page status line. training-guide.js already closes
+    // itself before dispatching this.
+    this.$trainingGuideDialog.addEventListener('spot-pick', (e) => {
       this._battle(e.detail.name, `Logging battle vs ${titleCase(e.detail.name)}…`);
     });
   }
 
-  /**
-   * Seeds Nature from the entry (so a previous session's discarded edit
-   * never leaks into a fresh one), then opens. Nature has no history
-   * event of its own to undo (ADR 0006) — unlike Pokérus/Exp. Share/
-   * vitamins, a wrong pick has no cheap fix, which is exactly why it
-   * stays Save-gated instead of moving to the instant Items dialog.
-   */
-  _openNatureDialog() {
-    this.$nature.value = this._entry.nature || '';
-    this._renderNatureHint();
-    openShadowDialog(this.$natureDialog);
+  /** @param {import('../../lib/router.js').PokemonDialog} segment */
+  _navigateToDialog(segment) {
+    const partySlug = store.activeParty?.slug;
+    if (partySlug && this._entry) router.navigateToPokemonDialog(partySlug, this._entry.uid, segment);
   }
 
-  /** Applies the pending Nature if it actually changed, then closes. */
-  _saveNatureDialog() {
-    const e = this._entry;
-    if (this.$nature.value !== (e.nature || '')) store.setNature(e.uid, this.$nature.value || null);
-    this.$natureDialog.close();
+  /** @param {import('../../lib/router.js').PokemonDialog} segment */
+  _syncRouteOnClose(segment) {
+    const route = router.currentRoute();
+    if (route.pokemonDialog === segment) router.navigateToPokemon(route.partySlug, route.pokemonUid);
   }
 
   /** Removing a Pokémon from the roster is destructive and irreversible, so it's gated behind a native confirm() with no dialog of its own. */
@@ -733,6 +513,44 @@ export class PokemonDetail extends HTMLElement {
   }
   get entry() {
     return this._entry;
+  }
+
+  /** @param {import('../../lib/router.js').PokemonDialog} segment @returns {any} */
+  _dialogFor(segment) {
+    return {
+      nature: this.$natureDialog,
+      level: this.$levelDialog,
+      ivs: this.$ivDialog,
+      items: this.$itemsDialog,
+      competitive: this.$competitiveDialog,
+      'training-guide': this.$trainingGuideDialog,
+    }[segment];
+  }
+
+  /** Closes whichever of the six dialogs is open — a harmless no-op if none are. */
+  closeDialogs() {
+    for (const segment of /** @type {import('../../lib/router.js').PokemonDialog[]} */ (['nature', 'level', 'ivs', 'items', 'competitive', 'training-guide'])) {
+      this._dialogFor(segment).close();
+    }
+    this._openSegment = null;
+  }
+
+  /**
+   * Called by components/pages/parties/pokemon/pokemon.js's render() on
+   * every route change (docs/adr/0023) — opens the named dialog (seeding
+   * its own pending state via that dialog's own `open()`), closing
+   * whichever else was open first. Guarded on `_openSegment` so a
+   * re-render that doesn't actually change which dialog is open (e.g. an
+   * unrelated store change) doesn't close-then-reopen the same one —
+   * `showModal()` throws on an already-open `<dialog>`, and closing an
+   * in-progress edit out from under the user would discard it.
+   * @param {import('../../lib/router.js').PokemonDialog|null} segment
+   */
+  syncDialog(segment) {
+    if (segment === this._openSegment) return;
+    this.closeDialogs();
+    this._openSegment = segment;
+    if (segment) this._dialogFor(segment).open();
   }
 
   async _battle(name, statusText) {
@@ -764,9 +582,8 @@ export class PokemonDetail extends HTMLElement {
     this.$species.textContent = e.nickname ? titleCase(e.speciesName) : '';
     this.$levelValue.textContent = `Lv. ${e.level}`;
     const natureAvailable = store.natureAvailable();
-    this.$natureField.hidden = !natureAvailable;
-    if (natureAvailable && !this.$natureDialog.open) this.$nature.value = e.nature || '';
-    this._renderNatureHint();
+    this.$natureDialog.entry = e;
+    this.$levelDialog.entry = e;
     const nature = natureAvailable ? NATURES.find((n) => n.id === e.nature) : null;
     this._renderNatureBadge(nature, natureAvailable);
     this._renderItemBadge(e);
@@ -795,7 +612,7 @@ export class PokemonDetail extends HTMLElement {
     this.$evSummary.statCap = store.statCap();
     this.$evSummary.totalCap = totalCap;
     this.$evSummary.mergedSpecial = mergedSpecial;
-    this.$evHelpBtn.title = statExp
+    this.$natureDialog.helpTitle = statExp
       ? "Stat Experience is this game's hidden bonus stat pool — up to 65,535 per stat, gained mainly from battling (equal to the defeated Pokémon's own base stat). Nature is fixed when a Pokémon is caught or hatched: it boosts one stat by 10% and lowers another. Nature doesn't change Stat Experience, but training the stat your nature already boosts gets the most out of your points."
       : "EVs (Effort Values) are hidden bonus stat points earned mainly from battling — up to 252 per stat, 510 total. Nature is fixed when a Pokémon is caught or hatched: it boosts one stat by 10% and lowers another. Nature doesn't change EVs, but training the stat your nature already boosts gets the most out of your points.";
 
@@ -819,133 +636,9 @@ export class PokemonDetail extends HTMLElement {
     } else {
       this.$sprite.title = '';
     }
-    // Curated per-game data (lib/ev-training-locations.js), not a party
-    // rule — no override, so read straight off the party's own baseGame
-    // rather than through an effective-aids-style helper.
-    const locations = evTrainingLocations(store.activeParty?.baseGame);
-    this.$trainingGuideBtn.hidden = !locations;
-    this.$trainingGuide.spriteGame = store.spriteBaseGame();
-    this.$trainingGuide.locations = locations;
+    this.$trainingGuideDialog.entry = e;
+    this.$trainingGuideBtn.hidden = !this.$trainingGuideDialog.locations();
     this.$histLog.entry = e;
-  }
-
-  // Shows the selected nature's stat effect right under the picker, so
-  // beginners don't have to memorize what e.g. "Adamant" does.
-  _renderNatureHint() {
-    const nature = NATURES.find((n) => n.id === this.$nature.value);
-    this.$natureHint.textContent = nature ? natureEffectHint(nature) : '';
-  }
-
-  /**
-   * Opens the Level popup fresh each time, prefilled to the current
-   * level (not +1 — this is as much "log/fix stats now" as it is
-   * "level up"). Both the evolution chain and the stat-reading rows
-   * (Gen III+ only, same gate possibleIvsFromReadings/logStatReading
-   * use) are shown immediately rather than gated behind an actual
-   * increase — <evolution-chain> already only offers Evolve for a
-   * directly-reachable next stage regardless of level (same as it did
-   * in Training & EVs before it moved here), and logging or fixing a
-   * stat reading shouldn't require bumping the level first either.
-   * Nothing here touches the store yet — typing a level or a stat is
-   * only a preview until Save commits it all together.
-   */
-  _openLevelUpDialog() {
-    const e = this._entry;
-    this.$levelUpFromValue.textContent = String(e.level);
-    this.$levelUpInput.value = String(e.level);
-    this.$levelUpEvolve.hidden = false;
-    this.$levelUpEvoChain.entry = e;
-    this.$levelUpEvoChain.load();
-    if (store.usesStatExpSystem()) {
-      this.$levelUpStats.hidden = true;
-    } else {
-      // Cleared before rebuilding: _renderLevelUpStatsFields carries
-      // forward whatever's already in these inputs (for a mid-edit
-      // re-render, e.g. the level field changing while this dialog stays
-      // open), but a fresh open of the dialog should never inherit
-      // fields left over from a previous, already-closed session.
-      this.$levelUpStatsFields.innerHTML = '';
-      this._renderLevelUpStatsFields(e.level);
-      this.$levelUpStats.hidden = false;
-    }
-    this.$levelUpDoneBtn.hidden = false;
-    openShadowDialog(this.$levelUpDialog);
-  }
-
-  /**
-   * Rebuilds the stat rows for `level`'s label, carrying forward
-   * whatever the user already typed into each one — this can run again
-   * mid-edit (the level field changing), so losing a half-entered
-   * reading just because the level was also adjusted would be hostile.
-   * @param {number} level
-   */
-  _renderLevelUpStatsFields(level) {
-    const existing = new Map(
-      [...this.$levelUpStatsFields.querySelectorAll('input[data-stat]')].map((input) => [input.dataset.stat, input.value])
-    );
-    this.$levelUpStatsLevel.textContent = String(level);
-    const e = this._entry;
-    this.$levelUpStatsFields.innerHTML = STATS.map(({ key, label }) => {
-      // The most recently logged reading for this stat, regardless of
-      // level — read-only context alongside the new-value input, the
-      // same "before → new" shape as the level field above it. Also
-      // prefills the input itself (same convention as the level field
-      // being prefilled to the current level) — a stat's real value
-      // does shift with level, so this is a starting point to correct
-      // after rechecking in-game, not assumed still accurate.
-      const last = e.events.filter((ev) => ev.kind === 'stat-reading' && ev.statKey === key).at(-1);
-      const lastNote = last ? `${last.observedStat} (Lv. ${last.level}) →` : '';
-      const prefill = last ? String(last.observedStat) : '';
-      const value = existing.get(key) ?? prefill;
-      // data-prefill lets Save (below) tell "still exactly what it was
-      // prefilled to" apart from "the user actually typed/confirmed
-      // this" — a stat's real value shifts with level, so an untouched
-      // prefill is a starting point to overwrite, not a reading to log.
-      return `<div class="iv-row level-up-stat-row"><span class="iv-row-label">${escapeHtml(label)}</span><span class="level-up-stat-last">${escapeHtml(lastNote)}</span><input type="number" inputmode="numeric" class="ds-field" data-stat="${key}" data-prefill="${escapeHtml(prefill)}" min="1" value="${escapeHtml(value)}" aria-label="${escapeHtml(label)} observed stat value" placeholder="Actual stat" /></div>`;
-    }).join('');
-  }
-
-  /** Clamps and previews the typed level against the stat rows' heading — nothing persists until Save. */
-  _previewLevelUpInput() {
-    const parsed = Math.round(Number(this.$levelUpInput.value));
-    const clamped = Number.isNaN(parsed) ? this._entry.level : Math.min(MAX_LEVEL, Math.max(MIN_LEVEL, parsed));
-    this.$levelUpInput.value = String(clamped);
-    if (!store.usesStatExpSystem()) this._renderLevelUpStatsFields(clamped);
-  }
-
-  /**
-   * Records the level (and every filled-in stat row, at that now-current
-   * level) first, then commits any pending Evolve/Undo choice (the one
-   * network step here — see evolution-chain.js's `commit()`), then
-   * closes — so history reads level-up-then-evolve, matching how the
-   * games narrate it, rather than evolve-then-level. A failed evolve
-   * commit leaves the dialog open with its own error message shown
-   * instead of closing over a Save that didn't fully apply; the level
-   * and stat readings it already recorded stay recorded, since a failed
-   * evolve doesn't invalidate them. The level and every stat reading
-   * share one batchId (not the evolve, which stays its own prominent
-   * entry) so ev-history-log.js collapses them into a single summarized
-   * entry instead of one row per stat.
-   */
-  async _saveLevelUp() {
-    const e = this._entry;
-    const batchId = crypto.randomUUID();
-    store.setLevel(e.uid, this.$levelUpInput.value, batchId);
-    for (const input of this.$levelUpStatsFields.querySelectorAll('input[data-stat]')) {
-      const observed = Number(input.value);
-      // Skip a field still sitting at its untouched prefill — see that
-      // attribute's own comment (_renderLevelUpStatsFields) for why an
-      // unconfirmed prefill must not get logged as if re-checked.
-      if (observed && input.value !== input.dataset.prefill) {
-        store.logStatReading(e.uid, /** @type {StatKey} */ (input.dataset.stat), observed, batchId);
-      }
-    }
-    try {
-      await this.$levelUpEvoChain.commit();
-    } catch {
-      return;
-    }
-    this.$levelUpDialog.close();
   }
 
   // The nature badge sits in the title row, always visible, phrased the

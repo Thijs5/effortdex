@@ -75,6 +75,12 @@ export class BaseDialog extends HTMLElement {
     this.$dialog.addEventListener('close', () => {
       clearShadowDialogFlag();
       this._onClose();
+      // Re-dispatched on the host: the inner <dialog>'s own 'close' event
+      // doesn't cross the shadow boundary, so an owner outside this
+      // component (e.g. pokemon-detail.js syncing a dialog route,
+      // docs/adr/0023) can't listen on `$dialog` directly — only on this
+      // element itself.
+      this.dispatchEvent(new Event('close'));
     });
     $close?.addEventListener('click', () => this.$dialog.close());
     this.$dialog.addEventListener('click', (e) => {
@@ -103,5 +109,9 @@ export class BaseDialog extends HTMLElement {
   }
   close() {
     this.$dialog.close();
+  }
+  /** @returns {boolean} */
+  isOpen() {
+    return this.$dialog.open;
   }
 }

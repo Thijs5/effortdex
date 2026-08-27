@@ -1,10 +1,10 @@
-import { STATS, STAT_LABEL } from '../../lib/constants.js';
-import { gen1SpecialStat } from '../../lib/gen1-special-stats.js';
-import { escapeHtml } from '../../lib/utils.js';
-import { store, smogon } from '../../lib/services.js';
-import { toShowdownId, smogonSetsKey, TIER_DESCRIPTIONS } from '../../lib/smogon-client.js';
-import { matchGameVersion } from '../../lib/game-versions.js';
-import { BaseDialog } from '../atoms/base-dialog.js';
+import { STATS, STAT_LABEL } from '../../../../lib/constants.js';
+import { gen1SpecialStat } from '../../../../lib/gen1-special-stats.js';
+import { escapeHtml } from '../../../../lib/utils.js';
+import { store, smogon } from '../../../../lib/services.js';
+import { toShowdownId, smogonSetsKey, TIER_DESCRIPTIONS } from '../../../../lib/smogon-client.js';
+import { matchGameVersion } from '../../../../lib/game-versions.js';
+import { BaseDialog } from '../../../atoms/base-dialog.js';
 
 /** @typedef {import('../lib/store.js').RosterEntry} RosterEntry */
 
@@ -18,8 +18,8 @@ const TIER_SPECIAL = new Set(['LC', 'NFE']);
  * dialog: base stats, its Pokémon Showdown tier, and a few common
  * Smogon sets. Extracted out of pokemon-detail.js (docs/adr/0008's
  * own note that it was still oversized even after item-button-grid.js)
- * — same "own dialog, own store calls" shape as iv-dialog.js/
- * items-dialog.js, minus any pending/Save state: this dialog is pure
+ * — same "own dialog, own store calls" shape as ivs.js/
+ * items.js, minus any pending/Save state: this dialog is pure
  * reference, nothing here ever writes to the store.
  *
  * Set `.entry` to a Store roster entry — kept live on every assignment
@@ -27,6 +27,11 @@ const TIER_SPECIAL = new Set(['LC', 'NFE']);
  * 0002 point 5) so the content is already correct the instant `open()`
  * shows it, and stays correct if the species changes while it's open.
  * Call `open()` to show it.
+ *
+ * Routed under "#/parties/<slug>/<uid>/competitive" (docs/adr/0023) —
+ * still instantiated and owned by pokemon-detail.js's own shadow DOM,
+ * same as before; the route only decides when `open()`/`close()` get
+ * called.
  */
 export class CompetitiveDialog extends BaseDialog {
   constructor() {

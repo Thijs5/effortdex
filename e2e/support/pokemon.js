@@ -1,11 +1,11 @@
 // @ts-check
 // Shared flows for adding a Pokémon and driving its detail page. There is
 // exactly one <pokemon-detail> element in the whole app
-// (components/pages/parties/pokemon.js creates it once and re-renders it for
-// whichever Pokémon's detail page is open) — the roster list itself only
-// shows compact link rows. So every spec that needs vitamins/training
-// items/evolution/battle-logging must first navigate into a specific
-// Pokémon's detail page via `openDetail`.
+// (components/pages/parties/pokemon/pokemon.js creates it once and
+// re-renders it for whichever Pokémon's detail page is open) — the
+// roster list itself only shows compact link rows. So every spec that
+// needs vitamins/training items/evolution/battle-logging must first
+// navigate into a specific Pokémon's detail page via `openDetail`.
 
 /**
  * From a party's roster page, searches for `species` in the add panel,

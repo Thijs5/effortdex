@@ -16,7 +16,7 @@ import './lib/shell.js';
 import './lib/app-version.js';
 import * as parties from './components/pages/parties/parties.js';
 import * as roster from './components/pages/parties/roster.js';
-import * as pokemon from './components/pages/parties/pokemon.js';
+import * as pokemon from './components/pages/parties/pokemon/pokemon.js';
 import * as partyDialog from './components/pages/parties/party-dialog.js';
 import * as settings from './components/pages/settings/settings.js';
 import * as transferHub from './components/pages/transfer/transfer.js';
@@ -39,10 +39,11 @@ function showView(view) {
 }
 
 function render() {
-  const { page, partySlug, pokemonUid, payload, dialog } = router.currentRoute();
+  const { page, partySlug, pokemonUid, payload, dialog, pokemonDialog } = router.currentRoute();
 
   if (page === 'settings') {
     partyDialog.closeIfOpen();
+    pokemon.closeDialogsIfOpen();
     showView(settings.view);
     settings.render();
     return;
@@ -50,6 +51,7 @@ function render() {
 
   if (page === 'transfer') {
     partyDialog.closeIfOpen();
+    pokemon.closeDialogsIfOpen();
     showView(transferHub.view);
     transferHub.render();
     return;
@@ -57,6 +59,7 @@ function render() {
 
   if (page === 'transfer-export') {
     partyDialog.closeIfOpen();
+    pokemon.closeDialogsIfOpen();
     showView(transferExport.view);
     transferExport.render();
     return;
@@ -64,6 +67,7 @@ function render() {
 
   if (page === 'cache') {
     partyDialog.closeIfOpen();
+    pokemon.closeDialogsIfOpen();
     showView(spriteCache.view);
     spriteCache.render();
     return;
@@ -71,12 +75,14 @@ function render() {
 
   if (page === 'import') {
     partyDialog.closeIfOpen();
+    pokemon.closeDialogsIfOpen();
     showView(importPage.view);
     importPage.render(payload);
     return;
   }
 
   if (!partySlug) {
+    pokemon.closeDialogsIfOpen();
     showView(parties.view);
     parties.render();
     if (dialog === 'create-party') partyDialog.openCreateDialog();
@@ -102,10 +108,11 @@ function render() {
     }
     partyDialog.closeIfOpen(); // no dialog route exists this deep — always closed here
     showView(pokemon.view);
-    pokemon.render(party, entry);
+    pokemon.render(party, entry, pokemonDialog);
     return;
   }
 
+  pokemon.closeDialogsIfOpen();
   showView(roster.view);
   roster.render(party);
   if (dialog === 'edit-party') partyDialog.openEditDialog(party);
