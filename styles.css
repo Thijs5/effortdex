@@ -794,6 +794,19 @@ html[data-modal-open] body {
   min-height: 0;
   margin-top: var(--space-2);
 }
+/* Same reasoning as #clear-cache-status above — text only shows for an
+   instant, so the usual reserved min-height would just be a permanent
+   empty gap. Also collapses the checkbox label's own margin-bottom
+   (.field-label's default, sized for a label followed by more form
+   content) down to match, since here it's immediately followed by this
+   status line instead. */
+.settings-section:has(#notify-cache-done-input) .field-label {
+  margin-bottom: var(--space-2);
+}
+#notify-cache-done-status {
+  min-height: 0;
+  margin-top: 0;
+}
 #settings-version {
   font-family: var(--font-mono);
 }
@@ -985,6 +998,24 @@ textarea.ds-field { resize: vertical; }
 .field-label--checkbox .hint {
   margin: 2px 0 0;
   font-weight: 400;
+}
+/* The flex-start + 3px nudge above lines the checkbox up with just the
+   *first* line of a two-line label (party-cache-offline-row's own
+   checkbox + wrapped .hint underneath it) — for a plain one-line label
+   with no wrapped hint, that same offset reads as sitting low against
+   the text instead of level with it. */
+.field-label--checkbox-inline {
+  align-items: center;
+}
+.field-label--checkbox-inline input[type='checkbox'] {
+  margin-top: 0;
+}
+/* Flex centering lines up the checkbox and the label's *line box*, but
+   the line box reserves font-metric leading the label's actual glyphs
+   don't use — which reads as the text sitting a couple px low against
+   the checkbox. Nudge the glyphs up to compensate. */
+.field-label--checkbox-inline span {
+  transform: translateY(-1.5px);
 }
 /* A fixed width, not auto, on purpose: a <select>'s auto width follows
    its own longest option text, so left to itself each of these six

@@ -236,6 +236,20 @@
       </section>
 
       <section class="settings-section">
+        <h3>Notifications</h3>
+        <p class="hint">
+          Caching a whole generation can take a couple of minutes &mdash;
+          get a notification when a "Cache" or "Cache all" run finishes,
+          even if you've switched away from this tab in the meantime.
+        </p>
+        <label class="field-label field-label--checkbox field-label--checkbox-inline">
+          <input type="checkbox" id="notify-cache-done-input" />
+          <span>Notify me when caching finishes</span>
+        </label>
+        <p id="notify-cache-done-status" class="status-line" aria-live="polite"></p>
+      </section>
+
+      <section class="settings-section">
         <h3>Developer: disable caching</h3>
         <p class="hint">
           Turns off the service worker and all offline caching entirely
@@ -245,7 +259,7 @@
           while this is on, so leave it off otherwise. Takes effect
           immediately (reloads the page).
         </p>
-        <label class="field-label field-label--checkbox">
+        <label class="field-label field-label--checkbox field-label--checkbox-inline">
           <input type="checkbox" id="disable-caching-input" />
           <span>Disable caching</span>
         </label>
