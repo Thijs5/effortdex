@@ -199,3 +199,65 @@ Two alternatives were considered and rejected:
   `_enqueueAutomatic` (not awaited before the per-generation loop below
   it): nothing needs to block on item warming finishing first, since
   both feed the same shared queue either way.
+
+## Addendum: evolution-chain prefetch (closing the same offline gap for evolution data)
+
+This ADR's Decision closed the offline gap for sprite *images*, but
+`PokeApiClient#getEvolutionChain`/`getEvolutionOptions` (cached under the
+`effortdex:evolutions:`/`effortdex:evochain:`/`effortdex:species:` key
+prefixes — ADR 0001) had no equivalent: a species' evolution chain was
+only ever fetched the first time something actually opened its evolution
+UI, so it 404s offline for any species nobody has personally looked up
+yet, same as sprites did before this ADR. Filed and tracked as GitHub
+issue #27.
+
+- **`PrefetchService` gained a third `QueueTask` shape.** Every task
+  previously either resolved a sprite URL from a species lookup
+  (`resolveUrl` + `getPokemon`) or already knew a direct URL outright
+  (item icons, `url`). Evolution-chain warming needs neither — there's no
+  sprite URL to cache-check or `fetch()`, just an arbitrary async warmer
+  (`warm`) to run, whose entire job is populating `PokeApiClient`'s own
+  cache as a side effect (`getEvolutionChain(name)` itself). `_runTask`
+  branches on whichever of the three is set and runs it through the same
+  `silent`-gated `withoutTracking` wrapper every other task uses.
+- **Enqueued under one shared `'evo'` source tag, everywhere** — `start()`
+  (the automatic scan), `prefetchGame()`, and `prefetchGeneration()` all
+  feed evolution-chain warming through `_enqueueEvolutionChains(species)`
+  under the same tag, never a per-game one. Unlike a sprite, which can
+  genuinely differ by title (`versionedSpriteUrl`), an evolution chain
+  doesn't vary by which game asked for it — there's exactly one correct
+  target per species, so every caller should dedupe against the same
+  entry rather than each maintaining its own copy of identical data.
+  Concretely: the automatic scan warming generation 1 and someone
+  clicking "Cache" for a Gen I game on `#/settings/cache` both enqueue
+  `evo:bulbasaur`, and whichever gets there first is the one that runs.
+- **Always silent, regardless of entry point.** The sprite work
+  `prefetchGame`/`prefetchGeneration` do stays visible (unwrapped,
+  showing the header LED — ADR 0013) since it's the thing the user
+  explicitly asked for; evolution-chain warming alongside it is
+  additional, unrequested background work, so it stays silent even under
+  a manual trigger — consistent with this ADR's own automatic scan being
+  silent throughout, and matching the "no visible progress" note issue
+  #27 raised for this exact addition. It's also left out of
+  `onProgress`'s `{done, total}` count for the same reason: that count
+  exists for a "Caching… 42/151" button label, not something with a
+  progress-worth story of its own here.
+- **Chain-level dedup was already free.** `getEvolutionChain` fetches a
+  chain keyed by the chain's own URL (`_getEvolutionChain`, this file's
+  header comment references it too) — many species in one family already
+  share a single request purely from that existing cache key, independent
+  of anything `PrefetchService` does. So `_enqueueEvolutionChains`
+  enqueues one task per species (needed regardless, since each species'
+  own `evolution_chain.url` isn't known until its own species record is
+  fetched) rather than trying to resolve families up front — the
+  underlying chain fetch still only happens once per family either way.
+- **No new PokeApiClient method.** `getEvolutionChain(name)` already did
+  everything this needed — fetch the species record, fetch the chain,
+  cache both — so this addendum is entirely a `PrefetchService` change,
+  the queue growing a task shape rather than gaining a new API surface.
+- Covered by new unit tests in `test/prefetch-service.test.js`
+  ("evolution-chain warming" section): automatic-scan warming, silence,
+  best-effort failure handling, both manual triggers warming their own
+  species, and the shared-tag dedup between the automatic scan and a
+  manual game. No e2e coverage, for the same idle-deferred/real-network
+  reasons this ADR's own automatic scan has none.
