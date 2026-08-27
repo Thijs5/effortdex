@@ -21,15 +21,22 @@ localStorage-backed cache with different rules (see ADR 0001).
 ## Decision
 
 1. **`sw.js` caches only the app shell, cache-first.** `SHELL_PATHS`
-   enumerates every file the app is made of, resolved relative to the
-   worker's own location so the same list works at a domain root or a
-   subpath (GitHub Pages). Cross-origin requests (PokéAPI JSON, sprite
-   images) are deliberately not intercepted.
-   - Maintenance invariant: **adding a source file means adding it to
-     `SHELL_PATHS`.** Nothing enforces this mechanically (no build
-     step); a file missing from the list still works online but 404s
-     offline. Reviewing that list on any PR that adds a file is part of
-     code review, like ADR 0002's other by-hand boundaries.
+   enumerates every file the *deployed* app is made of, resolved
+   relative to the worker's own location so the same list works at a
+   domain root or a subpath (GitHub Pages). Cross-origin requests
+   (PokéAPI JSON, sprite images) are deliberately not intercepted.
+   - Since `scripts/build.mjs` bundles the entire `lib/`/`components/`
+     module graph into a single `dist/app.js` (docs/adr/0002), the
+     deployed shell really is just `index.html`, `app.js`,
+     `styles.css`, `tokens.css`, `manifest.webmanifest`,
+     `version.json`, and `icons/` — so `SHELL_PATHS` lists exactly
+     those and nothing per-module. Adding a new `lib/`/`components/`
+     source file needs no `SHELL_PATHS` change, since it's inlined
+     into `dist/app.js` by the build; the maintenance invariant this
+     point used to describe (one entry per source file) no longer
+     applies. `SHELL_PATHS` only needs revisiting if a *new top-level
+     asset* (not folded into the JS/CSS bundles) is added to the
+     deployed output.
 2. **Releases are stamped, not hand-versioned.** The deploy workflow
    rewrites `CACHE_NAME` to `effortdex-shell-<tag>-<sha>` and
    `version.json` to the release tag on every tag push. The literals
