@@ -84,11 +84,31 @@ export class EvolutionChain extends HTMLElement {
   _setPending(next) {
     const same = this._pending?.action === next.action && /** @type {any} */ (this._pending).name === /** @type {any} */ (next).name;
     this._pending = same ? null : next;
-    this.$status.textContent = !this._pending
-      ? ''
-      : this._pending.action === 'evolve'
-        ? `Will evolve into ${titleCase(this._pending.name)} on Save`
-        : 'Will undo evolution on Save';
+    this.$status.textContent = '';
+    this._syncPendingButtons();
+  }
+
+  /**
+   * Colors the picked node's button `active` (the same persistent-pressed
+   * look the current-form node always renders with) instead of a status
+   * line — cleared on the previously-picked button, if any, when the
+   * choice changes. The current-form node hands its own `active` off to
+   * the pending pick while one is staged, and takes it back once the
+   * pick is cleared/committed — otherwise both would render "active" at
+   * once (the old form never visibly deselecting) since they share the
+   * same look.
+   */
+  _syncPendingButtons() {
+    const currentBtn = this.$chain.querySelector('.evo-current-btn');
+    if (currentBtn) currentBtn.toggleAttribute('active', this._pending === null);
+    for (const el of this.$chain.querySelectorAll('[data-action]')) {
+      const btn = /** @type {HTMLElement} */ (el);
+      const isPending =
+        this._pending !== null &&
+        btn.dataset.action === this._pending.action &&
+        (this._pending.action !== 'evolve' || btn.dataset.name === this._pending.name);
+      btn.toggleAttribute('active', isPending);
+    }
   }
 
   /**
@@ -111,6 +131,7 @@ export class EvolutionChain extends HTMLElement {
         store.revertEvolution(entry.uid);
       }
       this._pending = null;
+      this._syncPendingButtons();
     } catch (err) {
       this.$status.textContent = err instanceof Error ? err.message : 'Could not evolve.';
       throw err;
@@ -121,6 +142,7 @@ export class EvolutionChain extends HTMLElement {
   discard() {
     this._pending = null;
     this.$status.textContent = '';
+    this._syncPendingButtons();
   }
 
   /** @param {RosterEntry|null} e */
@@ -202,7 +224,7 @@ export class EvolutionChain extends HTMLElement {
     const attrs = `icon="${escapeHtml(sprite)}" label="${escapeHtml(label)}" boost="${escapeHtml(boost)}"`;
 
     if (node.name === currentName) {
-      return `<ds-item-button ${attrs} active disabled title="Current form"></ds-item-button>`;
+      return `<ds-item-button ${attrs} class="evo-current-btn" active disabled title="Current form"></ds-item-button>`;
     }
     if (node.name === prevName) {
       return `<ds-item-button ${attrs} data-action="undo" data-name="${escapeHtml(node.name)}" title="Undo evolution — revert to ${label}"></ds-item-button>`;

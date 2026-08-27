@@ -101,10 +101,10 @@ export class EvHistoryLog extends HTMLElement {
             <option value="all">All types</option>
             <option value="battle">Battles</option>
             <option value="vitamin">Vitamins</option>
-            <option value="feather">Wings</option>
-            <option value="berry">EV-reducing berries</option>
+            <option value="feather" class="hist-kind-opt-feather">Wings</option>
+            <option value="berry" class="hist-kind-opt-berry">EV-reducing berries</option>
             <option value="held-item">Held items</option>
-            <option value="pokerus">Pokérus</option>
+            <option value="pokerus" class="hist-kind-opt-pokerus">Pokérus</option>
             <option value="exp-share">Exp. Share</option>
             <option value="level">Level &amp; stat readings</option>
             <option value="evolve">Evolutions</option>
@@ -118,6 +118,9 @@ export class EvHistoryLog extends HTMLElement {
     this.$histList = shadow.querySelector('.hist-list');
     this.$histSearch = shadow.querySelector('.hist-search');
     this.$histKindFilter = shadow.querySelector('.hist-kind-filter');
+    this.$histKindOptFeather = shadow.querySelector('.hist-kind-opt-feather');
+    this.$histKindOptBerry = shadow.querySelector('.hist-kind-opt-berry');
+    this.$histKindOptPokerus = shadow.querySelector('.hist-kind-opt-pokerus');
 
     this.$details.addEventListener('toggle', () => {
       this._open = this.$details.open;
@@ -164,7 +167,26 @@ export class EvHistoryLog extends HTMLElement {
     if (!e) return;
     this.$details.open = this._open;
     this.$histCount.textContent = e.history.length;
+    this._syncKindFilterOptions();
     this._renderList();
+  }
+
+  // Hides filter options for mechanics the active party's generation
+  // doesn't have (e.g. no Wings pre-Gen V) — mirrors items-dialog.js/
+  // roster.js's own wingsAvailable()/berriesAvailable()/pokerusAvailable()
+  // gating. Already-logged entries of a since-unavailable kind (say, a
+  // party's game version changed) still show under "All types"; only the
+  // filter option itself is hidden, and a filter left selected on one
+  // that just disappeared falls back to "All types" rather than staying
+  // stuck on an invisible option.
+  _syncKindFilterOptions() {
+    this.$histKindOptFeather.hidden = !store.wingsAvailable();
+    this.$histKindOptBerry.hidden = !store.berriesAvailable();
+    this.$histKindOptPokerus.hidden = !store.pokerusAvailable();
+    if (this.$histKindFilter.selectedOptions[0]?.hidden) {
+      this._filterKind = 'all';
+      this.$histKindFilter.value = 'all';
+    }
   }
 
   // Re-renders just the list against the current search/kind filter,

@@ -49,6 +49,7 @@ test.describe('EV-training location guide', () => {
     await catchPokemon(page, 'Charmander');
     const card = await openDetail(page, 'Charmander');
 
-    await expect(card.locator('.training-guide-btn')).toBeHidden();
+    await card.getByRole('button', { name: 'More' }).click();
+    await expect(card.locator('.training-guide-menu-item')).toBeHidden();
   });
 });

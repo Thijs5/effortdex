@@ -143,4 +143,17 @@ test.describe('Gen I/II Stat Experience', () => {
     await expect(dialog.locator('.vitamin-grid')).toBeVisible();
     await expect(dialog.locator('.pokerus-toggle-btn')).toBeVisible();
   });
+
+  test("the history filter dropdown hides Wings/berries/Pokérus on a Gen I party — none of them exist yet", async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Red run', baseGame: 'Red' });
+    await catchPokemon(page, 'Bulbasaur');
+    const card = await openDetail(page, 'Bulbasaur');
+    const histFilter = card.locator('ev-history-log .hist-kind-filter');
+
+    await expect(histFilter.locator('option[value="feather"]')).toHaveJSProperty('hidden', true);
+    await expect(histFilter.locator('option[value="berry"]')).toHaveJSProperty('hidden', true);
+    await expect(histFilter.locator('option[value="pokerus"]')).toHaveJSProperty('hidden', true);
+    await expect(histFilter.locator('option[value="vitamin"]')).toHaveJSProperty('hidden', false);
+  });
 });
