@@ -11,6 +11,7 @@
 import { store, prefetchService } from './lib/services.js';
 import { attachDesignSystem } from './lib/design-system.js';
 import { wireDialogCloseButtons } from './lib/dom.js';
+import { trackPageview } from './lib/analytics.js';
 import * as router from './lib/router.js';
 import './lib/shell.js';
 import './lib/app-version.js';
@@ -120,6 +121,11 @@ function render() {
 }
 
 router.onRouteChange(render);
+// The count script (index.html) already counts the initial page load
+// on its own; this only needs to cover subsequent in-app hash
+// navigation, which is why it's wired to route changes specifically —
+// not to store's own 'change' (data edits, not navigation) below.
+router.onRouteChange(trackPageview);
 store.addEventListener('change', render);
 render();
 
