@@ -747,6 +747,7 @@ export class CaughtPokemonDetail extends HTMLElement {
       const mon = await api.getPokemon(name);
       store.logDefeat(this._entry.uid, mon);
       this.$status.textContent = '';
+      this.$battleDialog.close();
     } catch (err) {
       this.$status.textContent = err.message || 'Could not log that battle.';
     }

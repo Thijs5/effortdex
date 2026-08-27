@@ -148,8 +148,9 @@ export async function openTrainingGuide(card) {
 /**
  * Logs a battle against `opponentSpecies` from the "Log a battle" FAB's
  * dialog — the one entry point for both a direct fight and Exp. Share's
- * passive gain. Opens the dialog first if it isn't already open (it's
- * left open afterwards, same as the old always-visible inline search).
+ * passive gain. Opens the dialog first if it isn't already open; the
+ * dialog closes itself once the battle is successfully logged, so this
+ * waits for that before returning.
  * @param {import('@playwright/test').Locator} card
  * @param {string} opponentSpecies
  */
@@ -158,4 +159,5 @@ export async function logBattle(card, opponentSpecies) {
   if (!(await dialog.isVisible())) await card.locator('.battle-fab').click();
   await dialog.getByRole('combobox', { name: 'Defeated Pokémon…' }).fill(opponentSpecies);
   await card.page().getByRole('option').filter({ hasText: new RegExp(opponentSpecies, 'i') }).first().click();
+  await dialog.waitFor({ state: 'hidden' });
 }
