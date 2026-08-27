@@ -407,12 +407,22 @@
           <game-version-picker id="override-sprite-version" maxlength="40" placeholder="Auto (from base game)" aria-label="Sprite style"></game-version-picker>
         </label>
         <p class="hint sprite-style-hint">Shows this title's sprites for the roster instead of the base game's &mdash; e.g. play a Ruby ROM hack but see Emerald's sprites. Any species missing from that title's sprites falls back to the modern default.</p>
-        <label class="field-label">
+        <label class="field-label field-label--inline">
           Available Pok&eacute;mon
-          <pokemon-search id="override-available-species-search" placeholder="Add a Pok&eacute;mon from your run…"></pokemon-search>
+          <select id="override-available-generation" class="ds-field">
+            <option value="">Auto (from base game)</option>
+            <option value="1">Up to Generation I</option>
+            <option value="2">Up to Generation II</option>
+            <option value="3">Up to Generation III</option>
+            <option value="4">Up to Generation IV</option>
+            <option value="5">Up to Generation V</option>
+            <option value="6">Up to Generation VI</option>
+            <option value="7">Up to Generation VII</option>
+            <option value="8">Up to Generation VIII</option>
+            <option value="9">Up to Generation IX</option>
+          </select>
         </label>
-        <ul class="chip-list" id="override-available-species-list" aria-label="Available Pok&eacute;mon"></ul>
-        <p class="hint">Leave empty to use every species from this game's generation (and earlier ones) automatically. Add species here to restrict the battle-log and add-Pok&eacute;mon pickers to exactly this list &mdash; for a randomizer or dex-limited run where real availability doesn't match a normal game's.</p>
+        <p class="hint">Restricts the battle-log and add-Pok&eacute;mon pickers to species from up to the chosen generation, instead of following the base game's own &mdash; for a ROM hack/mod whose dex doesn't match its base game's real generation.</p>
       </details>
 
       <div class="party-dialog-actions">

@@ -28,10 +28,8 @@
 import { store, prefetchService } from '../../../lib/services.js';
 import * as router from '../../../lib/router.js';
 import { isCachingDisabled } from '../../../lib/dev-cache.js';
-import { titleCase, escapeHtml } from '../../../lib/utils.js';
 import '../../atoms/game-ball.js';
 import '../../molecules/game-version-picker.js';
-import '../../organisms/pokemon-search.js';
 
 const partyDialog = document.getElementById('party-dialog');
 const partyForm = document.getElementById('party-form');
@@ -69,41 +67,8 @@ const OVERRIDE_FIELDS = [
   { key: 'evBerries', el: document.getElementById('override-ev-berries'), type: 'bool' },
   { key: 'nature', el: document.getElementById('override-nature'), type: 'bool' },
   { key: 'spriteVersion', el: document.getElementById('override-sprite-version'), type: 'string' },
+  { key: 'availableGeneration', el: document.getElementById('override-available-generation'), type: 'number' },
 ];
-
-// `availableSpecies` (GitHub issue #31) isn't a single-field select like
-// the rest of OVERRIDE_FIELDS — it's a user-built list, so it gets its
-// own chip-list UI and round-trip logic below instead of a declarative
-// entry.
-const overrideAvailableSpeciesSearch = document.getElementById('override-available-species-search');
-const overrideAvailableSpeciesList = document.getElementById('override-available-species-list');
-let availableSpeciesDraft = []; // string[], insertion order, this dialog session only
-
-function renderAvailableSpeciesChips() {
-  overrideAvailableSpeciesList.innerHTML = availableSpeciesDraft
-    .map(
-      (name) => `<li class="chip" data-name="${escapeHtml(name)}">
-        <span>${escapeHtml(titleCase(name))}</span>
-        <button type="button" class="chip-remove" aria-label="Remove ${escapeHtml(titleCase(name))}">&#10005;</button>
-      </li>`
-    )
-    .join('');
-}
-
-overrideAvailableSpeciesSearch.addEventListener('pokemon-pick', (e) => {
-  const name = e.detail.name;
-  if (!availableSpeciesDraft.includes(name)) {
-    availableSpeciesDraft.push(name);
-    renderAvailableSpeciesChips();
-  }
-});
-
-overrideAvailableSpeciesList.addEventListener('click', (e) => {
-  const li = e.target.closest('li.chip');
-  if (!li || !e.target.closest('.chip-remove')) return;
-  availableSpeciesDraft = availableSpeciesDraft.filter((name) => name !== li.dataset.name);
-  renderAvailableSpeciesChips();
-});
 
 function writeOverridesToDialog(overrides) {
   let anySet = false;
@@ -112,9 +77,6 @@ function writeOverridesToDialog(overrides) {
     field.el.value = value === null ? '' : String(value);
     if (value !== null) anySet = true;
   }
-  availableSpeciesDraft = [...(overrides?.availableSpecies || [])];
-  renderAvailableSpeciesChips();
-  if (availableSpeciesDraft.length) anySet = true;
   // Open the section automatically when editing a party that already has
   // overrides set, so they're never silently hidden from view.
   partyAdvancedRules.open = anySet;
@@ -127,7 +89,6 @@ function readOverridesFromDialog() {
     overrides[field.key] =
       raw === '' ? null : field.type === 'number' ? Number(raw) : field.type === 'string' ? raw : raw === 'true';
   }
-  overrides.availableSpecies = availableSpeciesDraft.length ? [...availableSpeciesDraft] : null;
   return overrides;
 }
 

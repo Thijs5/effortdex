@@ -16,12 +16,12 @@ test('availableSpeciesFor returns null (unrestricted) for a party-less caller', 
   assert.equal(await availableSpeciesFor(null, fakeApi({})), null);
 });
 
-test('availableSpeciesFor returns null when the base game is unrecognized (ROM hack) and no explicit list is set', async () => {
+test('availableSpeciesFor returns null when the base game is unrecognized (ROM hack) and no generation override is set', async () => {
   const party = { baseGame: 'Radical Red', overrides: {} };
   assert.equal(await availableSpeciesFor(party, fakeApi({})), null);
 });
 
-test('availableSpeciesFor unions every generation up to the base game\'s own, cumulatively', async () => {
+test("availableSpeciesFor unions every generation up to the base game's own, cumulatively", async () => {
   const api = fakeApi({ 1: ['bulbasaur'], 2: ['chikorita'], 3: ['treecko'] });
   const party = { baseGame: 'Emerald', overrides: {} }; // gen 3
   const result = await availableSpeciesFor(party, api);
@@ -34,16 +34,16 @@ test('availableSpeciesFor fails open (null) when a generation fetch fails', asyn
   assert.equal(await availableSpeciesFor(party, api), null);
 });
 
-test('availableSpeciesFor prefers an explicit per-party list over generation lookup', async () => {
-  const api = fakeApi({ 1: ['bulbasaur'] });
-  const party = { baseGame: 'Red', overrides: { availableSpecies: ['mew', 'ditto'] } };
+test("availableSpeciesFor prefers an explicit generation override over the base game's own generation", async () => {
+  const api = fakeApi({ 1: ['bulbasaur'], 2: ['chikorita'] });
+  const party = { baseGame: 'Red', overrides: { availableGeneration: 2 } }; // Red is gen 1, override says gen 2
   const result = await availableSpeciesFor(party, api);
-  assert.deepEqual([...result].sort(), ['ditto', 'mew']);
+  assert.deepEqual([...result].sort(), ['bulbasaur', 'chikorita']);
 });
 
-test('availableSpeciesFor ignores an empty explicit list, falling back to generation lookup', async () => {
+test('availableSpeciesFor uses the generation override even for an unrecognized base game (ROM hack)', async () => {
   const api = fakeApi({ 1: ['bulbasaur'] });
-  const party = { baseGame: 'Red', overrides: { availableSpecies: [] } };
+  const party = { baseGame: 'Radical Red', overrides: { availableGeneration: 1 } };
   const result = await availableSpeciesFor(party, api);
   assert.deepEqual([...result], ['bulbasaur']);
 });

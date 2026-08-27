@@ -784,7 +784,7 @@ test('migrates a v1 (pre-event-sourcing) save: identity, level, EVs and Pokérus
   const party = loaded.state.parties[0];
   assert.equal(party.description, ''); // party backfills still apply post-migration
   assert.equal(party.slug, 'old-party');
-  assert.deepEqual(party.overrides, { powerItemBonus: null, powerItems: null, machoBrace: null, vitaminCutoff: null, pokerus: null, wings: null, evBerries: null, nature: null, statExpSystem: null, spriteVersion: null, availableSpecies: null });
+  assert.deepEqual(party.overrides, { powerItemBonus: null, powerItems: null, machoBrace: null, vitaminCutoff: null, pokerus: null, wings: null, evBerries: null, nature: null, statExpSystem: null, spriteVersion: null, availableGeneration: null });
 
   const entry = party.pokemon[0];
   assert.equal(entry.uid, 'old-1');

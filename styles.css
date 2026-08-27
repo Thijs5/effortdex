@@ -1022,36 +1022,6 @@ textarea.ds-field { resize: vertical; }
    would size slightly differently (and the sprite-style picker below,
    not a <select> at all, wouldn't match any of them). One shared width
    is what actually makes the row's controls line up. */
-.chip-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: var(--space-2);
-  margin: var(--space-2) 0 0;
-  padding: 0;
-  list-style: none;
-}
-.chip {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-1) var(--space-2);
-  border-radius: var(--radius-sm);
-  background: var(--lcd);
-  border: 1px solid var(--lcd-line);
-  font-size: var(--font-size-xs);
-  text-transform: capitalize;
-}
-.chip-remove {
-  border: none;
-  background: transparent;
-  cursor: pointer;
-  padding: 0;
-  line-height: 1;
-  font-size: var(--font-size-sm);
-  color: var(--ink-soft);
-}
-.chip-remove:hover { color: var(--poke-red); }
-
 .field-label--inline .ds-field {
   width: 230px;
   margin-top: 0;

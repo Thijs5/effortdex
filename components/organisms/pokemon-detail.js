@@ -519,9 +519,9 @@ export class PokemonDetail extends HTMLElement {
 
   /**
    * The roster's own party (GitHub issue #31) — restricts the "Log a
-   * battle" search to species actually reachable in this party's game
-   * (or its explicit dex, `overrides.availableSpecies`) instead of every
-   * species PokéAPI knows about. Set alongside `entry` by
+   * battle" search to species actually reachable in this party's
+   * generation (its base game's own, or `overrides.availableGeneration`)
+   * instead of every species PokéAPI knows about. Set alongside `entry` by
    * components/pages/parties/pokemon/pokemon.js's `render()`.
    * `PokeApiClient`'s own cache (docs/adr/0001) makes recomputing this on
    * every render cheap after the first lookup.
