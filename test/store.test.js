@@ -126,6 +126,23 @@ test('evolvePokemon changes species identity but preserves EVs and history', () 
   assert.equal(entry.evolutions[0].toName, 'ivysaur');
 });
 
+// Regression: the Level popup's Save handler (caught-pokemon-detail.js
+// _saveLevelUp) used to commit the evolve pick before recording the new
+// level, so a level-up-that-evolves read backwards in history — the
+// evolve event above the level-up that triggered it. Store itself only
+// appends in whatever order its callers call it, so this pins that the
+// intended call order (setLevel, then evolvePokemon) actually produces
+// history in the intended level-then-evolve order.
+test('a level change recorded before an evolve reads level-up-then-evolve in history, newest first', () => {
+  const entry = store.catchPokemon(mon(), 15);
+  store.setLevel(entry.uid, 16);
+  store.evolvePokemon(entry.uid, mon({ id: 2, name: 'ivysaur' }));
+
+  assert.equal(entry.history[0].kind, 'evolve');
+  assert.equal(entry.history[1].kind, 'level');
+  assert.equal(entry.history[1].toLevel, 16);
+});
+
 test('revertEvolution restores the previous identity from the event snapshot — no species data needed', () => {
   const entry = store.catchPokemon(mon());
   store.logDefeat(entry.uid, opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 }));

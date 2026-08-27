@@ -31,8 +31,15 @@ test.describe('Evolution', () => {
     const dialog = await openLevelUpDialog(card);
     await dialog.getByRole('heading', { name: 'Evolution' }).waitFor({ state: 'visible' });
 
-    await dialog.locator('.level-up-evo-chain [data-action="evolve"] button').first().click();
-    await expect(dialog.locator('.evolve-status')).toHaveText(/Will evolve into Ivysaur on Save/);
+    const evolveBtn = dialog.locator('.level-up-evo-chain [data-action="evolve"]').first();
+    const currentBtn = dialog.locator('.level-up-evo-chain .evo-current-btn');
+    await expect(currentBtn).toHaveAttribute('active', '');
+    await evolveBtn.locator('button').click();
+    await expect(evolveBtn).toHaveAttribute('active', '');
+    // Regression: the current-form node used to keep its own `active`
+    // highlight even after a different target was picked, so both read
+    // as "active" at once and the old one never visibly deselected.
+    await expect(currentBtn).not.toHaveAttribute('active', '');
     await dialog.locator('.level-up-done-btn').click();
     await dialog.waitFor({ state: 'hidden' });
 
@@ -58,8 +65,9 @@ test.describe('Evolution', () => {
 
     dialog = await openLevelUpDialog(card);
     await dialog.getByRole('heading', { name: 'Evolution' }).waitFor({ state: 'visible' });
-    await dialog.locator('.level-up-evo-chain [data-action="undo"] button').first().click();
-    await expect(dialog.locator('.evolve-status')).toHaveText(/Will undo evolution on Save/);
+    const undoBtn = dialog.locator('.level-up-evo-chain [data-action="undo"]').first();
+    await undoBtn.locator('button').click();
+    await expect(undoBtn).toHaveAttribute('active', '');
     await dialog.locator('.level-up-done-btn').click();
     await dialog.waitFor({ state: 'hidden' });
 
