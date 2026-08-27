@@ -11,7 +11,6 @@
 import { store, prefetchService } from './lib/services.js';
 import { attachDesignSystem } from './lib/design-system.js';
 import { wireDialogCloseButtons } from './lib/dom.js';
-import { trackPageview } from './lib/analytics.js';
 import * as router from './lib/router.js';
 import './lib/shell.js';
 import './lib/app-version.js';
@@ -125,7 +124,22 @@ router.onRouteChange(render);
 // on its own; this only needs to cover subsequent in-app hash
 // navigation, which is why it's wired to route changes specifically —
 // not to store's own 'change' (data edits, not navigation) below.
-router.onRouteChange(trackPageview);
+//
+// Imported dynamically, not statically: a static import is one failed
+// network request away from taking the entire module graph down with
+// it (an ad-blocker filter list blocking this file by name did exactly
+// that — see lib/goatcounter-report.js's own header comment). A
+// dynamic import failing here only means pageviews go unreported;
+// nothing else about the app is affected, matching this feature's own
+// "no dependency on the analytics server" promise (issue #24) for the
+// local file itself, not just the third-party script it loads.
+let reportPageview = () => {};
+import('./lib/goatcounter-report.js')
+  .then((m) => {
+    reportPageview = m.trackPageview;
+  })
+  .catch(() => {}); // blocked/missing — analytics just doesn't happen
+router.onRouteChange(() => reportPageview());
 store.addEventListener('change', render);
 render();
 

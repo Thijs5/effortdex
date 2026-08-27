@@ -86,10 +86,11 @@ referrer, coarse browser/OS) via [GoatCounter](https://www.goatcounter.com/),
 a privacy-friendly analytics service: no cookies, no personal data, no
 cross-site tracking, and the dashboard is private. The app has no
 *functional* dependency on it — the count script (`index.html`) and the
-one call site that reports in-app route changes (`lib/analytics.js`)
-are fire-and-forget; if the analytics service is blocked, unreachable,
-or removed entirely, the app keeps working exactly the same, offline
-included.
+one call site that reports in-app route changes
+(`lib/goatcounter-report.js`, loaded dynamically so even a blocked
+import can't affect anything else) are fire-and-forget; if the
+analytics service is blocked, unreachable, or removed entirely, the app
+keeps working exactly the same, offline included.
 
 ---
 
