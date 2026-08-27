@@ -18,6 +18,14 @@
   <meta name="apple-mobile-web-app-title" content="Effortdex" />
   <link rel="stylesheet" href="tokens.css" />
   <link rel="stylesheet" href="styles.css" />
+  <!-- GoatCounter (issue #24): a hardcoded, optional pageview counter —
+       no account/env vars/build step needed to keep this app fully
+       working, and no code path here ever waits on or branches on it.
+       If this site is ever gone/unreachable/blocked, `async` plus this
+       being the only reference to it means the script tag simply does
+       nothing; see lib/analytics.js for the one other place aware this
+       exists (in-app hash-route navigation reporting). -->
+  <script data-goatcounter="https://effortdex.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
   <script>
     // Apply a saved manual theme before first paint to avoid a flash;
     // without a saved choice the CSS follows prefers-color-scheme.
