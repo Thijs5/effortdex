@@ -23,8 +23,12 @@
        working, and no code path here ever waits on or branches on it.
        If this site is ever gone/unreachable/blocked, `async` plus this
        being the only reference to it means the script tag simply does
-       nothing; see lib/analytics.js for the one other place aware this
-       exists (in-app hash-route navigation reporting). -->
+       nothing; see lib/goatcounter-report.js for the one other place
+       aware this exists (in-app hash-route navigation reporting) —
+       deliberately not named "analytics.js", since a generic ad-blocker
+       filename filter blocking that literal name once took this whole
+       app down (app.js imported it statically; see that file's own
+       header comment). -->
   <script data-goatcounter="https://effortdex.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
   <script>
     // Apply a saved manual theme before first paint to avoid a flash;
