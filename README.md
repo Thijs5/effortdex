@@ -85,16 +85,17 @@ for the reasoning.
 
 ## Technical details
 
-Built with native Web Components: no framework, no bundler, no
-transpilation — every file runs in the browser exactly as written. Open
-`index.html` (or serve the directory) and it runs, straight from
-source, with no build step required for local development. The
-deployed site (GitHub Pages, `.github/workflows/deploy.yml`) is built
-first (`npm run build`) — a minify-only pass (`scripts/build.mjs`,
-esbuild) that shrinks the shipped JS/CSS without bundling/concatenating
-or touching source: one minified output file per input file, same
-directory layout, so dev and prod both run the same unmodified
-`index.html`/`sw.js` against files at the same relative paths.
+Built with native Web Components: no framework, no transpilation —
+every file runs in the browser exactly as written. Open `index.html`
+(or serve the directory) and it runs, straight from source, with no
+build step required for local development. The deployed site (GitHub
+Pages, `.github/workflows/deploy.yml`) is built first (`npm run
+build`) — `scripts/build.mjs` (esbuild) bundles the entire JS module
+graph (`app.js` and everything it imports from `lib/`/`components/`)
+into a single minified `dist/app.js`, and minifies the CSS; `index.html`
+and `sw.js` are copied through unmodified, since both only ever
+reference `app.js`/`styles.css`/`tokens.css` by name, not the module
+graph behind them.
 
 ### Running it locally
 
