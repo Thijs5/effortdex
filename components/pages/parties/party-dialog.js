@@ -67,6 +67,7 @@ const OVERRIDE_FIELDS = [
   { key: 'evBerries', el: document.getElementById('override-ev-berries'), type: 'bool' },
   { key: 'nature', el: document.getElementById('override-nature'), type: 'bool' },
   { key: 'spriteVersion', el: document.getElementById('override-sprite-version'), type: 'string' },
+  { key: 'availableGeneration', el: document.getElementById('override-available-generation'), type: 'number' },
 ];
 
 function writeOverridesToDialog(overrides) {
