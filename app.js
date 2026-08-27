@@ -4,7 +4,9 @@
 // chrome (lib/shell.js, lib/app-version.js), and dispatches each route
 // to its page module (components/pages/*.js) — no page-specific DOM or
 // rendering lives here. All domain logic lives in lib/, and each custom
-// element owns its own rendering.
+// element owns its own rendering. Also the one place that opens/closes
+// the party create/edit dialog, in response to a route's `dialog` field
+// (docs/adr/0022) — party-dialog.js itself never opens on its own.
 
 import { store, prefetchService } from './lib/services.js';
 import { attachDesignSystem } from './lib/design-system.js';
@@ -12,9 +14,10 @@ import { wireDialogCloseButtons } from './lib/dom.js';
 import * as router from './lib/router.js';
 import './lib/shell.js';
 import './lib/app-version.js';
-import * as picker from './components/pages/picker.js';
-import * as roster from './components/pages/roster.js';
-import * as pokemon from './components/pages/pokemon.js';
+import * as parties from './components/pages/parties/parties.js';
+import * as roster from './components/pages/parties/roster.js';
+import * as pokemon from './components/pages/parties/pokemon.js';
+import * as partyDialog from './components/pages/parties/party-dialog.js';
 import * as settings from './components/pages/settings/settings.js';
 import * as transferHub from './components/pages/transfer/transfer.js';
 import * as transferExport from './components/pages/transfer/export.js';
@@ -30,56 +33,54 @@ wireDialogCloseButtons();
 /* Router <-> page                                                     */
 /* ------------------------------------------------------------------ */
 
-const VIEWS = [picker.view, roster.view, pokemon.view, settings.view, transferHub.view, transferExport.view, spriteCache.view, importPage.view];
+const VIEWS = [parties.view, roster.view, pokemon.view, settings.view, transferHub.view, transferExport.view, spriteCache.view, importPage.view];
 function showView(view) {
   for (const v of VIEWS) v.hidden = v !== view;
 }
 
-// The most recent picker/party/pokemon route — still null means nothing
-// to go back to. Only this composition root sees every route change, so
-// it's the one place that can track this; utility pages receive it as a
-// render() argument rather than reading shared global state (see
-// lib/dom.js's wireUtilityBackLink).
-/** @type {string|null} */
-let lastContentPath = null;
-
 function render() {
-  const { page, partySlug, pokemonUid, payload } = router.currentRoute();
+  const { page, partySlug, pokemonUid, payload, dialog } = router.currentRoute();
 
   if (page === 'settings') {
+    partyDialog.closeIfOpen();
     showView(settings.view);
-    settings.render(lastContentPath);
+    settings.render();
     return;
   }
 
   if (page === 'transfer') {
+    partyDialog.closeIfOpen();
     showView(transferHub.view);
-    transferHub.render(lastContentPath);
+    transferHub.render();
     return;
   }
 
   if (page === 'transfer-export') {
+    partyDialog.closeIfOpen();
     showView(transferExport.view);
     transferExport.render();
     return;
   }
 
   if (page === 'cache') {
+    partyDialog.closeIfOpen();
     showView(spriteCache.view);
     spriteCache.render();
     return;
   }
 
   if (page === 'import') {
+    partyDialog.closeIfOpen();
     showView(importPage.view);
-    importPage.render(payload, lastContentPath);
+    importPage.render(payload);
     return;
   }
 
   if (!partySlug) {
-    lastContentPath = router.partyPath(null);
-    showView(picker.view);
-    picker.render();
+    showView(parties.view);
+    parties.render();
+    if (dialog === 'create-party') partyDialog.openCreateDialog();
+    else partyDialog.closeIfOpen();
     return;
   }
 
@@ -99,15 +100,16 @@ function render() {
       router.navigateToParty(party.slug); // stale link, or this Pokémon was just removed
       return;
     }
-    lastContentPath = router.pokemonPath(party.slug, pokemonUid);
+    partyDialog.closeIfOpen(); // no dialog route exists this deep — always closed here
     showView(pokemon.view);
     pokemon.render(party, entry);
     return;
   }
 
-  lastContentPath = router.partyPath(party.slug);
   showView(roster.view);
   roster.render(party);
+  if (dialog === 'edit-party') partyDialog.openEditDialog(party);
+  else partyDialog.closeIfOpen();
 }
 
 router.onRouteChange(render);

@@ -63,6 +63,13 @@ export class PokemonSearch extends HTMLElement {
     shadow.innerHTML = `
       <style>
         :host { display: block; position: relative; min-width: 180px; flex: 1; }
+        /* Shadow hosts need this spelled out explicitly — the UA default
+           hidden-attribute rule loses to this component's own :host
+           display: block otherwise. Lets a caller that owns a standalone
+           force-sheet instance (no wrapping dialog of its own) fully hide
+           it between uses via the plain hidden attribute, the same way
+           every other optional element in this app already works. */
+        :host([hidden]) { display: none; }
         .wrap { position: relative; }
         ul {
           position: fixed;
@@ -159,8 +166,18 @@ export class PokemonSearch extends HTMLElement {
           color: var(--ink-soft); padding: var(--space-1);
         }
         .sheet-close:hover { color: var(--ink); }
-        .wrap.sheet input.ds-field {
+        /* A caller can project extra sheet-only content (e.g. a help
+           note) via slot="sheet-extra" — hidden outside the sheet, since
+           it has nowhere sensible to render in the inline-dropdown mode. */
+        slot[name="sheet-extra"] { display: none; }
+        .wrap.sheet slot[name="sheet-extra"] {
+          display: block;
           order: 1;
+          flex: 0 0 auto;
+          padding: 0 var(--space-3);
+        }
+        .wrap.sheet input.ds-field {
+          order: 2;
           flex: 0 0 auto;
           /* .ds-field's shared width: 100% is relative to the flex
              container, same as the margin below — combined they'd
@@ -170,7 +187,7 @@ export class PokemonSearch extends HTMLElement {
           margin: var(--space-2) var(--space-3);
         }
         .wrap.sheet ul.suggestions {
-          order: 2;
+          order: 3;
           position: static;
           flex: 1 1 auto;
           min-height: 0;
@@ -187,6 +204,7 @@ export class PokemonSearch extends HTMLElement {
           <span class="sheet-title"></span>
           <button type="button" class="sheet-close" aria-label="Close search">&#10005;</button>
         </div>
+        <slot name="sheet-extra"></slot>
         <input class="ds-field" type="text" role="combobox" aria-expanded="false"
                aria-controls="ps-list" aria-autocomplete="list"
                autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false"
@@ -317,6 +335,12 @@ export class PokemonSearch extends HTMLElement {
     this.$wrap.style.top = '';
     this.$wrap.style.height = '';
     document.body.style.overflow = this._prevBodyOverflow || '';
+    // Lets a caller that owns this element's `hidden` attribute (a
+    // standalone force-sheet instance with no wrapping <dialog> of its
+    // own) re-hide it the moment the sheet closes for any reason — a
+    // pick, Escape, or blurring away — without needing its own close
+    // affordance duplicated outside this component.
+    this.dispatchEvent(new CustomEvent('sheet-close', { bubbles: true, composed: true }));
   }
 
   _reposition() {

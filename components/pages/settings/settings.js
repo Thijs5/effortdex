@@ -23,7 +23,7 @@ const backupSection = document.getElementById('pre-migration-backup-section');
 const copyBackupBtn = document.getElementById('copy-backup-btn');
 const copyBackupStatus = document.getElementById('copy-backup-status');
 
-const setBackLinkPath = wireUtilityBackLink(backFromSettings);
+const syncBackLink = wireUtilityBackLink(backFromSettings);
 transferBtn.addEventListener('click', () => router.navigateToTransfer());
 manageStorageBtn.addEventListener('click', () => router.navigateToCache());
 
@@ -49,9 +49,8 @@ copyBackupBtn.addEventListener('click', async () => {
   copyBackupStatus.textContent = 'Copied — paste it into your bug report if a developer asks for it.';
 });
 
-/** @param {string|null} contentPath */
-export function render(contentPath) {
-  setBackLinkPath(contentPath);
+export function render() {
+  syncBackLink();
   renderVersion();
   renderBackupSection();
   copyBackupStatus.textContent = '';

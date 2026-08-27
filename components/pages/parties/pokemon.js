@@ -1,10 +1,10 @@
 // @ts-check
-// A single roster Pokémon's detail page ("/<party-slug>/<uid>") — thin:
+// A single roster Pokémon's detail page ("/parties/<slug>/<uid>") — thin:
 // all the rendering lives in <pokemon-detail> itself.
 
-import * as router from '../../lib/router.js';
-import { interceptLinkClick } from '../../lib/dom.js';
-import '../organisms/pokemon-detail.js';
+import * as router from '../../../lib/router.js';
+import { interceptLinkClick } from '../../../lib/dom.js';
+import '../../organisms/pokemon-detail.js';
 
 export const view = document.getElementById('pokemon-view');
 const backToRoster = document.getElementById('back-to-roster');

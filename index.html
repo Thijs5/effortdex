@@ -28,7 +28,7 @@
 <body>
   <div class="device">
     <header class="bezel">
-      <h1><a id="header-home-link" href="#/"><span class="power-led" aria-hidden="true"></span>Effort<span class="e-accent">dex</span></a></h1>
+      <h1><a id="header-home-link" href="#/parties"><span class="power-led" aria-hidden="true"></span>Effort<span class="e-accent">dex</span></a></h1>
       <div class="bezel-menu">
         <button id="menu-btn" class="bezel-btn bezel-btn--menu" type="button" aria-haspopup="true" aria-expanded="false">Menu</button>
         <div id="header-menu" class="header-menu" role="menu" aria-label="App menu" hidden>
@@ -56,7 +56,7 @@
       </div>
     </header>
 
-    <!-- "/" — choose which party (save file / playthrough) to open -->
+    <!-- "/parties" — choose which party (save file / playthrough) to open -->
     <main id="picker-view" class="picker">
       <h2>Choose a party</h2>
       <p class="hint">Keep a separate party per save file or playthrough you're running at once.</p>
@@ -72,10 +72,10 @@
       </p>
     </main>
 
-    <!-- "/<party-slug>" — that party's add panel + roster -->
+    <!-- "/parties/<slug>" — that party's add panel + roster -->
     <main id="party-view" class="party-view" hidden>
       <div class="party-view-header">
-        <a id="back-to-parties" class="back-link" href="#/">&larr; All parties</a>
+        <a id="back-to-parties" class="back-link" href="#/parties">&larr; All parties</a>
         <div class="party-identity">
           <div class="party-identity-head">
             <h2 id="active-party-name"></h2>
@@ -123,7 +123,7 @@
       </div>
     </main>
 
-    <!-- "/<party-slug>/<uid>" — one roster Pokémon's full detail page -->
+    <!-- "/parties/<slug>/<uid>" — one roster Pokémon's full detail page -->
     <main id="pokemon-view" class="pokemon-view" hidden>
       <a id="back-to-roster" class="back-link" href="#/">&larr; Roster</a>
     </main>

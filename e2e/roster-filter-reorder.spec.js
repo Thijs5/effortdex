@@ -163,7 +163,7 @@ test.describe('Roster filters, manual reorder, and URL state', () => {
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
     await addPokemon(page, 'Bulbasaur');
 
-    await expect(page).toHaveURL(/#\/emerald-nuzlocke$/);
+    await expect(page).toHaveURL(/#\/parties\/emerald-nuzlocke$/);
   });
 
   test('switching parties resets the previous party\'s search, not carrying it over', async ({ page }) => {

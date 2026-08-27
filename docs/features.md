@@ -16,10 +16,10 @@ Share — is a rule derived from a party's game version and generation, so
 picking the base game correctly is the one thing that determines almost
 all downstream behavior (`lib/game-versions.js`, `lib/store.js`).
 
-- **Party picker ("/")** — `components/pages/picker.js` lists every party as a card
+- **Party picker ("/parties")** — `components/pages/parties/parties.js` lists every party as a card
   (name, base game, roster count, trained count) and is the app's home
   route.
-- **Create/edit a party** — `components/pages/party-dialog.js` drives a shared
+- **Create/edit a party** (`/parties/create`, `/parties/<slug>/edit` — `docs/adr/0022`) — `components/pages/parties/party-dialog.js` drives a shared
   create/edit `<dialog>`: name, description, base game (via
   `<game-version-picker>`, which validates against the known
   `GAME_VERSIONS` table and rejects an unrecognized typed name rather than
@@ -50,9 +50,9 @@ the native `<dialog>` and removes it from the roster.
 
 Covered by `e2e/add-pokemon.spec.js`.
 
-## Roster (a party's Pokémon list, `#/<party-slug>`)
+## Roster (a party's Pokémon list, `#/parties/<slug>`)
 
-`components/pages/roster.js` renders:
+`components/pages/parties/roster.js` renders:
 
 - An identity header for the party (name, base game).
 - A **rules legend** (`renderLegend`) generated directly from `Store`'s
@@ -78,9 +78,9 @@ Covered by `e2e/add-pokemon.spec.js`.
 
 Covered by `e2e/roster-filter-reorder.spec.js`, `e2e/roster-search.spec.js`.
 
-## Pokémon detail page (`#/<party-slug>/<uid>`)
+## Pokémon detail page (`#/parties/<slug>/<uid>`)
 
-`components/pages/pokemon.js` is a thin wrapper; nearly everything lives in
+`components/pages/parties/pokemon.js` is a thin wrapper; nearly everything lives in
 `<pokemon-detail>` (`components/organisms/pokemon-detail.js`), the
 app's largest component. The header shows sprite, an instantly-editable
 nickname, a nature badge, a level button, a held-item badge, EV bars
@@ -123,7 +123,7 @@ way (✕, Escape, backdrop click) discards the pending edit.
   sourced from Pokémon Showdown/Smogon data (see below).
 
 A **"Log a battle" FAB** opens a battle-search dialog; picking a result
-calls `store.logDefeat()`, applying that opponent's EV yield (or, on a
+calls `store.logBattle()`, applying that opponent's EV yield (or, on a
 Gen I/II party, its base Special-Experience-era stat) immediately — no
 separate Save step, since a single battle is already one atomic action.
 

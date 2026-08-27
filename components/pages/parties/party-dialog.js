@@ -1,13 +1,35 @@
 // @ts-check
 // The party create/edit dialog — shared by the picker page ("New party")
 // and the roster page ("Edit party"), so it's its own module rather than
-// living in either.
+// living in either. Deliberately kept as one dialog/module for both
+// modes rather than split into separate create/edit files: it's already
+// one <dialog>, one form, and splitting it would duplicate
+// OVERRIDE_FIELDS/the submit and delete handlers for no benefit.
+//
+// Routed, not just opened by a button click: "/parties/create" and
+// "/parties/<slug>/edit" are real, bookmarkable/reloadable routes
+// (docs/adr/0022) — app.js (the composition root for routing, docs/
+// adr/0008 point 3) calls openCreateDialog()/openEditDialog(party) when
+// the current route's `dialog` says so, not the picker/roster pages
+// themselves. This module's own job is keeping the URL in sync with the
+// dialog closing, however that happens:
+//  - Explicit success (Create/Save/Delete) navigates to the target
+//    route *before* calling partyDialog.close() — see each handler
+//    below for why the order matters.
+//  - Cancel, and any *implicit* dismissal (✕, Escape, backdrop click)
+//    only ever call .close() with no navigation of their own — the
+//    shared `close` listener below is what then routes back to
+//    wherever this dialog's route says its "parent" page is. Reading
+//    `router.currentRoute()` fresh (rather than a variable captured at
+//    open time) is what makes this listener a no-op on the explicit-
+//    success paths (they've already navigated away by the time `close`
+//    fires) instead of double-navigating.
 
-import { store, prefetchService } from '../../lib/services.js';
-import * as router from '../../lib/router.js';
-import { isCachingDisabled } from '../../lib/dev-cache.js';
-import '../atoms/game-ball.js';
-import '../molecules/game-version-picker.js';
+import { store, prefetchService } from '../../../lib/services.js';
+import * as router from '../../../lib/router.js';
+import { isCachingDisabled } from '../../../lib/dev-cache.js';
+import '../../atoms/game-ball.js';
+import '../../molecules/game-version-picker.js';
 
 const partyDialog = document.getElementById('party-dialog');
 const partyForm = document.getElementById('party-form');
@@ -112,7 +134,31 @@ export function openEditDialog(party) {
   partyNameInput.focus();
 }
 
+/** Called by app.js from every route whose `dialog` isn't 'create-party'/'edit-party' — a harmless no-op if this dialog wasn't open. */
+export function closeIfOpen() {
+  if (partyDialog.open) partyDialog.close();
+}
+
 partyCancelBtn.addEventListener('click', () => partyDialog.close());
+
+// A native <dialog> doesn't close on a backdrop click by default — this
+// was missing entirely before (Escape already works natively; Cancel/✕
+// are wired explicitly above/via lib/dom.js's wireDialogCloseButtons).
+// Same pattern components/atoms/base-dialog.js's own dialogs use.
+partyDialog.addEventListener('click', (e) => {
+  if (e.target === partyDialog) partyDialog.close();
+});
+
+// Covers Cancel, Escape, backdrop click, and the ✕ button — every way
+// this dialog can close *without* one of the explicit-success handlers
+// below already having navigated. Reading the route fresh here (not a
+// value captured when the dialog opened) is what keeps this a no-op
+// on those explicit-success paths instead of navigating twice.
+partyDialog.addEventListener('close', () => {
+  const route = router.currentRoute();
+  if (route.dialog === 'create-party') router.navigateToParty(null);
+  else if (route.dialog === 'edit-party') router.navigateToParty(route.partySlug);
+});
 
 partyForm.addEventListener('submit', (e) => {
   e.preventDefault();
@@ -142,10 +188,17 @@ partyForm.addEventListener('submit', (e) => {
     // using the app. Unchecking the box just means "don't bother", not
     // "block until this finishes".
     if (partyCacheOfflineInput.checked) prefetchService.prefetchGame(baseGame);
-    partyDialog.close();
+    // Navigate first, then close: by the time the `close` listener
+    // above fires, the route's `dialog` is already null, so it
+    // correctly no-ops instead of navigating to the picker a second
+    // time right after this line already reached the new roster.
     router.navigateToParty(party.slug);
+    partyDialog.close();
   } else {
     store.updateParty(dialogEditingId, { name, description, baseGame, overrides });
+    // Same slug either way (editing never changes it) — this still
+    // needs to fire so the URL drops the trailing "/edit".
+    router.navigateToParty(router.currentRoute().partySlug);
     partyDialog.close();
   }
 });
@@ -160,7 +213,7 @@ partyDeleteBtn.addEventListener('click', () => {
       : `Delete "${party.name}"?`;
   if (confirm(msg)) {
     store.deleteParty(party.id);
-    partyDialog.close();
     router.navigateHome();
+    partyDialog.close();
   }
 });

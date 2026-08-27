@@ -20,12 +20,12 @@ test('uniqueSlug disambiguates against existing slugs with a numeric suffix', ()
   assert.equal(uniqueSlug('Emerald', new Set()), 'emerald');
 });
 
-test('uniqueSlug never hands out a reserved app-page slug', () => {
-  // "settings"/"transfer" are router pages (lib/router.js) — a party
-  // with one of these names must get a different slug or its URL would
-  // be unreachable. "cache"/"export"/"import" don't need reserving too
-  // — they're only special one level down, under "settings"/"transfer".
-  assert.equal(uniqueSlug('Settings', new Set()), 'settings-2');
-  assert.equal(uniqueSlug('Transfer', new Set()), 'transfer-2');
-  assert.equal(uniqueSlug('Import', new Set()), 'import'); // no longer reserved — nests under #/transfer/import now
+test('uniqueSlug never hands out the reserved "create" slug', () => {
+  // "create" collides with "#/parties/create" (lib/router.js) — a party
+  // named that must get a different slug or its own URL would be
+  // unreachable. "settings"/"transfer" no longer need reserving —
+  // parties live fully under #/parties/<slug> now, a separate namespace.
+  assert.equal(uniqueSlug('Create', new Set()), 'create-2');
+  assert.equal(uniqueSlug('Settings', new Set()), 'settings'); // no longer reserved — separate namespace from #/settings now
+  assert.equal(uniqueSlug('Transfer', new Set()), 'transfer'); // no longer reserved — separate namespace from #/transfer now
 });

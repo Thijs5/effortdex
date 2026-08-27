@@ -219,11 +219,6 @@ export class PokemonDetail extends HTMLElement {
         .nature-dialog[open] { display: grid; }
         .nature-dialog .ds-dialog-header { margin-bottom: 0; }
         .nature-dialog.ds-dialog { width: min(420px, calc(100vw - 2.4rem)); }
-        .battle-dialog { gap: var(--space-4); }
-        .battle-dialog:not([open]) { display: none; }
-        .battle-dialog[open] { display: grid; }
-        .battle-dialog.ds-dialog { width: min(420px, calc(100vw - 2.4rem)); }
-        .battle-dialog .ds-dialog-header { margin-bottom: 0; }
         .training-guide-dialog { gap: var(--space-4); }
         .training-guide-dialog:not([open]) { display: none; }
         .training-guide-dialog[open] { display: grid; }
@@ -276,7 +271,6 @@ export class PokemonDetail extends HTMLElement {
            is an explicit (non-auto) value, so it isn't subject to that
            fill-the-gap resolution and genuinely shrink-wraps instead. */
         @media (max-width: 640px) {
-          .battle-dialog.ds-dialog,
           .level-up-dialog.ds-dialog,
           .nature-dialog.ds-dialog,
           .training-guide-dialog.ds-dialog {
@@ -310,7 +304,6 @@ export class PokemonDetail extends HTMLElement {
           box-shadow: 0 3px 0 var(--poke-red-dark), var(--shadow-panel);
         }
         .battle-fab svg { width: 18px; height: 18px; flex: 0 0 auto; }
-        .battle-dialog .battle-dialog-body { display: grid; gap: var(--space-3); min-width: min(320px, 80vw); }
 
         .section-title {
           margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs);
@@ -365,7 +358,7 @@ export class PokemonDetail extends HTMLElement {
         .level-up-stat-last { font-family: var(--font-mono); font-size: var(--font-size-2xs); white-space: nowrap; }
         .training-guide-attribution { margin: var(--space-3) 0 0; font-size: var(--font-size-2xs); color: var(--ink-soft); }
 
-        .status { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--poke-red-dark); min-height: 1em; }
+        .battle-status { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--poke-red-dark); min-height: 1em; }
       </style>
       <article class="card">
         <header>
@@ -476,25 +469,26 @@ export class PokemonDetail extends HTMLElement {
 
         <ev-history-log></ev-history-log>
 
-        <button type="button" class="battle-fab ds-btn ds-btn--primary" aria-haspopup="dialog">
+        <button type="button" class="battle-fab ds-btn ds-btn--primary" aria-haspopup="true">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg>
           Log a battle
         </button>
+        <p class="battle-status" aria-live="polite"></p>
 
-        <dialog class="battle-dialog ds-dialog" aria-labelledby="battle-dialog-title">
-          <header class="ds-dialog-header">
-            <h2 id="battle-dialog-title">Log a battle
-              <button type="button" class="help-btn" aria-expanded="false" aria-label="What about Exp. Share?" title="Holding an Exp. Share doesn't change how EVs work here — a Pokémon that gets EVs via Exp. Share earns exactly what it would from fighting directly. Just log the defeat here for this Pokémon too, whether or not it was the one that actually battled.">?</button>
-            </h2>
-            <button class="battle-dialog-close ds-dialog-close" type="button" aria-label="Close">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
-            </button>
-          </header>
-          <div class="battle-dialog-body">
-            <pokemon-search placeholder="Defeated Pokémon…" show-ev-yield sheet-title="Log a battle" force-sheet></pokemon-search>
-            <p class="status" aria-live="polite"></p>
+        <!--
+          One modal layer, not two (issue: the old outer .battle-dialog
+          wrapper around this search's own full-screen sheet could be left
+          open after the sheet closed — two stacked dialogs with only one
+          of them actually tracking "closed"). This <pokemon-search>'s own
+          force-sheet mode *is* the whole "Log a battle" UI now; the FAB
+          shows it and focuses it, and pokemon-search's 'sheet-close' event
+          (fired on pick, Escape, or blur-away) re-hides it below.
+        -->
+        <pokemon-search hidden placeholder="Defeated Pokémon…" show-ev-yield sheet-title="Log a battle" force-sheet>
+          <div class="section-title" slot="sheet-extra">Exp. Share
+            <button type="button" class="help-btn" aria-expanded="false" aria-label="What about Exp. Share?" title="Holding an Exp. Share doesn't change how EVs work here — a Pokémon that gets EVs via Exp. Share earns exactly what it would from fighting directly. Just log the defeat here for this Pokémon too, whether or not it was the one that actually battled.">?</button>
           </div>
-        </dialog>
+        </pokemon-search>
       </article>
     `;
 
@@ -540,11 +534,9 @@ export class PokemonDetail extends HTMLElement {
     // `this._entry` live at call time, so it stays correct as the entry
     // (or its Pokérus/item state) changes without needing to be reset.
     this.$search.evModifier = (mon) => store.previewDefeat(this._entry.uid, mon)?.applied;
-    this.$status = shadow.querySelector('.status');
+    this.$battleStatus = shadow.querySelector('.battle-status');
     this.$histLog = shadow.querySelector('ev-history-log');
     this.$battleFab = shadow.querySelector('.battle-fab');
-    this.$battleDialog = shadow.querySelector('.battle-dialog');
-    this.$battleDialogClose = shadow.querySelector('.battle-dialog-close');
     this.$trainingGuideBtn = shadow.querySelector('.training-guide-menu-item');
     this.$trainingGuideDialog = shadow.querySelector('.training-guide-dialog');
     this.$trainingGuideDialogClose = shadow.querySelector('.training-guide-dialog-close');
@@ -615,14 +607,18 @@ export class PokemonDetail extends HTMLElement {
     });
     this.$natureDialogSaveBtn.addEventListener('click', () => this._saveNatureDialog());
     this.$natureBtn.addEventListener('click', () => this._openNatureDialog());
-    this.$battleDialog.addEventListener('close', () => clearShadowDialogFlag());
-    this.$battleDialogClose.addEventListener('click', () => this.$battleDialog.close());
-    this.$battleDialog.addEventListener('click', (e) => {
-      if (e.target === this.$battleDialog) this.$battleDialog.close();
+    // One modal layer, not two — <pokemon-search force-sheet> owns its
+    // own full-screen sheet, so this element's plain `hidden` attribute
+    // (not a wrapping <dialog>) is the only other state to manage: show
+    // it and focus it to open, and let its own 'sheet-close' (fired on
+    // pick, Escape, or blur-away — every way the sheet can end) hide it
+    // again, whichever of those actually happened.
+    this.$search.addEventListener('sheet-close', () => {
+      this.$search.hidden = true;
     });
     this.$battleFab.addEventListener('click', () => {
-      this.$status.textContent = '';
-      openShadowDialog(this.$battleDialog);
+      this.$battleStatus.textContent = '';
+      this.$search.hidden = false;
       // Focusing immediately (rather than waiting for a tap on the field)
       // is what actually triggers pokemon-search's own recent-picks
       // list/full-screen sheet — the point of the FAB is one tap to a
@@ -653,10 +649,12 @@ export class PokemonDetail extends HTMLElement {
     // The "?" buttons toggle their explanation inline: title tooltips are
     // hover-only, which leaves them unreachable on touch devices. Listens
     // on the shadow root, since these help buttons are spread across
-    // several separate dialogs (Nature, Battle, Where to train) — Items/
-    // IVs/Competitive each wire their own identical delegation in their
-    // own shadow root now (iv-dialog.js/items-dialog.js/
-    // competitive-dialog.js).
+    // several separate dialogs (Nature, Where to train) plus the battle
+    // search's own slotted "Exp. Share" note — a click on a light-DOM
+    // child of <pokemon-search> still bubbles up through here regardless
+    // of which shadow tree it's slotted into for rendering. Items/IVs/
+    // Competitive each wire their own identical delegation in their own
+    // shadow root now (iv-dialog.js/items-dialog.js/competitive-dialog.js).
     this.shadowRoot.addEventListener('click', (e) => {
       const btn = e.target.closest('.help-btn');
       if (!btn) return;
@@ -684,10 +682,8 @@ export class PokemonDetail extends HTMLElement {
       this._battle(e.detail.name, 'Looking up battle data…');
     });
     this.$histLog.addEventListener('redefeat', (e) => {
-      // Opens the battle dialog too — its status line is the only place
-      // "re-logging…"/an error would be visible now that it's not always
-      // on-page (the FAB rework, issue #17).
-      openShadowDialog(this.$battleDialog);
+      // Already knows the opponent's name — no need to open the search at
+      // all, just the always-on-page status line.
       this._battle(e.detail.name, `Re-logging battle vs ${titleCase(e.detail.name)}…`);
     });
     this.$trainingGuideDialog.addEventListener('close', () => clearShadowDialogFlag());
@@ -695,14 +691,12 @@ export class PokemonDetail extends HTMLElement {
     this.$trainingGuideDialog.addEventListener('click', (e) => {
       if (e.target === this.$trainingGuideDialog) this.$trainingGuideDialog.close();
     });
-    // Reuses the battle dialog for status, same precedent as the history
-    // log's own 'redefeat' handler above — its status line is the only
-    // place "logging…"/an error would show. Closes the guide first: a
-    // native <dialog>.showModal() call from inside another open modal is
-    // otherwise a dead end (docs/adr/0007's own modal-on-modal note).
+    // Same precedent as the history log's own 'redefeat' handler above —
+    // already knows the opponent's name, so no search UI needed, just the
+    // always-on-page status line. Closes the guide first so it's not left
+    // sitting open behind the rest of the page.
     this.$trainingGuide.addEventListener('spot-pick', (e) => {
       this.$trainingGuideDialog.close();
-      openShadowDialog(this.$battleDialog);
       this._battle(e.detail.name, `Logging battle vs ${titleCase(e.detail.name)}…`);
     });
   }
@@ -742,14 +736,13 @@ export class PokemonDetail extends HTMLElement {
   }
 
   async _battle(name, statusText) {
-    this.$status.textContent = statusText;
+    this.$battleStatus.textContent = statusText;
     try {
       const mon = await api.getPokemon(name);
       store.logBattle(this._entry.uid, mon);
-      this.$status.textContent = '';
-      this.$battleDialog.close();
+      this.$battleStatus.textContent = '';
     } catch (err) {
-      this.$status.textContent = err.message || 'Could not log that battle.';
+      this.$battleStatus.textContent = err.message || 'Could not log that battle.';
     }
   }
 

@@ -1,5 +1,5 @@
 // @ts-check
-// Party roster ("/<party-slug>") — the active party's identity header,
+// Party roster ("/parties/<slug>") — the active party's identity header,
 // the add panel (species search -> add-Pokémon dialog), the per-game
 // rules legend, and the roster itself: summary rows linking to each
 // Pokémon's own detail page. Rebuilt from scratch on every render, same
@@ -22,20 +22,19 @@ import {
   EXP_SHARE_SPRITE,
   versionedSpriteOnError,
   NATURES,
-} from '../../lib/constants.js';
-import { titleCase, totalEvs, natureOptionsHtml, escapeHtml, sortedNatures, natureLabel } from '../../lib/utils.js';
-import { POKERUS_ICON_SVG } from '../../lib/icons.js';
-import { api, store } from '../../lib/services.js';
-import { versionedSpriteUrl } from '../../lib/pokeapi-client.js';
-import { wireSpriteFallback } from '../../lib/sprite-fallback.js';
-import * as router from '../../lib/router.js';
-import { interceptLinkClick } from '../../lib/dom.js';
-import { wireDragHandle } from '../../lib/drag-reorder.js';
-import { openEditDialog } from './party-dialog.js';
-import '../atoms/game-ball.js';
-import '../organisms/pokemon-search.js';
-import '../atoms/ev-bar.js';
-import '../atoms/level-input.js';
+} from '../../../lib/constants.js';
+import { titleCase, totalEvs, natureOptionsHtml, escapeHtml, sortedNatures, natureLabel } from '../../../lib/utils.js';
+import { POKERUS_ICON_SVG } from '../../../lib/icons.js';
+import { api, store } from '../../../lib/services.js';
+import { versionedSpriteUrl } from '../../../lib/pokeapi-client.js';
+import { wireSpriteFallback } from '../../../lib/sprite-fallback.js';
+import * as router from '../../../lib/router.js';
+import { interceptLinkClick } from '../../../lib/dom.js';
+import { wireDragHandle } from '../../../lib/drag-reorder.js';
+import '../../atoms/game-ball.js';
+import '../../organisms/pokemon-search.js';
+import '../../atoms/ev-bar.js';
+import '../../atoms/level-input.js';
 
 export const view = document.getElementById('party-view');
 const backToParties = document.getElementById('back-to-parties');
@@ -109,7 +108,10 @@ const addDialogSpriteFallback = wireSpriteFallback(addDialogSprite);
 
 backToParties.href = router.partyPath(null);
 interceptLinkClick(backToParties, () => router.navigateHome());
-editPartyBtn.addEventListener('click', () => openEditDialog(store.activeParty));
+// Navigates to "/parties/<slug>/edit" rather than opening the dialog
+// directly — app.js dispatches to party-dialog.js's openEditDialog() in
+// response to that route (docs/adr/0008 point 3).
+editPartyBtn.addEventListener('click', () => router.navigateToPartyEdit(store.activeParty.slug));
 
 /* ------------------------------------------------------------------ */
 /* Add panel                                                           */
@@ -160,6 +162,14 @@ async function openAddPokemonDialog(name) {
 }
 
 addDialogCancelBtn.addEventListener('click', () => addDialog.close());
+
+// A native <dialog> doesn't close on a backdrop click by default — this
+// was missing entirely before (Escape already works natively; Cancel/✕
+// are wired explicitly). Same pattern components/atoms/base-dialog.js's
+// own dialogs (and now components/pages/parties/party-dialog.js) use.
+addDialog.addEventListener('click', (e) => {
+  if (e.target === addDialog) addDialog.close();
+});
 
 // A <dialog> closing restores focus to whatever was focused when it
 // opened — here, addSearch's input, since that's what the pick that

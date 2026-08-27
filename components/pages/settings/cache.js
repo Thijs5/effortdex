@@ -14,7 +14,11 @@
 // so its back link always targets Settings specifically, a fixed
 // destination, not "wherever you came from" (same reasoning
 // components/pages/transfer/export.js's own back link now uses, one
-// level down from the Transfer hub).
+// level down from the Transfer hub). Still carries Settings' own
+// "?returnTo=" through as passthrough baggage (router.navigateToCache()
+// embeds it, router.settingsReturnPath()/navigateToSettings() read it
+// back out) — otherwise a Settings -> Cache -> back round trip would
+// silently drop where the user was before they ever opened Settings.
 
 import { interceptLinkClick } from '../../../lib/dom.js';
 import { GAME_VERSIONS, GEN_ROMAN } from '../../../lib/game-versions.js';
@@ -42,7 +46,7 @@ disableCachingInput.addEventListener('change', () => {
   window.location.reload();
 });
 
-backFromCache.href = router.settingsPath();
+backFromCache.href = router.settingsReturnPath();
 interceptLinkClick(backFromCache, () => router.navigateToSettings());
 
 // Read once — the toggle above reloads the page on change, so this
@@ -366,6 +370,7 @@ function buildGeneration(gen) {
 let generationBlocks = [];
 
 export function render() {
+  backFromCache.href = router.settingsReturnPath();
   renderClearCacheSize();
   clearCacheStatus.textContent = '';
   disableCachingInput.checked = isCachingDisabled();

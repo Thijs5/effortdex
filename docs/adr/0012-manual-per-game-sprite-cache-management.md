@@ -287,7 +287,7 @@ kind of real-timing, real-navigation behavior ADR 0011/0012's existing
 ## Addendum 2: an opt-out checkbox at party creation
 
 A third manual entry point, alongside the per-row and per-generation
-buttons on this page: `components/pages/party-dialog.js`'s "New party" form gets a
+buttons on this page: `components/pages/parties/party-dialog.js`'s "New party" form gets a
 "Cache this game's sprites for offline use" checkbox, **checked by
 default**. On submit, if checked, it fires `prefetchService.prefetchGame
 (baseGame)` — deliberately not awaited, so party creation and the

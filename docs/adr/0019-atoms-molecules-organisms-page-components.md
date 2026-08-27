@@ -100,15 +100,15 @@ one-off file — not to relabel the entire component tree for its own sake.
   comment already anticipated) follows this same `BaseDialog` pattern
   rather than re-duplicating the chrome a fourth and fifth time.
 - **Considered and deliberately deferred, not done here:** a shared
-  card/row atom for `.party-card` (`components/pages/picker.js`),
-  `.roster-card` (`components/pages/roster.js`) and `.sprite-cache-row`
+  card/row atom for `.party-card` (`components/pages/parties/parties.js`),
+  `.roster-card` (`components/pages/parties/roster.js`) and `.sprite-cache-row`
   (`components/pages/settings/cache.js`) — structurally similar
   "icon/image + name + meta/status + action buttons" shapes — plus a
   shared sprite-with-fallback atom for the `<img>` fallback markup
   repeated across `components/organisms/pokemon-search.js`,
   `components/molecules/ev-training-guide.js`,
   `components/organisms/evolution-chain.js`, and
-  `components/pages/roster.js`. Unlike the dialog chrome, these three
+  `components/pages/parties/roster.js`. Unlike the dialog chrome, these three
   card shapes aren't identical (`roster.js`'s card is entangled with
   filter/sort/drag-reorder logic — it would need a fairly large
   precomputed view-model, not just an entry), and e2e specs

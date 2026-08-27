@@ -12,11 +12,10 @@ const backFromHub = document.getElementById('back-from-transfer-hub');
 const exportBtn = document.getElementById('transfer-export-btn');
 const importBtn = document.getElementById('transfer-import-btn');
 
-const setBackLinkPath = wireUtilityBackLink(backFromHub);
+const syncBackLink = wireUtilityBackLink(backFromHub);
 exportBtn.addEventListener('click', () => router.navigateToTransferExport());
 importBtn.addEventListener('click', () => router.navigateToImport());
 
-/** @param {string|null} contentPath */
-export function render(contentPath) {
-  setBackLinkPath(contentPath);
+export function render() {
+  syncBackLink();
 }

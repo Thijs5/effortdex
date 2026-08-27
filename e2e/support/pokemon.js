@@ -1,7 +1,7 @@
 // @ts-check
 // Shared flows for adding a Pokémon and driving its detail page. There is
 // exactly one <pokemon-detail> element in the whole app
-// (components/pages/pokemon.js creates it once and re-renders it for
+// (components/pages/parties/pokemon.js creates it once and re-renders it for
 // whichever Pokémon's detail page is open) — the roster list itself only
 // shows compact link rows. So every spec that needs vitamins/training
 // items/evolution/battle-logging must first navigate into a specific
@@ -147,17 +147,19 @@ export async function openTrainingGuide(card) {
 
 /**
  * Logs a battle against `opponentSpecies` from the "Log a battle" FAB's
- * dialog — the one entry point for both a direct fight and Exp. Share's
- * passive gain. Opens the dialog first if it isn't already open; the
- * dialog closes itself once the battle is successfully logged, so this
- * waits for that before returning.
+ * search sheet — the one entry point for both a direct fight and Exp.
+ * Share's passive gain. Opens the search first if it isn't already
+ * visible; it hides itself once the battle is successfully logged, so
+ * this waits for that before returning.
  * @param {import('@playwright/test').Locator} card
  * @param {string} opponentSpecies
  */
 export async function logBattle(card, opponentSpecies) {
-  const dialog = card.locator('dialog.battle-dialog');
-  if (!(await dialog.isVisible())) await card.locator('.battle-fab').click();
-  await dialog.getByRole('combobox', { name: 'Defeated Pokémon…' }).fill(opponentSpecies);
+  const search = card.locator('pokemon-search');
+  if (await search.getAttribute('hidden') !== null) await card.locator('.battle-fab').click();
+  const combobox = search.getByRole('combobox', { name: 'Defeated Pokémon…' });
+  await combobox.waitFor({ state: 'visible' });
+  await combobox.fill(opponentSpecies);
   await card.page().getByRole('option').filter({ hasText: new RegExp(opponentSpecies, 'i') }).first().click();
-  await dialog.waitFor({ state: 'hidden' });
+  await search.waitFor({ state: 'hidden' });
 }

@@ -1,12 +1,15 @@
 // @ts-check
-// Party picker ("/") — every saved party as a card linking to its roster.
+// Party picker ("/parties") — every saved party as a card linking to its
+// roster. "New party" navigates to "/parties/create" rather than opening
+// the dialog directly — app.js (the composition root for routing, docs/
+// adr/0008 point 3) is the one place that actually calls
+// party-dialog.js's openCreateDialog(), in response to that route.
 
-import { totalEvs, escapeHtml } from '../../lib/utils.js';
-import { store } from '../../lib/services.js';
-import * as router from '../../lib/router.js';
-import { interceptLinkClick } from '../../lib/dom.js';
-import { openCreateDialog } from './party-dialog.js';
-import '../atoms/game-ball.js';
+import { totalEvs, escapeHtml } from '../../../lib/utils.js';
+import { store } from '../../../lib/services.js';
+import * as router from '../../../lib/router.js';
+import { interceptLinkClick } from '../../../lib/dom.js';
+import '../../atoms/game-ball.js';
 
 export const view = document.getElementById('picker-view');
 const partyList = document.getElementById('party-list');
@@ -14,7 +17,7 @@ const pickerEmpty = document.getElementById('picker-empty');
 const pickerNewPartyBtn = document.getElementById('picker-new-party-btn');
 const pickerImportBtn = document.getElementById('picker-import-btn');
 
-pickerNewPartyBtn.addEventListener('click', openCreateDialog);
+pickerNewPartyBtn.addEventListener('click', () => router.navigateToPartyCreate());
 pickerImportBtn.addEventListener('click', () => router.navigateToImport());
 
 export function render() {

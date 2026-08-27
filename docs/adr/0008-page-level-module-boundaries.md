@@ -21,10 +21,13 @@ written to prevent, just at the view layer instead of the domain layer.
 ## Decision
 
 1. **One page, one module.** Each route's view gets its own file under
-   `components/pages/`: `picker.js`, `roster.js`, `pokemon.js`, and —
-   nested to mirror a real sub-route hierarchy —
+   `components/pages/`, nested to mirror a real sub-route hierarchy:
+   `parties/parties.js` + `parties/roster.js` + `parties/pokemon.js` +
+   `parties/party-dialog.js` (`#/parties`, `#/parties/<slug>`,
+   `#/parties/<slug>/<uid>`, and the `create`/`edit` dialog routes,
+   [`docs/adr/0022`](0022-parties-aggregate-root-url-scheme.md)),
    `settings/settings.js` + `settings/cache.js` (`#/settings`,
-   `#/settings/cache`) and `transfer/transfer.js` + `transfer/export.js`
+   `#/settings/cache`), and `transfer/transfer.js` + `transfer/export.js`
    + `transfer/import.js` (`#/transfer`, `#/transfer/export`,
    `#/transfer/import`, [`docs/adr/0020`](0020-transfer-hub-nested-export-import-routes.md)).
    Each exports a `view` (its root DOM element, for `app.js`'s show/hide)
@@ -40,7 +43,7 @@ written to prevent, just at the view layer instead of the domain layer.
 2. **Shared UI that spans pages gets its own module, not a home in
    either page.** The party create/edit dialog is opened from both the
    picker ("New party") and the roster page ("Edit party"), so it lives
-   in `components/pages/party-dialog.js` rather than being duplicated or arbitrarily
+   in `components/pages/parties/party-dialog.js` rather than being duplicated or arbitrarily
    owned by one of its two callers.
 3. **`app.js` is the composition root for routing**, mirroring
    `lib/services.js`'s role for domain objects (ADR-0002, point 3): it
@@ -54,24 +57,27 @@ written to prevent, just at the view layer instead of the domain layer.
    under `lib/` rather than `components/pages/` because nothing about them is a
    route's view — same test ADR-0002 already applies to `store.js`,
    `router.js`, etc.
-5. **Cross-page navigation glue is shared, but the state it acts on is
-   not.** `interceptLinkClick` and the `.ds-dialog-close` wiring live in
-   `lib/dom.js` as stateless helpers. The "last content route" a utility
+5. **Cross-page navigation glue is shared, and so is the state it acts
+   on — but that state lives in the URL, not in `app.js` or any page
+   module.** `interceptLinkClick` and the `.ds-dialog-close` wiring live
+   in `lib/dom.js` as stateless helpers. The "return to" path a utility
    page's back-link needs (so Settings → Transfer → back unwinds one
-   real step instead of jumping home) is tracked by `app.js` alone —
-   it's the only module that sees every route change — and handed to
-   each utility page's `render(...)` as a plain argument;
+   real step instead of jumping home, and survives a reload) is a
+   `?returnTo=<path>` query string embedded in the utility page's own
+   URL by `lib/router.js`'s `navigateToSettings()`/`navigateToTransfer()`/
+   `navigateToImport()`, not tracked by `app.js` in memory (that
+   in-memory approach — a `lastContentPath` variable in `app.js`, read
+   by each utility page's `render(contentPath)` — was this ADR's
+   original design, replaced once it turned out not to survive a
+   reload; see `docs/adr/0022`'s "folded in" section for why).
    `lib/dom.js`'s `wireUtilityBackLink(el)` wires the link once and
-   returns a setter for that page to call with the value it received,
-   the same "state set during `render()`, closed over by the click
-   handler" shape `components/pages/pokemon.js` already uses for its own back
-   link's target — there, the page module owns the variable directly;
-   here, `lib/dom.js` owns it (byte-identical wiring across three
-   pages is worth sharing) and the page module only holds the setter.
-   Either way, no module holds this as shared global state.
-   `lib/dom.js` itself is deliberately *not* folded into `router.js`,
-   which ADR-0002 already scopes to "URL ⇄ route translation only" —
-   it's DOM/navigation glue, not routing.
+   returns a `sync()` function each page's `render()` calls with no
+   argument — it re-reads `router.currentRoute().returnTo` itself every
+   time, since that query string is part of the *current* hash and
+   changes on every navigation. `lib/dom.js` itself is deliberately
+   *not* folded into `router.js`, which ADR-0002 already scopes to
+   "URL ⇄ route translation only" — it's DOM/navigation glue, not
+   routing.
 
 ## Consequences
 
