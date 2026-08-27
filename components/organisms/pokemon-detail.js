@@ -2,6 +2,7 @@ import { POWER_ITEMS, MACHO_BRACE_SPRITE, EXP_SHARE_SPRITE, NATURES, STATS, STAT
 import { titleCase, totalEvs, natureEffectHint, dayLabel } from '../../lib/utils.js';
 import { api, store } from '../../lib/services.js';
 import { versionedSpriteUrl } from '../../lib/pokeapi-client.js';
+import { availableSpeciesFor } from '../../lib/species-availability.js';
 import { attachDesignSystem } from '../../lib/design-system.js';
 import { wireSpriteFallback } from '../../lib/sprite-fallback.js';
 import { wireDisclosureMenu } from '../../lib/dom.js';
@@ -28,6 +29,7 @@ export class PokemonDetail extends HTMLElement {
   constructor() {
     super();
     this._entry = null;
+    this._allowedSpeciesToken = 0;
     // The Nature dialog's own preview-then-Save state (docs/adr/0017)
     // lives directly on its <select> value — no separate pending field
     // needed. IVs/Items/Competitive each own their own dialog and pending
@@ -513,6 +515,23 @@ export class PokemonDetail extends HTMLElement {
   }
   get entry() {
     return this._entry;
+  }
+
+  /**
+   * The roster's own party (GitHub issue #31) — restricts the "Log a
+   * battle" search to species actually reachable in this party's
+   * generation (its base game's own, or `overrides.availableGeneration`)
+   * instead of every species PokéAPI knows about. Set alongside `entry` by
+   * components/pages/parties/pokemon/pokemon.js's `render()`.
+   * `PokeApiClient`'s own cache (docs/adr/0001) makes recomputing this on
+   * every render cheap after the first lookup.
+   * @param {import('../../lib/store.js').Party|null} p
+   */
+  set party(p) {
+    const token = ++this._allowedSpeciesToken;
+    availableSpeciesFor(p, api).then((allowed) => {
+      if (token === this._allowedSpeciesToken) this.$search.allowedSpecies = allowed;
+    });
   }
 
   /** @param {import('../../lib/router.js').PokemonDialog} segment @returns {any} */
