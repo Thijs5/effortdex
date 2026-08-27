@@ -45,6 +45,10 @@ const RECENT_LIMIT = 5;
  * `recent` (a settable property, not an attribute — it's data, not a
  * string) is a `{ name, sprite }[]`, most-recent-first. Assign it to
  * offer quick reselection of recently-picked species before typing.
+ *
+ * `allowedSpecies` (a settable property, `Set<string>|null`) restricts
+ * suggestions/direct-pick to that set of species names when set; `null`
+ * (default) is unrestricted. See `lib/species-availability.js`.
  */
 export class PokemonSearch extends HTMLElement {
   constructor() {
@@ -57,6 +61,7 @@ export class PokemonSearch extends HTMLElement {
     this._recent = [];
     this._showingRecent = false;
     this._evModifier = null;
+    this._allowedSpecies = null; // Set<string>|null — null means unrestricted, see `allowedSpecies` setter
 
     const shadow = this.attachShadow({ mode: 'open' });
     attachDesignSystem(shadow);
@@ -284,6 +289,28 @@ export class PokemonSearch extends HTMLElement {
     this._evModifier = typeof fn === 'function' ? fn : null;
   }
 
+  get allowedSpecies() {
+    return this._allowedSpecies;
+  }
+
+  /**
+   * Restricts suggestions/direct-pick to this set of species names —
+   * e.g. a party's own generation-scoped or explicit dex (GitHub issue
+   * #31, `lib/species-availability.js`). `null` (the default) means
+   * unrestricted: per docs/adr/0024, a caller that couldn't resolve the
+   * restriction (offline, a failed fetch) should pass `null` rather than
+   * an empty set, so a lookup failure never hides species that are
+   * actually fine to pick.
+   * @param {Set<string>|null} set
+   */
+  set allowedSpecies(set) {
+    this._allowedSpecies = set instanceof Set ? set : null;
+    // Live-refresh an already-open list (e.g. the party's game resolves
+    // shortly after this field opens) the same way a species-list load
+    // completing mid-type already does below.
+    if (this.$input.value.trim()) this._onInput();
+  }
+
   set recent(list) {
     const seen = new Set();
     this._recent = (list || [])
@@ -408,6 +435,7 @@ export class PokemonSearch extends HTMLElement {
     const byNumber = /^\d+$/.test(qNum);
     this._matches = this._species
       .filter((s) => s.name.includes(q) || (byNumber && String(s.id).startsWith(qNum)))
+      .filter((s) => !this._allowedSpecies || this._allowedSpecies.has(s.name))
       .slice(0, 8);
     this._renderList();
   }
@@ -531,7 +559,8 @@ export class PokemonSearch extends HTMLElement {
 
   _tryDirectPick() {
     const q = this.$input.value.trim().toLowerCase();
-    if (this._species?.some((s) => s.name === q)) this._pick(q);
+    if (this._species?.some((s) => s.name === q) && (!this._allowedSpecies || this._allowedSpecies.has(q)))
+      this._pick(q);
   }
 
   _pick(name) {

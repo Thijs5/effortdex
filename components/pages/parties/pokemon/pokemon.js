@@ -18,11 +18,12 @@ view.appendChild(pokemonDetail);
 let backToRosterSlug = null;
 interceptLinkClick(backToRoster, () => router.navigateToParty(backToRosterSlug));
 
-/** @param {{ slug: string, name: string }} party @param {object} entry @param {import('../../../../lib/router.js').PokemonDialog|null} [dialog] */
+/** @param {import('../../../../lib/store.js').Party} party @param {object} entry @param {import('../../../../lib/router.js').PokemonDialog|null} [dialog] */
 export function render(party, entry, dialog = null) {
   backToRosterSlug = party.slug;
   backToRoster.href = router.partyPath(party.slug);
   backToRoster.textContent = `← ${party.name}`;
+  pokemonDetail.party = party;
   pokemonDetail.entry = entry;
   pokemonDetail.syncDialog(dialog);
 }

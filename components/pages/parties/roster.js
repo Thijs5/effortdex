@@ -28,6 +28,7 @@ import { POKERUS_ICON_SVG } from '../../../lib/icons.js';
 import { api, store } from '../../../lib/services.js';
 import { versionedSpriteUrl } from '../../../lib/pokeapi-client.js';
 import { wireSpriteFallback } from '../../../lib/sprite-fallback.js';
+import { availableSpeciesFor } from '../../../lib/species-availability.js';
 import * as router from '../../../lib/router.js';
 import { interceptLinkClick } from '../../../lib/dom.js';
 import { wireDragHandle } from '../../../lib/drag-reorder.js';
@@ -317,7 +318,23 @@ function writeRosterStateToQuery() {
   history.replaceState(null, '', url);
 }
 
+// Restricts addSearch's suggestions to species actually reachable in the
+// active party's game (or its explicit dex) — GitHub issue #31. Keyed by
+// a signature so the frequent, keystroke-driven renderRoster() calls
+// (search/filter inputs) don't re-derive this on every call; only an
+// actual party/game/override change does.
+let addSearchAllowedFor = null;
+function refreshAddSearchAllowedSpecies(party) {
+  const signature = `${party.id}|${party.baseGame}|${JSON.stringify(party.overrides?.availableSpecies ?? null)}`;
+  if (signature === addSearchAllowedFor) return;
+  addSearchAllowedFor = signature;
+  availableSpeciesFor(party, api).then((allowed) => {
+    if (signature === addSearchAllowedFor) addSearch.allowedSpecies = allowed;
+  });
+}
+
 function renderRoster(party) {
+  refreshAddSearchAllowedSpecies(party);
   // Hide filter options a party's game version makes meaningless, same
   // gating the rules legend below uses — an always-empty filter reads as
   // broken, not as "nothing matches."
