@@ -102,6 +102,18 @@ test('a failed lookup is not cached: the next attempt retries and can succeed', 
   assert.equal(fetchCalls.length, 2);
 });
 
+test('a 404 lookup is cached: repeat attempts do not hit the network again', async () => {
+  routes.push({ match: '/pokemon/notapokemon', handler: () => ({ ok: false, status: 404, json: async () => ({}) }) });
+  const client = new PokeApiClient();
+  await assert.rejects(() => client.getPokemon('notapokemon'), /Unknown Pokémon/);
+  await assert.rejects(() => client.getPokemon('notapokemon'), /Unknown Pokémon/);
+  assert.equal(fetchCalls.length, 1); // second lookup replayed the cached miss, no new fetch
+
+  const second = new PokeApiClient(); // fresh in-memory cache — must hit localStorage's cached miss
+  await assert.rejects(() => second.getPokemon('notapokemon'), /Unknown Pokémon/);
+  assert.equal(fetchCalls.length, 1);
+});
+
 test('getAllSpecies derives ids and sprite URLs from the list URLs', async () => {
   routes.push({
     match: 'pokemon?limit',
