@@ -74,12 +74,22 @@ separate Sp. Atk/Sp. Def, since that split didn't happen until Gen II.
 ## Data & privacy
 
 Everything lives in this browser's `localStorage`. There's no backend,
-no account, no analytics. Species data (stats, sprites, evolution
-chains) is fetched from [PokéAPI](https://pokeapi.co/) on demand and
-cached indefinitely, since it's static reference data; your own party/
-roster data is kept separate from that cache. See
+no account. Species data (stats, sprites, evolution chains) is fetched
+from [PokéAPI](https://pokeapi.co/) on demand and cached indefinitely,
+since it's static reference data; your own party/roster data is kept
+separate from that cache. See
 [`docs/adr/0001-external-data-caching.md`](docs/adr/0001-external-data-caching.md)
 for the reasoning.
+
+The hosted app reports anonymous pageviews (page/route visited,
+referrer, coarse browser/OS) via [GoatCounter](https://www.goatcounter.com/),
+a privacy-friendly analytics service: no cookies, no personal data, no
+cross-site tracking, and the dashboard is private. The app has no
+*functional* dependency on it — the count script (`index.html`) and the
+one call site that reports in-app route changes (`lib/analytics.js`)
+are fire-and-forget; if the analytics service is blocked, unreachable,
+or removed entirely, the app keeps working exactly the same, offline
+included.
 
 ---
 
