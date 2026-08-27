@@ -1,47 +1,29 @@
 #!/usr/bin/env node
 // Production build (docs/adr/0002's "no framework" is a separate
-// decision from "no build tooling" — see that ADR's own note). Minifies
-// the app's JS/CSS into dist/ without bundling/concatenating: each
-// source file is transformed in place, one output file per input, same
-// relative path — so the ES module graph (import specifiers, directory
-// layout) is untouched and dev (`npx serve .`, raw source) and prod
-// (`npx serve dist`, this output) both just work off the same index.html/
-// sw.js unmodified. Static assets (index.html, sw.js, manifest, icons,
-// version.json) are copied through as-is; only JS/CSS gets minified.
+// decision from "no build tooling" — see that ADR's own note). Bundles
+// the entire JS module graph (app.js and everything it imports from
+// lib/ and components/) into a single dist/app.js, and minifies the
+// CSS. Dev (`npx serve .`, raw source) still runs the real, unbundled
+// module graph directly — only prod (`npx serve dist`) gets the
+// bundle — so index.html and sw.js's SHELL_PATHS (see docs/adr/0004)
+// only need to name the files that actually exist in dist/, not every
+// source module.
 import { build } from 'esbuild';
-import { cp, mkdir, readdir, rm } from 'node:fs/promises';
+import { cp, mkdir, rm } from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const root = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
 const outDir = path.join(root, 'dist');
 
-/** @param {string} dir @returns {Promise<string[]>} */
-async function findJsFiles(dir) {
-  const entries = await readdir(dir, { withFileTypes: true });
-  const files = await Promise.all(
-    entries.map((entry) => {
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) return findJsFiles(full);
-      return entry.name.endsWith('.js') ? [full] : [];
-    })
-  );
-  return files.flat();
-}
-
 async function main() {
   await rm(outDir, { recursive: true, force: true });
   await mkdir(outDir, { recursive: true });
 
-  const jsEntryPoints = (
-    await Promise.all([findJsFiles(path.join(root, 'lib')), findJsFiles(path.join(root, 'components'))])
-  ).flat();
-  jsEntryPoints.push(path.join(root, 'app.js'));
-
-  // No `bundle: true` — a transform-only minify per file, so import
-  // specifiers (and the directory layout they point at) pass through
-  // unchanged rather than getting inlined/rewritten. `sourcemap: true`
-  // (a real .map file per output, referenced via a trailing
+  // `bundle: true`, single entry point: esbuild inlines the whole
+  // import graph (lib/, components/) into one dist/app.js, so prod no
+  // longer makes a per-module request for every file the app is made
+  // of. `sourcemap: true` (a real .map file, referenced via a trailing
   // `//# sourceMappingURL=` comment, not inlined) is deliberate for a
   // fully open-source app with nothing to hide in its minified output —
   // a live bug report is debuggable against original file/line numbers
@@ -49,9 +31,10 @@ async function main() {
   // only fetch a .map when DevTools is actually open, so this costs
   // ordinary visitors nothing.
   await build({
-    entryPoints: jsEntryPoints,
+    entryPoints: [path.join(root, 'app.js')],
     outdir: outDir,
     outbase: root,
+    bundle: true,
     minify: true,
     sourcemap: true,
     format: 'esm',
