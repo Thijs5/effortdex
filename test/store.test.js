@@ -1577,7 +1577,8 @@ test('actualStat falls back to the IV-derived formula once the logged reading is
   store.setLevel(entry.uid, 50);
   store.logStatReading(entry.uid, 'atk', 97); // logged at Lv. 50
   store.setLevel(entry.uid, 51); // now stale — no longer this entry's current level
-  assert.equal(store.actualStat(entry, 'atk', 80), null); // IV still unknown, so no derived value either
+  // IV still unknown: no derived value possible, so the stale reading itself is the best available number.
+  assert.equal(store.actualStat(entry, 'atk', 80), 97);
   store.setIv(entry.uid, 'atk', 25);
   // Level 51, base 80, IV 25, 0 EV, neutral nature: floor((2*80+25)*51/100)+5 = floor(185*0.51)+5 = 94+5 = 99.
   assert.equal(store.actualStat(entry, 'atk', 80), 99);
