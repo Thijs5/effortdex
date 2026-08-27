@@ -1,7 +1,7 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 
-// The sprite cache manager ("/settings/cache", pages/sprite-cache.js,
+// The sprite cache manager ("/settings/cache", components/pages/settings/cache.js,
 // ADR 0012) — per-generation, per-game control over the offline sprite
 // cache. Caching is ON by default everywhere now, localhost included
 // (ADR 0004) — but this whole suite runs with it explicitly disabled
@@ -110,13 +110,16 @@ test.describe('Sprite cache manager', () => {
   test('lives at #/settings/cache, and its back link returns to Settings specifically, not the party picker', async ({ page }) => {
     await openSpriteCacheManager(page);
 
-    await expect(page).toHaveURL(/#\/settings\/cache$/);
+    // Cache legitimately carries a "?returnTo=" passthrough (docs/adr/
+    // 0022) for wherever Settings itself should return to afterward, so
+    // this only asserts the path, not the full URL.
+    await expect(page).toHaveURL(/#\/settings\/cache(\?|$)/);
     // Not getByRole('link', { name: '← Back' }) — that text is shared
     // with Settings' own back link, which coexists in the DOM (just
     // hidden); scope to this page's specific one to avoid ambiguity.
     await page.locator('#back-from-cache').click();
 
-    await expect(page).toHaveURL(/#\/settings$/);
+    await expect(page).toHaveURL(/#\/settings(\?|$)/);
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
   });
 
@@ -228,7 +231,7 @@ test.describe('Sprite cache manager', () => {
     // comment) — lib/prefetch-service.js refuses to do anything under
     // that flag (a real service worker was never even given a chance
     // to register, so nothing could actually land in Cache Storage
-    // anyway), and pages/sprite-cache.js disables the Cache/Cache-all
+    // anyway), and components/pages/settings/cache.js disables the Cache/Cache-all
     // buttons to match, rather than leaving a clickable button that
     // silently does nothing.
     await mockGenerationOne(page);

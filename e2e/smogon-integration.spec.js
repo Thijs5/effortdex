@@ -1,7 +1,7 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 import { createParty } from './support/party.js';
-import { catchPokemon, openDetail, openCompetitive } from './support/pokemon.js';
+import { addPokemon, openDetail, openCompetitive } from './support/pokemon.js';
 import { mockPokeApi } from './support/pokeapi-mock.js';
 import { mockSmogon } from './support/smogon-mock.js';
 
@@ -18,7 +18,7 @@ test.describe('Smogon competitive data', () => {
   test('shows the tier badge and common sets for a species with published data', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Scarlet Run', baseGame: 'Scarlet' });
-    await catchPokemon(page, 'Chansey');
+    await addPokemon(page, 'Chansey');
     const card = await openDetail(page, 'Chansey');
     const dialog = await openCompetitive(card);
 
@@ -35,7 +35,7 @@ test.describe('Smogon competitive data', () => {
   test("shows the species' base stats, since a fixed reference is what min-maxing a build actually needs, not this Pokémon's own current values", async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Scarlet Run', baseGame: 'Scarlet' });
-    await catchPokemon(page, 'Chansey');
+    await addPokemon(page, 'Chansey');
     const card = await openDetail(page, 'Chansey');
     const dialog = await openCompetitive(card);
 
@@ -48,7 +48,7 @@ test.describe('Smogon competitive data', () => {
   test('a set with an array of alternative EV spreads shows the first one as plain numbers, not [object Object]', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Scarlet Run', baseGame: 'Scarlet' });
-    await catchPokemon(page, 'Chansey');
+    await addPokemon(page, 'Chansey');
     const card = await openDetail(page, 'Chansey');
     const dialog = await openCompetitive(card);
 
@@ -60,7 +60,7 @@ test.describe('Smogon competitive data', () => {
   test('shows the empty state for a species with no published set data, even with a tier', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Scarlet Run', baseGame: 'Scarlet' });
-    await catchPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openCompetitive(card);
 
@@ -72,7 +72,7 @@ test.describe('Smogon competitive data', () => {
   test('tapping the tier badge shows what the tier means, in plain English', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Scarlet Run', baseGame: 'Scarlet' });
-    await catchPokemon(page, 'Chansey');
+    await addPokemon(page, 'Chansey');
     const card = await openDetail(page, 'Chansey');
     const dialog = await openCompetitive(card);
 
@@ -85,7 +85,7 @@ test.describe('Smogon competitive data', () => {
   test('an explicitly Illegal tier is shown, distinct from having no tier data at all', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Scarlet Run', baseGame: 'Scarlet' });
-    await catchPokemon(page, 'Mewtwo');
+    await addPokemon(page, 'Mewtwo');
     const card = await openDetail(page, 'Mewtwo');
     const dialog = await openCompetitive(card);
 
@@ -102,7 +102,7 @@ test.describe('Smogon competitive data', () => {
     await page.route('**/play.pokemonshowdown.com/data/formats-data.js', (route) => route.abort());
     await page.goto('/');
     await createParty(page, { name: 'Scarlet Run', baseGame: 'Scarlet' });
-    await catchPokemon(page, 'Chansey');
+    await addPokemon(page, 'Chansey');
     const card = await openDetail(page, 'Chansey');
     const dialog = await openCompetitive(card);
 

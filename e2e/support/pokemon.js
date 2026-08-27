@@ -1,44 +1,44 @@
 // @ts-check
-// Shared flows for catching a Pokémon and driving its detail page. There is
-// exactly one <caught-pokemon-detail> element in the whole app (pages/
-// pokemon.js creates it once and re-renders it for whichever Pokémon's
-// detail page is open) — the roster list itself only shows compact link
-// rows. So every
-// spec that needs vitamins/training items/evolution/battle-logging must
-// first navigate into a specific Pokémon's detail page via `openDetail`.
+// Shared flows for adding a Pokémon and driving its detail page. There is
+// exactly one <pokemon-detail> element in the whole app
+// (components/pages/parties/pokemon/pokemon.js creates it once and
+// re-renders it for whichever Pokémon's detail page is open) — the
+// roster list itself only shows compact link rows. So every spec that
+// needs vitamins/training items/evolution/battle-logging must first
+// navigate into a specific Pokémon's detail page via `openDetail`.
 
 /**
- * From a party's roster page, searches for `species` in the catch panel,
- * picks it, and submits the catch dialog (level defaults to 5 unless
- * `level` is given; `nature` only applies on a Gen III+ party, where the
- * dialog shows the field). Leaves the page on the roster list, not the
- * new Pokémon's detail page.
+ * From a party's roster page, searches for `species` in the add panel,
+ * picks it, and submits the add-Pokémon dialog (level defaults to 5
+ * unless `level` is given; `nature` only applies on a Gen III+ party,
+ * where the dialog shows the field). Leaves the page on the roster list,
+ * not the new Pokémon's detail page.
  * @param {import('@playwright/test').Page} page
  * @param {string} species
  * @param {{ level?: number, nature?: string }} [opts]
  */
-export async function catchPokemon(page, species, { level, nature } = {}) {
-  const catchPanel = page.locator('section', { has: page.getByRole('heading', { name: 'Catch a Pokémon' }) });
+export async function addPokemon(page, species, { level, nature } = {}) {
+  const addPanel = page.locator('section', { has: page.getByRole('heading', { name: 'Add a Pokémon' }) });
   // getByPlaceholder would also match <pokemon-search>'s own host element,
   // which reflects the attribute but isn't the actual input — role=combobox
   // only exists on the real <input> inside its shadow root.
-  await catchPanel.getByRole('combobox', { name: 'e.g. Bulbasaur', exact: true }).fill(species);
+  await addPanel.getByRole('combobox', { name: 'e.g. Bulbasaur', exact: true }).fill(species);
   await page.getByRole('option').filter({ hasText: new RegExp(species, 'i') }).first().click();
 
-  const dialog = page.locator('dialog#catch-dialog');
+  const dialog = page.locator('dialog#add-pokemon-dialog');
   await dialog.waitFor({ state: 'visible' });
   if (level != null) await dialog.getByLabel('Level').fill(String(level));
   // Selecting by value (the NATURES id, e.g. 'adamant') rather than label
   // text, which would need the exact rendered "Adamant (+ATK, -SPA)" string.
   if (nature) await dialog.getByLabel('Nature').selectOption(nature);
-  await dialog.getByRole('button', { name: 'Catch!' }).click();
+  await dialog.getByRole('button', { name: 'Add!' }).click();
   await dialog.waitFor({ state: 'hidden' });
 }
 
 /**
- * The roster list's compact row for a caught species (its link to the
- * detail page) — for assertions like "is it caught" or "what level does
- * the list show", without navigating into the detail page.
+ * The roster list's compact row for an added species (its link to the
+ * detail page) — for assertions like "is it in the roster" or "what
+ * level does the list show", without navigating into the detail page.
  * @param {import('@playwright/test').Page} page
  * @param {string} species
  */
@@ -47,14 +47,14 @@ export function rosterRow(page, species) {
 }
 
 /**
- * Clicks a caught Pokémon's roster row and returns the (single, reused)
- * `<caught-pokemon-detail>` once its detail page has loaded.
+ * Clicks a roster Pokémon's roster row and returns the (single, reused)
+ * `<pokemon-detail>` once its detail page has loaded.
  * @param {import('@playwright/test').Page} page
  * @param {string} species
  */
 export async function openDetail(page, species) {
   await rosterRow(page, species).click();
-  const detail = page.locator('caught-pokemon-detail');
+  const detail = page.locator('pokemon-detail');
   await detail.waitFor({ state: 'visible' });
   return detail;
 }
@@ -147,17 +147,19 @@ export async function openTrainingGuide(card) {
 
 /**
  * Logs a battle against `opponentSpecies` from the "Log a battle" FAB's
- * dialog — the one entry point for both a direct fight and Exp. Share's
- * passive gain. Opens the dialog first if it isn't already open; the
- * dialog closes itself once the battle is successfully logged, so this
- * waits for that before returning.
+ * search sheet — the one entry point for both a direct fight and Exp.
+ * Share's passive gain. Opens the search first if it isn't already
+ * visible; it hides itself once the battle is successfully logged, so
+ * this waits for that before returning.
  * @param {import('@playwright/test').Locator} card
  * @param {string} opponentSpecies
  */
 export async function logBattle(card, opponentSpecies) {
-  const dialog = card.locator('dialog.battle-dialog');
-  if (!(await dialog.isVisible())) await card.locator('.battle-fab').click();
-  await dialog.getByRole('combobox', { name: 'Defeated Pokémon…' }).fill(opponentSpecies);
+  const search = card.locator('pokemon-search');
+  if (await search.getAttribute('hidden') !== null) await card.locator('.battle-fab').click();
+  const combobox = search.getByRole('combobox', { name: 'Defeated Pokémon…' });
+  await combobox.waitFor({ state: 'visible' });
+  await combobox.fill(opponentSpecies);
   await card.page().getByRole('option').filter({ hasText: new RegExp(opponentSpecies, 'i') }).first().click();
-  await dialog.waitFor({ state: 'hidden' });
+  await search.waitFor({ state: 'hidden' });
 }

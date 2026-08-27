@@ -32,10 +32,21 @@ jobs:
           printf '{\n  "version": "%s"\n}\n' "${GITHUB_REF_NAME#v}" > version.json
           cat version.json
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build
+        run: npm run build
+
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: dist
 
       - name: Deploy
         id: deployment

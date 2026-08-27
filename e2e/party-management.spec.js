@@ -23,8 +23,8 @@ test.describe('Party management', () => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
 
-    await expect(page.getByRole('heading', { name: 'Catch a Pokémon' })).toBeVisible();
-    await expect(page).toHaveURL(/#\/emerald-nuzlocke/);
+    await expect(page.getByRole('heading', { name: 'Add a Pokémon' })).toBeVisible();
+    await expect(page).toHaveURL(/#\/parties\/emerald-nuzlocke/);
   });
 
   test('an unrecognized typed base game (a ROM hack name) is rejected, not silently accepted', async ({ page }) => {
@@ -84,7 +84,7 @@ test.describe('Party management', () => {
   // explicitly disabled (playwright.config.js), under which
   // lib/prefetch-service.js refuses to fetch anything at all — so the
   // checkbox itself is hidden rather than offered as a control that
-  // could never have an effect (pages/party-dialog.js). That's what
+  // could never have an effect (components/pages/parties/party-dialog.js). That's what
   // this test actually verifies; the checkbox's live fetch-triggering
   // behavior when caching *is* on is covered at the unit level
   // (test/prefetch-service.test.js) with real dependency injection,
@@ -101,6 +101,6 @@ test.describe('Party management', () => {
 
     // Creating the party still works fine with the row absent.
     await page.getByRole('button', { name: 'Create party' }).click();
-    await expect(page.getByRole('heading', { name: 'Catch a Pokémon' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Add a Pokémon' })).toBeVisible();
   });
 });

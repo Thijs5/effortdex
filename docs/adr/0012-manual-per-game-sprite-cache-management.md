@@ -85,7 +85,7 @@ the underlying cache can't actually do.
 4. **`lib/pokeapi-client.js#spriteGroupKey(gameName)`** (new) exposes
    which PokéAPI sprite folder (if any) a title maps to, so callers can
    tell when two titles are the literal same cached images.
-5. **New page, `pages/sprite-cache.js` at `#/settings/cache`** (reachable
+5. **New page, `components/pages/settings/cache.js` at `#/settings/cache`** (reachable
    from Settings' Storage section, "Manage sprite cache"), one
    collapsible section per generation:
    - **Nested under Settings, not a sibling route.** Unlike Transfer or
@@ -206,8 +206,8 @@ ADR's scope (the same page, the same queue), landed together:
    controls already lived here; splitting "clear everything" onto a
    *different* page than "clear just this" made Settings a dumping
    ground for storage UI while this page only had half the picture.
-   `pages/settings.js` lost `clearAppCache`/`estimateCacheSize`
-   entirely; `pages/sprite-cache.js` gained them verbatim (same
+   `components/pages/settings/settings.js` lost `clearAppCache`/`estimateCacheSize`
+   entirely; `components/pages/settings/cache.js` gained them verbatim (same
    behavior, same ids, just relocated).
 2. **Byte sizes, not just counts.** Every row (`inspectCache`, a single
    pass reading both hit-count and each cached Response's `blob().size`)
@@ -287,7 +287,7 @@ kind of real-timing, real-navigation behavior ADR 0011/0012's existing
 ## Addendum 2: an opt-out checkbox at party creation
 
 A third manual entry point, alongside the per-row and per-generation
-buttons on this page: `pages/party-dialog.js`'s "New party" form gets a
+buttons on this page: `components/pages/parties/party-dialog.js`'s "New party" form gets a
 "Cache this game's sprites for offline use" checkbox, **checked by
 default**. On submit, if checked, it fires `prefetchService.prefetchGame
 (baseGame)` — deliberately not awaited, so party creation and the

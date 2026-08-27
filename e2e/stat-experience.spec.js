@@ -1,7 +1,7 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 import { createParty } from './support/party.js';
-import { catchPokemon, openDetail, openItemDialog, logBattle } from './support/pokemon.js';
+import { addPokemon, openDetail, openItemDialog, logBattle } from './support/pokemon.js';
 import { mockPokeApi } from './support/pokeapi-mock.js';
 
 // Generation I/II's Stat Experience system (lib/store.js's
@@ -20,7 +20,7 @@ test.describe('Gen I/II Stat Experience', () => {
   test('logging a battle adds the opponent\'s own base stat, not a fixed EV yield', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Red run', baseGame: 'Red' });
-    await catchPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
 
     // Onix: base Attack 45 (its modern EV yield, by contrast, is +1 Def).
@@ -32,7 +32,7 @@ test.describe('Gen I/II Stat Experience', () => {
   test('a vitamin adds 2,560 Stat Experience and stops once the stat has 25,600, with no combined total cap', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Crystal run', baseGame: 'Crystal' });
-    await catchPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openItemDialog(card);
     const proteinBtn = dialog.locator('[data-id="protein"] button');
@@ -51,7 +51,7 @@ test.describe('Gen I/II Stat Experience', () => {
   test('Gen I merges Special into one SPC stat: the SpD bar is hidden, Calcium feeds it, Zinc is unavailable', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Red run', baseGame: 'Red' });
-    await catchPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
 
     await expect(card.locator('ev-summary ev-bar[data-key="spd"]')).toBeHidden();
@@ -67,7 +67,7 @@ test.describe('Gen I/II Stat Experience', () => {
   test('Gen I\'s real historical Special stat is used for a species whose modern Sp. Atk/Sp. Def split unevenly', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Red run', baseGame: 'Red' });
-    await catchPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
 
     // Chansey: modern Sp. Atk 35 / Sp. Def 105 — a very uneven split. Its
@@ -81,7 +81,7 @@ test.describe('Gen I/II Stat Experience', () => {
   test('battling several strong opponents keeps growing past the old 510 total — there is no combined cap to hit', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Red run', baseGame: 'Red' });
-    await catchPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
 
     // Two high-base-stat opponents alone add well past the modern 510 EV
@@ -105,7 +105,7 @@ test.describe('Gen I/II Stat Experience', () => {
   test('Pokérus doesn\'t exist on a Gen I party', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Red run', baseGame: 'Red' });
-    await catchPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openItemDialog(card);
 
@@ -115,7 +115,7 @@ test.describe('Gen I/II Stat Experience', () => {
   test('Pokérus is available on a Gen II party (introduced there)', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Gold run', baseGame: 'Gold' });
-    await catchPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openItemDialog(card);
 
@@ -132,7 +132,7 @@ test.describe('Gen I/II Stat Experience', () => {
   test('the item badge stays visible on a Gen I party, even with no held-item mechanic at all', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Red run', baseGame: 'Red' });
-    await catchPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
 
     const itemBtn = card.getByRole('button', { name: 'Items', exact: true });
@@ -147,7 +147,7 @@ test.describe('Gen I/II Stat Experience', () => {
   test("the history filter dropdown hides Wings/berries/Pokérus on a Gen I party — none of them exist yet", async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Red run', baseGame: 'Red' });
-    await catchPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
     const histFilter = card.locator('ev-history-log .hist-kind-filter');
 

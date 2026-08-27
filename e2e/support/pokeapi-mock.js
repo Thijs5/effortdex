@@ -4,7 +4,7 @@
 // deterministic, fast, and doesn't burn PokéAPI's fair-use budget on
 // every test run. Modeled on e2e/sprite-cache.spec.js's own
 // mockGenerationOne, generalized to cover every species any spec
-// actually looks up (search, catch, battle-logging, evolution).
+// actually looks up (search, add, battle-logging, evolution).
 //
 // Real stat/id/evolution data below — not placeholders — since several
 // specs assert on exact values PokéAPI returns for these species (e.g.
@@ -137,7 +137,7 @@ function chainNode(species) {
  * Mocks every PokéAPI/sprite endpoint lib/pokeapi-client.js calls, for the
  * fixed roster of species declared in SPECIES above (Bulbasaur, Ivysaur,
  * Charmander, Caterpie, Onix, Chansey, Mewtwo — every species any spec
- * actually searches for, catches, or battles). Does not mock
+ * actually searches for, adds, or battles). Does not mock
  * `/api/v2/generation/*` — the sprite-prefetch scan (lib/prefetch-service.js)
  * that would call it no-ops while caching is disabled, which every e2e
  * test runs under (playwright.config.js's pre-seeded

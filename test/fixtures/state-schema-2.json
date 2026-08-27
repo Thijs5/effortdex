@@ -1,0 +1,177 @@
+{
+  "schema": 2,
+  "statExpBackfillApplied": true,
+  "activePartyId": "01a04278-d25a-7734-bf74-815cca56086b",
+  "parties": [
+    {
+      "id": "01a04278-d25a-7734-bf74-815cca56086b",
+      "name": "Fixture party",
+      "description": "",
+      "baseGame": "Ultra Sun",
+      "overrides": {
+        "powerItemBonus": null,
+        "powerItems": null,
+        "machoBrace": null,
+        "vitaminCutoff": null,
+        "pokerus": null,
+        "wings": null,
+        "evBerries": null,
+        "nature": null,
+        "statExpSystem": null,
+        "spriteVersion": null
+      },
+      "slug": "fixture-party",
+      "pokemon": [
+        {
+          "uid": "01a04278-d25d-76b0-b3b1-0dbc462c3bd5",
+          "nickname": "Buddy",
+          "nature": "adamant",
+          "powerItem": null,
+          "machoBrace": false,
+          "ivs": {
+            "hp": null,
+            "atk": null,
+            "def": null,
+            "spa": null,
+            "spd": null,
+            "spe": null
+          },
+          "events": [
+            {
+              "id": "01a04278-d25d-76b0-b3b1-0dbd6cfa7e8f",
+              "kind": "add",
+              "timestamp": 1787821609565,
+              "speciesName": "bulbasaur",
+              "speciesId": 1,
+              "sprite": "bulbasaur.png",
+              "baseStats": {
+                "hp": 45,
+                "atk": 49,
+                "def": 49,
+                "spa": 65,
+                "spd": 65,
+                "spe": 45
+              },
+              "level": 5
+            },
+            {
+              "id": "01a04278-d25e-79e4-9e8a-3caec0099fd2",
+              "kind": "held-item",
+              "timestamp": 1787821609566,
+              "powerItem": "bracer",
+              "machoBrace": false
+            },
+            {
+              "id": "01a04278-d25e-79e4-9e8a-3caf810055e9",
+              "kind": "held-item",
+              "timestamp": 1787821609566,
+              "powerItem": null,
+              "machoBrace": true
+            },
+            {
+              "id": "01a04278-d25e-79e4-9e8a-3cb0a0c2256d",
+              "kind": "pokerus",
+              "timestamp": 1787821609566,
+              "active": true
+            },
+            {
+              "id": "01a04278-d25e-79e4-9e8a-3cb1b772116c",
+              "kind": "held-item",
+              "timestamp": 1787821609566,
+              "powerItem": null,
+              "machoBrace": false
+            },
+            {
+              "id": "01a04278-d25e-79e4-9e8a-3cb224717464",
+              "kind": "exp-share",
+              "timestamp": 1787821609566,
+              "active": true
+            },
+            {
+              "id": "01a04278-d25f-7f4d-bf4e-5e82d8b2926f",
+              "kind": "battle",
+              "timestamp": 1787821609567,
+              "opponentName": "rattata",
+              "sprite": "rattata.png",
+              "applied": {
+                "hp": 0,
+                "atk": 2,
+                "def": 0,
+                "spa": 0,
+                "spd": 0,
+                "spe": 0
+              },
+              "powerItem": null,
+              "machoBrace": false,
+              "pokerus": true
+            },
+            {
+              "id": "01a04278-d260-7206-aba4-36e667f3f97e",
+              "kind": "vitamin",
+              "timestamp": 1787821609568,
+              "vitaminId": "hp-up",
+              "stat": "hp",
+              "linkedStat": null,
+              "applied": 10,
+              "blockedByCutoff": false,
+              "blockedByCeiling": false
+            },
+            {
+              "id": "01a04278-d260-7206-aba4-36e7e0d959d5",
+              "kind": "feather",
+              "timestamp": 1787821609568,
+              "featherId": "muscle-wing",
+              "stat": "atk",
+              "applied": 1
+            },
+            {
+              "id": "01a04278-d261-7c7f-9147-958ee54ea260",
+              "kind": "berry",
+              "timestamp": 1787821609569,
+              "berryId": "pomeg",
+              "stat": "hp",
+              "applied": 10
+            },
+            {
+              "id": "01a04278-d261-7c7f-9147-958fee3c4ca7",
+              "kind": "level",
+              "timestamp": 1787821609569,
+              "toLevel": 12
+            },
+            {
+              "id": "01a04278-d261-7c7f-9147-95906445704f",
+              "kind": "evolve",
+              "timestamp": 1787821609569,
+              "from": {
+                "speciesName": "bulbasaur",
+                "speciesId": 1,
+                "sprite": "bulbasaur.png",
+                "baseStats": {
+                  "hp": 45,
+                  "atk": 49,
+                  "def": 49,
+                  "spa": 65,
+                  "spd": 65,
+                  "spe": 45
+                }
+              },
+              "to": {
+                "speciesName": "ivysaur",
+                "speciesId": 2,
+                "sprite": "ivysaur.png",
+                "baseStats": {
+                  "hp": 60,
+                  "atk": 62,
+                  "def": 63,
+                  "spa": 80,
+                  "spd": 80,
+                  "spe": 60
+                }
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

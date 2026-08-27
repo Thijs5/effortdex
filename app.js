@@ -2,9 +2,11 @@
 // No frameworks, no build step. This file is the composition root: it
 // wires the design system into the light DOM, initializes app-wide
 // chrome (lib/shell.js, lib/app-version.js), and dispatches each route
-// to its page module (pages/*.js) — no page-specific DOM or rendering
-// lives here. All domain logic lives in lib/, and each custom element
-// owns its own rendering.
+// to its page module (components/pages/*.js) — no page-specific DOM or
+// rendering lives here. All domain logic lives in lib/, and each custom
+// element owns its own rendering. Also the one place that opens/closes
+// the party create/edit dialog, in response to a route's `dialog` field
+// (docs/adr/0022) — party-dialog.js itself never opens on its own.
 
 import { store, prefetchService } from './lib/services.js';
 import { attachDesignSystem } from './lib/design-system.js';
@@ -12,13 +14,15 @@ import { wireDialogCloseButtons } from './lib/dom.js';
 import * as router from './lib/router.js';
 import './lib/shell.js';
 import './lib/app-version.js';
-import * as picker from './pages/picker.js';
-import * as roster from './pages/roster.js';
-import * as pokemon from './pages/pokemon.js';
-import * as settings from './pages/settings.js';
-import * as transfer from './pages/transfer.js';
-import * as spriteCache from './pages/sprite-cache.js';
-import * as importPage from './pages/import.js';
+import * as parties from './components/pages/parties/parties.js';
+import * as roster from './components/pages/parties/roster.js';
+import * as pokemon from './components/pages/parties/pokemon/pokemon.js';
+import * as partyDialog from './components/pages/parties/party-dialog.js';
+import * as settings from './components/pages/settings/settings.js';
+import * as transferHub from './components/pages/transfer/transfer.js';
+import * as transferExport from './components/pages/transfer/export.js';
+import * as spriteCache from './components/pages/settings/cache.js';
+import * as importPage from './components/pages/transfer/import.js';
 
 // Let light-DOM markup (the party dialog) use the same .ds-field/.ds-btn
 // primitives every shadow-DOM component uses — one shared stylesheet.
@@ -29,50 +33,60 @@ wireDialogCloseButtons();
 /* Router <-> page                                                     */
 /* ------------------------------------------------------------------ */
 
-const VIEWS = [picker.view, roster.view, pokemon.view, settings.view, transfer.view, spriteCache.view, importPage.view];
+const VIEWS = [parties.view, roster.view, pokemon.view, settings.view, transferHub.view, transferExport.view, spriteCache.view, importPage.view];
 function showView(view) {
   for (const v of VIEWS) v.hidden = v !== view;
 }
 
-// The most recent picker/party/pokemon route — still null means nothing
-// to go back to. Only this composition root sees every route change, so
-// it's the one place that can track this; utility pages receive it as a
-// render() argument rather than reading shared global state (see
-// lib/dom.js's wireUtilityBackLink).
-/** @type {string|null} */
-let lastContentPath = null;
-
 function render() {
-  const { page, partySlug, pokemonUid, payload } = router.currentRoute();
+  const { page, partySlug, pokemonUid, payload, dialog, pokemonDialog } = router.currentRoute();
 
   if (page === 'settings') {
+    partyDialog.closeIfOpen();
+    pokemon.closeDialogsIfOpen();
     showView(settings.view);
-    settings.render(lastContentPath);
+    settings.render();
     return;
   }
 
   if (page === 'transfer') {
-    showView(transfer.view);
-    transfer.render(lastContentPath);
+    partyDialog.closeIfOpen();
+    pokemon.closeDialogsIfOpen();
+    showView(transferHub.view);
+    transferHub.render();
+    return;
+  }
+
+  if (page === 'transfer-export') {
+    partyDialog.closeIfOpen();
+    pokemon.closeDialogsIfOpen();
+    showView(transferExport.view);
+    transferExport.render();
     return;
   }
 
   if (page === 'cache') {
+    partyDialog.closeIfOpen();
+    pokemon.closeDialogsIfOpen();
     showView(spriteCache.view);
     spriteCache.render();
     return;
   }
 
   if (page === 'import') {
+    partyDialog.closeIfOpen();
+    pokemon.closeDialogsIfOpen();
     showView(importPage.view);
-    importPage.render(payload, lastContentPath);
+    importPage.render(payload);
     return;
   }
 
   if (!partySlug) {
-    lastContentPath = router.partyPath(null);
-    showView(picker.view);
-    picker.render();
+    pokemon.closeDialogsIfOpen();
+    showView(parties.view);
+    parties.render();
+    if (dialog === 'create-party') partyDialog.openCreateDialog();
+    else partyDialog.closeIfOpen();
     return;
   }
 
@@ -89,18 +103,20 @@ function render() {
   if (pokemonUid) {
     const entry = party.pokemon.find((e) => e.uid === pokemonUid);
     if (!entry) {
-      router.navigateToParty(party.slug); // stale link, or this Pokémon was just released
+      router.navigateToParty(party.slug); // stale link, or this Pokémon was just removed
       return;
     }
-    lastContentPath = router.pokemonPath(party.slug, pokemonUid);
+    partyDialog.closeIfOpen(); // no dialog route exists this deep — always closed here
     showView(pokemon.view);
-    pokemon.render(party, entry);
+    pokemon.render(party, entry, pokemonDialog);
     return;
   }
 
-  lastContentPath = router.partyPath(party.slug);
+  pokemon.closeDialogsIfOpen();
   showView(roster.view);
   roster.render(party);
+  if (dialog === 'edit-party') partyDialog.openEditDialog(party);
+  else partyDialog.closeIfOpen();
 }
 
 router.onRouteChange(render);

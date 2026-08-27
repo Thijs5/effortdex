@@ -74,7 +74,7 @@ localStorage-backed cache with different rules (see ADR 0001).
    fixes that outright, since PokéAPI data was never part of this
    system anyway (its own cache, ADR 0001, is untouched either way).
    A manual "Developer: disable caching" toggle still exists on the
-   Storage page (`#/settings/cache`, `pages/sprite-cache.js`), persisting
+   Storage page (`#/settings/cache`, `components/pages/settings/cache.js`), persisting
    a flag to `localStorage` (`effortdex:dev-no-cache`) that force-disables
    service-worker registration and unregisters/wipes any existing worker
    and caches — useful e.g. to kill caching on a real deployed origin for

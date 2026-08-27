@@ -5,7 +5,7 @@
 [![Open the app](https://img.shields.io/badge/Open-the%20app-teal)](https://thijs5.github.io/effortdex/)
 [![Changelog](https://img.shields.io/badge/Changelog-releases-blue)](https://github.com/Thijs5/effortdex/releases)
 
-A local-only Pokémon EV (Effort Value) training tracker. Catch Pokémon,
+A local-only Pokémon EV (Effort Value) training tracker. Add Pokémon,
 log the battles you defeat while training them, and watch their EVs fill
 up, across as many parties (save files / playthroughs) as you're juggling at once.
 
@@ -18,7 +18,7 @@ once loaded, and keeps everything on your device (see
 
 ### EV tracking & progress logging
 
-Organize caught Pokémon into parties, one per save file or playthrough,
+Organize your roster Pokémon into parties, one per save file or playthrough,
 each with a base game picked from every official title spanning Gen I-IX.
 The base game decides which vitamin, training item, Pokérus and nature
 rules apply, and which title's sprites are shown; everything is
@@ -37,25 +37,24 @@ separate Sp. Atk/Sp. Def, since that split didn't happen until Gen II.
   itself didn't exist until Gen II).
 - **Vitamins**: fed straight from the roster card, capped like battling
   and accurate to the rules of whichever generation the party belongs to.
-- **EV-yield previews**: see what EVs a catch or battle would actually
-  yield before committing. Catching opens a modal with the sprite, base
-  EV yield, a level field, and an optional nature.
+- **EV-yield previews**: logging a battle shows each search result's own
+  base EV yield right in the dropdown, before you commit to picking it.
 - **Natures**: set or change a Pokémon's nature; the boosted/hindered
   stat is flagged right on the EV bars as a reminder of what's worth
   prioritizing.
 - **Battle history**: every logged defeat or vitamin dose is kept, with
   one-click repeat logging and a delete button that reverts the EVs it
   applied.
-- **Evolutions**: evolve a caught Pokémon with its EVs, nickname,
+- **Evolutions**: evolve a roster Pokémon with its EVs, nickname,
   training aids and history carried over, with an undo for accidental
   clicks.
 - **Where to train**: a short, curated list of good spots to grind each
   stat's EVs in the party's own game (Gen III onward), with one tap to
   log a battle against a recommended Pokémon.
-- **IVs**: record a caught Pokémon's Individual Values alongside its EVs.
+- **IVs**: record a roster Pokémon's Individual Values alongside its EVs.
 - **Competitive data**: pull up Smogon's competitive sets/analysis for a
   species right from its detail page.
-- **Transfer**: move a caught Pokémon from one party to another, carrying
+- **Transfer**: move a roster Pokémon from one party to another, carrying
   its EVs/IVs, nickname and history along with it.
 - **Roster search, filter & reorder**: find a Pokémon in a large roster
   quickly, filter the list down (gen-gated to what applies to the
@@ -86,8 +85,16 @@ for the reasoning.
 
 ## Technical details
 
-Built with native Web Components: no framework, no build step, no
-bundler. Open `index.html` (or serve the directory) and it runs.
+Built with native Web Components: no framework, no bundler, no
+transpilation — every file runs in the browser exactly as written. Open
+`index.html` (or serve the directory) and it runs, straight from
+source, with no build step required for local development. The
+deployed site (GitHub Pages, `.github/workflows/deploy.yml`) is built
+first (`npm run build`) — a minify-only pass (`scripts/build.mjs`,
+esbuild) that shrinks the shipped JS/CSS without bundling/concatenating
+or touching source: one minified output file per input file, same
+directory layout, so dev and prod both run the same unmodified
+`index.html`/`sw.js` against files at the same relative paths.
 
 ### Running it locally
 
@@ -116,7 +123,7 @@ npm test
 ```
 
 An end-to-end suite (`e2e/`, Playwright) drives the actual app through a
-real browser, organized one file per feature (party management, catching,
+real browser, organized one file per feature (party management, adding a Pokémon,
 EV training, Pokérus/Exp. Share, evolution, transfer, settings). Run
 `npx playwright test --list` for a feature-by-feature tour of what
 Effortdex does, or run it with:
@@ -146,10 +153,14 @@ history linear and resolve conflicts at rebase time, not merge time.
 ### Architecture
 
 - `lib/`: framework-free domain logic. `store.js` (party/roster state;
-  each caught Pokémon is event-sourced, so its event log is the single
+  each roster Pokémon is event-sourced, so its event log is the single
   source of truth and EVs/level/identity are pure folds over it; see
   [`docs/adr/0006`](docs/adr/0006-event-sourced-roster-entries.md)),
   `pokeapi-client.js` (the only module that talks to PokéAPI),
+  `shell.js` (app-wide chrome: header menu, theme switching, the power
+  LED, offline app-shell/service-worker registration — runs once,
+  regardless of route; see
+  [`docs/adr/0008`](docs/adr/0008-page-level-module-boundaries.md)),
   `router.js` (hash-based routing), `slug.js` (party name → URL
   segment), `game-versions.js` (official titles and the generation each
   belongs to), `gen1-special-stats.js` (the real Gen I Special stat per
@@ -168,7 +179,7 @@ history linear and resolve conflicts at rebase time, not merge time.
   [`docs/adr/0012`](docs/adr/0012-manual-per-game-sprite-cache-management.md)),
   `schema-version.js` (storage schema version + migrations; see
   [`docs/adr/0009`](docs/adr/0009-automatic-breaking-storage-migrations.md)),
-  `transfer.js` (moving a caught Pokémon between parties),
+  `transfer.js` (moving a roster Pokémon between parties),
   `network-activity.js` (in-flight request tracking for UI indicators),
   `drag-reorder.js` (roster drag-to-reorder), `dom.js`/`icons.js`/
   `memo-cache.js` (small shared helpers),

@@ -10,7 +10,7 @@ Effortdex's interactive UI is built almost entirely from native elements
 and hand-rolled custom elements with shadow DOM (`components/*.js`) —
 there's no UI framework and no accessibility layer coming from one
 (issue #9). Some of it (the header menu in `index.html`/`lib/shell.js`,
-`components/pokemon-search.js`'s combobox via `lib/combobox.js`) already
+`components/organisms/pokemon-search.js`'s combobox via `lib/combobox.js`) already
 followed WAI-ARIA APG patterns closely before this ADR existed; the rest
 was inconsistent, because nothing wrote down which pattern to reach for
 or when ARIA is actually needed versus redundant. Issue #9 audited the
@@ -55,8 +55,8 @@ app against the spec and fixed the gaps found; this ADR is the
    clear the visual fill is.
 6. **Text that updates asynchronously and matters to the current task
    gets `aria-live="polite"`** (status lines, async result summaries) —
-   already the pattern for `#catch-status`, `#copy-backup-status`,
-   `#clear-cache-status`, `#catch-dialog-ev-yield`. Don't mark up
+   already the pattern for `#add-status`, `#copy-backup-status`,
+   `#clear-cache-status`, `#add-pokemon-dialog-status`. Don't mark up
    everything that changes — only text a user would otherwise have to
    notice changed on their own (a result, an error, a completion state),
    not decorative or purely visual updates.

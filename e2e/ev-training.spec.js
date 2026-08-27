@@ -1,7 +1,7 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 import { createParty } from './support/party.js';
-import { catchPokemon, openDetail, openItemDialog, logBattle } from './support/pokemon.js';
+import { addPokemon, openDetail, openItemDialog, logBattle } from './support/pokemon.js';
 import { mockPokeApi } from './support/pokeapi-mock.js';
 
 // EV training mechanics — how the six per-stat values fill up, per
@@ -22,7 +22,7 @@ test.describe('EV training', () => {
   test('logging a battle applies the opponent\'s EV yield', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    await catchPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
 
     // Caterpie yields +1 HP.
@@ -34,7 +34,7 @@ test.describe('EV training', () => {
   test('a vitamin adds EVs to its stat, up to the 252 cap', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    await catchPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openItemDialog(card);
 
@@ -47,7 +47,7 @@ test.describe('EV training', () => {
   test('on a Gen III-VII party, vitamins stop once the stat already has 100+ EVs', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    await catchPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openItemDialog(card);
     const proteinBtn = dialog.locator('[data-id="protein"] button');
@@ -65,7 +65,7 @@ test.describe('EV training', () => {
   test('on a Gen VIII+ party, the vitamin cutoff no longer applies — it trains all the way to 252', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Shield Playthrough', baseGame: 'Shield' });
-    await catchPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openItemDialog(card);
 
@@ -78,7 +78,7 @@ test.describe('EV training', () => {
   test('a held Macho Brace doubles EVs gained in battle (Gen III-VI)', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    await catchPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
     const itemDialog = await openItemDialog(card);
 
@@ -92,7 +92,7 @@ test.describe('EV training', () => {
   test('an EV-reducing berry removes EVs from one stat (Gen III+)', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    await catchPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
 
     let dialog = await openItemDialog(card);
@@ -109,7 +109,7 @@ test.describe('EV training', () => {
   test('a Wing adds 1 EV with no 100-EV cutoff, unlike vitamins (Gen V+)', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Black' });
-    await catchPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openItemDialog(card);
 
@@ -122,7 +122,7 @@ test.describe('EV training', () => {
   test('Save applies every queued Vitamin/Wing/berry click and closes the Items popup; queued and already-fed counts are shown separately', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    await catchPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
     const proteinBtn1 = (await openItemDialog(card)).locator('[data-id="protein"] button');
 
@@ -146,7 +146,7 @@ test.describe('EV training', () => {
   test('Save groups every queued click into one history entry, styled like any other entry, with no group-wide delete', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    await catchPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openItemDialog(card);
 
@@ -172,7 +172,7 @@ test.describe('EV training', () => {
   test('10 of the same vitamin collapses to one summed total, not ten repeated lines, with that vitamin\'s own icon', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    await catchPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openItemDialog(card);
     const calciumBtn = dialog.locator('[data-id="calcium"] button');
@@ -191,7 +191,7 @@ test.describe('EV training', () => {
   test('a Save mixing multiple item kinds groups each kind into its own entry, not one mixed blob', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    await catchPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openItemDialog(card);
 
@@ -213,7 +213,7 @@ test.describe('EV training', () => {
   test('the history log can be filtered by type and searched by name, without changing the total count', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    await catchPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
 
     await logBattle(card, 'Caterpie');
@@ -227,7 +227,7 @@ test.describe('EV training', () => {
 
     // Total count in the summary always reflects everything logged,
     // regardless of the current filter/search.
-    await expect(histLog.locator('.hist-count')).toHaveText('3'); // catch + battle + vitamin
+    await expect(histLog.locator('.hist-count')).toHaveText('3'); // add + battle + vitamin
 
     await histLog.locator('.hist-kind-filter').selectOption('vitamin');
     await expect(histLog.locator('ul.hist-list > li').filter({ hasText: 'Protein' })).toBeVisible();
