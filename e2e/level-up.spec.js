@@ -101,6 +101,43 @@ test.describe('Level popup', () => {
     await expect(ivDialog.getByText('Lv. 12 — 20')).toBeHidden(); // untouched prefill, correctly not logged again
   });
 
+  test('a stat with a prior reading gets +/- nudge buttons; one with none stays a plain field', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
+    await addPokemon(page, 'Bulbasaur', { level: 10 });
+    const card = await openDetail(page, 'Bulbasaur');
+
+    // Log one ATK reading so, on reopen, ATK has something to anchor to.
+    let dialog = await openLevelUpDialog(card);
+    await dialog.getByLabel('ATK observed stat value').fill('20');
+    await dialog.getByRole('button', { name: 'Save' }).click();
+    await expect(dialog).toBeHidden();
+
+    dialog = await openLevelUpDialog(card);
+    const atk = dialog.getByLabel('ATK observed stat value');
+    await expect(atk).toHaveValue('20');
+    // Steppers only on the row that has a previous reading.
+    await expect(dialog.getByRole('button', { name: 'ATK plus 1' })).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'DEF plus 1' })).toHaveCount(0);
+
+    await dialog.getByRole('button', { name: 'ATK plus 5' }).click();
+    await dialog.getByRole('button', { name: 'ATK plus 1' }).click();
+    await expect(atk).toHaveValue('26');
+    await dialog.getByRole('button', { name: 'ATK minus 1' }).click();
+    await expect(atk).toHaveValue('25');
+
+    // The nudged value is a real edit, so Save logs it as a new reading.
+    await dialog.getByLabel('New level').fill('12');
+    await dialog.getByLabel('New level').blur();
+    await dialog.getByRole('button', { name: 'Save' }).click();
+    await expect(dialog).toBeHidden();
+
+    const ivDialog = await openIvs(card);
+    await ivDialog.getByText("Don't know an IV?").click();
+    await ivDialog.getByLabel('Stat', { exact: true }).selectOption('atk');
+    await expect(ivDialog.getByText('Lv. 12 — 25')).toBeVisible();
+  });
+
   test('Save groups the level change and its stat readings into one collapsible history entry', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
