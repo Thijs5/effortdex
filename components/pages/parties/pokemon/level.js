@@ -5,6 +5,13 @@ import { BaseDialog } from '../../../atoms/base-dialog.js';
 import '../../../organisms/evolution-chain.js';
 import '../../../atoms/level-input.js';
 
+// Nudge amounts offered next to a stat that already has a previous
+// reading (negatives render before the value, positives after). A stat's
+// real value only drifts by a few points between two nearby levels, so a
+// −1 to walk back an overshoot plus +1/+5 to climb covers the common
+// case without retyping; anything further is still a plain edit.
+const STAT_STEPS = [-1, 1, 5];
+
 /** @typedef {import('../../../../lib/store.js').RosterEntry} RosterEntry */
 /** @typedef {import('../../../../lib/constants.js').StatKey} StatKey */
 
@@ -68,8 +75,23 @@ export class LevelDialog extends BaseDialog {
       }
       .iv-row-label { font-family: var(--font-mono); }
       .iv-row input { width: auto; min-width: 0; }
-      .level-up-stat-row { grid-template-columns: 3.5em auto 1fr; }
-      .level-up-stat-last { font-family: var(--font-mono); font-size: var(--font-size-2xs); white-space: nowrap; }
+      /* Stat-reading row: [label] [ −1  <value>  +1  +5   was N (Lv. M) ].
+         The steppers only appear once there's a previous reading to
+         anchor from — between two levels a stat drifts by a handful of
+         points, so nudging beats select-all-and-retype. A stat with no
+         prior reading stays a plain "type what you see" field. */
+      .level-up-stat-entry {
+        display: flex; align-items: center; gap: var(--space-1); flex-wrap: wrap; min-width: 0;
+      }
+      .level-up-stat-entry input { width: 4em; min-width: 0; text-align: center; flex: 0 0 auto; }
+      .level-up-step {
+        flex: 0 0 auto; min-width: 2.4em; min-height: 30px; padding: 0.2em 0.45em;
+        font-family: var(--font-mono); font-size: var(--font-size-2xs); line-height: 1;
+        border: 1px solid var(--lcd-line); border-radius: var(--radius-sm);
+        background: var(--surface); color: var(--ink-soft); cursor: pointer; touch-action: manipulation;
+      }
+      .level-up-step:hover { color: var(--teal); border-color: var(--teal); }
+      .level-up-stat-last { font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--ink-soft); }
     `;
     shadow.appendChild(style);
 
@@ -105,6 +127,22 @@ export class LevelDialog extends BaseDialog {
 
     this.$input.addEventListener('change', () => this._previewInput());
     this.$saveBtn?.addEventListener('click', () => this._save());
+
+    // Delegated on the stable container: _renderStatsFields rewrites the
+    // rows' innerHTML on every open and on every level change, so a
+    // per-button listener wouldn't survive. A step button just nudges
+    // its own row's value input (clamped at 1); Save still compares the
+    // result against data-prefill, so nudging back to the original
+    // reading logs nothing.
+    this.$statsFields.addEventListener('click', (ev) => {
+      const btn = /** @type {HTMLElement} */ (ev.target).closest?.('.level-up-step');
+      if (!btn) return;
+      const input = /** @type {HTMLInputElement|null} */ (
+        this.$statsFields.querySelector(`input[data-stat="${btn.dataset.stat}"]`)
+      );
+      if (!input) return;
+      input.value = String(Math.max(1, (Number(input.value) || 0) + Number(btn.dataset.step)));
+    });
   }
 
   /** @param {RosterEntry|null} e */
@@ -170,21 +208,28 @@ export class LevelDialog extends BaseDialog {
     this.$statsLevel.textContent = String(level);
     const e = /** @type {RosterEntry} */ (this._entry);
     this.$statsFields.innerHTML = STATS.map(({ key, label }) => {
-      // The most recently logged reading for this stat, regardless of
-      // level — read-only context alongside the new-value input, the
-      // same "before → new" shape as the level field above it. Also
-      // prefills the input itself — a stat's real value shifts with
-      // level, so this is a starting point to correct, not assumed
-      // still accurate.
+      // The most recently logged reading for this stat, at whatever level
+      // it was taken. When one exists, the field is seeded to it and
+      // flanked by nudge buttons (STAT_STEPS) — a re-read at the new
+      // level is usually the old value plus a few. With no prior reading
+      // there's nothing to anchor to, so the row is just a plain "type
+      // the number you see" field, same as before.
       const last = e.events.filter((ev) => ev.kind === 'stat-reading' && ev.statKey === key).at(-1);
-      const lastNote = last ? `${last.observedStat} (Lv. ${last.level}) →` : '';
       const prefill = last ? String(last.observedStat) : '';
       const value = existing.get(key) ?? prefill;
       // data-prefill lets Save (below) tell "still exactly what it was
-      // prefilled to" apart from "the user actually typed/confirmed
-      // this" — a stat's real value shifts with level, so an untouched
-      // prefill is a starting point to overwrite, not a reading to log.
-      return `<div class="iv-row level-up-stat-row"><span class="iv-row-label">${escapeHtml(label)}</span><span class="level-up-stat-last">${escapeHtml(lastNote)}</span><input type="number" inputmode="numeric" class="ds-field" data-stat="${key}" data-prefill="${escapeHtml(prefill)}" min="1" value="${escapeHtml(value)}" aria-label="${escapeHtml(label)} observed stat value" placeholder="Actual stat" /></div>`;
+      // prefilled to" apart from "the user actually typed/nudged/
+      // confirmed this" — a stat's real value shifts with level, so an
+      // untouched prefill is a starting point to overwrite, not a
+      // reading to log.
+      const step = (s) =>
+        `<button type="button" class="level-up-step" data-stat="${key}" data-step="${s}" aria-label="${escapeHtml(label)} ${s < 0 ? 'minus' : 'plus'} ${Math.abs(s)}">${s < 0 ? '−' : '+'}${Math.abs(s)}</button>`;
+      const before = last ? STAT_STEPS.filter((s) => s < 0).map(step).join('') : '';
+      const after = last
+        ? STAT_STEPS.filter((s) => s > 0).map(step).join('') +
+          `<span class="level-up-stat-last">was ${last.observedStat} (Lv. ${last.level})</span>`
+        : '';
+      return `<div class="iv-row"><span class="iv-row-label">${escapeHtml(label)}</span><div class="level-up-stat-entry">${before}<input type="number" inputmode="numeric" class="ds-field" data-stat="${key}" data-prefill="${escapeHtml(prefill)}" min="1" value="${escapeHtml(value)}" aria-label="${escapeHtml(label)} observed stat value" placeholder="Actual stat" />${after}</div></div>`;
     }).join('');
   }
 
