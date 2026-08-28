@@ -84,7 +84,7 @@ for the reasoning.
 The hosted app reports anonymous pageviews (page/route visited,
 referrer, coarse browser/OS) via [GoatCounter](https://www.goatcounter.com/),
 a privacy-friendly analytics service: no cookies, no personal data, no
-cross-site tracking, and the dashboard is private. The app has no
+cross-site tracking. The app has no
 *functional* dependency on it — the count script (`index.html`) and the
 one call site that reports in-app route changes
 (`lib/goatcounter-report.js`, loaded dynamically so even a blocked

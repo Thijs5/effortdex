@@ -134,6 +134,37 @@ test('path builders produce the hashes currentRoute parses back', () => {
   assert.equal(router.importPath('abc123'), '#/transfer/import/abc123');
 });
 
+test('currentRoutePattern collapses every dynamic segment to a placeholder (issue #36)', () => {
+  const cases = [
+    ['', '#/parties'],
+    ['#/', '#/parties'],
+    ['#/parties', '#/parties'],
+    ['#/parties/create', '#/parties/create'],
+    ['#/parties/emerald-run', '#/parties/:slug'],
+    ['#/parties/platinum-nuzlocke', '#/parties/:slug'],
+    ['#/parties/emerald-run/edit', '#/parties/:slug/edit'],
+    ['#/parties/emerald-run/abc-123', '#/parties/:slug/:uid'],
+    ['#/parties/emerald-run/abc-123/ivs', '#/parties/:slug/:uid/ivs'],
+    ['#/parties/emerald-run/abc-123/nature', '#/parties/:slug/:uid/nature'],
+    ['#/parties/emerald-run/abc-123/not-a-dialog', '#/parties/:slug/:uid'],
+    ['#/settings', '#/settings'],
+    ['#/settings/cache', '#/settings/cache'],
+    ['#/transfer', '#/transfer'],
+    ['#/transfer/export', '#/transfer/export'],
+    ['#/transfer/import', '#/transfer/import'],
+    ['#/transfer/import/eyJ2IjoxfQ', '#/transfer/import'],
+  ];
+  for (const [hash, pattern] of cases) {
+    window.location.hash = hash;
+    assert.equal(router.currentRoutePattern(), pattern, `${hash || '(empty)'} -> ${pattern}`);
+  }
+});
+
+test('currentRoutePattern ignores a hash-embedded "?returnTo=" query string', () => {
+  window.location.hash = '#/settings?returnTo=%23%2Fparties%2Femerald-run';
+  assert.equal(router.currentRoutePattern(), '#/settings');
+});
+
 test('navigate helpers set the hash', () => {
   router.navigateToParty('emerald-run');
   assert.equal(window.location.hash, '#/parties/emerald-run');
