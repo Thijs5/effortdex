@@ -107,7 +107,21 @@ self.addEventListener('fetch', (event) => {
         const cached = await cache.match(request);
         if (cached) return cached;
         const response = await fetch(request);
-        if (response.ok) {
+        // Sprite <img> tags and lib/prefetch-service.js both request these
+        // no-cors now (see lib/constants.js's FALLBACK_ONERROR comment for
+        // why the earlier crossorigin="anonymous" was dropped), so a
+        // successful fetch here is an *opaque* Response: status 0, ok
+        // false, body unreadable. Cache those too — an opaque body still
+        // paints fine in an <img>, and serving one back from Cache Storage
+        // offline is the one path WebKit/iOS actually handles reliably
+        // (it drops a cors Response served from cache offline, which is
+        // what made every sprite go black in the installed PWA). The
+        // tradeoff: an opaque response can't be inspected, so a sprite URL
+        // that 404s (a species with no versioned sprite for that title)
+        // gets cached as junk instead of skipped — harmless for display,
+        // since the <img> onerror chain still falls back to the modern/
+        // placeholder sprite when that junk fails to decode.
+        if (response.ok || response.type === 'opaque') {
           await cache.put(request, response.clone());
           // Doesn't block the response (respondWith already has what it
           // needs), but still needs event.waitUntil: without it, the

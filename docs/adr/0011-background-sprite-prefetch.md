@@ -144,6 +144,30 @@ Two alternatives were considered and rejected:
   `raw.githubusercontent.com` sends `Access-Control-Allow-Origin: *` on
   every sprite path this app uses (species and items alike), confirmed
   by hand, so this doesn't risk breaking any of them.
+  **Counter-correction (the `crossorigin` fix broke offline sprites on
+  iOS):** making the requests cors-mode meant `sw.js` cached a *cors*
+  Response — and WebKit/iOS refuses to serve a cors Response back from
+  Cache Storage while offline. In the installed PWA on iOS every sprite
+  therefore failed its load offline and fell through to the placeholder
+  (`FALLBACK_SPRITE`), which — separately, a double-encoding bug in that
+  data URI (`%23` was written into the SVG source *and* then
+  `encodeURIComponent`'d, so the parser saw an invalid `%2523...` colour
+  and defaulted `fill` to black) — was itself rendering as an opaque
+  black blob. Net user-visible symptom: "every sprite is a black square
+  offline" even with the cache fully warmed. Fixed by (a) correcting the
+  `FALLBACK_SPRITE` encoding, and (b) reverting the `crossorigin`
+  attribute everywhere and instead teaching `sw.js`'s sprite handler to
+  cache *opaque* responses (`response.ok || response.type === 'opaque'`);
+  `lib/prefetch-service.js`'s warm-fetch is `mode: 'no-cors'` now too, so
+  it lands the same opaque entry an `<img>` produces. The original
+  `if (response.ok)` gap the first correction closed doesn't reopen —
+  opaque responses are cached deliberately now rather than silently
+  dropped. Trade-off: an opaque response can't be inspected, so a
+  versioned-sprite URL that 404s gets cached as junk rather than skipped
+  — harmless, since the `<img>` `onerror` chain still falls back to the
+  modern/placeholder sprite when that junk fails to decode. Nothing in
+  the app reads sprite pixels through a canvas, so dropping cors costs
+  nothing else.
 - The "skip a non-wifi/ethernet connection" half of the network-aware
   gate silently never fired on Chrome — the majority browser — since
   Chrome doesn't populate `navigator.connection.type`. Fixed by also
