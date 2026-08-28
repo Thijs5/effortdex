@@ -29,6 +29,20 @@
        filename filter blocking that literal name once took this whole
        app down (app.js imported it statically; see that file's own
        header comment). -->
+  <!-- Normalize the single pageview count.js sends on its own, before
+       lib/goatcounter-report.js is loaded: drop the roster
+       search/filter/sort query string (issue #36 / docs/adr/0013) so a
+       reloaded or shared filtered-roster link — including a free-text
+       "?q=" search — doesn't register as its own path row. count.js
+       never puts the hash route in the path, so the slug/uid
+       placeholder normalization for in-app navigation is entirely
+       goatcounter-report.js's job. Must be set *before* count.js loads —
+       see https://www.goatcounter.com/help/js. -->
+  <script>
+    window.goatcounter = {
+      path: function (p) { return p.replace(/[?#].*$/, ''); },
+    };
+  </script>
   <script data-goatcounter="https://effortdex.goatcounter.com/count" async src="//gc.zgo.at/count.js"></script>
   <script>
     // Apply a saved manual theme before first paint to avoid a flash;
