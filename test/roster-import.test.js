@@ -22,6 +22,14 @@ import { totalEvs } from '../lib/utils.js';
 
 const FIXTURE = readFileSync(new URL('./fixtures/roster-blob-multi-party.json', import.meta.url), 'utf8');
 
+// This fixture is a FROZEN artifact. It was produced by the current
+// Store, so on its own it can only prove "today's happy-path shape
+// survives the blob -> IDB move" — not migration, and not the
+// off-shape saves that caused the v1.9.x data loss. Those two
+// dimensions are covered separately below: the frozen schema-1 fixture
+// (migrate-then-import) and hand-authored malformed blobs (never
+// generated — the whole point is shapes Store would never write).
+
 test('the multi-party blob loads and projects through the current pipeline (the half P4 reuses)', () => {
   localStorage.clear();
   localStorage.setItem('effortdex:state', FIXTURE);
@@ -91,15 +99,94 @@ test('the fixture actually exercises the shapes P4 has to carry across', () => {
   assert.equal(addOnly.length, 1, 'has exactly one add-only entry');
 });
 
-// P4 (ADR 0025): the actual blob -> IndexedDB import. Turn this on when
-// the importer lands. It should:
-//   1. load the fixture through the current pipeline -> `before` roster
-//   2. openDb() (fake-indexeddb), run the importer against the blob state
-//   3. rebuild a roster purely from the `parties`/`rosterEntries`/`events`
-//      rows and project it -> `after`
-//   4. assert.deepEqual(after, before), and assert the raw blob is still
-//      in localStorage as `effortdex:state.pre-idb-backup`
-//   5. assert a second import is a no-op (meta.rosterImported guard)
-//   6. a variant with two parties sharing a slug still imports (the
-//      importer must re-uniqueSlug collisions before writing rows)
+// --- migrate-then-import: a legacy (schema-1) save is the harder input ---
+
+const SCHEMA1 = readFileSync(new URL('./fixtures/state-schema-1.json', import.meta.url), 'utf8');
+
+test('a frozen schema-1 blob migrates and projects — the legacy input P4 must migrate before importing', () => {
+  localStorage.clear();
+  localStorage.setItem('effortdex:state', SCHEMA1);
+
+  const store = new Store();
+  const entry = store.activeParty.pokemon[0];
+
+  // The 1->2 migration ran: no 'catch' events survive, they are 'add'.
+  const kinds = new Set(entry.events.map((e) => e.kind));
+  assert.ok(!kinds.has('catch'), 'catch->add rename applied');
+  assert.ok(kinds.has('add'), 'origin event is now add');
+  // ...and it still projects to a coherent entry.
+  assert.equal(entry.speciesName, 'ivysaur');
+  assert.ok(Number.isInteger(entry.level) && entry.level >= 1);
+});
+
+// --- resilience: shapes Store never writes, that broke v1.9.1/v1.9.2 ---
+// Authored as literals here (not generated) so they stay exactly as
+// bad as intended. The P4 importer inherits this repair for free by
+// reusing _load/_normalizeEntries — these assert that contract holds.
+
+const goodEntry = () => ({
+  uid: 'u1',
+  nickname: '',
+  nature: null,
+  powerItem: null,
+  machoBrace: false,
+  ivs: { hp: null, atk: null, def: null, spa: null, spd: null, spe: null },
+  events: [
+    { id: 'e1', kind: 'add', timestamp: 1, speciesName: 'bulbasaur', speciesId: 1, sprite: null, baseStats: null, level: 5 },
+  ],
+});
+
+/** @type {[string, any][]} */
+const MALFORMED = [
+  ['a party with no pokemon array', { schema: 2, statExpBackfillApplied: true, activePartyId: 'p1', parties: [{ id: 'p1', name: 'P', slug: 'p' }] }],
+  ['an entry with no events array', { schema: 2, statExpBackfillApplied: true, activePartyId: 'p1', parties: [{ id: 'p1', name: 'P', description: '', baseGame: 'Emerald', overrides: {}, slug: 'p', pokemon: [goodEntry(), { uid: 'u2', nickname: 'Broken' }] }] }],
+  ['an event with an unknown kind', { schema: 2, statExpBackfillApplied: true, activePartyId: 'p1', parties: [{ id: 'p1', name: 'P', description: '', baseGame: 'Emerald', overrides: {}, slug: 'p', pokemon: [{ ...goodEntry(), events: [...goodEntry().events, { id: 'e2', kind: 'from-the-future', timestamp: 2 }] }] }] }],
+  ['two parties sharing a slug', { schema: 2, statExpBackfillApplied: true, activePartyId: 'p1', parties: [{ id: 'p1', name: 'A', description: '', baseGame: 'Emerald', overrides: {}, slug: 'run', pokemon: [] }, { id: 'p2', name: 'B', description: '', baseGame: 'Emerald', overrides: {}, slug: 'run', pokemon: [] }] }],
+  ['a pre-ADR-0010 bare schema:2 (no statExpBackfillApplied)', { schema: 2, activePartyId: 'p1', parties: [{ id: 'p1', name: 'Old', description: '', baseGame: 'Emerald', overrides: {}, slug: 'old', pokemon: [{ ...goodEntry(), events: [{ id: 'e1', kind: 'catch', timestamp: 1, speciesName: 'bulbasaur', speciesId: 1, sprite: null, baseStats: null, level: 5 }] }] }] }],
+];
+
+for (const [label, state] of MALFORMED) {
+  test(`resilience: ${label} — parties survive and shapes are repaired`, () => {
+    localStorage.clear();
+    localStorage.setItem('effortdex:state', JSON.stringify(state));
+
+    const store = new Store(); // must not throw
+    assert.ok(store.state.parties.length >= 1, 'parties kept, not wiped');
+    for (const party of store.state.parties) {
+      assert.ok(Array.isArray(party.pokemon), 'pokemon coerced to an array');
+      assert.ok(party.slug, 'slug present');
+      for (const entry of party.pokemon) {
+        assert.ok(Array.isArray(entry.events), 'events coerced to an array');
+        assert.ok(Number.isInteger(entry.level), 'projects without throwing');
+      }
+    }
+  });
+}
+
+test('duplicate slugs SURVIVE the current pipeline unchanged — so P4 must de-dupe them itself', () => {
+  // _normalizeEntries only backfills a *missing* slug; it never
+  // re-uniques a collision. `parties.slug` is a UNIQUE index in P4, so
+  // the importer needs an explicit slug de-dupe pre-pass before writing
+  // rows (docs/adr/0025 §6) — this test pins the reason that step
+  // exists, and will change to "distinct" once P4 adds it.
+  localStorage.clear();
+  localStorage.setItem('effortdex:state', JSON.stringify(MALFORMED[3][1]));
+  const slugs = new Store().state.parties.map((p) => p.slug);
+  assert.deepEqual(slugs, ['run', 'run'], 'collision passes through today');
+});
+
+// P4 (ADR 0025 §6): the actual blob -> IndexedDB import. Turn this on
+// when the importer lands. Run it against EACH of these inputs:
+//   - roster-blob-multi-party.json  (breadth)
+//   - state-schema-1.json           (migrate, then import)
+//   - every MALFORMED case above    (repair, then import)
+// For each: (1) load through the current pipeline -> `before` roster;
+// (2) openDb() on fake-indexeddb and run the importer against the blob
+// state; (3) rebuild a roster purely from the parties/rosterEntries/
+// events rows and project it -> `after`; (4) assert.deepEqual(after,
+// before); (5) assert the raw blob is retained as
+// `effortdex:state.pre-idb-backup`; (6) assert a second import is a
+// no-op (meta.rosterImported guard); (7) for the duplicate-slug case,
+// assert the import still succeeds (slugs re-uniqued before the rows
+// are written, so the UNIQUE index never trips).
 test('P4: importing the blob yields DB rows that re-project to an identical roster', { skip: 'roster importer lands in ADR 0025 P4' }, () => {});
