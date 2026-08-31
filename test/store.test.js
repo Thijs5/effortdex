@@ -845,6 +845,106 @@ test('corrupt or unrecognized saved state falls back to a fresh empty state', ()
   assert.deepEqual(new Store().state, { schema: SCHEMA_VERSION, statExpBackfillApplied: true, parties: [], activePartyId: null });
 });
 
+// Regression: v1.7.0 bumped SCHEMA_VERSION 1 -> 2 but left
+// _readSchemaVersion hard-coded to report every numeric schema as `1`,
+// so a current (schema-2) save re-ran migrateTo2 on *every* load. That
+// was mostly wasteful — except migrateTo2 threw on a party/entry with a
+// missing `pokemon`/`events` array (shapes _normalizeEntries exists to
+// repair), and _load's catch then swapped the whole save for a fresh
+// empty state, which the next _save persisted. Losing every party.
+test('a current schema-2 save loads without re-running any migration or touching the backup', () => {
+  const state = {
+    schema: SCHEMA_VERSION,
+    statExpBackfillApplied: true,
+    activePartyId: 'p1',
+    parties: [{
+      id: 'p1', name: 'Kept', description: '', baseGame: 'Emerald',
+      overrides: {}, slug: 'kept',
+      pokemon: [{
+        uid: 'u1', nickname: 'Buddy', nature: null, powerItem: null, machoBrace: false,
+        ivs: { hp: null, atk: null, def: null, spa: null, spd: null, spe: null },
+        events: [{ id: 'e1', kind: 'add', timestamp: 1, speciesName: 'bulbasaur', speciesId: 1, sprite: null, baseStats: null, level: 5 }],
+      }],
+    }],
+  };
+  localStorage.setItem('effortdex:state', JSON.stringify(state));
+
+  const loaded = new Store();
+  assert.equal(loaded.activeParty.name, 'Kept');
+  assert.equal(loaded.activeParty.pokemon[0].nickname, 'Buddy');
+  // No breaking migration ran, so no pre-migration backup was written.
+  assert.equal(localStorage.getItem('effortdex:state.pre-migration-backup'), null);
+});
+
+test('a schema-2 save with a malformed party or entry keeps its parties instead of being wiped', () => {
+  const base = {
+    schema: SCHEMA_VERSION, statExpBackfillApplied: true, activePartyId: 'p1',
+  };
+  const goodEntry = {
+    uid: 'u1', nickname: 'Buddy', nature: null, powerItem: null, machoBrace: false,
+    ivs: { hp: null, atk: null, def: null, spa: null, spd: null, spe: null },
+    events: [{ id: 'e1', kind: 'add', timestamp: 1, speciesName: 'bulbasaur', speciesId: 1, sprite: null, baseStats: null, level: 5 }],
+  };
+
+  // A party object with no `pokemon` array at all.
+  localStorage.setItem('effortdex:state', JSON.stringify({
+    ...base, parties: [{ id: 'p1', name: 'My Party', slug: 'my-party' }],
+  }));
+  let party = new Store().activeParty;
+  assert.equal(party.name, 'My Party');
+  assert.deepEqual(party.pokemon, []);
+
+  // A roster entry with no `events` array.
+  localStorage.setItem('effortdex:state', JSON.stringify({
+    ...base,
+    parties: [{ id: 'p1', name: 'My Party', description: '', baseGame: 'Emerald', overrides: {}, slug: 'my-party', pokemon: [goodEntry, { uid: 'u2', nickname: 'Broken' }] }],
+  }));
+  party = new Store().activeParty;
+  assert.equal(party.pokemon.length, 2);
+  assert.equal(party.pokemon[0].nickname, 'Buddy');
+  assert.deepEqual(party.pokemon[1].events, []);
+});
+
+test('a legacy pre-ADR-0009 bare schema:2 save (no statExpBackfillApplied) still runs the catch -> add rename', () => {
+  localStorage.setItem('effortdex:state', JSON.stringify({
+    schema: 2, // the pre-ADR-0009 internal counter, == schema version 1
+    activePartyId: 'p1',
+    parties: [{
+      id: 'p1', name: 'Old', description: '', baseGame: 'Emerald', overrides: {}, slug: 'old',
+      pokemon: [{
+        uid: 'u1', nickname: '', nature: null, powerItem: null, machoBrace: false,
+        ivs: { hp: null, atk: null, def: null, spa: null, spd: null, spe: null },
+        events: [{ id: 'e1', kind: 'catch', timestamp: 1, speciesName: 'bulbasaur', speciesId: 1, sprite: null, baseStats: null, level: 5 }],
+      }],
+    }],
+  }));
+
+  const entry = new Store().activeParty.pokemon[0];
+  assert.equal(entry.events[0].kind, 'add');
+  assert.ok(!entry.events.some((ev) => ev.kind === 'catch'));
+});
+
+test('projectEntry skips an event with an unknown kind rather than throwing the roster away', () => {
+  localStorage.setItem('effortdex:state', JSON.stringify({
+    schema: SCHEMA_VERSION, statExpBackfillApplied: true, activePartyId: 'p1',
+    parties: [{
+      id: 'p1', name: 'P', description: '', baseGame: 'Emerald', overrides: {}, slug: 'p',
+      pokemon: [{
+        uid: 'u1', nickname: 'Buddy', nature: null, powerItem: null, machoBrace: false,
+        ivs: { hp: null, atk: null, def: null, spa: null, spd: null, spe: null },
+        events: [
+          { id: 'e1', kind: 'add', timestamp: 1, speciesName: 'bulbasaur', speciesId: 1, sprite: null, baseStats: null, level: 5 },
+          { id: 'e2', kind: 'from-the-future', timestamp: 2 },
+        ],
+      }],
+    }],
+  }));
+
+  const entry = new Store().activeParty.pokemon[0];
+  assert.equal(entry.nickname, 'Buddy');
+  assert.equal(entry.level, 5);
+});
+
 // docs/adr/0009's guard against the easy mistake: bumping SCHEMA_VERSION
 // without writing the migration that reaches it, or the reverse. Catches
 // gaps/out-of-order entries too.
