@@ -8,6 +8,11 @@ import { DB_VERSION, STORES, MIGRATIONS } from '../lib/db/schema.js';
 // a store definition without bumping the version and adding a migration
 // fails here rather than at runtime on an old client. Mirrors the
 // SCHEMA_VERSION/MIGRATIONS agreement test in test/store.test.js.
+//
+// This only works because MIGRATIONS steps are frozen snapshots that do
+// NOT read STORES (schema.js documents why): if they looped STORES, both
+// the migration and the "created === STORES" assertion below would move
+// together and catch nothing.
 
 // Minimal stand-in for the IDBDatabase handed to a migration's `db`:
 // records createObjectStore / createIndex so a run can be inspected
@@ -73,6 +78,23 @@ test('each created store matches its STORES keyPath and indexes', () => {
       assert.deepEqual(builtIdx.keyPath, expectedKeyPath, `${name}.${indexName} keyPath`);
       assert.equal(builtIdx.unique, spec.unique ?? false, `${name}.${indexName} unique`);
       assert.equal(builtIdx.multiEntry, spec.multiEntry ?? false, `${name}.${indexName} multiEntry`);
+    }
+  }
+});
+
+test('a compound index (name contains "+") declares an explicit array keyPath', () => {
+  // There is no name-based shorthand — a `foo+bar` name without an
+  // explicit `keyPath: ['foo','bar']` would build an index over the
+  // literal property "foo+bar", which no record has, so it is silently
+  // always empty.
+  for (const [name, def] of Object.entries(STORES)) {
+    for (const [indexName, spec] of Object.entries(def.indexes ?? {})) {
+      if (indexName.includes('+')) {
+        assert.ok(
+          Array.isArray(spec.keyPath),
+          `index "${name}.${indexName}" looks compound but has no array keyPath`
+        );
+      }
     }
   }
 });
