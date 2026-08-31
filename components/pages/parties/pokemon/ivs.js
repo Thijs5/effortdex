@@ -100,7 +100,7 @@ export class IvDialog extends BaseDialog {
          tooltips don't exist on touch devices, so the same text must be
          reachable with a tap. */
       .help-note {
-        margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs);
+        margin: 0 0 var(--space-3); font-family: var(--font-mono); font-size: var(--font-size-2xs);
         color: var(--ink-soft); background: var(--lcd);
         border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3);
         text-transform: none; letter-spacing: normal;
@@ -148,17 +148,18 @@ export class IvDialog extends BaseDialog {
     // are hover-only, unreachable on touch) — same pattern as every
     // other dialog's own help buttons.
     this.$helpBtn?.addEventListener('click', () => {
-      const anchor = this.$helpBtn.closest('.ds-dialog-header');
-      if (!anchor) return;
-      const next = anchor.nextElementSibling;
-      if (next?.classList.contains('help-note')) {
-        next.remove();
+      // Into the scrolling body (top), not after the header — the header
+      // is its own grid row now, so a sibling inserted there would land
+      // in the body's grid track and break the layout.
+      const existing = this.$body.querySelector('.help-note');
+      if (existing) {
+        existing.remove();
         this.$helpBtn.setAttribute('aria-expanded', 'false');
       } else {
         const note = document.createElement('p');
         note.className = 'help-note';
         note.textContent = this.$helpBtn.title;
-        anchor.after(note);
+        this.$body.prepend(note);
         this.$helpBtn.setAttribute('aria-expanded', 'true');
       }
     });

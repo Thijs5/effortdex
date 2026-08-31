@@ -43,6 +43,8 @@
   --pokerus-purple-soft: #e8d7f0;
   --on-pokerus: #fff;
   --sprite-bg: rgba(255, 255, 255, 0.55);
+  --sprite-glow: #c9a227;                      /* fully-trained (510 EVs) halo */
+  --sprite-glow-soft: rgba(201, 162, 39, 0.4);
   --scanline: rgba(27, 31, 24, 0.2);
   --lcd-grid: rgba(27, 31, 24, 0.055);
   --shadow-lcd: inset 0 2px 6px rgba(27, 31, 24, 0.18), inset 0 -1px 0 rgba(255, 255, 255, 0.5);
@@ -122,6 +124,8 @@
     --pokerus-purple-soft: #3a2748;
     --on-pokerus: #1c1424;
     --sprite-bg: rgba(255, 255, 255, 0.08);
+  --sprite-glow: #e8c14e;
+  --sprite-glow-soft: rgba(232, 193, 78, 0.32);
     --scanline: rgba(0, 0, 0, 0.35);
     --lcd-grid: rgba(0, 0, 0, 0.3);
     --shadow-lcd: inset 0 2px 8px rgba(0, 0, 0, 0.5), inset 0 -1px 0 rgba(255, 255, 255, 0.06);
@@ -167,6 +171,8 @@
   --pokerus-purple-soft: #3a2748;
   --on-pokerus: #1c1424;
   --sprite-bg: rgba(255, 255, 255, 0.08);
+  --sprite-glow: #e8c14e;
+  --sprite-glow-soft: rgba(232, 193, 78, 0.32);
   --scanline: rgba(0, 0, 0, 0.35);
   --lcd-grid: rgba(0, 0, 0, 0.3);
   --shadow-lcd: inset 0 2px 8px rgba(0, 0, 0, 0.5), inset 0 -1px 0 rgba(255, 255, 255, 0.06);

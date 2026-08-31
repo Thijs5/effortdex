@@ -545,7 +545,6 @@ html[data-modal-open] body {
   flex-direction: column;
   align-items: stretch;
   gap: var(--space-2);
-  margin-top: var(--space-2);
 }
 .roster-filter-actions .ds-btn { width: 100%; }
 .roster-filter-group {
@@ -655,16 +654,25 @@ html[data-modal-open] body {
 .roster-card-handle:hover { color: var(--ink); }
 .roster-card--dragging .roster-card-handle { cursor: grabbing; }
 
-.roster-card-sprite {
+.roster-card-sprite-frame {
   flex: 0 0 auto;
+  position: relative;
   width: 36px;
   height: 36px;
+  display: inline-flex;
+}
+.roster-card-sprite {
+  width: 100%;
+  height: 100%;
   image-rendering: pixelated;
+  object-fit: contain;
+}
+/* Gen I/II sprites are an opaque white bitmap — round the corners and
+   sit it on the sprite chip so it doesn't read as a hard rectangle.
+   Transparent sprites (every other gen) float on the card. */
+.roster-card-sprite-frame--opaque .roster-card-sprite {
   background: var(--sprite-bg);
   border-radius: var(--radius-sm);
-  object-fit: contain;
-  box-sizing: border-box;
-  border: 2px solid transparent;
 }
 
 .roster-card-body {
@@ -697,37 +705,56 @@ html[data-modal-open] body {
   min-width: 84px;
 }
 
-/* Same purple ring as the detail page's sprite for an active Pokérus
-   infection (see pokemon-detail.js's :host([pokerus-infected])). */
-.roster-card-sprite--pokerus {
-  border-color: var(--pokerus-purple);
-  box-shadow: 0 0 0 3px var(--pokerus-purple-soft);
+/* Fully trained (at the 510 EV cap): a soft gold halo, subtly pulsing —
+   mirrors pokemon-detail.js's shadow-DOM treatment, kept in sync
+   deliberately (a class here rather than an attribute selector, since
+   this markup is plain light DOM with no :host). drop-shadow follows the
+   silhouette on a transparent PNG; the opaque Gen I/II bitmap gets a
+   box-shadow ring on its rounded chip instead — same colour and pulse
+   rhythm, different shape. Keyframes are shared with the detail card. */
+.roster-card-sprite-frame--trained .roster-card-sprite {
+  animation: sprite-glow-pulse 2.8s ease-in-out infinite;
 }
-
-/* Same gold-shimmer treatment as the detail page's sprite (see
-   pokemon-detail.js) — a class here instead of an attribute
-   selector, since this markup is plain light-DOM HTML, not a component
-   with its own :host. */
-.roster-card-sprite--trained {
-  border-color: #caa53d;
-  box-shadow: 0 0 0 3px rgba(202, 165, 61, 0.35), 0 0 8px rgba(255, 215, 0, 0.3);
-  background-image: linear-gradient(120deg, #c9a227 0%, #ffe9a8 30%, #fff6d5 50%, #ffe9a8 70%, #c9a227 100%);
-  background-size: 180% 180%;
-  animation: fully-trained-shimmer 5.5s linear infinite;
+.roster-card-sprite-frame--trained.roster-card-sprite-frame--opaque .roster-card-sprite {
+  animation: sprite-glow-pulse-box 2.8s ease-in-out infinite;
 }
-/* Both apply: keep the Pokérus ring visible (higher specificity — two
-   classes — wins over the single-class rules above) rather than letting
-   gold hide it, while still layering the gold glow around it. */
-.roster-card-sprite--trained.roster-card-sprite--pokerus {
-  border-color: var(--pokerus-purple);
-  box-shadow: 0 0 0 3px var(--pokerus-purple-soft), 0 0 8px rgba(255, 215, 0, 0.3);
+@keyframes sprite-glow-pulse {
+  0%, 100% { filter: drop-shadow(0 0 1px var(--sprite-glow)) drop-shadow(0 0 3px var(--sprite-glow)); }
+  50%      { filter: drop-shadow(0 0 2px var(--sprite-glow)) drop-shadow(0 0 6px var(--sprite-glow)); }
 }
-@keyframes fully-trained-shimmer {
-  0% { background-position: 0% 50%; }
-  100% { background-position: 100% 50%; }
+@keyframes sprite-glow-pulse-box {
+  0%, 100% { box-shadow: 0 0 0 2px var(--sprite-glow), 0 0 4px 0 var(--sprite-glow-soft); }
+  50%      { box-shadow: 0 0 0 2px var(--sprite-glow), 0 0 10px 2px var(--sprite-glow-soft); }
 }
 @media (prefers-reduced-motion: reduce) {
-  .roster-card-sprite--trained { animation: none; background-position: 40% 50%; }
+  .roster-card-sprite-frame--trained .roster-card-sprite {
+    animation: none;
+    filter: drop-shadow(0 0 1px var(--sprite-glow)) drop-shadow(0 0 4px var(--sprite-glow));
+  }
+  .roster-card-sprite-frame--trained.roster-card-sprite-frame--opaque .roster-card-sprite {
+    filter: none;
+    box-shadow: 0 0 0 2px var(--sprite-glow), 0 0 7px 1px var(--sprite-glow-soft);
+  }
+}
+
+/* Pokérus: the status glyph tucked into the sprite's top-right corner —
+   compact enough for the roster list (the detail card has room for the
+   fuller "PKRS" tag). roster.js only renders it for parties whose
+   generation has Pokérus (Gen II+, minus a few later titles). */
+.roster-card-pkrs {
+  position: absolute;
+  top: -3px;
+  right: -3px;
+  width: 15px;
+  height: 15px;
+  color: var(--pokerus-purple);
+  pointer-events: none;
+  filter: drop-shadow(0 0 1.5px var(--lcd)) drop-shadow(0 0 1.5px var(--lcd));
+}
+.roster-card-pkrs svg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .roster-card-exp-share {
@@ -1057,11 +1084,25 @@ textarea.ds-field { resize: vertical; }
   }
 }
 
+/* The light-DOM dialogs wrap everything in a <form>; make it transparent
+   to layout so the <header> / .dialog-body / .party-dialog-actions inside
+   it become .ds-dialog's own three grid rows. */
+#party-form,
+#add-pokemon-form {
+  display: contents;
+}
+
+/* Bottom grid row, outside the scrolling .dialog-body — the light-DOM
+   equivalent of .ds-dialog-footer (design-system.js). Owns its own
+   padding now that .ds-dialog has none. */
 .party-dialog-actions {
   display: flex;
   align-items: center;
   gap: var(--space-2);
   flex-wrap: wrap;
+  padding: var(--space-3) var(--space-4) var(--space-4);
+  background: var(--paper-panel);
+  box-shadow: 0 -4px 8px -4px rgba(23, 26, 19, 0.15);
 }
 .party-dialog-actions .spacer { flex: 1; }
 

@@ -89,6 +89,26 @@ test.describe('EV training', () => {
     await expect(card.locator('ev-summary ev-bar[data-key="hp"]').locator('.value')).toHaveText('2/252');
   });
 
+  test('unequipping a training item logs which item was removed, not a generic line', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Diamond Nuzlocke', baseGame: 'Diamond' }); // Gen IV — Power items
+    await addPokemon(page, 'Bulbasaur');
+    const card = await openDetail(page, 'Bulbasaur');
+
+    let itemDialog = await openItemDialog(card);
+    await itemDialog.locator('.item-grid [data-id="bracer"] button').click(); // Power Bracer
+    await itemDialog.locator('.item-dialog-save-btn').click();
+    await expect(itemDialog).toBeHidden();
+
+    itemDialog = await openItemDialog(card);
+    await itemDialog.locator('.item-grid [data-id="bracer"] button').click(); // click again to unequip
+    await itemDialog.locator('.item-dialog-save-btn').click();
+    await expect(itemDialog).toBeHidden();
+
+    await card.getByText(/History/).click();
+    await expect(card.locator('ev-history-log').getByText('Power Bracer removed')).toBeVisible();
+  });
+
   test('an EV-reducing berry removes EVs from one stat (Gen III+)', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });

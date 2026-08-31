@@ -42,10 +42,8 @@ export class BaseDialog extends HTMLElement {
     shadow.innerHTML = `
       <style>
         :host { display: contents; }
-        dialog.${dialogClass} { gap: var(--space-4); }
-        dialog.${dialogClass}:not([open]) { display: none; }
-        dialog.${dialogClass}[open] { display: grid; }
-        dialog.${dialogClass} .ds-dialog-header { margin-bottom: 0; }
+        /* Open/close + the 3-row grid layout come from .ds-dialog /
+           .ds-dialog[open] in design-system.js — nothing to add here. */
         @media (max-width: 640px) {
           dialog.${dialogClass}.ds-dialog {
             margin: auto;

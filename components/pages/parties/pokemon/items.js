@@ -89,11 +89,16 @@ export class ItemsDialog extends BaseDialog {
         text-transform: none; letter-spacing: normal;
       }
       .vitamins, .wings, .berries { display: grid; gap: var(--space-2); }
-      .pokerus-section { display: grid; gap: var(--space-2); justify-items: stretch; min-width: 0; }
+      /* Between-section breathing, matching the Level dialog's rhythm —
+         .aids is first so it needs no top margin. */
+      .toggle-row, .vitamins, .wings, .berries { margin-top: var(--space-4); }
+      .aids[hidden] + .toggle-row { margin-top: 0; }
+      /* Pokérus and Exp. Share are each a single toggle — pair them on one
+         row (kept 2-up even on mobile; they stay narrow). */
+      .toggle-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); align-items: start; }
+      .pokerus-section, .exp-share-section { display: grid; gap: var(--space-2); justify-items: stretch; min-width: 0; }
       .pokerus-icon { width: 22px; height: 22px; flex: 0 0 auto; display: inline-flex; color: var(--pokerus-purple); }
       .pokerus-icon svg { width: 100%; height: 100%; }
-      .exp-share-section { display: grid; gap: var(--space-2); justify-items: stretch; min-width: 0; }
-      .pokerus-note { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--ink-soft); }
     `;
     shadow.appendChild(style);
 
@@ -106,22 +111,23 @@ export class ItemsDialog extends BaseDialog {
         <item-button-grid class="item-grid" columns="2"></item-button-grid>
       </section>
 
-      <section class="pokerus-section">
-        <h3 class="section-title">Pokérus
-          <button type="button" class="help-btn" aria-expanded="false" aria-label="What is Pokérus?" title="A rare, harmless in-game virus. While infected, every EV your Pokémon earns from battling is doubled — pure bonus, no downside. It can also spread to other party members over time. Once it cures (after a few days), the ×2 EV bonus stays forever — no need to toggle this off.">?</button>
-        </h3>
-        <ds-item-button class="pokerus-toggle-btn" label="Pokérus" boost="×2 EVs">
-          <span slot="icon" class="pokerus-icon" aria-hidden="true">${POKERUS_ICON_SVG}</span>
-        </ds-item-button>
-        <p class="pokerus-note" hidden>Pokérus doesn't double EVs in this game.</p>
-      </section>
+      <div class="toggle-row">
+        <section class="pokerus-section">
+          <h3 class="section-title">Pokérus
+            <button type="button" class="help-btn" aria-expanded="false" aria-label="What is Pokérus?" title="A rare, harmless in-game virus. While infected, every EV your Pokémon earns from battling is doubled — pure bonus, no downside. It can also spread to other party members over time. Once it cures (after a few days), the ×2 EV bonus stays forever — no need to toggle this off.">?</button>
+          </h3>
+          <ds-item-button class="pokerus-toggle-btn" label="Pokérus" boost="×2 EVs">
+            <span slot="icon" class="pokerus-icon" aria-hidden="true">${POKERUS_ICON_SVG}</span>
+          </ds-item-button>
+        </section>
 
-      <section class="exp-share-section">
-        <h3 class="section-title">Exp. Share
-          <button type="button" class="help-btn" aria-expanded="false" aria-label="What does Exp. Share do?" title="While holding an Exp. Share, this Pokémon also earns EVs whenever any other Pokémon in this party has a battle logged — the same base amount that Pokémon got, doubled by this Pokémon's own Pokérus if it has any. It never inherits the other Pokémon's held item bonus.">?</button>
-        </h3>
-        <ds-item-button class="exp-share-toggle-btn" icon="${EXP_SHARE_SPRITE}" label="Exp. Share" boost="Shares other EVs"></ds-item-button>
-      </section>
+        <section class="exp-share-section">
+          <h3 class="section-title">Exp. Share
+            <button type="button" class="help-btn" aria-expanded="false" aria-label="What does Exp. Share do?" title="While holding an Exp. Share, this Pokémon also earns EVs whenever any other Pokémon in this party has a battle logged — the same base amount that Pokémon got, doubled by this Pokémon's own Pokérus if it has any. It never inherits the other Pokémon's held item bonus.">?</button>
+          </h3>
+          <ds-item-button class="exp-share-toggle-btn" icon="${EXP_SHARE_SPRITE}" label="Exp. Share" boost="Shares other EVs"></ds-item-button>
+        </section>
+      </div>
 
       <section class="vitamins">
         <h3 class="section-title">Vitamins</h3>
@@ -141,9 +147,9 @@ export class ItemsDialog extends BaseDialog {
     this.$footer.innerHTML = `<button type="button" class="ds-btn ds-btn--primary item-dialog-save-btn">Save</button>`;
     this.$footer.hidden = false;
 
+    this.$aidsSection = /** @type {HTMLElement} */ (shadow.querySelector('.aids'));
     this.$itemGrid = shadow.querySelector('.item-grid');
     this.$pokerusToggle = shadow.querySelector('.pokerus-toggle-btn');
-    this.$pokerusNote = /** @type {HTMLElement} */ (shadow.querySelector('.pokerus-note'));
     this.$expShareToggle = shadow.querySelector('.exp-share-toggle-btn');
     this.$vitaminGrid = shadow.querySelector('.vitamin-grid');
     this.$wingsSection = /** @type {HTMLElement} */ (shadow.querySelector('.wings'));
@@ -226,7 +232,9 @@ export class ItemsDialog extends BaseDialog {
     this.$pokerusToggle.toggleAttribute('active', this._pendingPokerus ?? !!e.pokerus);
     const pokerusAvailable = store.pokerusAvailable();
     this.$pokerusToggle.toggleAttribute('disabled', !pokerusAvailable);
-    this.$pokerusNote.hidden = pokerusAvailable;
+    // When the game has no Pokérus, say so on the button's own sub-line
+    // instead of a separate note underneath it.
+    this.$pokerusToggle.setAttribute('boost', pokerusAvailable ? '×2 EVs' : 'Not in this game');
   }
   get entry() {
     return this._entry;
@@ -278,7 +286,16 @@ export class ItemsDialog extends BaseDialog {
     const batchId = crypto.randomUUID();
     if (p.expShare) store.setExpShare(e.uid, true, batchId);
     else if (p.machoBrace) store.setMachoBrace(e.uid, true, batchId);
-    else store.setPowerItem(e.uid, p.powerItem, batchId);
+    else {
+      // Clear the Exp. Share explicitly rather than leaning on
+      // setPowerItem's tail call: when nothing is picked, powerItem is
+      // already null and setPowerItem bails at its no-op guard before it
+      // gets to vacate the held-item slot, leaving a toggled-off Exp.
+      // Share still equipped (GitHub issue #39). setExpShare(uid, false)
+      // is itself a no-op when it wasn't set.
+      store.setPowerItem(e.uid, p.powerItem, batchId);
+      store.setExpShare(e.uid, false, batchId);
+    }
     store.setPokerus(e.uid, this._pendingPokerus, batchId);
     for (const item of this._pendingApplies) {
       if (item.kind === 'vitamin') store.useVitamin(e.uid, item.id, batchId);
@@ -302,6 +319,10 @@ export class ItemsDialog extends BaseDialog {
     const e = /** @type {RosterEntry} */ (this._entry);
     const bonus = store.powerItemBonus();
     const availability = store.trainingItemAvailability();
+    // Gen I/II have no held-item training aids at all (the Macho Brace is
+    // Gen III, Power items Gen IV) — hide the section outright rather than
+    // leave a bare "Training item" heading over an empty grid.
+    this.$aidsSection.hidden = !availability.machoBrace && !availability.powerItems;
     const pending = this._pendingHeldItem || e;
     const selected = pending.machoBrace ? 'macho-brace' : pending.powerItem || '';
     this.$expShareToggle.toggleAttribute('active', !!pending.expShare);

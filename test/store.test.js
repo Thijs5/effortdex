@@ -1275,6 +1275,46 @@ test('Exp. Share, a power item, and the Macho Brace are all mutually exclusive �
   assert.equal(entry.machoBrace, false);
 });
 
+test('isFullyTrained: 510 total under the modern system, every stat maxed under Stat Experience', () => {
+  // Modern EV system — the 510 combined total is the bar.
+  store.createParty('Emerald run', '', 'Emerald');
+  const modern = store.addPokemon(mon());
+  assert.equal(store.isFullyTrained(modern), false);
+  modern.evs = { hp: 252, atk: 252, def: 6, spa: 0, spd: 0, spe: 0 }; // 510
+  assert.equal(store.isFullyTrained(modern), true);
+
+  // Gen II Stat Experience — no combined total, so every one of the six
+  // tracked stats has to be at the 65,535 per-stat cap.
+  store.createParty('Gold run', '', 'Gold');
+  const g2 = store.addPokemon(mon());
+  g2.evs = { hp: 65535, atk: 65535, def: 65535, spa: 65535, spd: 65535, spe: 65535 };
+  assert.equal(store.isFullyTrained(g2), true);
+  g2.evs = { ...g2.evs, spd: 40000 };
+  assert.equal(store.isFullyTrained(g2), false); // Gen II tracks Sp. Def on its own
+
+  // Gen I merges Special — Sp. Def isn't tracked separately, so a maxed
+  // Special (spa) is enough even with spd left at 0.
+  store.createParty('Red run', '', 'Red');
+  const g1 = store.addPokemon(mon());
+  g1.evs = { hp: 65535, atk: 65535, def: 65535, spa: 65535, spd: 0, spe: 65535 };
+  assert.equal(store.isFullyTrained(g1), true);
+});
+
+test('a held-item event records the item it replaced, so the log can name what was removed', () => {
+  const entry = store.addPokemon(mon());
+
+  store.setPowerItem(entry.uid, 'bracer');
+  store.setPowerItem(entry.uid, null); // unequip
+  const removal = entry.history[0];
+  assert.equal(removal.kind, 'held-item');
+  assert.equal(removal.powerItem, null);
+  assert.equal(removal.prevPowerItem, 'bracer'); // "Power Bracer removed", not a generic "Held item removed"
+
+  store.setMachoBrace(entry.uid, true);
+  store.setMachoBrace(entry.uid, false);
+  assert.equal(entry.history[0].prevMachoBrace, true);
+});
+
 test("an Exp.-Share recipient's own Pokérus doubles the EVs it receives passively", () => {
   const battler = store.addPokemon(mon());
   const holder = store.addPokemon(mon({ id: 2, name: 'charmander' }));
@@ -1629,11 +1669,15 @@ test('logStatReading snapshots the current level/EVs into a stat-reading history
   assert.equal(stillTheSameRecord.level, 50);
 });
 
-test('logStatReading is a no-op on a Gen I/II (legacy) party', () => {
+test('logStatReading still records the entry on a Gen I/II (legacy) party — no IV math, but a log', () => {
   store.createParty('Yellow run', '', 'Yellow');
   const entry = store.addPokemon(mon());
   store.logStatReading(entry.uid, 'atk', 50);
-  assert.equal(entry.events.length, 1); // only the add event
+  assert.equal(entry.events.length, 2); // add + stat-reading
+  assert.equal(entry.events.at(-1).kind, 'stat-reading');
+  assert.equal(entry.events.at(-1).observedStat, 50);
+  // ...but nothing is derived from it under Stat Experience.
+  assert.deepEqual(store.possibleIvsFromReadings(entry), []);
 });
 
 test('actualStat returns null when neither a fresh reading nor a known IV exists', () => {

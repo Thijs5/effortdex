@@ -1,7 +1,7 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 import { createParty } from './support/party.js';
-import { addPokemon, openDetail, openItemDialog, logBattle } from './support/pokemon.js';
+import { addPokemon, openDetail, openItemDialog, openLevelUpDialog, logBattle } from './support/pokemon.js';
 import { mockPokeApi } from './support/pokeapi-mock.js';
 
 // Generation I/II's Stat Experience system (lib/store.js's
@@ -142,6 +142,34 @@ test.describe('Gen I/II Stat Experience', () => {
     await expect(dialog).toBeVisible();
     await expect(dialog.locator('.vitamin-grid')).toBeVisible();
     await expect(dialog.locator('.pokerus-toggle-btn')).toBeVisible();
+  });
+
+  test('the Level dialog can log a stat reading on a Gen II party — it just goes to the history log', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Crystal run', baseGame: 'Crystal' });
+    await addPokemon(page, 'Bulbasaur', { level: 10 });
+    const card = await openDetail(page, 'Bulbasaur');
+    const dialog = await openLevelUpDialog(card);
+
+    await expect(dialog.getByRole('heading', { name: 'Log stats' })).toBeVisible();
+    await dialog.getByLabel('ATK reading').fill('30');
+    await dialog.getByRole('button', { name: 'Save' }).click();
+    await expect(dialog).toBeHidden();
+
+    await card.getByText(/History/).click();
+    await expect(card.locator('ev-history-log').getByText('ATK reading logged')).toBeVisible();
+    await expect(card.locator('ev-history-log').getByText('30 at Lv. 10')).toBeVisible();
+  });
+
+  test('the Gen I Level dialog collapses Sp. Atk / Sp. Def into a single "Special" reading row', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Red run', baseGame: 'Red' });
+    await addPokemon(page, 'Bulbasaur', { level: 10 });
+    const card = await openDetail(page, 'Bulbasaur');
+    const dialog = await openLevelUpDialog(card);
+
+    const rows = dialog.locator('.level-up-stat-label');
+    await expect(rows).toHaveText(['HP', 'ATK', 'DEF', 'Special', 'SPE']);
   });
 
   test("the history filter dropdown hides Wings/berries/Pokérus on a Gen I party — none of them exist yet", async ({ page }) => {

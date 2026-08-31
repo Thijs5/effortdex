@@ -1,7 +1,7 @@
 import { POWER_ITEMS, MACHO_BRACE_SPRITE, EXP_SHARE_SPRITE, NATURES, STATS, STAT_LABEL, MACHO_BRACE_MULTIPLIER, FALLBACK_SPRITE, FALLBACK_ONERROR } from '../../lib/constants.js';
-import { titleCase, totalEvs, natureEffectHint, dayLabel } from '../../lib/utils.js';
+import { titleCase, natureEffectHint, dayLabel } from '../../lib/utils.js';
 import { api, store } from '../../lib/services.js';
-import { versionedSpriteUrl } from '../../lib/pokeapi-client.js';
+import { versionedSpriteUrl, versionedSpriteIsOpaque } from '../../lib/pokeapi-client.js';
 import { availableSpeciesFor } from '../../lib/species-availability.js';
 import { attachDesignSystem } from '../../lib/design-system.js';
 import { wireSpriteFallback } from '../../lib/sprite-fallback.js';
@@ -60,50 +60,67 @@ export class PokemonDetail extends HTMLElement {
           padding-bottom: var(--space-4);
           border-bottom: 1px dashed var(--lcd-line);
         }
-        .sprite {
+        .sprite-frame {
           grid-area: sprite; align-self: start;
-          width: 64px; height: 64px; image-rendering: pixelated;
-          background: var(--sprite-bg); border-radius: var(--radius-sm); object-fit: contain;
-          box-sizing: border-box; border: 2px solid transparent;
+          position: relative; width: 64px; height: 64px;
+          display: inline-flex;
         }
-        /* Ambient cue for the permanent ×2 EV bonus, visible even with the
-           status row scrolled out of view — mirrors the pill's own color
-           so both read as the same status. */
-        :host([pokerus-infected]) .sprite {
-          border-color: var(--pokerus-purple);
-          box-shadow: 0 0 0 3px var(--pokerus-purple-soft);
+        .sprite {
+          width: 100%; height: 100%; image-rendering: pixelated; object-fit: contain;
         }
-        /* A Pokémon at the 510 EV cap gets a gold shimmer instead of a
-           text badge — the achievement reads at a glance without taking
-           up header space. Backgrounds paint fine on <img> (unlike
-           ::after, which replaced elements like <img> don't support), so
-           the shimmer is just an animated gradient behind the sprite's
-           transparent PNG edges. The border/ring still goes to Pokérus
-           when both apply (next rule, higher specificity) — trained is a
-           one-time achievement the background alone already communicates,
-           while the ring is this Pokémon's one ongoing status worth not
-           burying. */
+        /* Gen I/II sprites are an opaque white bitmap (no alpha) — round
+           its corners and sit it on the sprite chip so it doesn't read as
+           a hard white rectangle. Every other gen is a transparent PNG
+           and gets neither: it floats on the page. */
+        .sprite-frame--opaque .sprite {
+          background: var(--sprite-bg); border-radius: var(--radius-sm);
+        }
+
+        /* Fully trained (at the 510 EV cap): a soft gold halo, subtly
+           pulsing — the achievement reads at a glance without a text
+           badge taking up header space. drop-shadow reads the sprite's
+           alpha, so on a transparent PNG the halo hugs the silhouette;
+           the opaque Gen I/II bitmap would just outline its rectangle, so
+           that variant gets a box-shadow ring on the rounded chip
+           instead — same colour, same pulse rhythm, different shape. */
         :host([fully-trained]) .sprite {
-          border-color: #caa53d;
-          box-shadow: 0 0 0 3px rgba(202, 165, 61, 0.35), 0 0 8px rgba(255, 215, 0, 0.3);
-          background-image: linear-gradient(120deg, #c9a227 0%, #ffe9a8 30%, #fff6d5 50%, #ffe9a8 70%, #c9a227 100%);
-          background-size: 180% 180%;
-          animation: fully-trained-shimmer 5.5s linear infinite;
+          animation: sprite-glow-pulse 2.8s ease-in-out infinite;
         }
-        /* Both apply: keep the Pokérus ring (a fact about the Pokémon)
-           visible rather than letting the gold fully-trained treatment
-           hide it, while still layering the gold glow around it. */
-        :host([fully-trained][pokerus-infected]) .sprite {
-          border-color: var(--pokerus-purple);
-          box-shadow: 0 0 0 3px var(--pokerus-purple-soft), 0 0 8px rgba(255, 215, 0, 0.3);
+        :host([fully-trained]) .sprite-frame--opaque .sprite {
+          animation: sprite-glow-pulse-box 2.8s ease-in-out infinite;
         }
-        @keyframes fully-trained-shimmer {
-          0% { background-position: 0% 50%; }
-          100% { background-position: 100% 50%; }
+        @keyframes sprite-glow-pulse {
+          0%, 100% { filter: drop-shadow(0 0 1px var(--sprite-glow)) drop-shadow(0 0 3px var(--sprite-glow)); }
+          50%      { filter: drop-shadow(0 0 3px var(--sprite-glow)) drop-shadow(0 0 7px var(--sprite-glow)); }
+        }
+        @keyframes sprite-glow-pulse-box {
+          0%, 100% { box-shadow: 0 0 0 2px var(--sprite-glow), 0 0 5px 0 var(--sprite-glow-soft); }
+          50%      { box-shadow: 0 0 0 2px var(--sprite-glow), 0 0 12px 2px var(--sprite-glow-soft); }
         }
         @media (prefers-reduced-motion: reduce) {
-          :host([fully-trained]) .sprite { animation: none; background-position: 40% 50%; }
+          :host([fully-trained]) .sprite {
+            animation: none;
+            filter: drop-shadow(0 0 2px var(--sprite-glow)) drop-shadow(0 0 5px var(--sprite-glow));
+          }
+          :host([fully-trained]) .sprite-frame--opaque .sprite {
+            filter: none;
+            box-shadow: 0 0 0 2px var(--sprite-glow), 0 0 9px 1px var(--sprite-glow-soft);
+          }
         }
+
+        /* Pokérus: a small "PKRS" tag on the sprite's lower edge, echoing
+           the marker the games show on the summary screen. pokemon.js
+           only toggles [pokerus-infected] for parties whose generation
+           actually has Pokérus (Gen II+, minus a few later titles). */
+        .sprite-pkrs {
+          position: absolute; left: 50%; bottom: -3px; transform: translateX(-50%);
+          display: none; padding: 1px 4px; border-radius: var(--radius-pill);
+          background: var(--pokerus-purple); color: var(--on-pokerus);
+          font-family: var(--font-mono); font-size: 0.6rem; font-weight: 700;
+          letter-spacing: 0.08em; line-height: 1.35; white-space: nowrap;
+          pointer-events: none;
+        }
+        :host([pokerus-infected]) .sprite-pkrs { display: block; }
         /* "#169 Adamant Slowpoke": Dex number, then nature (the games'
            own phrasing), then the editable name — one line, one glance.
            Both prefixes are softer weight/color than the editable name
@@ -237,29 +254,18 @@ export class PokemonDetail extends HTMLElement {
           letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft);
           display: flex; align-items: center; gap: var(--space-2);
         }
-        .help-btn {
-          display: inline-flex; align-items: center; justify-content: center;
-          width: 15px; height: 15px; border-radius: 50%; border: 1px solid var(--lcd-line);
-          background: var(--surface); color: var(--ink-soft); font-family: var(--font-mono);
-          font-size: 10px; font-weight: 700; letter-spacing: 0; text-transform: none;
-          line-height: 1; padding: 0; flex: 0 0 auto; cursor: pointer;
-        }
-        .help-btn:hover, .help-btn:focus-visible { border-color: var(--teal); color: var(--teal); }
-        /* Tap-to-toggle explanation under a section title — title-attribute
-           tooltips don't exist on touch devices, so the same text must be
-           reachable with a tap. */
-        .help-note {
-          margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs);
-          color: var(--ink-soft); background: var(--lcd);
-          border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3);
-          text-transform: none; letter-spacing: normal;
+        .sheet-exp-share-note {
+          margin: 0; font-size: var(--font-size-xs); color: var(--ink-soft);
         }
 
         .battle-status { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--poke-red-dark); min-height: 1em; }
       </style>
       <article class="card">
         <header>
-          <img class="sprite" alt="" />
+          <span class="sprite-frame">
+            <img class="sprite" alt="" />
+            <span class="sprite-pkrs" aria-hidden="true">PKRS</span>
+          </span>
           <div class="titles">
             <div class="name-row">
               <span class="species-num"></span>
@@ -324,14 +330,13 @@ export class PokemonDetail extends HTMLElement {
           (fired on pick, Escape, or blur-away) re-hides it below.
         -->
         <pokemon-search hidden placeholder="Defeated Pokémon…" show-ev-yield sheet-title="Log a battle" force-sheet>
-          <div class="section-title" slot="sheet-extra">Exp. Share
-            <button type="button" class="help-btn" aria-expanded="false" aria-label="What about Exp. Share?" title="Holding an Exp. Share doesn't change how EVs work here — a Pokémon that gets EVs via Exp. Share earns exactly what it would from fighting directly. Just log the defeat here for this Pokémon too, whether or not it was the one that actually battled.">?</button>
-          </div>
+          <p class="sheet-exp-share-note" slot="sheet-extra" hidden>Holding an Exp. Share — log the defeat here too, whether or not this Pokémon did the fighting. It earns the same EVs either way.</p>
         </pokemon-search>
       </article>
     `;
 
     this.$sprite = shadow.querySelector('.sprite');
+    this.$spriteFrame = shadow.querySelector('.sprite-frame');
     this.$speciesNum = shadow.querySelector('.species-num');
     this.$nickname = shadow.querySelector('.nickname');
     this.$species = shadow.querySelector('.species');
@@ -351,6 +356,7 @@ export class PokemonDetail extends HTMLElement {
     this.$competitiveDialog = shadow.querySelector('competitive-dialog');
     this.$evSummary = shadow.querySelector('ev-summary');
     this.$search = shadow.querySelector('pokemon-search');
+    this.$sheetExpShareNote = shadow.querySelector('.sheet-exp-share-note');
     // Shows what battling this opponent would actually add right now —
     // held item, Pokérus and the 252/510 caps folded in — rather than
     // the opponent's raw base yield, since those are what the player
@@ -450,31 +456,6 @@ export class PokemonDetail extends HTMLElement {
       this.$search.focus();
     });
     this.$itemBtn.addEventListener('click', () => this._navigateToDialog('items'));
-    // The "?" toggle for the battle search's own slotted "Exp. Share"
-    // note — the only help-btn left in this shadow root's own light DOM;
-    // every dialog (Nature/Level/IVs/Items/Competitive/Where to train)
-    // now wires this identical delegation in its own shadow root
-    // instead (nature.js/level.js/ivs.js/items.js/competitive.js/
-    // training-guide.js), since a click inside one of those retargets to
-    // the dialog's host element by the time it reaches here and this
-    // listener could no longer find the real .help-btn it came from.
-    this.shadowRoot.addEventListener('click', (e) => {
-      const btn = e.target.closest('.help-btn');
-      if (!btn) return;
-      const anchor = btn.closest('.section-title');
-      if (!anchor) return;
-      const next = anchor.nextElementSibling;
-      if (next?.classList.contains('help-note')) {
-        next.remove();
-        btn.setAttribute('aria-expanded', 'false');
-      } else {
-        const note = document.createElement('p');
-        note.className = 'help-note';
-        note.textContent = btn.title;
-        anchor.after(note);
-        btn.setAttribute('aria-expanded', 'true');
-      }
-    });
     this.$search.addEventListener('pokemon-pick', (e) => {
       this._battle(e.detail.name, 'Looking up battle data…');
     });
@@ -587,8 +568,12 @@ export class PokemonDetail extends HTMLElement {
     const e = this._entry;
     if (!e) return;
     const modernSprite = e.sprite || FALLBACK_SPRITE;
-    const versioned = versionedSpriteUrl(store.spriteBaseGame(), e.speciesId);
+    const spriteGame = store.spriteBaseGame();
+    const versioned = versionedSpriteUrl(spriteGame, e.speciesId);
     this._spriteFallback.setVersionedSprite(versioned, modernSprite);
+    // Gen I/II sprites carry an opaque white background — the fully-trained
+    // halo boxes them instead of hugging a silhouette (see the stylesheet).
+    this.$spriteFrame.classList.toggle('sprite-frame--opaque', !!versioned && versionedSpriteIsOpaque(spriteGame));
     // Nickname is instant (not dialog-scoped, see _wireEvents), so this
     // always reflects the real, current value — no pending state to
     // preserve here the way Nature/Pokérus/Exp. Share below need to.
@@ -606,6 +591,8 @@ export class PokemonDetail extends HTMLElement {
     const nature = natureAvailable ? NATURES.find((n) => n.id === e.nature) : null;
     this._renderNatureBadge(nature, natureAvailable);
     this._renderItemBadge(e);
+    // Only relevant while this Pokémon actually holds an Exp. Share.
+    this.$sheetExpShareNote.hidden = !e.expShare;
     // Recently-defeated opponents, most recent first (history is
     // unshift-ordered already) — lets a grinding session re-pick the
     // same opponent without retyping it each time.
@@ -635,13 +622,12 @@ export class PokemonDetail extends HTMLElement {
       ? "Stat Experience is this game's hidden bonus stat pool — up to 65,535 per stat, gained mainly from battling (equal to the defeated Pokémon's own base stat). Nature is fixed when a Pokémon is caught or hatched: it boosts one stat by 10% and lowers another. Nature doesn't change Stat Experience, but training the stat your nature already boosts gets the most out of your points."
       : "EVs (Effort Values) are hidden bonus stat points earned mainly from battling — up to 252 per stat, 510 total. Nature is fixed when a Pokémon is caught or hatched: it boosts one stat by 10% and lowers another. Nature doesn't change EVs, but training the stat your nature already boosts gets the most out of your points.";
 
-    const trained = totalCap != null && totalEvs(e.evs) >= totalCap;
-    this.toggleAttribute('fully-trained', trained);
+    this.toggleAttribute('fully-trained', store.isFullyTrained(e));
 
     // IVs/Items/Competitive each keep themselves live from `.entry` now
-    // (iv-dialog.js/items-dialog.js/competitive-dialog.js) — the ambient
-    // ring/shimmer below stays keyed to the entry's actual committed
-    // Pokérus status regardless, same as it always did.
+    // (iv-dialog.js/items-dialog.js/competitive-dialog.js) — the PKRS tag
+    // below stays keyed to the entry's actual committed Pokérus status
+    // regardless, same as it always did.
     this.$ivDialog.entry = e;
     this.$itemsDialog.entry = e;
     this.$competitiveDialog.entry = e;

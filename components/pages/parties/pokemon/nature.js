@@ -39,8 +39,11 @@ export class NatureDialog extends BaseDialog {
         font-size: var(--font-size-xs); color: var(--ink-soft);
       }
       .field-inline select { width: auto; flex: 1 1 auto; max-width: 14em; }
+      /* Sits under the picker (right-aligned to line up with it), a small
+         step below — a plain positive margin, not the negative-margin
+         pull it used to use to close the gap (GitHub issue #41). */
       .nature-hint {
-        margin: calc(-1 * var(--space-2)) 0 0; font-family: var(--font-mono);
+        margin: var(--space-2) 0 0; font-family: var(--font-mono);
         font-size: var(--font-size-2xs); color: var(--ink-soft); text-align: right;
       }
       .nature-hint:empty { display: none; }
@@ -53,7 +56,7 @@ export class NatureDialog extends BaseDialog {
       }
       .help-btn:hover, .help-btn:focus-visible { border-color: var(--teal); color: var(--teal); }
       .help-note {
-        margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs);
+        margin: 0 0 var(--space-3); font-family: var(--font-mono); font-size: var(--font-size-2xs);
         color: var(--ink-soft); background: var(--lcd);
         border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3);
         text-transform: none; letter-spacing: normal;
@@ -83,17 +86,19 @@ export class NatureDialog extends BaseDialog {
     shadow.addEventListener('click', (e) => {
       const btn = /** @type {HTMLElement} */ (e.target).closest('.help-btn');
       if (!btn) return;
-      const anchor = btn.closest('.ds-dialog-header');
-      if (!anchor) return;
-      const next = anchor.nextElementSibling;
-      if (next?.classList.contains('help-note')) {
-        next.remove();
+      // The note lives at the top of the dialog body (normal block flow,
+      // like items.js's help notes) rather than wedged between the grid's
+      // header and body rows, where it picked up the full inter-section
+      // gap on both sides (GitHub issue #41).
+      const existing = this.$body.querySelector('.help-note');
+      if (existing) {
+        existing.remove();
         btn.setAttribute('aria-expanded', 'false');
       } else {
         const note = document.createElement('p');
         note.className = 'help-note';
         note.textContent = btn.title;
-        anchor.after(note);
+        this.$body.prepend(note);
         btn.setAttribute('aria-expanded', 'true');
       }
     });

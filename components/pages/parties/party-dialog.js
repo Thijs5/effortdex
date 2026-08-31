@@ -28,6 +28,7 @@
 import { store, prefetchService } from '../../../lib/services.js';
 import * as router from '../../../lib/router.js';
 import { isCachingDisabled } from '../../../lib/dev-cache.js';
+import { focusDialogStart } from '../../../lib/dom.js';
 import '../../atoms/game-ball.js';
 import '../../molecules/game-version-picker.js';
 
@@ -114,7 +115,7 @@ export function openCreateDialog() {
   partyCacheOfflineRow.hidden = isCachingDisabled();
   partyCacheOfflineInput.checked = true;
   partyDialog.showModal();
-  partyNameInput.focus();
+  focusDialogStart(partyDialog);
 }
 
 export function openEditDialog(party) {
@@ -132,7 +133,7 @@ export function openEditDialog(party) {
   // party's game by hand, not a checkbox on an unrelated edit form.
   partyCacheOfflineRow.hidden = true;
   partyDialog.showModal();
-  partyNameInput.focus();
+  focusDialogStart(partyDialog);
 }
 
 /** Called by app.js from every route whose `dialog` isn't 'create-party'/'edit-party' — a harmless no-op if this dialog wasn't open. */

@@ -26,11 +26,11 @@ import {
 import { titleCase, totalEvs, natureOptionsHtml, escapeHtml, sortedNatures, natureLabel } from '../../../lib/utils.js';
 import { POKERUS_ICON_SVG } from '../../../lib/icons.js';
 import { api, store } from '../../../lib/services.js';
-import { versionedSpriteUrl } from '../../../lib/pokeapi-client.js';
+import { versionedSpriteUrl, versionedSpriteIsOpaque } from '../../../lib/pokeapi-client.js';
 import { wireSpriteFallback } from '../../../lib/sprite-fallback.js';
 import { availableSpeciesFor } from '../../../lib/species-availability.js';
 import * as router from '../../../lib/router.js';
-import { interceptLinkClick } from '../../../lib/dom.js';
+import { interceptLinkClick, focusDialogStart } from '../../../lib/dom.js';
 import { wireDragHandle } from '../../../lib/drag-reorder.js';
 import '../../atoms/game-ball.js';
 import '../../organisms/pokemon-search.js';
@@ -144,6 +144,7 @@ async function openAddPokemonDialog(name) {
   addDialogNatureField.hidden = !store.natureAvailable();
   addDialogSubmitBtn.disabled = true;
   addDialog.showModal();
+  focusDialogStart(addDialog);
 
   try {
     const mon = await api.getPokemon(name);
@@ -379,7 +380,7 @@ function renderRoster(party) {
   // on-screen position wouldn't map onto a stable index to move it to.
   const reorderable = rosterSortSelect.value === 'add' && entries.length === party.pokemon.length;
   for (const entry of entries) {
-    const trained = totalCap != null && totalEvs(entry.evs) >= totalCap;
+    const trained = store.isFullyTrained(entry); // 510 total, or every stat maxed under Stat Exp
     const pokerusActive = store.effectiveAids(entry).pokerus;
     // "Adamant Fangs McGee" (nickname) or plain "Slowpoke" (no nickname)
     // — same nature-prefix convention as the detail page's title, minus
@@ -394,6 +395,9 @@ function renderRoster(party) {
     const versionedSprite = versionedSpriteUrl(spriteGame, entry.speciesId);
     const spriteSrc = versionedSprite || modernSprite;
     const spriteOnError = versionedSprite ? versionedSpriteOnError(modernSprite) : FALLBACK_ONERROR;
+    // Gen I/II sprites have an opaque white background — the fully-trained
+    // halo boxes them instead of tracing a silhouette (see styles.css).
+    const spriteOpaque = !!versionedSprite && versionedSpriteIsOpaque(spriteGame);
 
     const row = document.createElement('div');
     row.className = 'roster-card';
@@ -401,7 +405,10 @@ function renderRoster(party) {
     row.innerHTML = `
       ${reorderable ? `<button type="button" class="roster-card-handle" aria-label="Reorder ${escapeHtml(displayName)}">&#9776;</button>` : ''}
       <a class="roster-card-link" href="${router.pokemonPath(party.slug, entry.uid)}">
-        <img class="roster-card-sprite${trained ? ' roster-card-sprite--trained' : ''}${pokerusActive ? ' roster-card-sprite--pokerus' : ''}" src="${spriteSrc}" alt="" title="${trained ? 'Fully trained' : pokerusActive ? 'Pokérus — every EV earned from battling is doubled, permanently' : ''}" ${spriteOnError} />
+        <span class="roster-card-sprite-frame${trained ? ' roster-card-sprite-frame--trained' : ''}${spriteOpaque ? ' roster-card-sprite-frame--opaque' : ''}">
+          <img class="roster-card-sprite" src="${spriteSrc}" alt="" title="${trained ? 'Fully trained' : pokerusActive ? 'Pokérus — every EV earned from battling is doubled, permanently' : ''}" ${spriteOnError} />
+          ${pokerusActive ? `<span class="roster-card-pkrs" aria-hidden="true">${POKERUS_ICON_SVG}</span>` : ''}
+        </span>
         <div class="roster-card-body">
           <span class="roster-card-name">${namePrefix}${escapeHtml(displayName)}</span>
           <span class="roster-card-meta">
@@ -524,6 +531,7 @@ rosterFilterClear.addEventListener('click', () => {
 });
 rosterFilterBtn.addEventListener('click', () => {
   rosterFilterDialog.showModal();
+  focusDialogStart(rosterFilterDialog);
   // Opening alone doesn't trigger renderRoster (nothing filterable has
   // changed yet) — without this, filterOpen only reached the URL once
   // something inside the dialog did.
@@ -558,7 +566,10 @@ export function render(party) {
       for (const radio of rosterFilterTrainedRadios) radio.checked = radio.value === restored.trained;
       setToggleActive(rosterFilterItem, restored.item);
       rosterFilterNature.value = restored.nature;
-      if (restored.filterOpen) rosterFilterDialog.showModal();
+      if (restored.filterOpen) {
+        rosterFilterDialog.showModal();
+        focusDialogStart(rosterFilterDialog);
+      }
     } else {
       rosterSearchInput.value = '';
       rosterSortSelect.value = 'add';
