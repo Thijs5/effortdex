@@ -435,3 +435,33 @@ Also still open: the per-kind `apiCache` entry cap (P2); the Gen I/II
 Stat-Exp backfill still runs in the constructor against a possibly-cold
 `peekCached` — it moves into `init()` (after `hydrateCache`) as part of
 P4b, where the ~5 affected tests get `await store.init()`.
+
+## Addendum — P4b landed: the rows are the read path
+
+`Store#init()`, when IndexedDB is available, adopts the rows as `state`
+after the one-time blob import. The localStorage blob is now a
+**dual-write backup**, not the source of truth.
+
+- **`rev` counter.** Bumped on every persisted mutation, written into
+  both the blob and `meta.rosterRev`. `init()` adopts whichever copy has
+  the higher `rev`; if the blob is ahead (a fire-and-forget mirror that
+  didn't finish before a reload) it keeps the blob and heals the rows.
+  This is what makes a non-awaited mirror safe.
+- **`init()` order:** `hydrateCache` → IndexedDB import / adopt / heal →
+  Gen I/II Stat-Exp backfill. The backfill moved out of the constructor
+  — it now runs against a warm cache *and* the adopted roster, and
+  re-projects / persists what it corrects. `_backfillGen1StatExp`
+  returns `touched` instead of saving itself; `_runStatExpBackfill`
+  drives the save.
+- `_writeState` mirrors the roster even when the localStorage write
+  throws — a full blob must not also block the roster's real home.
+- Tests: the 5 Gen I/II backfill tests + the corrupt-state test are
+  `async` now (`await new Store(...).init()`); `test/roster-import.test.js`
+  gained read-from-rows, mutation-survives-reload and `rev`-reconciliation
+  cases. 341 unit, 119 e2e, tsc clean.
+
+**Remaining:** P4c (targeted per-mutation row writes instead of the
+whole-roster re-mirror on every save — a perf change, not correctness)
+and P4d (drop the blob write once P4b has baked; `effortdex:state`
+becomes `state.pre-idb-backup`, then removed a release later). Still
+also open: the per-kind `apiCache` entry cap (P2).
