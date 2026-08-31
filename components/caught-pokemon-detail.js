@@ -26,6 +26,10 @@ const SORTED_EV_BERRIES = sortByLabel(EV_BERRIES);
 const TIER_DANGER = new Set(['Uber', 'AG']);
 const TIER_SPECIAL = new Set(['LC', 'NFE']);
 
+/** @typedef {import('../lib/store.js').RosterEntry} RosterEntry */
+/** @typedef {import('../lib/constants.js').StatKey} StatKey */
+/** @typedef {import('../lib/pokeapi-client.js').DomainPokemon} DomainPokemon */
+
 /**
  * <caught-pokemon-detail> — a caught Pokémon's full detail page: identity,
  * EV bars, training aids (power item / Pokérus), evolution
@@ -37,6 +41,7 @@ const TIER_SPECIAL = new Set(['LC', 'NFE']);
 export class CaughtPokemonDetail extends HTMLElement {
   constructor() {
     super();
+    /** @type {RosterEntry|null} */
     this._entry = null;
 
     const shadow = this.attachShadow({ mode: 'open' });
@@ -561,68 +566,68 @@ export class CaughtPokemonDetail extends HTMLElement {
       </article>
     `;
 
-    this.$sprite = shadow.querySelector('.sprite');
-    this.$speciesNum = shadow.querySelector('.species-num');
-    this.$nickname = shadow.querySelector('.nickname');
-    this.$species = shadow.querySelector('.species');
-    this.$levelValue = shadow.querySelector('.level-value');
-    this.$levelUpBtn = shadow.querySelector('.level-up-btn');
-    this.$levelInput = shadow.querySelector('.level-input');
-    this.$natureField = shadow.querySelector('.nature-field');
-    this.$nature = shadow.querySelector('.nature-select');
-    this.$natureHint = shadow.querySelector('.nature-hint');
-    this.$naturePrefix = shadow.querySelector('.nature-prefix');
-    this.$ivDialog = shadow.querySelector('.iv-dialog');
-    this.$ivDialogClose = shadow.querySelector('.iv-dialog-close');
-    this.$ivGrid = shadow.querySelector('.iv-grid');
-    this.$ivSummary = shadow.querySelector('.iv-summary');
-    this.$ivCalc = shadow.querySelector('.iv-calc');
-    this.$ivCalcStatName = shadow.querySelector('.iv-calc-stat-name');
-    this.$ivCalcStat = shadow.querySelector('.iv-calc-stat');
-    this.$ivCalcObserved = shadow.querySelector('.iv-calc-observed');
-    this.$ivCalcBtn = shadow.querySelector('.iv-calc-btn');
-    this.$ivCalcNote = shadow.querySelector('.iv-calc-note');
-    this.$ivCalcResults = shadow.querySelector('.iv-calc-results');
+    this.$sprite = /** @type {HTMLImageElement} */ (shadow.querySelector('.sprite'));
+    this.$speciesNum = /** @type {HTMLElement} */ (shadow.querySelector('.species-num'));
+    this.$nickname = /** @type {HTMLInputElement} */ (shadow.querySelector('.nickname'));
+    this.$species = /** @type {HTMLElement} */ (shadow.querySelector('.species'));
+    this.$levelValue = /** @type {HTMLElement} */ (shadow.querySelector('.level-value'));
+    this.$levelUpBtn = /** @type {HTMLButtonElement} */ (shadow.querySelector('.level-up-btn'));
+    this.$levelInput = /** @type {HTMLInputElement} */ (shadow.querySelector('.level-input'));
+    this.$natureField = /** @type {HTMLElement} */ (shadow.querySelector('.nature-field'));
+    this.$nature = /** @type {HTMLSelectElement} */ (shadow.querySelector('.nature-select'));
+    this.$natureHint = /** @type {HTMLElement} */ (shadow.querySelector('.nature-hint'));
+    this.$naturePrefix = /** @type {HTMLElement} */ (shadow.querySelector('.nature-prefix'));
+    this.$ivDialog = /** @type {HTMLDialogElement} */ (shadow.querySelector('.iv-dialog'));
+    this.$ivDialogClose = /** @type {HTMLElement} */ (shadow.querySelector('.iv-dialog-close'));
+    this.$ivGrid = /** @type {HTMLElement} */ (shadow.querySelector('.iv-grid'));
+    this.$ivSummary = /** @type {HTMLElement} */ (shadow.querySelector('.iv-summary'));
+    this.$ivCalc = /** @type {HTMLElement} */ (shadow.querySelector('.iv-calc'));
+    this.$ivCalcStatName = /** @type {HTMLElement} */ (shadow.querySelector('.iv-calc-stat-name'));
+    this.$ivCalcStat = /** @type {HTMLSelectElement} */ (shadow.querySelector('.iv-calc-stat'));
+    this.$ivCalcObserved = /** @type {HTMLInputElement} */ (shadow.querySelector('.iv-calc-observed'));
+    this.$ivCalcBtn = /** @type {HTMLButtonElement} */ (shadow.querySelector('.iv-calc-btn'));
+    this.$ivCalcNote = /** @type {HTMLElement} */ (shadow.querySelector('.iv-calc-note'));
+    this.$ivCalcResults = /** @type {HTMLElement} */ (shadow.querySelector('.iv-calc-results'));
     this.$ivCalcStat.innerHTML = STATS.map(({ key, label }) => `<option value="${key}">${label}</option>`).join('');
-    this.$statusRow = shadow.querySelector('.status-row');
-    this.$moreBtnWrap = shadow.querySelector('.more-btn-wrap');
-    this.$moreBtn = shadow.querySelector('.more-btn');
-    this.$moreMenu = shadow.querySelector('.more-menu');
-    this.$moreDialog = shadow.querySelector('.more-dialog');
-    this.$moreDialogClose = shadow.querySelector('.more-dialog-close');
-    this.$competitiveDialog = shadow.querySelector('.competitive-dialog');
-    this.$competitiveDialogClose = shadow.querySelector('.competitive-dialog-close');
-    this.$release = shadow.querySelector('.release');
-    this.$evSummary = shadow.querySelector('ev-summary');
-    this.$itemGrid = shadow.querySelector('.item-grid');
-    this.$pokerusToggle = shadow.querySelector('.pokerus-toggle-btn');
-    this.$pokerusNote = shadow.querySelector('.pokerus-note');
-    this.$expShareToggle = shadow.querySelector('.exp-share-toggle-btn');
-    this.$vitaminGrid = shadow.querySelector('.vitamin-grid');
-    this.$vitaminStatus = shadow.querySelector('.vitamin-status');
-    this.$evHelpBtn = shadow.querySelector('.details-section .help-btn');
-    this.$vitaminHelpBtn = shadow.querySelector('.vitamins .help-btn');
-    this.$wingsSection = shadow.querySelector('.wings');
-    this.$wingGrid = shadow.querySelector('.wing-grid');
-    this.$wingStatus = shadow.querySelector('.wing-status');
-    this.$berriesSection = shadow.querySelector('.berries');
-    this.$berryGrid = shadow.querySelector('.berry-grid');
-    this.$berryStatus = shadow.querySelector('.berry-status');
-    this.$evoChain = shadow.querySelector('evolution-chain');
-    this.$tierBadge = shadow.querySelector('.tier-badge');
-    this.$competitiveSets = shadow.querySelector('.competitive-sets');
-    this.$competitiveEmpty = shadow.querySelector('.competitive-empty');
+    this.$statusRow = /** @type {HTMLElement} */ (shadow.querySelector('.status-row'));
+    this.$moreBtnWrap = /** @type {HTMLElement} */ (shadow.querySelector('.more-btn-wrap'));
+    this.$moreBtn = /** @type {HTMLButtonElement} */ (shadow.querySelector('.more-btn'));
+    this.$moreMenu = /** @type {HTMLElement} */ (shadow.querySelector('.more-menu'));
+    this.$moreDialog = /** @type {HTMLDialogElement} */ (shadow.querySelector('.more-dialog'));
+    this.$moreDialogClose = /** @type {HTMLElement} */ (shadow.querySelector('.more-dialog-close'));
+    this.$competitiveDialog = /** @type {HTMLDialogElement} */ (shadow.querySelector('.competitive-dialog'));
+    this.$competitiveDialogClose = /** @type {HTMLElement} */ (shadow.querySelector('.competitive-dialog-close'));
+    this.$release = /** @type {HTMLButtonElement} */ (shadow.querySelector('.release'));
+    this.$evSummary = /** @type {import('./ev-summary.js').EvSummary} */ (shadow.querySelector('ev-summary'));
+    this.$itemGrid = /** @type {import('./item-button-grid.js').ItemButtonGrid} */ (shadow.querySelector('.item-grid'));
+    this.$pokerusToggle = /** @type {HTMLButtonElement} */ (shadow.querySelector('.pokerus-toggle-btn'));
+    this.$pokerusNote = /** @type {HTMLElement} */ (shadow.querySelector('.pokerus-note'));
+    this.$expShareToggle = /** @type {HTMLButtonElement} */ (shadow.querySelector('.exp-share-toggle-btn'));
+    this.$vitaminGrid = /** @type {import('./item-button-grid.js').ItemButtonGrid} */ (shadow.querySelector('.vitamin-grid'));
+    this.$vitaminStatus = /** @type {HTMLElement} */ (shadow.querySelector('.vitamin-status'));
+    this.$evHelpBtn = /** @type {HTMLElement} */ (shadow.querySelector('.details-section .help-btn'));
+    this.$vitaminHelpBtn = /** @type {HTMLElement} */ (shadow.querySelector('.vitamins .help-btn'));
+    this.$wingsSection = /** @type {HTMLElement} */ (shadow.querySelector('.wings'));
+    this.$wingGrid = /** @type {import('./item-button-grid.js').ItemButtonGrid} */ (shadow.querySelector('.wing-grid'));
+    this.$wingStatus = /** @type {HTMLElement} */ (shadow.querySelector('.wing-status'));
+    this.$berriesSection = /** @type {HTMLElement} */ (shadow.querySelector('.berries'));
+    this.$berryGrid = /** @type {import('./item-button-grid.js').ItemButtonGrid} */ (shadow.querySelector('.berry-grid'));
+    this.$berryStatus = /** @type {HTMLElement} */ (shadow.querySelector('.berry-status'));
+    this.$evoChain = /** @type {import('./evolution-chain.js').EvolutionChain} */ (shadow.querySelector('evolution-chain'));
+    this.$tierBadge = /** @type {HTMLElement} */ (shadow.querySelector('.tier-badge'));
+    this.$competitiveSets = /** @type {HTMLElement} */ (shadow.querySelector('.competitive-sets'));
+    this.$competitiveEmpty = /** @type {HTMLElement} */ (shadow.querySelector('.competitive-empty'));
     this._competitiveToken = 0; // guards against a stale async response landing after a fast species switch
-    this.$search = shadow.querySelector('pokemon-search');
+    this.$search = /** @type {import('./pokemon-search.js').PokemonSearch} */ (shadow.querySelector('pokemon-search'));
     // Shows what battling this opponent would actually add right now —
     // held item, Pokérus and the 252/510 caps folded in — rather than
     // the opponent's raw base yield, since those are what the player
     // actually cares about when picking who to grind against. Reads
     // `this._entry` live at call time, so it stays correct as the entry
     // (or its Pokérus/item state) changes without needing to be reset.
-    this.$search.evModifier = (mon) => store.previewDefeat(this._entry.uid, mon)?.applied;
-    this.$status = shadow.querySelector('.status');
-    this.$histLog = shadow.querySelector('ev-history-log');
+    this.$search.evModifier = (mon) => /** @type {any} */ (store.previewDefeat(/** @type {RosterEntry} */ (this._entry).uid, mon)?.applied);
+    this.$status = /** @type {HTMLElement} */ (shadow.querySelector('.status'));
+    this.$histLog = /** @type {import('./ev-history-log.js').EvHistoryLog} */ (shadow.querySelector('ev-history-log'));
 
     this._spriteFallback = wireSpriteFallback(this.$sprite);
 
@@ -639,7 +644,7 @@ export class CaughtPokemonDetail extends HTMLElement {
   _updateItemGrid() {
     const bonus = store.powerItemBonus();
     const availability = store.trainingItemAvailability();
-    const selected = this._entry.machoBrace ? 'macho-brace' : this._entry.powerItem || '';
+    const selected = this._e().machoBrace ? 'macho-brace' : this._e().powerItem || '';
 
     const offered = [];
     if (availability.machoBrace) {
@@ -669,16 +674,16 @@ export class CaughtPokemonDetail extends HTMLElement {
 
   _wireEvents() {
     this.$nickname.addEventListener('change', () => {
-      store.renamePokemon(this._entry.uid, this.$nickname.value.trim());
+      store.renamePokemon(this._e().uid, this.$nickname.value.trim());
     });
     this.$levelUpBtn.addEventListener('click', () => {
-      store.setLevel(this._entry.uid, this._entry.level + 1);
+      store.setLevel(this._e().uid, this._e().level + 1);
     });
     this.$levelInput.addEventListener('change', () => {
-      store.setLevel(this._entry.uid, this.$levelInput.value);
+      store.setLevel(this._e().uid, this.$levelInput.value);
     });
     this.$nature.addEventListener('change', () => {
-      store.setNature(this._entry.uid, this.$nature.value || null);
+      store.setNature(this._e().uid, this.$nature.value || null);
       this._renderNatureHint();
     });
     // Delegated: the grid's number inputs are rebuilt every render (one
@@ -689,14 +694,14 @@ export class CaughtPokemonDetail extends HTMLElement {
       const input = /** @type {HTMLInputElement} */ (e.target);
       const statKey = input?.dataset?.stat;
       if (!statKey) return;
-      store.setIv(this._entry.uid, /** @type {StatKey} */ (statKey), input.value === '' ? null : Number(input.value));
+      store.setIv(this._e().uid, /** @type {StatKey} */ (statKey), input.value === '' ? null : Number(input.value));
     });
     this.$ivCalcStat.addEventListener('change', () => this._updateIvCalcHint());
     this.$ivCalcBtn.addEventListener('click', () => this._runIvCalculator());
     this.$ivCalcResults.addEventListener('click', (e) => {
-      const chip = /** @type {HTMLElement} */ (e.target).closest('.iv-calc-chip');
+      const chip = /** @type {HTMLElement|null} */ (/** @type {HTMLElement} */ (e.target).closest('.iv-calc-chip'));
       if (!chip) return;
-      store.setIv(this._entry.uid, /** @type {StatKey} */ (this.$ivCalcStat.value), Number(chip.dataset.iv));
+      store.setIv(this._e().uid, /** @type {StatKey} */ (this.$ivCalcStat.value), Number(chip.dataset.iv));
     });
 
     // The "More" button opens a small menu (Training & EVs / Competitive)
@@ -706,7 +711,8 @@ export class CaughtPokemonDetail extends HTMLElement {
     // the app shell's own header menu (lib/shell.js) — open/outside-
     // click/Escape/arrow-key behavior all match it, reimplemented locally
     // since shadow DOM can't reuse that light-DOM listener setup.
-    const moreMenuItems = () => [...this.$moreMenu.querySelectorAll('.more-menu-item')];
+    const moreMenuItems = () => [...this.$moreMenu.querySelectorAll('.more-menu-item')].map((el) => /** @type {HTMLElement} */ (el));
+    /** @param {boolean} open */
     const setMoreMenuOpen = (open) => {
       this.$moreMenu.hidden = !open;
       this.$moreBtn.setAttribute('aria-expanded', String(open));
@@ -714,7 +720,7 @@ export class CaughtPokemonDetail extends HTMLElement {
     };
     this.$moreBtn.addEventListener('click', () => setMoreMenuOpen(this.$moreMenu.hidden));
     this.$moreMenu.addEventListener('click', (e) => {
-      const item = /** @type {HTMLElement} */ (e.target).closest('.more-menu-item');
+      const item = /** @type {HTMLElement|null} */ (/** @type {HTMLElement} */ (e.target).closest('.more-menu-item'));
       if (!item) return;
       setMoreMenuOpen(false);
       if (item.dataset.open === 'training') this._openDialog(this.$moreDialog);
@@ -731,17 +737,18 @@ export class CaughtPokemonDetail extends HTMLElement {
     document.addEventListener('click', (e) => {
       if (!this.$moreMenu.hidden && !e.composedPath().includes(this.$moreBtnWrap)) setMoreMenuOpen(false);
     });
-    this.shadowRoot.addEventListener('keydown', (e) => {
-      if (e.key === 'Escape' && !this.$moreMenu.hidden) {
+    /** @type {ShadowRoot} */ (this.shadowRoot).addEventListener('keydown', (e) => {
+      if (/** @type {KeyboardEvent} */ (e).key === 'Escape' && !this.$moreMenu.hidden) {
         setMoreMenuOpen(false);
         this.$moreBtn.focus();
       }
     });
-    this.$moreMenu.addEventListener('keydown', (e) => {
+    this.$moreMenu.addEventListener('keydown', (rawEvent) => {
+      const e = /** @type {KeyboardEvent} */ (rawEvent);
       if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
       e.preventDefault();
       const items = moreMenuItems();
-      const current = items.indexOf(/** @type {HTMLElement} */ (this.shadowRoot.activeElement));
+      const current = items.indexOf(/** @type {HTMLElement} */ (/** @type {ShadowRoot} */ (this.shadowRoot).activeElement));
       const step = e.key === 'ArrowDown' ? 1 : -1;
       items[(current + step + items.length) % items.length].focus();
     });
@@ -767,10 +774,11 @@ export class CaughtPokemonDetail extends HTMLElement {
     // hover-only, which leaves them unreachable on touch devices. Listens
     // on the shadow root, not just $moreDialog, since the battle
     // section's own help button (Exp. Share) lives outside that dialog.
-    this.shadowRoot.addEventListener('click', (e) => {
-      const btn = e.target.closest('.help-btn');
+    /** @type {ShadowRoot} */ (this.shadowRoot).addEventListener('click', (e) => {
+      const target = /** @type {HTMLElement|null} */ (e.target);
+      const btn = /** @type {HTMLElement|null} */ (target?.closest('.help-btn'));
       if (!btn) return;
-      const heading = btn.closest('.section-title');
+      const heading = /** @type {HTMLElement} */ (btn.closest('.section-title'));
       const next = heading.nextElementSibling;
       if (next?.classList.contains('help-note')) {
         next.remove();
@@ -784,37 +792,38 @@ export class CaughtPokemonDetail extends HTMLElement {
       }
     });
     this.$release.addEventListener('click', () => {
-      const label = titleCase(this._entry.nickname || this._entry.speciesName);
+      const label = titleCase(this._e().nickname || this._e().speciesName);
       if (confirm(`Release ${label}? Its EV log will be deleted.`)) {
         this.$moreDialog.close();
-        store.releasePokemon(this._entry.uid);
+        store.releasePokemon(this._e().uid);
       }
     });
     this.$itemGrid.addEventListener('item-pick', (e) => {
-      const val = e.detail.id;
-      const selected = this._entry.machoBrace ? 'macho-brace' : this._entry.powerItem || '';
+      const val = /** @type {CustomEvent} */ (e).detail.id;
+      const selected = this._e().machoBrace ? 'macho-brace' : this._e().powerItem || '';
       if (val === selected) {
-        store.setPowerItem(this._entry.uid, null); // clicking the active item again clears it
+        store.setPowerItem(this._e().uid, null); // clicking the active item again clears it
       } else if (val === 'macho-brace') {
-        store.setMachoBrace(this._entry.uid, true);
+        store.setMachoBrace(this._e().uid, true);
       } else {
-        store.setPowerItem(this._entry.uid, val);
+        store.setPowerItem(this._e().uid, val);
       }
     });
     this.$pokerusToggle.addEventListener('pick', () => {
-      store.setPokerus(this._entry.uid, !this.$pokerusToggle.hasAttribute('active'));
+      store.setPokerus(this._e().uid, !this.$pokerusToggle.hasAttribute('active'));
     });
     this.$expShareToggle.addEventListener('pick', () => {
-      store.setExpShare(this._entry.uid, !this.$expShareToggle.hasAttribute('active'));
+      store.setExpShare(this._e().uid, !this.$expShareToggle.hasAttribute('active'));
     });
-    this.$vitaminGrid.addEventListener('item-pick', (e) => this._useVitamin(e.detail.id));
-    this.$wingGrid.addEventListener('item-pick', (e) => this._useFeather(e.detail.id));
-    this.$berryGrid.addEventListener('item-pick', (e) => this._useBerry(e.detail.id));
+    this.$vitaminGrid.addEventListener('item-pick', (e) => this._useVitamin(/** @type {CustomEvent} */ (e).detail.id));
+    this.$wingGrid.addEventListener('item-pick', (e) => this._useFeather(/** @type {CustomEvent} */ (e).detail.id));
+    this.$berryGrid.addEventListener('item-pick', (e) => this._useBerry(/** @type {CustomEvent} */ (e).detail.id));
     this.$search.addEventListener('pokemon-pick', (e) => {
-      this._battle(e.detail.name, 'Looking up battle data…');
+      this._battle(/** @type {CustomEvent} */ (e).detail.name, 'Looking up battle data…');
     });
     this.$histLog.addEventListener('redefeat', (e) => {
-      this._battle(e.detail.name, `Re-logging battle vs ${titleCase(e.detail.name)}…`);
+      const name = /** @type {CustomEvent} */ (e).detail.name;
+      this._battle(name, `Re-logging battle vs ${titleCase(name)}…`);
     });
   }
 
@@ -831,29 +840,45 @@ export class CaughtPokemonDetail extends HTMLElement {
     delete document.documentElement.dataset.modalOpen;
   }
 
+  /** @param {RosterEntry} e */
   set entry(e) {
     this._entry = e;
     this._render();
   }
+  /** @returns {RosterEntry|null} */
   get entry() {
     return this._entry;
   }
 
+  // Every call site below only ever runs from an event listener wired in
+  // the constructor, or from a render path — both only reachable once
+  // `.entry` has actually been set (this card is never interacted with,
+  // or re-rendered, while empty) — so this asserts what's already true
+  // at runtime instead of threading `?.`/optional chaining through every
+  // one of them, which would silently no-op instead of failing loudly if
+  // that assumption were ever broken.
+  /** @returns {RosterEntry} */
+  _e() {
+    return /** @type {RosterEntry} */ (this._entry);
+  }
+
+  /** @param {string} name @param {string} statusText */
   async _battle(name, statusText) {
     this.$status.textContent = statusText;
     try {
       const mon = await api.getPokemon(name);
-      store.logDefeat(this._entry.uid, mon);
+      store.logDefeat(this._e().uid, mon);
       this.$status.textContent = '';
     } catch (err) {
-      this.$status.textContent = err.message || 'Could not log that battle.';
+      this.$status.textContent = (err instanceof Error && err.message) || 'Could not log that battle.';
     }
   }
 
-  /** Feeds one vitamin and reports exactly which stat moved and by how much. */
+  /** Feeds one vitamin and reports exactly which stat moved and by how much.
+   * @param {string} vitaminId */
   _useVitamin(vitaminId) {
     const vitamin = VITAMINS.find((v) => v.id === vitaminId);
-    const result = store.useVitamin(this._entry.uid, vitaminId);
+    const result = store.useVitamin(this._e().uid, vitaminId);
     if (!result || !vitamin) return;
     const statLabel = result.linkedStat ? 'SPC' : STAT_LABEL[vitamin.stat];
     const noun = store.usesStatExpSystem() ? 'Stat Experience' : 'EVs';
@@ -868,20 +893,22 @@ export class CaughtPokemonDetail extends HTMLElement {
     }
   }
 
-  /** Feeds one Wing and reports exactly which stat moved and by how much. */
+  /** Feeds one Wing and reports exactly which stat moved and by how much.
+   * @param {string} featherId */
   _useFeather(featherId) {
     const feather = FEATHERS.find((f) => f.id === featherId);
-    const result = store.useFeather(this._entry.uid, featherId);
+    const result = store.useFeather(this._e().uid, featherId);
     if (!result || !feather) return;
     this.$wingStatus.textContent = result.applied
       ? `${feather.label}: +${result.applied} ${STAT_LABEL[feather.stat]}`
       : `${feather.label}: no EVs gained — ${STAT_LABEL[feather.stat]} is already maxed out`;
   }
 
-  /** Feeds one EV-reducing berry and reports exactly which stat moved and by how much. */
+  /** Feeds one EV-reducing berry and reports exactly which stat moved and by how much.
+   * @param {string} berryId */
   _useBerry(berryId) {
     const berry = EV_BERRIES.find((b) => b.id === berryId);
-    const result = store.useBerry(this._entry.uid, berryId);
+    const result = store.useBerry(this._e().uid, berryId);
     if (!result || !berry) return;
     this.$berryStatus.textContent = result.applied
       ? `${berry.label}: −${result.applied} ${STAT_LABEL[berry.stat]}`
@@ -903,7 +930,7 @@ export class CaughtPokemonDetail extends HTMLElement {
     this.$species.textContent = e.nickname ? titleCase(e.speciesName) : '';
     this.$levelValue.textContent = `Lv. ${e.level}`;
     this.$levelUpBtn.disabled = e.level >= MAX_LEVEL;
-    this.$levelInput.value = e.level;
+    this.$levelInput.value = String(e.level);
     const natureAvailable = store.natureAvailable();
     this.$natureField.hidden = !natureAvailable;
     if (natureAvailable) this.$nature.value = e.nature || '';
@@ -928,7 +955,7 @@ export class CaughtPokemonDetail extends HTMLElement {
       mergedSpecial && e.baseStats
         ? { ...e.baseStats, spa: gen1SpecialStat(e.speciesId, e.baseStats.spa, e.baseStats.spd), spd: gen1SpecialStat(e.speciesId, e.baseStats.spa, e.baseStats.spd) }
         : e.baseStats;
-    this.$evSummary.nature = nature;
+    this.$evSummary.nature = nature ?? null;
     this.$evSummary.statCap = store.statCap();
     this.$evSummary.totalCap = totalCap;
     this.$evSummary.mergedSpecial = mergedSpecial;
@@ -1013,7 +1040,7 @@ export class CaughtPokemonDetail extends HTMLElement {
       // doesn't read as just another ranked tier.
       if (tierInfo?.tier) {
         this.$tierBadge.textContent = tierInfo.tier;
-        this.$tierBadge.title = TIER_DESCRIPTIONS[tierInfo.tier] || 'A Pokémon Showdown competitive tier.';
+        this.$tierBadge.title = /** @type {Record<string, string>} */ (TIER_DESCRIPTIONS)[tierInfo.tier] || 'A Pokémon Showdown competitive tier.';
         this.$tierBadge.classList.toggle('tier-badge--danger', TIER_DANGER.has(tierInfo.tier));
         this.$tierBadge.classList.toggle('tier-badge--special', TIER_SPECIAL.has(tierInfo.tier));
         this.$tierBadge.classList.toggle('tier-badge--illegal', tierInfo.tier === 'Illegal');
@@ -1136,7 +1163,7 @@ export class CaughtPokemonDetail extends HTMLElement {
    * as confusing/broken in testing without an explanation attached.
    */
   _runIvCalculator() {
-    const e = this._entry;
+    const e = this._e();
     const statKey = /** @type {StatKey} */ (this.$ivCalcStat.value);
     const observed = Number(this.$ivCalcObserved.value);
     this.$ivCalcResults.innerHTML = '';
@@ -1163,10 +1190,11 @@ export class CaughtPokemonDetail extends HTMLElement {
   // glance, phrased the way the games do: "Adamant Slowpoke". Unset
   // natures show nothing here — the More dialog's Nature select is
   // where absence reads as a fact rather than a mystery word.
+  /** @param {import('../lib/constants.js').Nature|null|undefined} nature @param {boolean} natureAvailable */
   _renderNatureBadge(nature, natureAvailable) {
     const show = natureAvailable && Boolean(nature);
     this.$naturePrefix.hidden = !show;
-    if (!show) return;
+    if (!show || !nature) return;
     this.$naturePrefix.textContent = nature.label;
     this.$naturePrefix.title = `${nature.label} nature — ${natureEffectHint(nature)}`;
   }
@@ -1180,6 +1208,7 @@ export class CaughtPokemonDetail extends HTMLElement {
   // (e.g. a Macho Brace left over from before the game version was
   // edited) shows as "No item" — matching the fact that it no longer
   // applies — rather than claiming a bonus that isn't granted.
+  /** @param {RosterEntry} e */
   _renderStatusBadges(e) {
     const aids = store.effectiveAids(e);
     const badges = [];
@@ -1223,6 +1252,7 @@ export class CaughtPokemonDetail extends HTMLElement {
   // fed, since that's otherwise invisible once EVs mix in with battle
   // EVs. On Gen I, Zinc is dropped entirely — Special hasn't split into
   // SpA/SpD yet.
+  /** @param {RosterEntry} e */
   _updateVitaminGrid(e) {
     const statExp = store.usesStatExpSystem();
     const mergedSpecial = store.specialStatMerged();
@@ -1251,6 +1281,7 @@ export class CaughtPokemonDetail extends HTMLElement {
 
   // Same shape as vitamins, minus the 100-EV-cutoff framing — Wings
   // never have one.
+  /** @param {RosterEntry} e */
   _updateWingGrid(e) {
     this.$wingGrid.items = SORTED_FEATHERS.map((f) => {
       const stat = e.evs[f.stat];
@@ -1268,6 +1299,7 @@ export class CaughtPokemonDetail extends HTMLElement {
   // remove (the stat is already at 0) rather than at the ceiling, and
   // the boost reads as a reduction — these subtract EVs rather than add
   // them.
+  /** @param {RosterEntry} e */
   _updateBerryGrid(e) {
     this.$berryGrid.items = SORTED_EV_BERRIES.map((b) => {
       const stat = e.evs[b.stat];

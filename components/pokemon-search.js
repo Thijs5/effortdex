@@ -7,7 +7,7 @@ import { attachPointerSelection, syncActiveDescendant } from '../lib/combobox.js
 /** @typedef {import('../lib/pokeapi-client.js').SpeciesListEntry} SpeciesListEntry */
 /** @typedef {import('../lib/pokeapi-client.js').DomainPokemon} DomainPokemon */
 /** @typedef {import('../lib/constants.js').EvMap} EvMap */
-/** @typedef {{ name: string, sprite: string|null, id: number|null }} RecentEntry */
+/** @typedef {{ name: string, sprite: string|null, id?: number|null }} RecentEntry */
 
 // Narrow + coarse-pointer only, so a resized desktop window (narrow but
 // mouse-driven) keeps the inline dropdown, and a touch laptop at full
