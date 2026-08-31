@@ -1,0 +1,760 @@
+{
+  "schema": 2,
+  "statExpBackfillApplied": true,
+  "activePartyId": "01a05964-f82f-74e8-b49a-f7f43b2d2af0",
+  "parties": [
+    {
+      "id": "01a05964-f828-7e0e-8da3-81d3a562a82f",
+      "name": "HeartGold Overhaul",
+      "description": "",
+      "baseGame": "HeartGold",
+      "overrides": {
+        "powerItemBonus": null,
+        "powerItems": null,
+        "machoBrace": null,
+        "vitaminCutoff": null,
+        "pokerus": null,
+        "wings": null,
+        "evBerries": null,
+        "nature": null,
+        "statExpSystem": null,
+        "spriteVersion": null,
+        "availableGeneration": null
+      },
+      "slug": "heartgold-overhaul",
+      "pokemon": [
+        {
+          "uid": "01a05964-f82d-79d6-bbbc-a0d1dce176bd",
+          "nickname": "",
+          "nature": "naive",
+          "powerItem": null,
+          "machoBrace": false,
+          "ivs": {
+            "hp": null,
+            "atk": null,
+            "def": null,
+            "spa": null,
+            "spd": null,
+            "spe": null
+          },
+          "events": [
+            {
+              "id": "01a05964-f82d-79d6-bbbc-a0d2af33f45c",
+              "kind": "add",
+              "timestamp": 1788206184493,
+              "speciesName": "cyndaquil",
+              "speciesId": 155,
+              "sprite": "cyndaquil.png",
+              "baseStats": {
+                "hp": 39,
+                "atk": 52,
+                "def": 43,
+                "spa": 60,
+                "spd": 50,
+                "spe": 65
+              },
+              "level": 5
+            },
+            {
+              "id": "01a05964-f82e-7e04-b858-f023e9bda76a",
+              "kind": "battle",
+              "timestamp": 1788206184494,
+              "opponentName": "rattata",
+              "sprite": "rattata.png",
+              "applied": {
+                "hp": 0,
+                "atk": 0,
+                "def": 0,
+                "spa": 0,
+                "spd": 0,
+                "spe": 1
+              },
+              "powerItem": null,
+              "machoBrace": false,
+              "pokerus": false
+            },
+            {
+              "id": "01a05964-f82e-7e04-b858-f0246d112b99",
+              "kind": "battle",
+              "timestamp": 1788206184494,
+              "opponentName": "poliwag",
+              "sprite": "poliwag.png",
+              "applied": {
+                "hp": 0,
+                "atk": 0,
+                "def": 0,
+                "spa": 0,
+                "spd": 0,
+                "spe": 1
+              },
+              "powerItem": null,
+              "machoBrace": false,
+              "pokerus": false
+            },
+            {
+              "id": "01a05964-f82e-7e04-b858-f02545c52136",
+              "kind": "level",
+              "timestamp": 1788206184494,
+              "toLevel": 6,
+              "batchId": "batch-a1"
+            },
+            {
+              "id": "01a05964-f82e-7e04-b858-f026b318891f",
+              "kind": "stat-reading",
+              "timestamp": 1788206184494,
+              "statKey": "hp",
+              "level": 6,
+              "evs": {
+                "hp": 0,
+                "atk": 0,
+                "def": 0,
+                "spa": 0,
+                "spd": 0,
+                "spe": 2
+              },
+              "observedStat": 10,
+              "batchId": "batch-a1"
+            },
+            {
+              "id": "01a05964-f82e-7e04-b858-f0276520a2fc",
+              "kind": "stat-reading",
+              "timestamp": 1788206184494,
+              "statKey": "atk",
+              "level": 6,
+              "evs": {
+                "hp": 0,
+                "atk": 0,
+                "def": 0,
+                "spa": 0,
+                "spd": 0,
+                "spe": 2
+              },
+              "observedStat": 11,
+              "batchId": "batch-a1"
+            },
+            {
+              "id": "01a05964-f82e-7e04-b858-f028b964950d",
+              "kind": "stat-reading",
+              "timestamp": 1788206184494,
+              "statKey": "def",
+              "level": 6,
+              "evs": {
+                "hp": 0,
+                "atk": 0,
+                "def": 0,
+                "spa": 0,
+                "spd": 0,
+                "spe": 2
+              },
+              "observedStat": 12,
+              "batchId": "batch-a1"
+            },
+            {
+              "id": "01a05964-f82e-7e04-b858-f029b51ec845",
+              "kind": "stat-reading",
+              "timestamp": 1788206184494,
+              "statKey": "spa",
+              "level": 6,
+              "evs": {
+                "hp": 0,
+                "atk": 0,
+                "def": 0,
+                "spa": 0,
+                "spd": 0,
+                "spe": 2
+              },
+              "observedStat": 13,
+              "batchId": "batch-a1"
+            },
+            {
+              "id": "01a05964-f82e-7e04-b858-f02a68b734ed",
+              "kind": "stat-reading",
+              "timestamp": 1788206184494,
+              "statKey": "spd",
+              "level": 6,
+              "evs": {
+                "hp": 0,
+                "atk": 0,
+                "def": 0,
+                "spa": 0,
+                "spd": 0,
+                "spe": 2
+              },
+              "observedStat": 14,
+              "batchId": "batch-a1"
+            },
+            {
+              "id": "01a05964-f82f-74e8-b49a-f7e7484c836c",
+              "kind": "stat-reading",
+              "timestamp": 1788206184495,
+              "statKey": "spe",
+              "level": 6,
+              "evs": {
+                "hp": 0,
+                "atk": 0,
+                "def": 0,
+                "spa": 0,
+                "spd": 0,
+                "spe": 2
+              },
+              "observedStat": 15,
+              "batchId": "batch-a1"
+            },
+            {
+              "id": "01a05964-f82f-74e8-b49a-f7e8bb1e59a8",
+              "kind": "battle",
+              "timestamp": 1788206184495,
+              "opponentName": "geodude",
+              "sprite": "geodude.png",
+              "applied": {
+                "hp": 0,
+                "atk": 0,
+                "def": 1,
+                "spa": 0,
+                "spd": 0,
+                "spe": 0
+              },
+              "powerItem": null,
+              "machoBrace": false,
+              "pokerus": false
+            }
+          ]
+        },
+        {
+          "uid": "01a05964-f82f-74e8-b49a-f7e95056a070",
+          "nickname": "",
+          "nature": "lonely",
+          "powerItem": null,
+          "machoBrace": false,
+          "ivs": {
+            "hp": null,
+            "atk": null,
+            "def": null,
+            "spa": null,
+            "spd": null,
+            "spe": null
+          },
+          "events": [
+            {
+              "id": "01a05964-f82f-74e8-b49a-f7eada741d24",
+              "kind": "add",
+              "timestamp": 1788206184495,
+              "speciesName": "geodude",
+              "speciesId": 74,
+              "sprite": "geodude.png",
+              "baseStats": {
+                "hp": 40,
+                "atk": 80,
+                "def": 100,
+                "spa": 30,
+                "spd": 30,
+                "spe": 20
+              },
+              "level": 3
+            },
+            {
+              "id": "01a05964-f82f-74e8-b49a-f7ebc0a754f0",
+              "kind": "level",
+              "timestamp": 1788206184495,
+              "toLevel": 4,
+              "batchId": "batch-a2"
+            },
+            {
+              "id": "01a05964-f82f-74e8-b49a-f7ecac1ddab5",
+              "kind": "stat-reading",
+              "timestamp": 1788206184495,
+              "statKey": "hp",
+              "level": 4,
+              "evs": {
+                "hp": 0,
+                "atk": 0,
+                "def": 0,
+                "spa": 0,
+                "spd": 0,
+                "spe": 0
+              },
+              "observedStat": 8,
+              "batchId": "batch-a2"
+            },
+            {
+              "id": "01a05964-f82f-74e8-b49a-f7edec802c3e",
+              "kind": "stat-reading",
+              "timestamp": 1788206184495,
+              "statKey": "atk",
+              "level": 4,
+              "evs": {
+                "hp": 0,
+                "atk": 0,
+                "def": 0,
+                "spa": 0,
+                "spd": 0,
+                "spe": 0
+              },
+              "observedStat": 9,
+              "batchId": "batch-a2"
+            },
+            {
+              "id": "01a05964-f82f-74e8-b49a-f7eed6c05bd1",
+              "kind": "stat-reading",
+              "timestamp": 1788206184495,
+              "statKey": "def",
+              "level": 4,
+              "evs": {
+                "hp": 0,
+                "atk": 0,
+                "def": 0,
+                "spa": 0,
+                "spd": 0,
+                "spe": 0
+              },
+              "observedStat": 10,
+              "batchId": "batch-a2"
+            },
+            {
+              "id": "01a05964-f82f-74e8-b49a-f7effdf2c826",
+              "kind": "stat-reading",
+              "timestamp": 1788206184495,
+              "statKey": "spa",
+              "level": 4,
+              "evs": {
+                "hp": 0,
+                "atk": 0,
+                "def": 0,
+                "spa": 0,
+                "spd": 0,
+                "spe": 0
+              },
+              "observedStat": 11,
+              "batchId": "batch-a2"
+            },
+            {
+              "id": "01a05964-f82f-74e8-b49a-f7f0c60ad6c2",
+              "kind": "stat-reading",
+              "timestamp": 1788206184495,
+              "statKey": "spd",
+              "level": 4,
+              "evs": {
+                "hp": 0,
+                "atk": 0,
+                "def": 0,
+                "spa": 0,
+                "spd": 0,
+                "spe": 0
+              },
+              "observedStat": 12,
+              "batchId": "batch-a2"
+            },
+            {
+              "id": "01a05964-f82f-74e8-b49a-f7f169e8f76e",
+              "kind": "stat-reading",
+              "timestamp": 1788206184495,
+              "statKey": "spe",
+              "level": 4,
+              "evs": {
+                "hp": 0,
+                "atk": 0,
+                "def": 0,
+                "spa": 0,
+                "spd": 0,
+                "spe": 0
+              },
+              "observedStat": 13,
+              "batchId": "batch-a2"
+            }
+          ]
+        },
+        {
+          "uid": "01a05964-f82f-74e8-b49a-f7f272c466e7",
+          "nickname": "",
+          "nature": "mild",
+          "powerItem": null,
+          "machoBrace": false,
+          "ivs": {
+            "hp": null,
+            "atk": null,
+            "def": null,
+            "spa": null,
+            "spd": null,
+            "spe": null
+          },
+          "events": [
+            {
+              "id": "01a05964-f82f-74e8-b49a-f7f3313c8d7e",
+              "kind": "add",
+              "timestamp": 1788206184495,
+              "speciesName": "poliwag",
+              "speciesId": 60,
+              "sprite": "poliwag.png",
+              "baseStats": {
+                "hp": 40,
+                "atk": 50,
+                "def": 40,
+                "spa": 40,
+                "spd": 40,
+                "spe": 90
+              },
+              "level": 3
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "01a05964-f82f-74e8-b49a-f7f43b2d2af0",
+      "name": "Unbound",
+      "description": "",
+      "baseGame": "FireRed",
+      "overrides": {
+        "powerItemBonus": null,
+        "powerItems": null,
+        "machoBrace": null,
+        "vitaminCutoff": null,
+        "pokerus": null,
+        "wings": null,
+        "evBerries": null,
+        "nature": null,
+        "statExpSystem": null,
+        "spriteVersion": null,
+        "availableGeneration": 8
+      },
+      "slug": "unbound",
+      "pokemon": [
+        {
+          "uid": "01a05964-f82f-74e8-b49a-f7f513cf11ed",
+          "nickname": "",
+          "nature": "serious",
+          "powerItem": null,
+          "machoBrace": false,
+          "ivs": {
+            "hp": null,
+            "atk": null,
+            "def": null,
+            "spa": null,
+            "spd": null,
+            "spe": null
+          },
+          "events": [
+            {
+              "id": "01a05964-f82f-74e8-b49a-f7f6884511af",
+              "kind": "add",
+              "timestamp": 1788206184495,
+              "speciesName": "gible",
+              "speciesId": 443,
+              "sprite": "gible.png",
+              "baseStats": {
+                "hp": 58,
+                "atk": 70,
+                "def": 45,
+                "spa": 40,
+                "spd": 45,
+                "spe": 42
+              },
+              "level": 5
+            },
+            {
+              "id": "01a05964-f830-76e7-83c8-0433b14a141c",
+              "kind": "battle",
+              "timestamp": 1788206184496,
+              "opponentName": "skorupi",
+              "sprite": "skorupi.png",
+              "applied": {
+                "hp": 0,
+                "atk": 0,
+                "def": 1,
+                "spa": 0,
+                "spd": 0,
+                "spe": 0
+              },
+              "powerItem": null,
+              "machoBrace": false,
+              "pokerus": false
+            },
+            {
+              "id": "01a05964-f830-76e7-83c8-0436a4eec8f4",
+              "kind": "battle",
+              "timestamp": 1788206184496,
+              "opponentName": "inkay",
+              "sprite": "inkay.png",
+              "applied": {
+                "hp": 0,
+                "atk": 1,
+                "def": 0,
+                "spa": 0,
+                "spd": 0,
+                "spe": 0
+              },
+              "powerItem": null,
+              "machoBrace": false,
+              "pokerus": false
+            },
+            {
+              "id": "01a05964-f832-7921-b24a-2aeedeb0a2f4",
+              "kind": "level",
+              "timestamp": 1788206184498,
+              "toLevel": 11,
+              "batchId": "batch-b1"
+            },
+            {
+              "id": "01a05964-f832-7921-b24a-2aef1fa13908",
+              "kind": "stat-reading",
+              "timestamp": 1788206184498,
+              "statKey": "hp",
+              "level": 11,
+              "evs": {
+                "hp": 0,
+                "atk": 1,
+                "def": 1,
+                "spa": 0,
+                "spd": 0,
+                "spe": 0
+              },
+              "observedStat": 15,
+              "batchId": "batch-b1"
+            },
+            {
+              "id": "01a05964-f832-7921-b24a-2af018db487b",
+              "kind": "stat-reading",
+              "timestamp": 1788206184498,
+              "statKey": "atk",
+              "level": 11,
+              "evs": {
+                "hp": 0,
+                "atk": 1,
+                "def": 1,
+                "spa": 0,
+                "spd": 0,
+                "spe": 0
+              },
+              "observedStat": 16,
+              "batchId": "batch-b1"
+            },
+            {
+              "id": "01a05964-f832-7921-b24a-2af1695b1c38",
+              "kind": "stat-reading",
+              "timestamp": 1788206184498,
+              "statKey": "def",
+              "level": 11,
+              "evs": {
+                "hp": 0,
+                "atk": 1,
+                "def": 1,
+                "spa": 0,
+                "spd": 0,
+                "spe": 0
+              },
+              "observedStat": 17,
+              "batchId": "batch-b1"
+            },
+            {
+              "id": "01a05964-f832-7921-b24a-2af28387bae4",
+              "kind": "stat-reading",
+              "timestamp": 1788206184498,
+              "statKey": "spa",
+              "level": 11,
+              "evs": {
+                "hp": 0,
+                "atk": 1,
+                "def": 1,
+                "spa": 0,
+                "spd": 0,
+                "spe": 0
+              },
+              "observedStat": 18,
+              "batchId": "batch-b1"
+            },
+            {
+              "id": "01a05964-f832-7921-b24a-2af3fecbfed2",
+              "kind": "stat-reading",
+              "timestamp": 1788206184498,
+              "statKey": "spd",
+              "level": 11,
+              "evs": {
+                "hp": 0,
+                "atk": 1,
+                "def": 1,
+                "spa": 0,
+                "spd": 0,
+                "spe": 0
+              },
+              "observedStat": 19,
+              "batchId": "batch-b1"
+            },
+            {
+              "id": "01a05964-f832-7921-b24a-2af4de5a96f7",
+              "kind": "stat-reading",
+              "timestamp": 1788206184498,
+              "statKey": "spe",
+              "level": 11,
+              "evs": {
+                "hp": 0,
+                "atk": 1,
+                "def": 1,
+                "spa": 0,
+                "spd": 0,
+                "spe": 0
+              },
+              "observedStat": 20,
+              "batchId": "batch-b1"
+            }
+          ]
+        },
+        {
+          "uid": "01a05964-f82f-74e8-b49a-f7f7f30eada2",
+          "nickname": "",
+          "nature": "hardy",
+          "powerItem": null,
+          "machoBrace": false,
+          "ivs": {
+            "hp": null,
+            "atk": null,
+            "def": null,
+            "spa": null,
+            "spd": null,
+            "spe": null
+          },
+          "events": [
+            {
+              "id": "01a05964-f82f-74e8-b49a-f7f823173fdf",
+              "kind": "add",
+              "timestamp": 1788206184495,
+              "speciesName": "vanillite",
+              "speciesId": 582,
+              "sprite": "vanillite.png",
+              "baseStats": {
+                "hp": 36,
+                "atk": 50,
+                "def": 50,
+                "spa": 65,
+                "spd": 60,
+                "spe": 44
+              },
+              "level": 9
+            },
+            {
+              "id": "01a05964-f82f-74e8-b49a-f7fb43cb7f20",
+              "kind": "exp-share",
+              "timestamp": 1788206184495,
+              "active": true
+            },
+            {
+              "id": "01a05964-f830-76e7-83c8-0434dd90ebb6",
+              "kind": "battle",
+              "timestamp": 1788206184496,
+              "opponentName": "skorupi",
+              "sprite": "skorupi.png",
+              "applied": {
+                "hp": 0,
+                "atk": 0,
+                "def": 1,
+                "spa": 0,
+                "spd": 0,
+                "spe": 0
+              },
+              "powerItem": null,
+              "machoBrace": false,
+              "pokerus": false,
+              "viaExpShare": true
+            },
+            {
+              "id": "01a05964-f831-7974-b5ed-e12b65d376a3",
+              "kind": "battle",
+              "timestamp": 1788206184497,
+              "opponentName": "inkay",
+              "sprite": "inkay.png",
+              "applied": {
+                "hp": 0,
+                "atk": 1,
+                "def": 0,
+                "spa": 0,
+                "spd": 0,
+                "spe": 0
+              },
+              "powerItem": null,
+              "machoBrace": false,
+              "pokerus": false,
+              "viaExpShare": true
+            }
+          ]
+        },
+        {
+          "uid": "01a05964-f82f-74e8-b49a-f7f94c3519b7",
+          "nickname": "",
+          "nature": "bold",
+          "powerItem": null,
+          "machoBrace": false,
+          "ivs": {
+            "hp": null,
+            "atk": null,
+            "def": null,
+            "spa": null,
+            "spd": null,
+            "spe": null
+          },
+          "events": [
+            {
+              "id": "01a05964-f82f-74e8-b49a-f7fad8c586cc",
+              "kind": "add",
+              "timestamp": 1788206184495,
+              "speciesName": "snorunt",
+              "speciesId": 361,
+              "sprite": "snorunt.png",
+              "baseStats": {
+                "hp": 50,
+                "atk": 50,
+                "def": 50,
+                "spa": 50,
+                "spd": 50,
+                "spe": 50
+              },
+              "level": 9
+            },
+            {
+              "id": "01a05964-f82f-74e8-b49a-f7fcef6628ac",
+              "kind": "exp-share",
+              "timestamp": 1788206184496,
+              "active": true
+            },
+            {
+              "id": "01a05964-f830-76e7-83c8-0435def71919",
+              "kind": "battle",
+              "timestamp": 1788206184496,
+              "opponentName": "skorupi",
+              "sprite": "skorupi.png",
+              "applied": {
+                "hp": 0,
+                "atk": 0,
+                "def": 1,
+                "spa": 0,
+                "spd": 0,
+                "spe": 0
+              },
+              "powerItem": null,
+              "machoBrace": false,
+              "pokerus": false,
+              "viaExpShare": true
+            },
+            {
+              "id": "01a05964-f831-7974-b5ed-e12c98e0457e",
+              "kind": "battle",
+              "timestamp": 1788206184497,
+              "opponentName": "inkay",
+              "sprite": "inkay.png",
+              "applied": {
+                "hp": 0,
+                "atk": 1,
+                "def": 0,
+                "spa": 0,
+                "spd": 0,
+                "spe": 0
+              },
+              "powerItem": null,
+              "machoBrace": false,
+              "pokerus": false,
+              "viaExpShare": true
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}
