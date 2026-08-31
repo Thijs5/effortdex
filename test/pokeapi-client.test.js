@@ -2,7 +2,7 @@ import './support/localstorage-polyfill.js';
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { PokeApiClient, versionedSpriteUrl, modernSpriteUrl } from '../lib/pokeapi-client.js';
+import { PokeApiClient, versionedSpriteUrl, versionedSpriteIsOpaque, modernSpriteUrl } from '../lib/pokeapi-client.js';
 
 // A tiny programmable fetch: routes by substring match on the URL, counts
 // calls, and can be told to fail. Exercises ADR 0001's cache guarantees
@@ -237,6 +237,16 @@ test('versionedSpriteUrl returns null for a title with no distinct sprite, or a 
   assert.equal(versionedSpriteUrl('Sword', 1), null); // 3D-only title, never got a sprite rip
   assert.equal(versionedSpriteUrl('', 1), null); // no base game / override set
   assert.equal(versionedSpriteUrl('Emerald', null), null);
+});
+
+test('versionedSpriteIsOpaque is true only for the Gen I/II sprite rips', () => {
+  assert.equal(versionedSpriteIsOpaque('Red'), true);
+  assert.equal(versionedSpriteIsOpaque('Yellow'), true);
+  assert.equal(versionedSpriteIsOpaque('Crystal'), true);
+  assert.equal(versionedSpriteIsOpaque('Emerald'), false); // Gen III+ folders are transparent PNGs
+  assert.equal(versionedSpriteIsOpaque('Scarlet'), false);
+  assert.equal(versionedSpriteIsOpaque('Sword'), false); // no folder at all
+  assert.equal(versionedSpriteIsOpaque(''), false);
 });
 
 test('modernSpriteUrl builds the default sprite URL from an id, or null without one', () => {

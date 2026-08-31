@@ -314,6 +314,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
         </button>
       </header>
+      <div class="dialog-body">
       <label class="field-label">
         Name
         <input type="text" id="party-name-input" class="ds-field" required maxlength="60" placeholder="e.g. Emerald Nuzlocke" />
@@ -439,6 +440,7 @@
         <p class="hint">Restricts the battle-log and add-Pok&eacute;mon pickers to species from up to the chosen generation, instead of following the base game's own &mdash; for a ROM hack/mod whose dex doesn't match its base game's real generation.</p>
       </details>
 
+      </div>
       <div class="party-dialog-actions">
         <button type="button" id="party-delete-btn" class="ds-btn ds-btn--ghost ds-btn--danger" hidden>Delete party</button>
         <span class="spacer"></span>
@@ -456,6 +458,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
         </button>
       </header>
+      <div class="dialog-body">
       <div class="add-pokemon-dialog-identity">
         <img id="add-pokemon-dialog-sprite" class="add-pokemon-dialog-sprite" alt="" />
         <div class="add-pokemon-dialog-identity-text">
@@ -471,6 +474,7 @@
         Nature <span class="field-optional">(optional)</span>
         <select id="add-pokemon-dialog-nature" class="ds-field"></select>
       </label>
+      </div>
       <div class="party-dialog-actions">
         <span class="spacer"></span>
         <button type="button" id="add-pokemon-dialog-cancel-btn" class="ds-btn ds-btn--ghost">Cancel</button>
@@ -486,6 +490,7 @@
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
       </button>
     </header>
+    <div class="dialog-body">
     <label class="field-label field-label--inline">
       Sort by
       <select id="roster-sort" class="ds-field" aria-label="Sort roster">
@@ -535,6 +540,7 @@
       Nature
       <select id="roster-filter-nature" class="ds-field" aria-label="Filter by nature"></select>
     </label>
+    </div>
     <div class="party-dialog-actions roster-filter-actions">
       <button type="button" id="roster-filter-clear" class="ds-btn ds-btn--ghost">Clear filters</button>
       <button type="button" id="roster-filter-done" class="ds-btn ds-btn--primary">

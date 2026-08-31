@@ -23,6 +23,14 @@ export class EvHistoryLog extends HTMLElement {
     super();
     this._entry = null;
     this._open = false;
+    // Which collapsible batch entries are expanded, keyed by
+    // `_batchKey`. Kept here (not in the DOM) so an expanded batch
+    // survives the full innerHTML rebuild every render does — otherwise
+    // deleting one nested entry re-renders and silently collapses the
+    // batch, hiding its remaining siblings (GitHub issue #35). Same
+    // reasoning as `_open` for the outer History disclosure.
+    /** @type {Set<string>} */
+    this._openBatches = new Set();
     this._filterKind = 'all';
     this._search = '';
 
@@ -133,6 +141,22 @@ export class EvHistoryLog extends HTMLElement {
       this._filterKind = this.$histKindFilter.value;
       this._renderList();
     });
+    // `toggle` doesn't bubble, so delegate in the capture phase — keeps
+    // `_openBatches` in sync as the user expands/collapses batch entries
+    // so the next render can restore them.
+    this.$histList.addEventListener(
+      'toggle',
+      (e) => {
+        const details = e.target;
+        const li = details.closest?.('li.hist-batch');
+        if (!li) return;
+        const key = li.dataset.batchKey;
+        if (!key) return;
+        if (details.open) this._openBatches.add(key);
+        else this._openBatches.delete(key);
+      },
+      true
+    );
     this.$histList.addEventListener('click', (e) => {
       const redefeatBtn = e.target.closest('.redefeat-btn');
       if (redefeatBtn) {
@@ -148,6 +172,10 @@ export class EvHistoryLog extends HTMLElement {
       }
       const deleteBtn = e.target.closest('.delete-hist-btn');
       if (deleteBtn) {
+        // Deleting a log entry can't be undone (some kinds also revert
+        // EVs/level/evolution as they go), so gate it behind a native
+        // confirm() — same treatment as removing a Pokémon or a party.
+        if (!confirm("Delete this log entry? This can't be undone.")) return;
         this._open = true;
         store.deleteHistoryEntry(this._entry.uid, deleteBtn.dataset.id);
       }
@@ -282,8 +310,12 @@ export class EvHistoryLog extends HTMLElement {
    */
   _batchHtml(batch) {
     const { title, gain } = this._batchContent(batch);
-    return `<li class="hist-batch">
-      <details>
+    // Stable across renders (batchId + kind-group is exactly the run
+    // `_listHtml` collapses), so `_openBatches` can re-open it after the
+    // innerHTML rebuild a nested delete triggers — GitHub issue #35.
+    const key = `${batch[0].batchId}:${this._batchGroupKey(batch[0])}`;
+    return `<li class="hist-batch" data-batch-key="${escapeHtml(key)}">
+      <details${this._openBatches.has(key) ? ' open' : ''}>
         <summary>
           <img src="${this._batchIcon(batch)}" alt="" ${FALLBACK_ONERROR} />
           <div>
@@ -310,9 +342,10 @@ export class EvHistoryLog extends HTMLElement {
     if (kind === 'berry') return EV_BERRIES.find((b) => b.id === batch[0].berryId)?.sprite || FALLBACK_SPRITE;
     if (kind === 'held-item') {
       const h = batch[0];
-      if (h.machoBrace) return MACHO_BRACE_SPRITE;
-      if (h.powerItem) return POWER_ITEMS.find((p) => p.id === h.powerItem)?.sprite || FALLBACK_SPRITE;
-      return FALLBACK_SPRITE; // cleared to no item — nothing specific to show
+      if (h.machoBrace || h.prevMachoBrace) return MACHO_BRACE_SPRITE;
+      const powerItem = h.powerItem || h.prevPowerItem;
+      if (powerItem) return POWER_ITEMS.find((p) => p.id === powerItem)?.sprite || FALLBACK_SPRITE;
+      return FALLBACK_SPRITE; // cleared to no item, none known — nothing specific to show
     }
     return this._entry.sprite || FALLBACK_SPRITE; // level/evolve group
   }
@@ -503,13 +536,20 @@ export class EvHistoryLog extends HTMLElement {
       </li>`;
     }
     if (h.kind === 'held-item') {
-      const item = h.powerItem ? POWER_ITEMS.find((p) => p.id === h.powerItem) : null;
-      const sprite = h.machoBrace ? MACHO_BRACE_SPRITE : item?.sprite;
-      const label = h.machoBrace ? 'Macho Brace' : item?.label;
+      const nameOf = (macho, powerItem) =>
+        macho ? 'Macho Brace' : powerItem ? POWER_ITEMS.find((p) => p.id === powerItem)?.label || null : null;
+      const spriteOf = (macho, powerItem) =>
+        macho ? MACHO_BRACE_SPRITE : powerItem ? POWER_ITEMS.find((p) => p.id === powerItem)?.sprite : null;
+      const equipped = nameOf(h.machoBrace, h.powerItem);
+      // `prev*` are absent on events logged before this was tracked — fall
+      // back to the old generic wording rather than guessing.
+      const removed = nameOf(h.prevMachoBrace, h.prevPowerItem);
+      const text = equipped ? `${equipped} equipped` : removed ? `${removed} removed` : 'Held item removed';
+      const sprite = spriteOf(h.machoBrace, h.powerItem) || spriteOf(h.prevMachoBrace, h.prevPowerItem);
       return `<li>
         <img src="${sprite || FALLBACK_SPRITE}" alt="" ${FALLBACK_ONERROR} />
         <div>
-          <strong>${label ? `${label} equipped` : 'Held item removed'}</strong>
+          <strong>${text}</strong>
         </div>
         <span class="hist-actions">
           <button class="delete-hist-btn" type="button" data-id="${h.id}" title="Delete this log entry" aria-label="Delete this log entry">✕</button>
@@ -517,10 +557,11 @@ export class EvHistoryLog extends HTMLElement {
       </li>`;
     }
     if (h.kind === 'stat-reading') {
+      const label = store.specialStatMerged() && h.statKey === 'spa' ? 'SPC' : STAT_LABEL[h.statKey];
       return `<li>
         <img src="${this._entry.sprite || FALLBACK_SPRITE}" alt="" ${FALLBACK_ONERROR} />
         <div>
-          <strong>${STAT_LABEL[h.statKey]} reading logged</strong>
+          <strong>${label} reading logged</strong>
           <span class="gain">${h.observedStat} at Lv. ${h.level}</span>
         </div>
         <span class="hist-actions">

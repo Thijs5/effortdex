@@ -149,13 +149,16 @@ export class LevelDialog extends BaseDialog {
 
     this.$title.textContent = 'Level';
     this.$body.innerHTML = `
-      <label class="field-inline level-up-field">Level
+      <!-- A div, not a <label>: the "+1" is a labelable element, so a
+           <label> wrapping it made a click anywhere on the "Level" text
+           bump the level. The <level-input> carries its own aria-label. -->
+      <div class="field-inline level-up-field"><span>Level</span>
         <span class="level-up-from">Lv. <span class="level-up-from-value"></span> →</span>
         <span class="level-up-input-wrap">
           <level-input class="level-up-input" aria-label="New level"></level-input>
           <button type="button" class="level-up-step level-up-input-step" aria-label="Level plus 1">+1</button>
         </span>
-      </label>
+      </div>
 
       <section class="level-up-stats" hidden>
         <h3 class="section-title">Log stats</h3>
@@ -274,18 +277,18 @@ export class LevelDialog extends BaseDialog {
     this.$evolve.hidden = false;
     this.$evoChain.entry = e;
     this.$evoChain.load();
-    if (store.usesStatExpSystem()) {
-      this.$stats.hidden = true;
-    } else {
-      // Cleared before rebuilding: _renderStatsFields carries forward
-      // whatever's already in these inputs (for a mid-edit re-render, e.g.
-      // the level field changing while this dialog stays open), but a
-      // fresh open should never inherit fields left over from a previous,
-      // already-closed session.
-      this.$statsFields.innerHTML = '';
-      this._renderStatsFields();
-      this.$stats.hidden = false;
-    }
+    // Shown on every generation: under the modern system these readings
+    // feed possibleIvsFromReadings; on Gen I/II nothing is derived from
+    // them yet, but a plain log of "what my stats read at Lv. N" is still
+    // useful to keep (GitHub request).
+    // Cleared before rebuilding: _renderStatsFields carries forward
+    // whatever's already in these inputs (for a mid-edit re-render, e.g.
+    // the level field changing while this dialog stays open), but a fresh
+    // open should never inherit fields left over from a previous,
+    // already-closed session.
+    this.$statsFields.innerHTML = '';
+    this._renderStatsFields();
+    this.$stats.hidden = false;
     super.open();
   }
 
@@ -315,8 +318,12 @@ export class LevelDialog extends BaseDialog {
     // new value. Stats are independent: HP can be blank while ATK has a
     // reading. With no prior reading anywhere the Adjust column is gone
     // and every Reading cell is a plain editable field.
-    const rows = STATS.map((s) => ({
+    // Gen I keeps Special as one stat — drop the Sp. Def row and relabel
+    // Sp. Atk as "Special" (same merge ev-summary / the vitamin grid use).
+    const merged = store.specialStatMerged();
+    const rows = STATS.filter((s) => !(merged && s.key === 'spd')).map((s) => ({
       ...s,
+      label: merged && s.key === 'spa' ? 'Special' : s.label,
       last: e.events.filter((ev) => ev.kind === 'stat-reading' && ev.statKey === s.key).at(-1),
     }));
     const hasChange = rows.some((r) => r.last);

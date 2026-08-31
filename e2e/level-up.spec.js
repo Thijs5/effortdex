@@ -186,6 +186,59 @@ test.describe('Level popup', () => {
     await expect(histLog.locator('.hist-batch-items li')).toHaveCount(3); // level + 2 readings, each still its own deletable entry
   });
 
+  test('deleting one nested entry keeps the batch expanded, not collapsed (GitHub issue #35)', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
+    await addPokemon(page, 'Bulbasaur', { level: 10 });
+    const card = await openDetail(page, 'Bulbasaur');
+    const dialog = await openLevelUpDialog(card);
+
+    await dialog.getByLabel('New level').fill('12');
+    await dialog.getByLabel('New level').blur();
+    await dialog.getByLabel('ATK reading').fill('20');
+    await dialog.getByLabel('DEF reading').fill('15');
+    await dialog.getByRole('button', { name: 'Save' }).click();
+    await expect(dialog).toBeHidden();
+
+    await card.getByText(/History/).click();
+    const histLog = card.locator('ev-history-log');
+    const batch = histLog.locator('li.hist-batch');
+    await batch.locator('summary').click();
+    const nested = histLog.locator('.hist-batch-items li');
+    await expect(nested).toHaveCount(3);
+
+    // Delete the ATK reading from inside the open batch (accept the
+    // "can't be undone" confirm).
+    page.once('dialog', (d) => d.accept());
+    await nested.filter({ hasText: 'ATK reading logged' }).getByRole('button', { name: 'Delete this log entry' }).click();
+
+    // The batch must stay open with its two remaining entries visible —
+    // before the fix the re-render silently collapsed it.
+    await expect(histLog.locator('.hist-batch-items')).toBeVisible();
+    await expect(histLog.locator('.hist-batch-items li')).toHaveCount(2);
+    await expect(histLog.locator('.hist-batch-items li').filter({ hasText: 'DEF reading logged' })).toBeVisible();
+  });
+
+  test('dismissing the delete confirmation keeps the entry', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
+    await addPokemon(page, 'Bulbasaur', { level: 10 });
+    const card = await openDetail(page, 'Bulbasaur');
+    const dialog = await openLevelUpDialog(card);
+    await dialog.getByLabel('ATK reading').fill('20');
+    await dialog.getByRole('button', { name: 'Save' }).click();
+    await expect(dialog).toBeHidden();
+
+    await card.getByText(/History/).click();
+    const histLog = card.locator('ev-history-log');
+    const entry = histLog.locator('li', { hasText: 'ATK reading logged' });
+    await expect(entry).toBeVisible();
+
+    page.once('dialog', (d) => d.dismiss()); // "cancel"
+    await entry.getByRole('button', { name: 'Delete this log entry' }).click();
+    await expect(entry).toBeVisible(); // still there
+  });
+
   test('pressing Enter in a field saves the dialog, same as clicking Save', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
