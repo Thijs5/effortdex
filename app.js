@@ -30,6 +30,7 @@ wireDialogCloseButtons();
 /* ------------------------------------------------------------------ */
 
 const VIEWS = [picker.view, roster.view, pokemon.view, settings.view, transfer.view, spriteCache.view, importPage.view];
+/** @param {HTMLElement} view */
 function showView(view) {
   for (const v of VIEWS) v.hidden = v !== view;
 }

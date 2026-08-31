@@ -14,7 +14,7 @@
 // targets Settings specifically, a fixed destination, not "wherever you
 // came from".
 
-import { interceptLinkClick } from '../lib/dom.js';
+import { interceptLinkClick, requireElementById } from '../lib/dom.js';
 import { GAME_VERSIONS, GEN_ROMAN } from '../lib/game-versions.js';
 import { spriteGroupKey } from '../lib/pokeapi-client.js';
 import { prefetchService } from '../lib/services.js';
@@ -24,12 +24,12 @@ import { isCachingDisabled, setCachingDisabled } from '../lib/dev-cache.js';
 import { escapeHtml, formatBytes } from '../lib/utils.js';
 import * as router from '../lib/router.js';
 
-export const view = document.getElementById('cache-view');
-const backFromCache = /** @type {HTMLAnchorElement} */ (document.getElementById('back-from-cache'));
-const generationsEl = document.getElementById('sprite-cache-generations');
-const clearCacheBtn = /** @type {HTMLButtonElement} */ (document.getElementById('clear-cache-btn'));
-const clearCacheStatus = /** @type {HTMLElement} */ (document.getElementById('clear-cache-status'));
-const disableCachingInput = /** @type {HTMLInputElement} */ (document.getElementById('disable-caching-input'));
+export const view = requireElementById('cache-view');
+const backFromCache = /** @type {HTMLAnchorElement} */ (requireElementById('back-from-cache'));
+const generationsEl = requireElementById('sprite-cache-generations');
+const clearCacheBtn = /** @type {HTMLButtonElement} */ (requireElementById('clear-cache-btn'));
+const clearCacheStatus = requireElementById('clear-cache-status');
+const disableCachingInput = /** @type {HTMLInputElement} */ (requireElementById('disable-caching-input'));
 
 // lib/shell.js reads this same flag (lib/dev-cache.js) once, at load, to
 // decide whether to register the service worker at all — so toggling it
@@ -371,7 +371,7 @@ export function render() {
     for (let gen = 1; gen <= 9; gen++) {
       const block = buildGeneration(gen);
       generationBlocks.push(block);
-      /** @type {HTMLElement} */ (generationsEl).appendChild(block.details);
+      generationsEl.appendChild(block.details);
     }
   }
   // Every visit re-checks every generation's summary (cheap: a cached

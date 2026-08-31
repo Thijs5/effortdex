@@ -9,6 +9,18 @@
 // left alone here (see docs/adr/0001) — except sprite *images* (see
 // SPRITE_CACHE_NAME below, docs/adr/0011), since PokeApiClient's cache
 // only ever held the sprite URL string, never the image bytes.
+// The DOM lib (tsconfig.json) types `self` as Window and event listener
+// callbacks as plain Event — this file actually runs in a
+// ServiceWorkerGlobalScope, where 'install'/'activate' fire
+// ExtendableEvents (a `waitUntil`) and 'fetch' fires a FetchEvent (also
+// `request`/`respondWith`). Minimal local shapes for just what's used
+// below, rather than pulling in the full (and Window-incompatible)
+// lib.webworker.d.ts.
+/** @typedef {Event & { waitUntil(p: Promise<any>): void }} ExtendableEventLike */
+/** @typedef {ExtendableEventLike & { request: Request, respondWith(p: Promise<Response|undefined>): void }} FetchEventLike */
+/** @type {{ skipWaiting(): Promise<void>, clients: { claim(): Promise<void> }, location: Location, addEventListener(type: string, listener: (event: any) => void): void }} */
+const worker = /** @type {any} */ (self);
+
 const CACHE_NAME = 'effortdex-shell';
 
 // Sprite images, kept in a cache of their own and — unlike CACHE_NAME —
@@ -108,26 +120,27 @@ const SHELL_PATHS = [
   'icons/icon-512-maskable.png',
   'icons/apple-touch-icon.png',
 ];
-const SHELL_URLS = SHELL_PATHS.map((p) => new URL(p, self.location).toString());
+const SHELL_URLS = SHELL_PATHS.map((p) => new URL(p, worker.location.href).toString());
 
-self.addEventListener('install', (event) => {
-  event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_URLS)).then(() => self.skipWaiting())
+worker.addEventListener('install', (event) => {
+  /** @type {ExtendableEventLike} */ (event).waitUntil(
+    caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_URLS)).then(() => worker.skipWaiting())
   );
 });
 
-self.addEventListener('activate', (event) => {
-  event.waitUntil(
+worker.addEventListener('activate', (event) => {
+  /** @type {ExtendableEventLike} */ (event).waitUntil(
     caches
       .keys()
       .then((keys) =>
         Promise.all(keys.filter((k) => k !== CACHE_NAME && k !== SPRITE_CACHE_NAME).map((k) => caches.delete(k)))
       )
-      .then(() => self.clients.claim())
+      .then(() => worker.clients.claim())
   );
 });
 
-self.addEventListener('fetch', (event) => {
+worker.addEventListener('fetch', (rawEvent) => {
+  const event = /** @type {FetchEventLike} */ (rawEvent);
   const { request } = event;
   if (request.method !== 'GET') return;
 
@@ -159,11 +172,11 @@ self.addEventListener('fetch', (event) => {
     return;
   }
 
-  if (url.origin !== self.location.origin) return; // let PokéAPI data reads etc. hit the network directly
+  if (url.origin !== worker.location.origin) return; // let PokéAPI data reads etc. hit the network directly
 
   if (request.mode === 'navigate') {
     event.respondWith(
-      fetch(request).catch(() => caches.match(new URL('index.html', self.location).toString()))
+      fetch(request).catch(() => caches.match(new URL('index.html', worker.location.href).toString()))
     );
     return;
   }

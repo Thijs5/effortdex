@@ -13,12 +13,16 @@ let fetchCalls;
 
 beforeEach(() => {
   fetchCalls = [];
-  globalThis.fetch = async (url) => {
-    fetchCalls.push(url);
-    return { ok: true, url };
-  };
+  globalThis.fetch = /** @type {typeof fetch} */ (
+    /** @param {string} url */
+    async (url) => {
+      fetchCalls.push(url);
+      return { ok: true, url };
+    }
+  );
 });
 
+/** @param {number} ms */
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -28,15 +32,20 @@ function sleep(ms) {
 // looks up the id from whichever generation list it appeared in, so
 // sprite-URL resolution (which needs the id) works the same as it would
 // against the real client.
+/** @param {{ generations?: Record<number, {name: string, id: number|null}[]>, fail?: string[] }} [opts] */
 function fakeApi({ generations = {}, fail = [] } = {}) {
+  /** @type {string[]} */
   const calls = [];
+  /** @type {Map<string, number|null>} */
   const idByName = new Map();
   for (const list of Object.values(generations)) for (const s of list) idByName.set(s.name, s.id);
   return {
     calls,
+    /** @param {number} gen */
     async getGenerationSpecies(gen) {
       return generations[gen] || [];
     },
+    /** @param {string} name */
     async getPokemon(name) {
       calls.push(name);
       if (fail.includes(name)) throw new Error(`unknown: ${name}`);
@@ -45,6 +54,7 @@ function fakeApi({ generations = {}, fail = [] } = {}) {
   };
 }
 
+/** @param {{ baseGame: string }[]} parties */
 function fakeStore(parties) {
   return { state: { parties } };
 }
@@ -52,10 +62,12 @@ function fakeStore(parties) {
 // An in-memory stand-in for the localStorage-backed resume-intent
 // pair, so tests can inspect/seed it directly without a real
 // `localStorage` global.
+/** @param {import('../lib/prefetch-service.js').ResumeIntent[]} [initial] */
 function fakeIntentStorage(initial = []) {
   let intents = initial;
   return {
     readResumeIntents: () => intents,
+    /** @param {import('../lib/prefetch-service.js').ResumeIntent[]} next */
     writeResumeIntents: (next) => {
       intents = next;
     },
@@ -69,8 +81,13 @@ function fakeIntentStorage(initial = []) {
 // (fetchCalls/api.calls counts and contents) stays scoped to the species
 // scan it's actually testing — the dedicated "item icon warming" section
 // further down overrides this to exercise that behavior directly.
+/** Every call site passes deliberately duck-typed subsets of Store/
+ * PokeApiClient (see fakeStore/fakeApi above), so `overrides` — and the
+ * constructor call below — stay loosely typed rather than threading a
+ * cast through every test.
+ * @param {Record<string, any>} [overrides] */
 function service(overrides = {}) {
-  return new PrefetchService({
+  return new PrefetchService(/** @type {any} */ ({
     store: fakeStore([{ baseGame: 'Red' }]),
     api: fakeApi(),
     isOnline: () => true,
@@ -78,7 +95,7 @@ function service(overrides = {}) {
     batchDelayMs: 0,
     itemSpriteUrls: [],
     ...overrides,
-  });
+  }));
 }
 
 /* ---------------- isCachingDisabled: every entry point becomes a no-op ---------------- */
@@ -198,9 +215,10 @@ test('a failed species lookup is skipped, not fatal to the rest of the run', asy
     generations: { 1: [{ name: 'bulbasaur', id: 1 }, { name: 'missingno', id: null }, { name: 'ivysaur', id: 2 }] },
     fail: ['missingno'],
   });
+  /** @type {any[]} */
   const events = [];
   const svc = service({ api });
-  svc.addEventListener('progress', (e) => events.push(e.detail));
+  svc.addEventListener('progress', (e) => events.push(/** @type {CustomEvent} */ (e).detail));
   await svc.start();
 
   assert.deepEqual(api.calls.sort(), ['bulbasaur', 'ivysaur', 'missingno']);
@@ -211,9 +229,10 @@ test('emits progress events in concurrency-sized batches', async () => {
   const api = fakeApi({
     generations: { 1: ['a', 'b', 'c', 'd', 'e'].map((name, i) => ({ name, id: i + 1 })) },
   });
+  /** @type {any[]} */
   const events = [];
   const svc = service({ api, concurrency: 2 });
-  svc.addEventListener('progress', (e) => events.push(e.detail));
+  svc.addEventListener('progress', (e) => events.push(/** @type {CustomEvent} */ (e).detail));
   await svc.start();
 
   assert.deepEqual(events.map((d) => d.done).slice(-1), [5]);
@@ -233,6 +252,7 @@ test('a party-less store runs cleanly with no prefetch traffic', async () => {
 // alongside it, `await start()` alone can return before the item fetches
 // actually settle, so these poll `pendingCount` rather than assuming
 // `start()`'s own promise covers them.
+/** @param {import('../lib/prefetch-service.js').PrefetchService} svc */
 async function waitForIdle(svc) {
   while (svc.pendingCount > 0) await sleep(5);
 }
@@ -270,7 +290,7 @@ test('an already-cached item icon is not re-fetched', async () => {
   const svc = service({
     store: fakeStore([]),
     itemSpriteUrls: urls,
-    isAlreadyCached: async (url) => url === urls[0],
+    isAlreadyCached: /** @param {string} url */ async (url) => url === urls[0],
   });
   await svc.start();
   await waitForIdle(svc);
@@ -391,6 +411,7 @@ test('spriteUrlsForGame() is empty for an unrecognized title', async () => {
 /* ---------------- silent tracking (the header LED, ADR 0013) ---------------- */
 
 function withoutTrackingSpy() {
+  /** @type {string[]} */
   const calls = [];
   return {
     calls,
@@ -474,7 +495,7 @@ test('a species already warmed silently by the automatic scan is not re-silenced
 test('skips the sprite fetch (but still warms species data) for a URL isAlreadyCached reports as cached', async () => {
   const api = fakeApi({ generations: { 1: [{ name: 'bulbasaur', id: 1 }, { name: 'ivysaur', id: 2 }] } });
   const cachedUrls = new Set(['https://sprites.example/bulbasaur.png']);
-  const svc = service({ api, isAlreadyCached: async (url) => cachedUrls.has(url) });
+  const svc = service({ api, isAlreadyCached: /** @param {string} url */ async (url) => cachedUrls.has(url) });
   await svc.start();
 
   // Both species' data still gets warmed either way...
@@ -571,17 +592,21 @@ test('resumeInterrupted() with nothing recorded is a harmless no-op', async () =
 
 test('backs off after failureThreshold consecutive failures, pausing the queue instead of continuing to hammer it', async () => {
   const species = Array.from({ length: 8 }, (_, i) => ({ name: `s${i}`, id: i + 1 }));
+  /** @type {string[]} */
   const calls = [];
   const api = {
     calls,
+    /** @param {number} gen */
     async getGenerationSpecies(gen) {
       return gen === 1 ? species : [];
     },
+    /** @param {string} name */
     async getPokemon(name) {
       calls.push(name);
       throw new Error('simulated failure');
     },
   };
+  /** @type {any[]} */
   const backoffEvents = [];
   // Long enough that it can't fire within this test's own assertion
   // window, but still short — a real multi-minute value here would
@@ -589,7 +614,7 @@ test('backs off after failureThreshold consecutive failures, pausing the queue i
   // prefetchGame() promise below is deliberately never awaited to
   // completion.
   const svc = service({ api, concurrency: 1, batchDelayMs: 0, failureThreshold: 3, initialBackoffMs: 300 });
-  svc.addEventListener('backoff', (e) => backoffEvents.push(e.detail));
+  svc.addEventListener('backoff', (e) => backoffEvents.push(/** @type {CustomEvent} */ (e).detail));
 
   svc.prefetchGame('Red'); // deliberately not awaited — backing off leaves the rest un-settled for the rest of this test
   await sleep(50);
@@ -602,12 +627,15 @@ test('backs off after failureThreshold consecutive failures, pausing the queue i
 test('automatically resumes after the backoff delay and retries the remaining work', async () => {
   const species = Array.from({ length: 4 }, (_, i) => ({ name: `s${i}`, id: i + 1 }));
   let shouldFail = true;
+  /** @type {string[]} */
   const calls = [];
   const api = {
     calls,
+    /** @param {number} gen */
     async getGenerationSpecies(gen) {
       return gen === 1 ? species : [];
     },
+    /** @param {string} name */
     async getPokemon(name) {
       calls.push(name);
       if (shouldFail) throw new Error('simulated failure');
@@ -629,13 +657,17 @@ test('automatically resumes after the backoff delay and retries the remaining wo
 
 test('a success resets the failure count and the backoff delay back to their starting points', async () => {
   const species = ['a', 'b', 'c'].map((name, i) => ({ name, id: i + 1 }));
+  /** @type {Record<string, string>} */
   const outcomes = { a: 'fail', b: 'ok', c: 'fail' };
+  /** @type {string[]} */
   const calls = [];
   const api = {
     calls,
+    /** @param {number} gen */
     async getGenerationSpecies(gen) {
       return gen === 1 ? species : [];
     },
+    /** @param {string} name */
     async getPokemon(name) {
       calls.push(name);
       if (outcomes[name] === 'fail') throw new Error('simulated failure');
@@ -644,8 +676,9 @@ test('a success resets the failure count and the backoff delay back to their sta
   };
   // failureThreshold 2: a fails (1), b succeeds (resets to 0), c fails (1) — never reaches 2, so no backoff at all.
   const svc = service({ api, concurrency: 1, batchDelayMs: 0, failureThreshold: 2, initialBackoffMs: 60_000 });
+  /** @type {any[]} */
   const backoffEvents = [];
-  svc.addEventListener('backoff', (e) => backoffEvents.push(e.detail));
+  svc.addEventListener('backoff', (e) => backoffEvents.push(/** @type {CustomEvent} */ (e).detail));
 
   await svc.prefetchGame('Red');
 
@@ -660,19 +693,22 @@ test('never exceeds the configured concurrency, even with the automatic scan and
   const species = Array.from({ length: 6 }, (_, i) => ({ name: `s${i}`, id: i + 1 }));
   let active = 0;
   let maxActive = 0;
+  /** @type {string[]} */
   const calls = [];
   const api = {
     calls,
+    /** @param {number} gen */
     async getGenerationSpecies(gen) {
       return gen === 1 ? species : [];
     },
+    /** @param {string} name */
     async getPokemon(name) {
       calls.push(name);
       active++;
       maxActive = Math.max(maxActive, active);
       await sleep(5);
       active--;
-      return { id: species.find((s) => s.name === name).id, sprite: `https://sprites.example/${name}.png` };
+      return { id: species.find((s) => s.name === name)?.id, sprite: `https://sprites.example/${name}.png` };
     },
   };
   const svc = service({ api, concurrency: 2 });
@@ -692,7 +728,7 @@ test('pauses cleanly if the connection drops mid-queue, and resumes on reconnect
     api,
     concurrency: 1,
     isOnline: () => online,
-    onOnlineChange: (notify) => {
+    onOnlineChange: (/** @type {() => void} */ notify) => {
       reconnect = notify;
     },
   });

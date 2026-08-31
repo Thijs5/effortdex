@@ -46,7 +46,7 @@ test('sortedNatures returns all 25 natures A-Z without mutating NATURES', () => 
 test('natureOptionsHtml puts Unknown first, then one option per nature', () => {
   const html = natureOptionsHtml();
   assert.ok(html.startsWith('<option value="">Unknown</option>'));
-  assert.equal(html.match(/<option /g).length, 26); // Unknown + 25 natures
+  assert.equal(html.match(/<option /g)?.length, 26); // Unknown + 25 natures
   assert.ok(html.includes('value="adamant"'));
 });
 

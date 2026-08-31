@@ -123,19 +123,24 @@ export class EvBar extends HTMLElement {
         <span class="badge" hidden title="Maxed out"></span>
       </div>
     `;
-    this.$label = shadow.querySelector('.label-text');
-    this.$baseStat = shadow.querySelector('.base-stat');
-    this.$track = shadow.querySelector('.track');
-    this.$fill = shadow.querySelector('.fill');
-    this.$value = shadow.querySelector('.value');
-    this.$badge = shadow.querySelector('.badge');
+    this.$label = /** @type {HTMLElement} */ (shadow.querySelector('.label-text'));
+    this.$baseStat = /** @type {HTMLElement} */ (shadow.querySelector('.base-stat'));
+    this.$track = /** @type {HTMLElement} */ (shadow.querySelector('.track'));
+    this.$fill = /** @type {HTMLElement} */ (shadow.querySelector('.fill'));
+    this.$value = /** @type {HTMLElement} */ (shadow.querySelector('.value'));
+    this.$badge = /** @type {HTMLElement} */ (shadow.querySelector('.badge'));
+    /** @type {string} */
     this._label = '';
+    /** @type {number|null} */
     this._baseStat = null;
+    /** @type {'boost'|'hinder'|null} */
     this._natureEffect = null;
     this._value = 0;
+    /** @type {number|null} */
     this._max = 252;
   }
 
+  /** @param {string} v */
   set label(v) {
     this._label = v;
     this._render();
@@ -143,7 +148,8 @@ export class EvBar extends HTMLElement {
   get label() {
     return this._label;
   }
-  /** The species' base stat for this row, shown as a small hint next to the label. Null hides it. */
+  /** The species' base stat for this row, shown as a small hint next to the label. Null hides it.
+   * @param {number|null} v */
   set baseStat(v) {
     this._baseStat = v;
     this._render();
@@ -151,7 +157,8 @@ export class EvBar extends HTMLElement {
   get baseStat() {
     return this._baseStat;
   }
-  /** This stat's nature effect: 'boost', 'hinder', or null. Colors the label accordingly. */
+  /** This stat's nature effect: 'boost', 'hinder', or null. Colors the label accordingly.
+   * @param {'boost'|'hinder'|null} v */
   set natureEffect(v) {
     this._natureEffect = v || null;
     this._render();
@@ -159,6 +166,7 @@ export class EvBar extends HTMLElement {
   get natureEffect() {
     return this._natureEffect;
   }
+  /** @param {number} v */
   set value(v) {
     this._value = v;
     this._render();
@@ -166,6 +174,7 @@ export class EvBar extends HTMLElement {
   get value() {
     return this._value;
   }
+  /** @param {number|null} v */
   set max(v) {
     this._max = v;
     this._render();
@@ -181,13 +190,14 @@ export class EvBar extends HTMLElement {
     this.$baseStat.title = this._baseStat != null ? `Base ${this._label}: ${this._baseStat}` : '';
     if (this._natureEffect) this.setAttribute('nature-effect', this._natureEffect);
     else this.removeAttribute('nature-effect');
-    const pct = Math.max(0, Math.min(100, (this._value / this._max) * 100));
+    const max = /** @type {number} */ (this._max);
+    const pct = Math.max(0, Math.min(100, (this._value / max) * 100));
     this.$fill.style.width = pct + '%';
     this.$value.textContent = `${this._value}/${this._max}`;
     this.$track.setAttribute('aria-valuenow', String(this._value));
     this.$track.setAttribute('aria-valuemax', String(this._max));
     this.$track.setAttribute('aria-label', this._label ? `${this._label} EVs` : 'EVs');
-    const maxed = this._value >= this._max;
+    const maxed = this._value >= max;
     this.toggleAttribute('maxed', maxed);
     this.$badge.hidden = !maxed;
   }

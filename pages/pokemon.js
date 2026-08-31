@@ -3,18 +3,23 @@
 // all the rendering lives in <caught-pokemon-detail> itself.
 
 import * as router from '../lib/router.js';
-import { interceptLinkClick } from '../lib/dom.js';
+import { interceptLinkClick, requireElementById } from '../lib/dom.js';
 import '../components/caught-pokemon-detail.js';
 
-export const view = document.getElementById('pokemon-view');
-const backToRoster = document.getElementById('back-to-roster');
-const pokemonDetail = document.createElement('caught-pokemon-detail');
+/** @typedef {import('../lib/store.js').Party} Party */
+/** @typedef {import('../lib/store.js').RosterEntry} RosterEntry */
+
+export const view = requireElementById('pokemon-view');
+const backToRoster = /** @type {HTMLAnchorElement} */ (requireElementById('back-to-roster'));
+const pokemonDetail = /** @type {import('../components/caught-pokemon-detail.js').CaughtPokemonDetail} */
+  (document.createElement('caught-pokemon-detail'));
 view.appendChild(pokemonDetail);
 
+/** @type {string|null} */
 let backToRosterSlug = null;
 interceptLinkClick(backToRoster, () => router.navigateToParty(backToRosterSlug));
 
-/** @param {{ slug: string, name: string }} party @param {object} entry */
+/** @param {Party} party @param {RosterEntry} entry */
 export function render(party, entry) {
   backToRosterSlug = party.slug;
   backToRoster.href = router.partyPath(party.slug);

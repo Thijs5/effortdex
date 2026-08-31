@@ -2,12 +2,12 @@
 // Transfer ("/transfer") — export this device's roster as a shareable
 // link. Thin: all the rendering lives in <transfer-panel> itself.
 
-import { wireUtilityBackLink } from '../lib/dom.js';
+import { wireUtilityBackLink, requireElementById, requireQuery } from '../lib/dom.js';
 import '../components/transfer-panel.js';
 
-export const view = document.getElementById('transfer-view');
-const backFromTransfer = document.getElementById('back-from-transfer');
-const transferPanel = view.querySelector('transfer-panel');
+export const view = requireElementById('transfer-view');
+const backFromTransfer = /** @type {HTMLAnchorElement} */ (requireElementById('back-from-transfer'));
+const transferPanel = /** @type {import('../components/transfer-panel.js').TransferPanel} */ (requireQuery('transfer-panel', view));
 
 const setBackLinkPath = wireUtilityBackLink(backFromTransfer);
 

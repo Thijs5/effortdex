@@ -10,18 +10,18 @@
 // ground for every sub-feature's own UI.
 
 import * as router from '../lib/router.js';
-import { wireUtilityBackLink } from '../lib/dom.js';
+import { wireUtilityBackLink, requireElementById } from '../lib/dom.js';
 import { getAppVersion, hasResolvedAppVersion, onAppVersion } from '../lib/app-version.js';
 import { readPreMigrationBackup } from '../lib/store.js';
 
-export const view = document.getElementById('settings-view');
-const backFromSettings = document.getElementById('back-from-settings');
-const settingsVersion = document.getElementById('settings-version');
-const manageStorageBtn = document.getElementById('manage-storage-btn');
-const transferBtn = document.getElementById('transfer-btn');
-const backupSection = document.getElementById('pre-migration-backup-section');
-const copyBackupBtn = document.getElementById('copy-backup-btn');
-const copyBackupStatus = document.getElementById('copy-backup-status');
+export const view = requireElementById('settings-view');
+const backFromSettings = /** @type {HTMLAnchorElement} */ (requireElementById('back-from-settings'));
+const settingsVersion = requireElementById('settings-version');
+const manageStorageBtn = requireElementById('manage-storage-btn');
+const transferBtn = requireElementById('transfer-btn');
+const backupSection = requireElementById('pre-migration-backup-section');
+const copyBackupBtn = requireElementById('copy-backup-btn');
+const copyBackupStatus = requireElementById('copy-backup-status');
 
 const setBackLinkPath = wireUtilityBackLink(backFromSettings);
 transferBtn.addEventListener('click', () => router.navigateToTransfer());

@@ -13,6 +13,7 @@ let fetchCalls;
 /** @type {{ match: string, handler: (url: string) => unknown }[]} */
 let routes;
 
+/** @param {unknown} data */
 function respond(data) {
   return { ok: true, json: async () => data };
 }
@@ -21,12 +22,15 @@ beforeEach(() => {
   localStorage.clear();
   fetchCalls = [];
   routes = [];
-  globalThis.fetch = async (url) => {
-    fetchCalls.push(url);
-    const route = routes.find((r) => url.includes(r.match));
-    if (!route) throw new Error(`unrouted fetch in test: ${url}`);
-    return route.handler(url);
-  };
+  globalThis.fetch = /** @type {typeof fetch} */ (
+    /** @param {string} url */
+    async (url) => {
+      fetchCalls.push(url);
+      const route = routes.find((r) => url.includes(r.match));
+      if (!route) throw new Error(`unrouted fetch in test: ${url}`);
+      return route.handler(url);
+    }
+  );
 });
 
 const PIKACHU = {
@@ -118,7 +122,7 @@ test('getAllSpecies derives ids and sprite URLs from the list URLs', async () =>
   const client = new PokeApiClient();
   const species = await client.getAllSpecies();
   assert.equal(species[0].id, 1);
-  assert.match(species[0].sprite, /\/1\.png$/);
+  assert.match(/** @type {string} */ (species[0].sprite), /\/1\.png$/);
   assert.equal(species[1].id, null);
   assert.equal(species[1].sprite, null);
 });

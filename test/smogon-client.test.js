@@ -9,6 +9,7 @@ let fetchCalls;
 /** @type {{ match: string, handler: (url: string) => unknown }[]} */
 let routes;
 
+/** @param {string} text */
 function textRes(text) {
   return { ok: true, text: async () => text, json: async () => JSON.parse(text) };
 }
@@ -17,12 +18,15 @@ beforeEach(() => {
   localStorage.clear();
   fetchCalls = [];
   routes = [];
-  globalThis.fetch = async (url) => {
-    fetchCalls.push(url);
-    const route = routes.find((r) => url.includes(r.match));
-    if (!route) throw new Error(`unrouted fetch in test: ${url}`);
-    return route.handler(url);
-  };
+  globalThis.fetch = /** @type {typeof fetch} */ (
+    /** @param {string} url */
+    async (url) => {
+      fetchCalls.push(url);
+      const route = routes.find((r) => url.includes(r.match));
+      if (!route) throw new Error(`unrouted fetch in test: ${url}`);
+      return route.handler(url);
+    }
+  );
 });
 
 // A trimmed-down but structurally real sample of formats-data.js's own
@@ -85,7 +89,7 @@ test('a stale (past CACHE_TTL_MS) cached entry is re-fetched, unlike PokeApiClie
 
   // Back-date the stored entry past the TTL, simulating a week-old cache.
   const key = 'effortdex:smogon:tiers';
-  const stored = JSON.parse(localStorage.getItem(key));
+  const stored = JSON.parse(/** @type {string} */ (localStorage.getItem(key)));
   stored.fetchedAt = Date.now() - 8 * 24 * 60 * 60 * 1000;
   localStorage.setItem(key, JSON.stringify(stored));
 

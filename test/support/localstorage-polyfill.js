@@ -5,14 +5,26 @@
 class MemoryStorage {
   #data = new Map();
 
+  get length() {
+    return this.#data.size;
+  }
+
+  /** @param {number} index */
+  key(index) {
+    return [...this.#data.keys()][index] ?? null;
+  }
+
+  /** @param {string} key */
   getItem(key) {
     return this.#data.has(key) ? this.#data.get(key) : null;
   }
 
+  /** @param {string} key @param {string} value */
   setItem(key, value) {
     this.#data.set(key, String(value));
   }
 
+  /** @param {string} key */
   removeItem(key) {
     this.#data.delete(key);
   }
@@ -22,4 +34,4 @@ class MemoryStorage {
   }
 }
 
-globalThis.localStorage = new MemoryStorage();
+globalThis.localStorage = /** @type {Storage} */ (/** @type {unknown} */ (new MemoryStorage()));

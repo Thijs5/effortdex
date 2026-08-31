@@ -3,8 +3,8 @@
 // `node:test` without a DOM. Assigning to location.hash here does NOT
 // fire hashchange — tests exercise the parsing/formatting logic and the
 // same-hash notify branch, not the browser's event plumbing.
-globalThis.window = {
+globalThis.window = /** @type {Window & typeof globalThis} */ (/** @type {unknown} */ ({
   location: { hash: '' },
   addEventListener() {},
   removeEventListener() {},
-};
+}));

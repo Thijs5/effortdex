@@ -3,18 +3,21 @@ import assert from 'node:assert/strict';
 
 import { NetworkActivity, withoutNetworkActivity } from '../lib/network-activity.js';
 
+/** @param {{ online?: boolean, flashMs?: number }} [opts] */
 function tracker({ online = true, flashMs = 0 } = {}) {
   let isOnline = online;
+  /** @type {string[]} */
   const changes = [];
   const na = new NetworkActivity({
     isOnline: () => isOnline,
     onOnlineChange: () => {}, // no window in this test environment — opt out of the real listener
     flashMs,
   });
-  na.addEventListener('change', (e) => changes.push(e.detail.status));
-  return { na, changes, setOnline: (v) => (isOnline = v) };
+  na.addEventListener('change', (e) => changes.push(/** @type {CustomEvent} */ (e).detail.status));
+  return { na, changes, setOnline: (/** @type {boolean} */ v) => (isOnline = v) };
 }
 
+/** @param {number} ms */
 function sleep(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -79,8 +82,9 @@ test('going offline mid-flash reports "off" until back online', async () => {
 });
 
 test('attach() wraps window.fetch and tracks begin/end around every call', async () => {
+  /** @param {string} url */
   const realFetch = async (url) => ({ ok: true, url });
-  globalThis.window = { fetch: realFetch };
+  globalThis.window = /** @type {Window & typeof globalThis} */ (/** @type {unknown} */ ({ fetch: realFetch }));
   try {
     const { na, changes } = tracker();
     na.attach();
@@ -95,13 +99,15 @@ test('attach() wraps window.fetch and tracks begin/end around every call', async
     await window.fetch('https://example.test');
     assert.deepEqual(changes, ['sending', 'receiving']);
   } finally {
+    // @ts-expect-error — simulating no window global outside this test's scope
     delete globalThis.window;
   }
 });
 
 test('withoutNetworkActivity suppresses tracking for fetch calls made inside it', async () => {
+  /** @param {string} url */
   const realFetch = async (url) => ({ ok: true, url });
-  globalThis.window = { fetch: realFetch };
+  globalThis.window = /** @type {Window & typeof globalThis} */ (/** @type {unknown} */ ({ fetch: realFetch }));
   try {
     const { na, changes } = tracker();
     na.attach();
@@ -112,13 +118,15 @@ test('withoutNetworkActivity suppresses tracking for fetch calls made inside it'
     await window.fetch('https://example.test/visible');
     assert.deepEqual(changes, ['sending', 'receiving']); // tracking resumes once outside the suppressed call
   } finally {
+    // @ts-expect-error — simulating no window global outside this test's scope
     delete globalThis.window;
   }
 });
 
 test('withoutNetworkActivity nests: an inner suppressed call does not re-enable tracking early for an outer one', async () => {
+  /** @param {string} url */
   const realFetch = async (url) => ({ ok: true, url });
-  globalThis.window = { fetch: realFetch };
+  globalThis.window = /** @type {Window & typeof globalThis} */ (/** @type {unknown} */ ({ fetch: realFetch }));
   try {
     const { na, changes } = tracker();
     na.attach();
@@ -129,6 +137,7 @@ test('withoutNetworkActivity nests: an inner suppressed call does not re-enable 
     });
     assert.deepEqual(changes, []);
   } finally {
+    // @ts-expect-error — simulating no window global outside this test's scope
     delete globalThis.window;
   }
 });

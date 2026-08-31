@@ -29,46 +29,50 @@ import { api, store } from '../lib/services.js';
 import { versionedSpriteUrl } from '../lib/pokeapi-client.js';
 import { wireSpriteFallback } from '../lib/sprite-fallback.js';
 import * as router from '../lib/router.js';
-import { interceptLinkClick } from '../lib/dom.js';
+import { interceptLinkClick, requireElementById, requireQuery } from '../lib/dom.js';
 import { openEditDialog } from './party-dialog.js';
 import '../components/game-ball.js';
 import '../components/pokemon-search.js';
 import '../components/ev-bar.js';
 
-export const view = document.getElementById('party-view');
-const backToParties = document.getElementById('back-to-parties');
-const activePartyName = document.getElementById('active-party-name');
-const activePartyGame = document.getElementById('active-party-game');
-const activePartyGameCart = activePartyGame.querySelector('game-ball');
-const activePartyGameLabel = document.getElementById('active-party-game-label');
-const activePartyDescription = document.getElementById('active-party-description');
-const editPartyBtn = document.getElementById('edit-party-btn');
+/** @typedef {import('../lib/store.js').Party} Party */
+/** @typedef {import('../lib/store.js').RosterEntry} RosterEntry */
+/** @typedef {import('../components/pokemon-search.js').PokemonSearch} PokemonSearch */
 
-const catchSearch = document.getElementById('catch-search');
-const catchStatus = document.getElementById('catch-status');
-const roster = document.getElementById('roster');
-const emptyState = document.getElementById('empty-state');
-const rosterToolbar = document.getElementById('roster-toolbar');
-const rosterSearchInput = document.getElementById('roster-search');
-const rosterSortSelect = document.getElementById('roster-sort');
-const rosterNoResults = document.getElementById('roster-no-results');
-const rosterFilterBtn = document.getElementById('roster-filter-btn');
-const rosterFilterDialog = document.getElementById('roster-filter-dialog');
-const rosterFilterDialogClose = document.getElementById('roster-filter-dialog-close');
-const rosterFilterCount = document.getElementById('roster-filter-count');
-const rosterFilterLevelMin = /** @type {HTMLInputElement} */ (document.getElementById('roster-filter-level-min'));
-const rosterFilterLevelMax = /** @type {HTMLInputElement} */ (document.getElementById('roster-filter-level-max'));
-const rosterFilterExpShare = document.getElementById('roster-filter-exp-share');
-const rosterFilterPokerus = document.getElementById('roster-filter-pokerus');
-const rosterFilterTrainedGroup = document.getElementById('roster-filter-trained-group');
-const rosterFilterTrainedRadios = [...document.getElementsByName('roster-filter-trained')];
-const rosterFilterItemRow = document.getElementById('roster-filter-item-row');
-const rosterFilterItem = document.getElementById('roster-filter-item');
-const rosterFilterNatureField = document.getElementById('roster-filter-nature-field');
-const rosterFilterNature = /** @type {HTMLSelectElement} */ (document.getElementById('roster-filter-nature'));
-const rosterFilterClear = document.getElementById('roster-filter-clear');
-const rosterFilterDone = document.getElementById('roster-filter-done');
-const rosterFilterDoneCount = document.getElementById('roster-filter-done-count');
+export const view = requireElementById('party-view');
+const backToParties = /** @type {HTMLAnchorElement} */ (requireElementById('back-to-parties'));
+const activePartyName = requireElementById('active-party-name');
+const activePartyGame = requireElementById('active-party-game');
+const activePartyGameCart = /** @type {import('../components/game-ball.js').GameBall} */ (requireQuery('game-ball', activePartyGame));
+const activePartyGameLabel = requireElementById('active-party-game-label');
+const activePartyDescription = requireElementById('active-party-description');
+const editPartyBtn = requireElementById('edit-party-btn');
+
+const catchSearch = /** @type {PokemonSearch} */ (requireElementById('catch-search'));
+const catchStatus = requireElementById('catch-status');
+const roster = requireElementById('roster');
+const emptyState = requireElementById('empty-state');
+const rosterToolbar = requireElementById('roster-toolbar');
+const rosterSearchInput = /** @type {HTMLInputElement} */ (requireElementById('roster-search'));
+const rosterSortSelect = /** @type {HTMLSelectElement} */ (requireElementById('roster-sort'));
+const rosterNoResults = requireElementById('roster-no-results');
+const rosterFilterBtn = requireElementById('roster-filter-btn');
+const rosterFilterDialog = /** @type {HTMLDialogElement} */ (requireElementById('roster-filter-dialog'));
+const rosterFilterDialogClose = requireElementById('roster-filter-dialog-close');
+const rosterFilterCount = requireElementById('roster-filter-count');
+const rosterFilterLevelMin = /** @type {HTMLInputElement} */ (requireElementById('roster-filter-level-min'));
+const rosterFilterLevelMax = /** @type {HTMLInputElement} */ (requireElementById('roster-filter-level-max'));
+const rosterFilterExpShare = requireElementById('roster-filter-exp-share');
+const rosterFilterPokerus = requireElementById('roster-filter-pokerus');
+const rosterFilterTrainedGroup = requireElementById('roster-filter-trained-group');
+const rosterFilterTrainedRadios = /** @type {HTMLInputElement[]} */ ([...document.getElementsByName('roster-filter-trained')]);
+const rosterFilterItemRow = requireElementById('roster-filter-item-row');
+const rosterFilterItem = requireElementById('roster-filter-item');
+const rosterFilterNatureField = requireElementById('roster-filter-nature-field');
+const rosterFilterNature = /** @type {HTMLSelectElement} */ (requireElementById('roster-filter-nature'));
+const rosterFilterClear = requireElementById('roster-filter-clear');
+const rosterFilterDone = requireElementById('roster-filter-done');
+const rosterFilterDoneCount = requireElementById('roster-filter-done-count');
 
 // Populated once — same icons the detail page's own Pokérus/Exp. Share/
 // Macho Brace controls use, so each filter reads as "the same thing"
@@ -76,9 +80,9 @@ const rosterFilterDoneCount = document.getElementById('roster-filter-done-count'
 // item is held" glyph — there's no single icon for "Power item or Macho
 // Brace", and it's the training item every generation this filter can
 // apply to (Gen III+) recognizes.
-document.getElementById('roster-filter-pokerus-icon').innerHTML = POKERUS_ICON_SVG;
-/** @type {HTMLImageElement} */ (document.getElementById('roster-filter-exp-share-icon')).src = EXP_SHARE_SPRITE;
-/** @type {HTMLImageElement} */ (document.getElementById('roster-filter-item-icon')).src = MACHO_BRACE_SPRITE;
+requireElementById('roster-filter-pokerus-icon').innerHTML = POKERUS_ICON_SVG;
+/** @type {HTMLImageElement} */ (requireElementById('roster-filter-exp-share-icon')).src = EXP_SHARE_SPRITE;
+/** @type {HTMLImageElement} */ (requireElementById('roster-filter-item-icon')).src = MACHO_BRACE_SPRITE;
 rosterFilterLevelMin.min = rosterFilterLevelMax.min = String(MIN_LEVEL);
 rosterFilterLevelMin.max = rosterFilterLevelMax.max = String(MAX_LEVEL);
 rosterFilterNature.innerHTML =
@@ -87,17 +91,17 @@ rosterFilterNature.innerHTML =
     .map((n) => `<option value="${n.id}">${natureLabel(n)}</option>`)
     .join('');
 
-const catchDialog = document.getElementById('catch-dialog');
-const catchForm = document.getElementById('catch-form');
-const catchDialogTitle = document.getElementById('catch-dialog-title');
-const catchDialogSprite = document.getElementById('catch-dialog-sprite');
-const catchDialogName = document.getElementById('catch-dialog-name');
-const catchDialogEvYield = document.getElementById('catch-dialog-ev-yield');
-const catchDialogLevel = document.getElementById('catch-dialog-level');
-const catchDialogNatureField = document.getElementById('catch-dialog-nature-field');
-const catchDialogNature = document.getElementById('catch-dialog-nature');
-const catchDialogSubmitBtn = document.getElementById('catch-dialog-submit-btn');
-const catchDialogCancelBtn = document.getElementById('catch-dialog-cancel-btn');
+const catchDialog = /** @type {HTMLDialogElement} */ (requireElementById('catch-dialog'));
+const catchForm = /** @type {HTMLFormElement} */ (requireElementById('catch-form'));
+const catchDialogTitle = requireElementById('catch-dialog-title');
+const catchDialogSprite = /** @type {HTMLImageElement} */ (requireElementById('catch-dialog-sprite'));
+const catchDialogName = requireElementById('catch-dialog-name');
+const catchDialogEvYield = requireElementById('catch-dialog-ev-yield');
+const catchDialogLevel = /** @type {HTMLInputElement} */ (requireElementById('catch-dialog-level'));
+const catchDialogNatureField = requireElementById('catch-dialog-nature-field');
+const catchDialogNature = /** @type {HTMLSelectElement} */ (requireElementById('catch-dialog-nature'));
+const catchDialogSubmitBtn = /** @type {HTMLButtonElement} */ (requireElementById('catch-dialog-submit-btn'));
+const catchDialogCancelBtn = requireElementById('catch-dialog-cancel-btn');
 
 // Populated once — the nature list doesn't depend on species or game
 // version. Same shared markup the detail card's picker uses.
@@ -107,7 +111,7 @@ const catchDialogSpriteFallback = wireSpriteFallback(catchDialogSprite);
 
 backToParties.href = router.partyPath(null);
 interceptLinkClick(backToParties, () => router.navigateHome());
-editPartyBtn.addEventListener('click', () => openEditDialog(store.activeParty));
+editPartyBtn.addEventListener('click', () => openEditDialog(activeParty()));
 
 /* ------------------------------------------------------------------ */
 /* Catch panel                                                         */
@@ -117,6 +121,7 @@ editPartyBtn.addEventListener('click', () => openEditDialog(store.activeParty));
 // catching immediately — level is decided at catch time, not fixed to
 // DEFAULT_LEVEL, since that's when the user actually knows it. EV yield
 // isn't shown here: it doesn't matter until the Pokémon is trained.
+/** @type {import('../lib/pokeapi-client.js').DomainPokemon|null} */
 let pendingCatchMon = null;
 
 // Guards against a stale lookup: open the dialog for a slow-loading
@@ -125,8 +130,9 @@ let pendingCatchMon = null;
 // and pendingCatchMon, so submitting would catch the wrong species.
 let catchDialogToken = 0;
 
-catchSearch.addEventListener('pokemon-pick', (e) => openCatchDialog(e.detail.name));
+catchSearch.addEventListener('pokemon-pick', (e) => openCatchDialog(/** @type {CustomEvent} */ (e).detail.name));
 
+/** @param {string} name */
 async function openCatchDialog(name) {
   const token = ++catchDialogToken;
   pendingCatchMon = null;
@@ -134,7 +140,7 @@ async function openCatchDialog(name) {
   catchDialogSpriteFallback.setVersionedSprite(null, FALLBACK_SPRITE);
   catchDialogName.textContent = titleCase(name);
   catchDialogEvYield.textContent = '';
-  catchDialogLevel.value = DEFAULT_LEVEL;
+  catchDialogLevel.value = String(DEFAULT_LEVEL);
   catchDialogNature.value = '';
   catchDialogNatureField.hidden = !store.natureAvailable();
   catchDialogSubmitBtn.disabled = true;
@@ -153,7 +159,7 @@ async function openCatchDialog(name) {
     catchDialogLevel.select();
   } catch (err) {
     if (token !== catchDialogToken) return;
-    catchDialogEvYield.textContent = err.message || 'Could not look up that Pokémon.';
+    catchDialogEvYield.textContent = (err instanceof Error && err.message) || 'Could not look up that Pokémon.';
   }
 }
 
@@ -167,6 +173,7 @@ catchDialogCancelBtn.addEventListener('click', () => catchDialog.close());
 // dialog can close by: submit, Cancel, Esc, and backdrop click.
 catchDialog.addEventListener('close', () => catchSearch.blur());
 
+/** @type {ReturnType<typeof setTimeout>|null} */
 let catchStatusTimer = null;
 
 catchForm.addEventListener('submit', (e) => {
@@ -181,7 +188,7 @@ catchForm.addEventListener('submit', (e) => {
   api.getEvolutionOptions(mon.name).catch(() => {});
   // Restart (not stack) the toast timer, so catching twice quickly
   // doesn't let the first timer wipe the second message early.
-  clearTimeout(catchStatusTimer);
+  if (catchStatusTimer !== null) clearTimeout(catchStatusTimer);
   catchStatusTimer = setTimeout(() => {
     catchStatus.textContent = '';
   }, 3000);
@@ -196,6 +203,9 @@ catchForm.addEventListener('submit', (e) => {
 // catchSearch.recent comment, and store.reorderPokemon) — that's the
 // roster's long-standing default order, catch-order or manually
 // reordered alike, so leave it alone rather than re-sort it.
+/** @typedef {{ levelMin: number|null, levelMax: number|null, expShare: boolean, pokerus: boolean, trained: string, item: boolean, nature: string }} RosterFilters */
+
+/** @type {Record<string, (entries: RosterEntry[]) => RosterEntry[]>} */
 const ROSTER_SORTS = {
   catch: (entries) => entries,
   name: (entries) =>
@@ -206,6 +216,7 @@ const ROSTER_SORTS = {
   evs: (entries) => [...entries].sort((a, b) => totalEvs(b.evs) - totalEvs(a.evs)),
 };
 
+/** @param {RosterEntry} entry @param {string} query */
 function matchesRosterQuery(entry, query) {
   if (!query) return true;
   return (
@@ -217,9 +228,11 @@ function matchesRosterQuery(entry, query) {
 // Pokérus/Exp. Share are .ds-item-btn toggles, not checkboxes — same
 // pressed-state convention as the detail page's own Pokérus/Exp. Share
 // toggles (components/caught-pokemon-detail.js).
+/** @param {HTMLElement} btn */
 function isToggleActive(btn) {
   return btn.getAttribute('aria-pressed') === 'true';
 }
+/** @param {HTMLElement} btn @param {boolean} active */
 function setToggleActive(btn, active) {
   btn.setAttribute('aria-pressed', String(active));
   btn.classList.toggle('ds-item-btn--active', active);
@@ -227,7 +240,8 @@ function setToggleActive(btn, active) {
 
 /** Reads the filter panel's controls into a plain object — called fresh
  * each render rather than cached, since the controls are the source of
- * truth (same reasoning as reading rosterSearchInput.value directly). */
+ * truth (same reasoning as reading rosterSearchInput.value directly).
+ * @returns {RosterFilters} */
 function readRosterFilters() {
   return {
     levelMin: rosterFilterLevelMin.value ? Number(rosterFilterLevelMin.value) : null,
@@ -240,6 +254,7 @@ function readRosterFilters() {
   };
 }
 
+/** @param {RosterEntry} entry @param {RosterFilters} filters @param {number|null} totalCap */
 function matchesRosterFilters(entry, filters, totalCap) {
   if (filters.levelMin != null && entry.level < filters.levelMin) return false;
   if (filters.levelMax != null && entry.level > filters.levelMax) return false;
@@ -272,12 +287,12 @@ function readRosterStateFromQuery() {
   const levelMax = Number(params.get('levelMax'));
   return {
     q: params.get('q') || '',
-    sort: ROSTER_SORT_VALUES.includes(sort) ? sort : 'catch',
+    sort: sort != null && ROSTER_SORT_VALUES.includes(sort) ? sort : 'catch',
     levelMin: params.has('levelMin') && Number.isInteger(levelMin) ? levelMin : null,
     levelMax: params.has('levelMax') && Number.isInteger(levelMax) ? levelMax : null,
     expShare: params.get('expShare') === '1',
     pokerus: params.get('pokerus') === '1',
-    trained: ROSTER_TRAINED_VALUES.includes(trained) ? trained : 'all',
+    trained: trained != null && ROSTER_TRAINED_VALUES.includes(trained) ? trained : 'all',
     item: params.get('item') === '1',
     nature: params.get('nature') || '',
     filterOpen: params.get('filterOpen') === '1',
@@ -305,6 +320,7 @@ function writeRosterStateToQuery() {
   history.replaceState(null, '', url);
 }
 
+/** @param {Party} party */
 function renderRoster(party) {
   // Hide filter options a party's game version makes meaningless, same
   // gating the rules legend below uses — an always-empty filter reads as
@@ -383,13 +399,13 @@ function renderRoster(party) {
         <ev-bar class="roster-card-evbar"></ev-bar>
       </a>
     `;
-    const link = row.querySelector('.roster-card-link');
-    const evBar = row.querySelector('ev-bar');
+    const link = /** @type {HTMLElement} */ (row.querySelector('.roster-card-link'));
+    const evBar = /** @type {import('../components/ev-bar.js').EvBar} */ (row.querySelector('ev-bar'));
     evBar.hidden = totalCap == null;
     evBar.max = totalCap;
     evBar.value = totalEvs(entry.evs);
     interceptLinkClick(link, () => router.navigateToPokemon(party.slug, entry.uid));
-    if (reorderable) wireDragHandle(row.querySelector('.roster-card-handle'), row);
+    if (reorderable) wireDragHandle(/** @type {HTMLButtonElement} */ (row.querySelector('.roster-card-handle')), row);
     roster.appendChild(row);
   }
   writeRosterStateToQuery();
@@ -435,6 +451,7 @@ function wireDragHandle(handle, row) {
     /** @type {{ card: Element, before: boolean } | null} */
     let dropTarget = null;
 
+    /** @param {PointerEvent} moveEvent */
     const onMove = (moveEvent) => {
       const { clientX: x, clientY: y } = moveEvent;
       let closest = null;
@@ -464,7 +481,7 @@ function wireDragHandle(handle, row) {
         roster.insertBefore(row, dropTarget.before ? dropTarget.card : dropTarget.card.nextSibling);
       }
       const endIndex = cardsNow().indexOf(row);
-      if (endIndex !== startIndex) store.reorderPokemon(row.dataset.uid, endIndex);
+      if (endIndex !== startIndex) store.reorderPokemon(/** @type {string} */ (row.dataset.uid), endIndex);
     };
     handle.addEventListener('pointermove', onMove);
     handle.addEventListener('pointerup', onEnd);
@@ -478,7 +495,7 @@ function wireDragHandle(handle, row) {
 /* text can never drift from the behavior again.                        */
 /* ------------------------------------------------------------------ */
 
-const trainingLegend = document.getElementById('training-legend');
+const trainingLegend = requireElementById('training-legend');
 
 function renderLegend() {
   const items = [];
@@ -534,31 +551,41 @@ function resetRosterFilters() {
 // renderRoster, so their value survives a same-party re-render (e.g.
 // catching another Pokémon while filtered) — only reset them on an
 // actual party switch.
+/** @type {string|null} */
 let currentPartySlug = null;
 
-rosterSearchInput.addEventListener('input', () => renderRoster(store.activeParty));
-rosterSortSelect.addEventListener('change', () => renderRoster(store.activeParty));
-rosterFilterLevelMin.addEventListener('input', () => renderRoster(store.activeParty));
-rosterFilterLevelMax.addEventListener('input', () => renderRoster(store.activeParty));
+// These listeners only ever fire while the roster view is showing, which
+// app.js only does once an active party is set (see app.js's render()) —
+// so store.activeParty is guaranteed non-null here, same reasoning as
+// lib/dom.js's requireElementById for static markup.
+/** @returns {Party} */
+function activeParty() {
+  return /** @type {Party} */ (store.activeParty);
+}
+
+rosterSearchInput.addEventListener('input', () => renderRoster(activeParty()));
+rosterSortSelect.addEventListener('change', () => renderRoster(activeParty()));
+rosterFilterLevelMin.addEventListener('input', () => renderRoster(activeParty()));
+rosterFilterLevelMax.addEventListener('input', () => renderRoster(activeParty()));
 rosterFilterExpShare.addEventListener('click', () => {
   setToggleActive(rosterFilterExpShare, !isToggleActive(rosterFilterExpShare));
-  renderRoster(store.activeParty);
+  renderRoster(activeParty());
 });
 rosterFilterPokerus.addEventListener('click', () => {
   setToggleActive(rosterFilterPokerus, !isToggleActive(rosterFilterPokerus));
-  renderRoster(store.activeParty);
+  renderRoster(activeParty());
 });
 for (const radio of rosterFilterTrainedRadios) {
-  radio.addEventListener('change', () => renderRoster(store.activeParty));
+  radio.addEventListener('change', () => renderRoster(activeParty()));
 }
 rosterFilterItem.addEventListener('click', () => {
   setToggleActive(rosterFilterItem, !isToggleActive(rosterFilterItem));
-  renderRoster(store.activeParty);
+  renderRoster(activeParty());
 });
-rosterFilterNature.addEventListener('change', () => renderRoster(store.activeParty));
+rosterFilterNature.addEventListener('change', () => renderRoster(activeParty()));
 rosterFilterClear.addEventListener('click', () => {
   resetRosterFilters();
-  renderRoster(store.activeParty);
+  renderRoster(activeParty());
 });
 rosterFilterBtn.addEventListener('click', () => {
   rosterFilterDialog.showModal();
@@ -576,7 +603,7 @@ rosterFilterDone.addEventListener('click', () => rosterFilterDialog.close());
 // synced to the URL.
 rosterFilterDialog.addEventListener('close', () => writeRosterStateToQuery());
 
-/** @param {ReturnType<typeof store.getPartyBySlug>} party */
+/** @param {Party} party */
 export function render(party) {
   if (party.slug !== currentPartySlug) {
     // The very first render since this page loaded doubles as "did the

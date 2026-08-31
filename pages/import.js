@@ -2,12 +2,12 @@
 // Import review ("/import/<payload>") — the screen a shared transfer
 // link opens to. Thin: all the rendering lives in <import-review> itself.
 
-import { wireUtilityBackLink } from '../lib/dom.js';
+import { wireUtilityBackLink, requireElementById, requireQuery } from '../lib/dom.js';
 import '../components/import-review.js';
 
-export const view = document.getElementById('import-view');
-const backFromImport = document.getElementById('back-from-import');
-const importReview = view.querySelector('import-review');
+export const view = requireElementById('import-view');
+const backFromImport = /** @type {HTMLAnchorElement} */ (requireElementById('back-from-import'));
+const importReview = /** @type {import('../components/import-review.js').ImportReview} */ (requireQuery('import-review', view));
 
 const setBackLinkPath = wireUtilityBackLink(backFromImport);
 

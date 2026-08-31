@@ -6,7 +6,7 @@ import { readFileSync } from 'node:fs';
 import { Store, MIGRATIONS } from '../lib/store.js';
 import { SCHEMA_VERSION } from '../lib/schema-version.js';
 import { STAT_CAP, TOTAL_CAP, VITAMIN_BONUS, MIN_LEVEL, MAX_LEVEL, DEFAULT_LEVEL } from '../lib/constants.js';
-import { emptyEvs } from '../lib/utils.js';
+import { emptyEvs, emptyIvs } from '../lib/utils.js';
 
 /** @typedef {import('../lib/pokeapi-client.js').DomainPokemon} DomainPokemon */
 
@@ -19,9 +19,22 @@ function mon(overrides = {}) {
 // call site behaves identically whether the active party reads the modern
 // EV yield or (Gen I-II) the Stat Experience base-stat yield — pass an
 // explicit `baseStats` override to exercise a case where they differ.
-/** @param {import('../lib/constants.js').EvMap} evYield @param {Partial<DomainPokemon>} [overrides] @returns {DomainPokemon} */
-function opponent(evYield, overrides = {}) {
-  return { id: 1, name: 'rattata', sprite: null, evYield, baseStats: evYield, ...overrides };
+/** @param {Partial<import('../lib/constants.js').EvMap>} [evYield] @param {Partial<DomainPokemon>} [overrides] @returns {DomainPokemon} */
+function opponent(evYield = {}, overrides = {}) {
+  const yieldMap = { ...emptyEvs(), ...evYield };
+  return { id: 1, name: 'rattata', sprite: null, evYield: yieldMap, baseStats: yieldMap, ...overrides };
+}
+
+// Store methods that look an entry up by uid return null on a bad uid —
+// real callers (pages/components) check that. Every uid in this file
+// comes straight from a just-created entry, so the lookup always
+// succeeds; this narrows the type for the assertions below rather than
+// threading `?.`/`!` through each one (which would silently swallow a
+// real regression instead of failing loudly).
+/** @template T @param {T} value @returns {NonNullable<T>} */
+function unwrap(value) {
+  assert.ok(value != null);
+  return /** @type {NonNullable<T>} */ (value);
 }
 
 /** @type {Store} */
@@ -100,11 +113,11 @@ test('previewDefeat reports the same yield as logDefeat but applies nothing', ()
   store.setPokerus(entry.uid, true);
   const opp = opponent({ hp: 0, atk: 0, def: 0, spa: 2, spd: 0, spe: 0 });
 
-  const preview = store.previewDefeat(entry.uid, opp);
+  const preview = unwrap(store.previewDefeat(entry.uid, opp));
   assert.deepEqual(entry.evs, { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 });
   assert.equal(entry.history.length, 2); // catch seed + pokerus toggle — preview logs nothing more
 
-  const logged = store.logDefeat(entry.uid, opp);
+  const logged = unwrap(store.logDefeat(entry.uid, opp));
   assert.deepEqual(preview.applied, logged.applied);
   assert.equal(entry.evs.spa, preview.applied.spa);
 });
@@ -115,7 +128,7 @@ test('previewDefeat.applied is zeroed once the stat is already at the 252 cap', 
   for (let i = 0; i < 200; i++) store.logDefeat(entry.uid, opp); // maxes out atk
   assert.equal(entry.evs.atk, STAT_CAP);
 
-  const preview = store.previewDefeat(entry.uid, opp);
+  const preview = unwrap(store.previewDefeat(entry.uid, opp));
   assert.equal(preview.applied.atk, 0); // nothing left to gain — the "Capped" UI state
   assert.notEqual(preview.base.atk, 0); // base yield itself is unaffected by the cap
 });
@@ -168,7 +181,7 @@ test('the catch event is never deletable', () => {
 
 test('useVitamin raises exactly its target stat by the vitamin bonus', () => {
   const entry = store.catchPokemon(mon());
-  const result = store.useVitamin(entry.uid, 'protein'); // targets atk
+  const result = unwrap(store.useVitamin(entry.uid, 'protein')); // targets atk
   assert.equal(result.applied, VITAMIN_BONUS);
   assert.equal(result.stat, 'atk');
   assert.equal(entry.evs.atk, VITAMIN_BONUS);
@@ -181,7 +194,7 @@ test('useVitamin is clamped by the same 252/510 caps as battling', () => {
   for (let i = 0; i < 30; i++) store.useVitamin(entry.uid, 'protein');
   assert.equal(entry.evs.atk, STAT_CAP);
 
-  const last = store.useVitamin(entry.uid, 'protein');
+  const last = unwrap(store.useVitamin(entry.uid, 'protein'));
   assert.equal(last.applied, 0);
 });
 
@@ -190,7 +203,7 @@ test('useVitamin respects the shared 510 total cap across stats', () => {
   const opp = opponent({ hp: 252, atk: 252, def: 0, spa: 0, spd: 0, spe: 0 });
   store.logDefeat(entry.uid, opp); // fills hp + atk to 252/252, total 504
 
-  const result = store.useVitamin(entry.uid, 'iron'); // targets def, room left = 6
+  const result = unwrap(store.useVitamin(entry.uid, 'iron')); // targets def, room left = 6
   assert.equal(result.applied, 6);
   assert.equal(Object.values(entry.evs).reduce((a, b) => a + b, 0), TOTAL_CAP);
 });
@@ -296,7 +309,7 @@ test('overrides only replace the keys given, and null clears back to auto', () =
   assert.equal(store.pokerusAvailable(), false);
   assert.equal(store.powerItemBonus(), 8); // untouched key still follows the game version
 
-  store.updateParty(store.activeParty.id, { overrides: { pokerus: null } });
+  store.updateParty(unwrap(store.activeParty).id, { overrides: { pokerus: null } });
   assert.equal(store.pokerusAvailable(), true); // back to Sword's real behavior
 });
 
@@ -311,7 +324,7 @@ test('useVitamin stops at 100 EVs on a recognized Gen III-VII title', () => {
   for (let i = 0; i < 10; i++) store.useVitamin(entry.uid, 'protein');
   assert.equal(entry.evs.atk, 100); // last dose crosses into the 100+ zone, still applied
 
-  const blocked = store.useVitamin(entry.uid, 'protein');
+  const blocked = unwrap(store.useVitamin(entry.uid, 'protein'));
   assert.equal(blocked.applied, 0);
   assert.equal(blocked.blockedByCutoff, true);
   assert.equal(entry.evs.atk, 100);
@@ -345,7 +358,7 @@ test('useFeather is clamped by the same 252/510 caps as battling', () => {
   for (let i = 0; i < 260; i++) store.useFeather(entry.uid, 'muscle-wing');
   assert.equal(entry.evs.atk, STAT_CAP);
 
-  const last = store.useFeather(entry.uid, 'muscle-wing');
+  const last = unwrap(store.useFeather(entry.uid, 'muscle-wing'));
   assert.equal(last.applied, 0);
 });
 
@@ -367,13 +380,13 @@ test('useBerry removes EV_BERRY_REDUCTION EVs from its target stat, floored at 0
   const entry = store.catchPokemon(mon());
   store.logDefeat(entry.uid, opponent({ hp: 0, atk: 6, def: 0, spa: 0, spd: 0, spe: 0 }));
 
-  const result = store.useBerry(entry.uid, 'kelpsy'); // targets atk
+  const result = unwrap(store.useBerry(entry.uid, 'kelpsy')); // targets atk
   assert.equal(result.applied, 6); // only 6 were there to remove
   assert.equal(result.stat, 'atk');
   assert.equal(entry.evs.atk, 0);
   assert.equal(entry.history[0].kind, 'berry');
 
-  const empty = store.useBerry(entry.uid, 'kelpsy');
+  const empty = unwrap(store.useBerry(entry.uid, 'kelpsy'));
   assert.equal(empty.applied, 0); // nothing left to remove
 });
 
@@ -407,11 +420,11 @@ test('on Diamond/Pearl/Platinum, a berry snaps a stat above 110 EVs straight to 
   const entry = store.catchPokemon(mon());
   store.logDefeat(entry.uid, opponent({ hp: 0, atk: 150, def: 0, spa: 0, spd: 0, spe: 0 }));
 
-  const result = store.useBerry(entry.uid, 'kelpsy');
+  const result = unwrap(store.useBerry(entry.uid, 'kelpsy'));
   assert.equal(entry.evs.atk, 100); // snapped, not 140
   assert.equal(result.applied, 50);
 
-  const again = store.useBerry(entry.uid, 'kelpsy'); // 100 is not above the 110 threshold
+  const again = unwrap(store.useBerry(entry.uid, 'kelpsy')); // 100 is not above the 110 threshold
   assert.equal(entry.evs.atk, 90); // ordinary -10 now
   assert.equal(again.applied, 10);
 });
@@ -430,10 +443,10 @@ test('deleteHistoryEntry removes a feather/berry record and reverts the EVs it a
 
 test('deleting the active party falls back to another remaining party', () => {
   const second = store.createParty('Party 2');
-  assert.equal(store.activeParty.id, second.id);
+  assert.equal(unwrap(store.activeParty).id, second.id);
 
   store.deleteParty(second.id);
-  assert.notEqual(store.activeParty.id, second.id);
+  assert.notEqual(unwrap(store.activeParty).id, second.id);
   assert.equal(store.state.parties.length, 1);
 });
 
@@ -517,7 +530,7 @@ test('useVitamin under Stat Experience adds STAT_EXP_VITAMIN_BONUS and stops onc
   for (let i = 0; i < 10; i++) store.useVitamin(entry.uid, 'protein');
   assert.equal(entry.evs.atk, 25600); // 10 * 2560, still within the 65,535 cap
 
-  const blocked = store.useVitamin(entry.uid, 'protein');
+  const blocked = unwrap(store.useVitamin(entry.uid, 'protein'));
   assert.equal(blocked.applied, 0);
   assert.equal(blocked.blockedByCeiling, true);
   assert.equal(entry.evs.atk, 25600); // 11th use does nothing
@@ -533,7 +546,7 @@ test('useVitamin under Stat Experience is blocked by pre-existing battle Stat Ex
   const opp = opponent({}, { baseStats: { hp: 0, atk: 30000, def: 0, spa: 0, spd: 0, spe: 0 } });
   store.logDefeat(entry.uid, opp); // atk = 30000, already past the ceiling
 
-  const result = store.useVitamin(entry.uid, 'protein');
+  const result = unwrap(store.useVitamin(entry.uid, 'protein'));
   assert.equal(result.applied, 0);
   assert.equal(result.blockedByCeiling, true);
   assert.equal(entry.evs.atk, 30000); // unchanged — no use counter to exhaust first
@@ -548,11 +561,11 @@ test('useVitamin under Stat Experience adds its full bonus even if that pushes t
   const opp = opponent({}, { baseStats: { hp: 0, atk: 25000, def: 0, spa: 0, spd: 0, spe: 0 } });
   store.logDefeat(entry.uid, opp); // atk = 25000, still under the ceiling
 
-  const result = store.useVitamin(entry.uid, 'protein');
+  const result = unwrap(store.useVitamin(entry.uid, 'protein'));
   assert.equal(result.applied, 2560);
   assert.equal(entry.evs.atk, 27560); // past 25,600, since the check ran before adding
 
-  const blocked = store.useVitamin(entry.uid, 'protein');
+  const blocked = unwrap(store.useVitamin(entry.uid, 'protein'));
   assert.equal(blocked.applied, 0); // now blocked, since 27560 >= 25600
 });
 
@@ -571,7 +584,7 @@ test('specialStatMerged is true only for Gen I, not overridable, and Calcium fee
   store.createParty('Red run', '', 'Red'); // Gen 1
   assert.equal(store.specialStatMerged(), true);
   const entry = store.catchPokemon(mon());
-  const result = store.useVitamin(entry.uid, 'calcium');
+  const result = unwrap(store.useVitamin(entry.uid, 'calcium'));
   assert.equal(result.applied, 2560);
   assert.equal(result.linkedStat, 'spd');
   assert.equal(entry.evs.spa, 2560);
@@ -580,7 +593,7 @@ test('specialStatMerged is true only for Gen I, not overridable, and Calcium fee
   store.createParty('Crystal run', '', 'Crystal'); // Gen 2: Special already split
   assert.equal(store.specialStatMerged(), false);
   const crystalEntry = store.catchPokemon(mon({ id: 2, name: 'charmander' }));
-  const crystalResult = store.useVitamin(crystalEntry.uid, 'calcium');
+  const crystalResult = unwrap(store.useVitamin(crystalEntry.uid, 'calcium'));
   assert.equal(crystalResult.linkedStat, null);
   assert.equal(crystalEntry.evs.spa, 2560);
   assert.equal(crystalEntry.evs.spd, 0);
@@ -589,7 +602,7 @@ test('specialStatMerged is true only for Gen I, not overridable, and Calcium fee
 test('deleteHistoryEntry on a merged-Special vitamin event reverts both spa and spd', () => {
   store.createParty('Red run', '', 'Red'); // Gen 1
   const entry = store.catchPokemon(mon());
-  const result = store.useVitamin(entry.uid, 'calcium');
+  const result = unwrap(store.useVitamin(entry.uid, 'calcium'));
   assert.equal(entry.evs.spa, 2560);
   assert.equal(entry.evs.spd, 2560);
 
@@ -676,8 +689,8 @@ test('releasePokemon removes the entry from the active party only', () => {
   const keep = store.catchPokemon(mon());
   const release = store.catchPokemon(mon({ id: 2, name: 'charmander' }));
   store.releasePokemon(release.uid);
-  assert.equal(store.activeParty.pokemon.length, 1);
-  assert.equal(store.activeParty.pokemon[0].uid, keep.uid);
+  assert.equal(unwrap(store.activeParty).pokemon.length, 1);
+  assert.equal(unwrap(store.activeParty).pokemon[0].uid, keep.uid);
 });
 
 test('setLevel clamps to [MIN_LEVEL, MAX_LEVEL] and logs history only on an actual change', () => {
@@ -704,7 +717,7 @@ test('setLevel clamps to [MIN_LEVEL, MAX_LEVEL] and logs history only on an actu
 test('createParty falls back to a numbered default name and becomes active', () => {
   const party = store.createParty('');
   assert.match(party.name, /^Party \d+$/);
-  assert.equal(store.activeParty.id, party.id);
+  assert.equal(unwrap(store.activeParty).id, party.id);
 });
 
 test('updateParty only touches the fields given, and merges overrides per-key', () => {
@@ -730,15 +743,15 @@ test('getPartyBySlug finds a party by its slug, or returns null', () => {
 });
 
 test('setActiveParty switches the active party, ignoring an unrecognized id', () => {
-  const first = store.activeParty;
+  const first = unwrap(store.activeParty);
   const second = store.createParty('Second');
-  assert.equal(store.activeParty.id, second.id); // createParty activates it
+  assert.equal(unwrap(store.activeParty).id, second.id); // createParty activates it
 
   store.setActiveParty(first.id);
-  assert.equal(store.activeParty.id, first.id);
+  assert.equal(unwrap(store.activeParty).id, first.id);
 
   store.setActiveParty('bogus-id');
-  assert.equal(store.activeParty.id, first.id); // unchanged
+  assert.equal(unwrap(store.activeParty).id, first.id); // unchanged
 });
 
 test('state persists across Store instances via localStorage', () => {
@@ -746,7 +759,7 @@ test('state persists across Store instances via localStorage', () => {
   store.renamePokemon(entry.uid, 'Buddy');
 
   const reloaded = new Store();
-  assert.equal(reloaded.activeParty.pokemon[0].nickname, 'Buddy');
+  assert.equal(unwrap(reloaded.activeParty).pokemon[0].nickname, 'Buddy');
 });
 
 test('migrates a v1 (pre-event-sourcing) save: identity, level, EVs and Pokérus survive as events', () => {
@@ -804,9 +817,10 @@ test('baseGame migrates from the old free-text gameVersion field: a matching tit
   );
 
   const loaded = new Store();
+  /** @type {(import('../lib/store.js').Party & { gameVersion?: string })[]} */
   const [official, romHack] = loaded.state.parties;
   assert.equal(official.baseGame, 'Emerald'); // snapped to canonical casing
-  assert.equal(official.gameVersion, undefined);
+  assert.equal(official.gameVersion, undefined); // the pre-migration field is gone, not just unused
   assert.equal(romHack.baseGame, '');
   assert.equal(romHack.gameVersion, undefined);
 });
@@ -819,7 +833,7 @@ test('a migrated save persists as schema 2 and round-trips', () => {
   migrated.renamePokemon('old-1', 'Kept'); // triggers a save in the new schema
 
   const reloaded = new Store();
-  const entry = reloaded.activeParty.pokemon[0];
+  const entry = unwrap(reloaded.activeParty).pokemon[0];
   assert.equal(entry.nickname, 'Kept');
   assert.equal(entry.level, 7);
   assert.equal(entry.evs.atk, 4);
@@ -862,7 +876,7 @@ test('a real save frozen at schema 1 still loads and projects correctly', () => 
   localStorage.setItem('effortdex:state', fixture);
 
   const loaded = new Store();
-  const party = loaded.activeParty;
+  const party = unwrap(loaded.activeParty);
   assert.equal(party.name, 'Fixture party');
   assert.equal(party.baseGame, 'Ultra Sun');
 
@@ -885,6 +899,11 @@ test('a real save frozen at schema 1 still loads and projects correctly', () => 
 // existed were computed under the old modern-EV rules and need
 // recomputing, sourced from the local PokeAPI cache (injected here via
 // `peekCachedMon` instead of a real PokeApiClient) — never a network call.
+// `events` here is raw pre-migration localStorage JSON, not a real
+// RosterEvent[] — the legacy*Event fixtures below are deliberately
+// missing fields the current RosterEvent shapes require (see each
+// fixture's own comment), which is the whole point of these tests.
+/** @param {any[]} events @param {Partial<import('../lib/store.js').PartyOverrides>} [overrides] */
 function legacyRedState(events, overrides = {}) {
   return {
     schema: SCHEMA_VERSION,
@@ -948,7 +967,8 @@ const legacyVitaminEvent = {
   blockedByCutoff: false,
 };
 
-const onixMon = { id: 95, name: 'onix', sprite: null, evYield: {}, baseStats: { hp: 35, atk: 45, def: 160, spa: 30, spd: 45, spe: 70 } };
+// evYield is irrelevant here — the backfill (Gen I/II) reads baseStats, never evYield.
+const onixMon = mon({ id: 95, name: 'onix', baseStats: { hp: 35, atk: 45, def: 160, spa: 30, spd: 45, spe: 70 } });
 
 test('the Gen I/II Stat Experience backfill recomputes old battle/vitamin events from the local mon cache', () => {
   localStorage.setItem(
@@ -957,7 +977,7 @@ test('the Gen I/II Stat Experience backfill recomputes old battle/vitamin events
   );
 
   const loaded = new Store({ peekCachedMon: (name) => (name === 'onix' ? onixMon : null) });
-  const entry = loaded.activeParty.pokemon[0];
+  const entry = unwrap(loaded.activeParty).pokemon[0];
 
   // Onix's real Attack (45), not the old modern EV yield (1), then +2,560
   // from the vitamin (well under the 25,600 ceiling).
@@ -971,7 +991,7 @@ test('the backfill leaves a battle event untouched when its opponent is no longe
   localStorage.setItem('effortdex:state', JSON.stringify(legacyRedState([legacyCatchEvent, legacyBattleEvent])));
 
   const loaded = new Store({ peekCachedMon: () => null }); // nothing cached
-  const entry = loaded.activeParty.pokemon[0];
+  const entry = unwrap(loaded.activeParty).pokemon[0];
 
   assert.equal(entry.evs.atk, 1); // old value, best-effort left alone
 });
@@ -983,13 +1003,13 @@ test('the backfill runs at most once — a second load never re-touches already-
   );
 
   const first = new Store({ peekCachedMon: (name) => (name === 'onix' ? onixMon : null) });
-  assert.equal(first.activeParty.pokemon[0].evs.atk, 45);
+  assert.equal(unwrap(first.activeParty).pokemon[0].evs.atk, 45);
 
   // Reloading with a DIFFERENT (wrong) mock proves the flag, not the mock,
   // is what's gating this — a second run would double-count otherwise.
   const secondMon = { ...onixMon, baseStats: { ...onixMon.baseStats, atk: 999 } };
   const second = new Store({ peekCachedMon: (name) => (name === 'onix' ? secondMon : null) });
-  assert.equal(second.activeParty.pokemon[0].evs.atk, 45);
+  assert.equal(unwrap(second.activeParty).pokemon[0].evs.atk, 45);
   assert.equal(second.state.statExpBackfillApplied, true);
 });
 
@@ -999,7 +1019,7 @@ test('the backfill does not touch a Gen III+ party\'s events at all', () => {
   localStorage.setItem('effortdex:state', JSON.stringify(rawState));
 
   const loaded = new Store({ peekCachedMon: () => onixMon });
-  const entry = loaded.activeParty.pokemon[0];
+  const entry = unwrap(loaded.activeParty).pokemon[0];
 
   assert.equal(entry.evs.atk, 1 + 10); // untouched: old battle +1, old vitamin +10
 });
@@ -1007,12 +1027,12 @@ test('the backfill does not touch a Gen III+ party\'s events at all', () => {
 test('the backfill merges Gen I\'s Special stat via gen1-special-stats.js, not the opponent\'s raw modern split', () => {
   // Chansey: modern spa 35 / spd 105, real Gen I Special 105 — see
   // lib/gen1-special-stats.js and its own dedicated tests.
-  const chansey = { id: 113, name: 'chansey', sprite: null, evYield: {}, baseStats: { hp: 250, atk: 5, def: 5, spa: 35, spd: 105, spe: 50 } };
+  const chansey = mon({ id: 113, name: 'chansey', baseStats: { hp: 250, atk: 5, def: 5, spa: 35, spd: 105, spe: 50 } });
   const legacyChanseyBattle = { ...legacyBattleEvent, opponentName: 'chansey', applied: { hp: 0, atk: 0, def: 0, spa: 3, spd: 0, spe: 0 } };
   localStorage.setItem('effortdex:state', JSON.stringify(legacyRedState([legacyCatchEvent, legacyChanseyBattle])));
 
   const loaded = new Store({ peekCachedMon: (name) => (name === 'chansey' ? chansey : null) });
-  const entry = loaded.activeParty.pokemon[0];
+  const entry = unwrap(loaded.activeParty).pokemon[0];
 
   assert.equal(entry.evs.spa, 105);
   assert.equal(entry.evs.spd, 105);
@@ -1022,7 +1042,7 @@ test('only source data is persisted — projections are rebuilt from events at l
   const entry = store.catchPokemon(mon());
   store.logDefeat(entry.uid, opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 }));
 
-  const persisted = JSON.parse(localStorage.getItem('effortdex:state'));
+  const persisted = JSON.parse(/** @type {string} */ (localStorage.getItem('effortdex:state')));
   const persistedEntry = persisted.parties[0].pokemon[0];
   assert.equal(persistedEntry.evs, undefined);
   assert.equal(persistedEntry.level, undefined);
@@ -1031,7 +1051,7 @@ test('only source data is persisted — projections are rebuilt from events at l
   assert.ok(Array.isArray(persistedEntry.events));
 
   const reloaded = new Store();
-  const rebuilt = reloaded.activeParty.pokemon[0];
+  const rebuilt = unwrap(reloaded.activeParty).pokemon[0];
   assert.equal(rebuilt.speciesName, 'bulbasaur');
   assert.equal(rebuilt.evs.atk, 1);
   assert.equal(rebuilt.level, DEFAULT_LEVEL);
@@ -1045,7 +1065,7 @@ test('a held Macho Brace stops applying when the game version no longer offers i
   assert.equal(entry.evs.atk, 2); // doubled while available
 
   // The party gets edited to a Gen VII title where the brace was dropped.
-  store.updateParty(store.activeParty.id, { baseGame: 'Sun' });
+  store.updateParty(unwrap(store.activeParty).id, { baseGame: 'Sun' });
   store.logDefeat(entry.uid, opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 }));
   assert.equal(entry.evs.atk, 3); // +1 only — the stored brace no longer applies
   assert.equal(entry.history[0].machoBrace, false); // and the record doesn't claim it did
@@ -1054,20 +1074,20 @@ test('a held Macho Brace stops applying when the game version no longer offers i
 test('a held power item stops applying when the game version predates power items', () => {
   const entry = store.catchPokemon(mon());
   store.setPowerItem(entry.uid, 'bracer');
-  store.updateParty(store.activeParty.id, { baseGame: 'Red' }); // Gen 1: no power items
+  store.updateParty(unwrap(store.activeParty).id, { baseGame: 'Red' }); // Gen 1: no power items
   store.logDefeat(entry.uid, opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 }));
   assert.equal(entry.evs.atk, 1); // no +8
   assert.equal(entry.history[0].powerItem, null);
 });
 
 test('spriteBaseGame falls back from the sprite override to the base game to empty', () => {
-  store.updateParty(store.activeParty.id, { baseGame: 'Emerald' });
+  store.updateParty(unwrap(store.activeParty).id, { baseGame: 'Emerald' });
   assert.equal(store.spriteBaseGame(), 'Emerald'); // no override set — follows the base game
 
-  store.updateParty(store.activeParty.id, { overrides: { spriteVersion: 'Crystal' } });
+  store.updateParty(unwrap(store.activeParty).id, { overrides: { spriteVersion: 'Crystal' } });
   assert.equal(store.spriteBaseGame(), 'Crystal'); // override wins over the base game
 
-  store.updateParty(store.activeParty.id, { baseGame: '', overrides: { spriteVersion: null } });
+  store.updateParty(unwrap(store.activeParty).id, { baseGame: '', overrides: { spriteVersion: null } });
   assert.equal(store.spriteBaseGame(), ''); // neither set
 });
 
@@ -1228,9 +1248,9 @@ test('exportPayload returns only source-of-truth fields, matching what _save per
   const exported = store.exportPayload();
   assert.equal(exported.length, 1);
   const [party] = exported;
-  assert.equal(party.id, store.activeParty.id);
+  assert.equal(party.id, unwrap(store.activeParty).id);
   assert.equal(party.pokemon[0].uid, entry.uid);
-  assert.equal(party.pokemon[0].evs, undefined); // no derived fields
+  assert.equal(/** @type {any} */ (party.pokemon[0]).evs, undefined); // no derived fields
   assert.ok(Array.isArray(party.pokemon[0].events));
 });
 
@@ -1238,14 +1258,15 @@ test('previewImport reports isNew and newEventCount relative to local state, wit
   const entry = store.catchPokemon(mon());
   const localCatchEvent = entry.events[0];
 
+  /** @type {import('../lib/store.js').ExportedParty[]} */
   const imported = [
     {
-      id: store.activeParty.id,
-      name: store.activeParty.name,
+      id: unwrap(store.activeParty).id,
+      name: unwrap(store.activeParty).name,
       description: '',
       baseGame: '',
       overrides: {},
-      slug: store.activeParty.slug,
+      slug: unwrap(store.activeParty).slug,
       pokemon: [
         {
           uid: entry.uid,
@@ -1253,7 +1274,8 @@ test('previewImport reports isNew and newEventCount relative to local state, wit
           nature: null,
           powerItem: null,
           machoBrace: false,
-          events: [localCatchEvent, { id: 'new-ev', kind: 'vitamin', timestamp: 2, vitaminId: 'protein', stat: 'atk', applied: 10, blockedByCutoff: false }],
+          ivs: emptyIvs(),
+          events: [localCatchEvent, { id: 'new-ev', kind: 'vitamin', timestamp: 2, vitaminId: 'protein', stat: 'atk', linkedStat: null, applied: 10, blockedByCutoff: false, blockedByCeiling: false }],
         },
         {
           uid: 'brand-new-uid',
@@ -1261,6 +1283,7 @@ test('previewImport reports isNew and newEventCount relative to local state, wit
           nature: null,
           powerItem: null,
           machoBrace: false,
+          ivs: emptyIvs(),
           events: [{ id: 'ev-x', kind: 'catch', timestamp: 3, speciesName: 'charmander', speciesId: 4, sprite: null, baseStats: null, level: 5 }],
         },
       ],
@@ -1283,6 +1306,7 @@ test('previewImport reports isNew and newEventCount relative to local state, wit
 });
 
 test('applyImport adds a brand-new party and Pokémon wholesale', () => {
+  /** @type {import('../lib/store.js').ExportedParty[]} */
   const imported = [
     {
       id: 'remote-party-1',
@@ -1298,6 +1322,7 @@ test('applyImport adds a brand-new party and Pokémon wholesale', () => {
           nature: 'jolly',
           powerItem: null,
           machoBrace: false,
+          ivs: emptyIvs(),
           events: [{ id: 'ev-1', kind: 'catch', timestamp: 1, speciesName: 'pikachu', speciesId: 25, sprite: null, baseStats: null, level: 10 }],
         },
       ],
@@ -1316,6 +1341,7 @@ test('applyImport adds a brand-new party and Pokémon wholesale', () => {
 });
 
 test('applyImport skips Pokémon not in the selected set entirely', () => {
+  /** @type {import('../lib/store.js').ExportedParty[]} */
   const imported = [
     {
       id: 'remote-party-2',
@@ -1331,6 +1357,7 @@ test('applyImport skips Pokémon not in the selected set entirely', () => {
           nature: null,
           powerItem: null,
           machoBrace: false,
+          ivs: emptyIvs(),
           events: [{ id: 'e1', kind: 'catch', timestamp: 1, speciesName: 'eevee', speciesId: 133, sprite: null, baseStats: null, level: 5 }],
         },
       ],
@@ -1346,15 +1373,17 @@ test('applyImport merges an existing Pokémon\'s events by id without duplicatin
   store.logDefeat(entry.uid, opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 })); // local-only battle
   assert.equal(entry.history.length, 2);
 
-  const remoteOnlyEvent = { id: 'remote-vitamin', kind: 'vitamin', timestamp: Date.now() + 1000, vitaminId: 'iron', stat: 'def', applied: 10, blockedByCutoff: false };
+  /** @type {import('../lib/store.js').VitaminEvent} */
+  const remoteOnlyEvent = { id: 'remote-vitamin', kind: 'vitamin', timestamp: Date.now() + 1000, vitaminId: 'iron', stat: 'def', linkedStat: null, applied: 10, blockedByCutoff: false, blockedByCeiling: false };
+  /** @type {import('../lib/store.js').ExportedParty[]} */
   const imported = [
     {
-      id: store.activeParty.id,
-      name: store.activeParty.name,
+      id: unwrap(store.activeParty).id,
+      name: unwrap(store.activeParty).name,
       description: '',
       baseGame: '',
       overrides: {},
-      slug: store.activeParty.slug,
+      slug: unwrap(store.activeParty).slug,
       pokemon: [
         {
           uid: entry.uid,
@@ -1362,6 +1391,7 @@ test('applyImport merges an existing Pokémon\'s events by id without duplicatin
           nature: entry.nature,
           powerItem: entry.powerItem,
           machoBrace: entry.machoBrace,
+          ivs: entry.ivs,
           events: [...entry.events, remoteOnlyEvent], // its own events, plus one new
         },
       ],
@@ -1381,14 +1411,15 @@ test('applyImport on a Pokémon with fully overlapping events is a no-op', () =>
   const beforeLength = entry.history.length;
   const beforeAtk = entry.evs.atk;
 
+  /** @type {import('../lib/store.js').ExportedParty[]} */
   const imported = [
     {
-      id: store.activeParty.id,
-      name: store.activeParty.name,
+      id: unwrap(store.activeParty).id,
+      name: unwrap(store.activeParty).name,
       description: '',
       baseGame: '',
       overrides: {},
-      slug: store.activeParty.slug,
+      slug: unwrap(store.activeParty).slug,
       pokemon: [
         {
           uid: entry.uid,
@@ -1396,6 +1427,7 @@ test('applyImport on a Pokémon with fully overlapping events is a no-op', () =>
           nature: entry.nature,
           powerItem: entry.powerItem,
           machoBrace: entry.machoBrace,
+          ivs: entry.ivs,
           events: entry.events, // identical to what's already local
         },
       ],
@@ -1413,14 +1445,15 @@ test('applyImport leaves an existing entry\'s nickname/nature/held item untouche
   store.setNature(entry.uid, 'timid');
   store.setPowerItem(entry.uid, 'lens');
 
+  /** @type {import('../lib/store.js').ExportedParty[]} */
   const imported = [
     {
-      id: store.activeParty.id,
-      name: store.activeParty.name,
+      id: unwrap(store.activeParty).id,
+      name: unwrap(store.activeParty).name,
       description: '',
       baseGame: '',
       overrides: {},
-      slug: store.activeParty.slug,
+      slug: unwrap(store.activeParty).slug,
       pokemon: [
         {
           uid: entry.uid,
@@ -1428,6 +1461,7 @@ test('applyImport leaves an existing entry\'s nickname/nature/held item untouche
           nature: 'adamant',
           powerItem: 'bracer',
           machoBrace: true,
+          ivs: entry.ivs,
           events: entry.events,
         },
       ],
@@ -1520,10 +1554,10 @@ test('exportPayload includes ivs, and a fresh load defaults them for old saves m
   assert.deepEqual(party.pokemon[0].ivs, { hp: null, atk: null, def: null, spa: null, spd: null, spe: 31 });
 
   // Simulate an old save from before IV tracking existed (field absent).
-  const raw = JSON.parse(localStorage.getItem('effortdex:state'));
+  const raw = JSON.parse(/** @type {string} */ (localStorage.getItem('effortdex:state')));
   delete raw.parties[0].pokemon[0].ivs;
   localStorage.setItem('effortdex:state', JSON.stringify(raw));
 
   const reloaded = new Store();
-  assert.deepEqual(reloaded.activeParty.pokemon[0].ivs, { hp: null, atk: null, def: null, spa: null, spd: null, spe: null });
+  assert.deepEqual(unwrap(reloaded.activeParty).pokemon[0].ivs, { hp: null, atk: null, def: null, spa: null, spd: null, spe: null });
 });

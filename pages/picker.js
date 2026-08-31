@@ -4,15 +4,15 @@
 import { totalEvs, escapeHtml } from '../lib/utils.js';
 import { store } from '../lib/services.js';
 import * as router from '../lib/router.js';
-import { interceptLinkClick } from '../lib/dom.js';
+import { interceptLinkClick, requireElementById } from '../lib/dom.js';
 import { openCreateDialog } from './party-dialog.js';
 import '../components/game-ball.js';
 
-export const view = document.getElementById('picker-view');
-const partyList = document.getElementById('party-list');
-const pickerEmpty = document.getElementById('picker-empty');
-const pickerNewPartyBtn = document.getElementById('picker-new-party-btn');
-const pickerImportBtn = document.getElementById('picker-import-btn');
+export const view = requireElementById('picker-view');
+const partyList = requireElementById('party-list');
+const pickerEmpty = requireElementById('picker-empty');
+const pickerNewPartyBtn = requireElementById('picker-new-party-btn');
+const pickerImportBtn = requireElementById('picker-import-btn');
 
 pickerNewPartyBtn.addEventListener('click', openCreateDialog);
 pickerImportBtn.addEventListener('click', () => router.navigateToImport());
@@ -41,7 +41,8 @@ export function render() {
         </div>
       </div>
     `;
-    card.querySelector('game-ball').name = party.baseGame;
+    /** @type {import('../components/game-ball.js').GameBall} */
+    (card.querySelector('game-ball')).name = party.baseGame;
     interceptLinkClick(card, () => router.navigateToParty(party.slug));
     partyList.appendChild(card);
   }
