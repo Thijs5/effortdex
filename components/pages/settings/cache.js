@@ -99,19 +99,19 @@ const cachingDisabled = isCachingDisabled();
 // grow large enough to block roster saves.
 async function renderClearCacheSize() {
   clearCacheBtn.textContent = 'Clear cache';
-  const size = (await estimateCacheSize()) ?? 0;
-  const total = size + api.localCacheBytes();
+  const [cacheStorage, clientCache] = await Promise.all([estimateCacheSize(), api.localCacheBytes()]);
+  const total = (cacheStorage ?? 0) + (clientCache ?? 0);
   if (total) clearCacheBtn.textContent = `Clear cache (${formatBytes(total)})`;
 }
 
 clearCacheBtn.addEventListener('click', async () => {
   clearCacheBtn.disabled = true;
   clearCacheStatus.textContent = 'Clearing cache… your parties and roster are untouched.';
-  // The localStorage-backed PokéAPI cache (species/generation lists,
-  // per-Pokémon data) as well as Cache Storage — the former is what can
-  // fill an installed PWA's whole quota and block roster saves, and
-  // estimateCacheSize()/this button historically only covered the latter.
-  api.evictLocalCache();
+  // The client's own response cache (species/generation lists,
+  // per-Pokémon data — now in IndexedDB, docs/adr/0025) as well as Cache
+  // Storage; estimateCacheSize()/this button historically only covered
+  // the latter.
+  await api.evictLocalCache();
   await clearAppCache();
   clearCacheStatus.textContent = 'Cache cleared — your data is safe. Reloading…';
   window.location.reload();

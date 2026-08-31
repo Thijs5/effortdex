@@ -760,32 +760,29 @@ test('state persists across Store instances via localStorage', () => {
   assert.equal(reloaded.activeParty.pokemon[0].nickname, 'Buddy');
 });
 
-// Regression: on an installed iOS PWA the PokeApiClient localStorage
-// cache can fill the origin's whole quota, so Store#_save()'s setItem
-// throws QuotaExceededError. It used to be unguarded — every roster
-// mutation then died before its dialog closed, and nothing persisted,
-// silently. Now _save() frees the disposable cache and retries once.
-test('_save survives a one-off quota failure by relieving pressure and retrying', () => {
+// Regression: Store#_save()'s setItem used to be unguarded, so a full
+// localStorage (an installed iOS PWA whose PokeApiClient cache filled
+// the quota) made every roster mutation die before its dialog closed,
+// silently. It now degrades: keep the in-memory state, flip saveHealthy,
+// show the "not saving" banner. (docs/adr/0025 P2 moved that cache to
+// IndexedDB, so `_save` no longer has anything to evict-and-retry.)
+test('a mutation still completes in memory when the write keeps failing', () => {
   localStorage.clear();
   const realSetItem = localStorage.setItem.bind(localStorage);
-  let failsLeft = 1;
-  let relieved = 0;
   localStorage.setItem = (key, value) => {
-    if (key === 'effortdex:state' && failsLeft > 0) {
-      failsLeft--;
-      throw new DOMException('exceeded', 'QuotaExceededError');
-    }
+    if (key === 'effortdex:state') throw new DOMException('exceeded', 'QuotaExceededError');
     return realSetItem(key, value);
   };
   try {
-    const s = new Store({ relieveStoragePressure: () => { relieved++; } });
+    const s = new Store();
     s.createParty('Kept');
-    s.addPokemon(mon());
+    const entry = s.addPokemon(mon());
 
-    assert.equal(relieved, 1); // only the first write needed a retry
-    assert.equal(s.saveHealthy, true);
-    assert.equal(new Store().activeParty.name, 'Kept');
-    assert.equal(new Store().activeParty.pokemon.length, 1);
+    assert.equal(s.saveHealthy, false);
+    assert.equal(s.activeParty.name, 'Kept');
+    assert.equal(s.activeParty.pokemon.length, 1); // usable in memory
+    assert.equal(s.activeParty.pokemon[0].uid, entry.uid);
+    assert.equal(localStorage.getItem('effortdex:state'), null); // but not persisted
   } finally {
     localStorage.setItem = realSetItem;
   }
@@ -799,7 +796,7 @@ test('_save flips saveHealthy and fires save-error once when the quota stays ful
     return realSetItem(key, value);
   };
   try {
-    const s = new Store({ relieveStoragePressure: () => {} });
+    const s = new Store();
     let errors = 0;
     let changes = 0;
     s.addEventListener('save-error', () => errors++);
@@ -827,7 +824,7 @@ test('_save fires save-ok and clears the flag once a write lands again', () => {
     return realSetItem(key, value);
   };
   try {
-    const s = new Store({ relieveStoragePressure: () => {} });
+    const s = new Store();
     s.createParty('P');
     assert.equal(s.saveHealthy, false);
 

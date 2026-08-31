@@ -17,9 +17,10 @@ test('openDb creates every store and index declared in schema', async () => {
   const idb = /** @type {any} */ (db)._idb;
   assert.deepEqual([...idb.objectStoreNames].sort(), Object.keys(STORES).sort());
 
-  const tx = idb.transaction(['parties', 'events'], 'readonly');
+  const tx = idb.transaction(['parties', 'rosterEntries', 'events'], 'readonly');
   assert.deepEqual([...tx.objectStore('parties').indexNames].sort(), ['order', 'slug']);
-  assert.deepEqual([...tx.objectStore('events').indexNames].sort(), ['entryUid', 'entryUid+timestamp']);
+  assert.deepEqual([...tx.objectStore('rosterEntries').indexNames].sort(), ['partyId+order']);
+  assert.deepEqual([...tx.objectStore('events').indexNames].sort(), ['entryUid+id']);
 });
 
 test('put then get round-trips a row', async () => {
