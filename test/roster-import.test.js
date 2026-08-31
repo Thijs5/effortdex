@@ -263,46 +263,80 @@ function view(parties) {
   }));
 }
 
-test('Store#init() imports the multi-party blob into rows once, and stamps the marker', async () => {
+/** Wires a Store the way services.js does when IndexedDB is available. */
+function idbStore(db) {
+  return new Store({
+    mirrorRoster: makeRosterMirror(db),
+    loadRoster: () => readRoster(db),
+  });
+}
+
+test('Store#init() imports the blob into rows once, stamps the marker, and then reads FROM the rows', async () => {
   const db = await freshDb();
   localStorage.clear();
   localStorage.setItem('effortdex:state', FIXTURE);
 
-  const s = new Store({ mirrorRoster: makeRosterMirror(db) });
+  const s = idbStore(db);
   const before = view(s.state.parties);
   await s.init();
 
   assert.ok(await readImportMarker(db), 'meta.rosterImported stamped');
-  const rows = await readRoster(db);
-  assert.deepEqual(view(rows.parties), before);
-  assert.equal(rows.activePartyId, s.state.activePartyId);
+  assert.deepEqual(view(s.state.parties), before, 'state now sourced from the rows, unchanged');
 
-  // Second run over the same db: the marker is present, so the
-  // firstRunOnly import is a no-op.
-  const mirror = makeRosterMirror(db);
-  assert.equal(await mirror({ parties: [] }, { firstRunOnly: true }), false);
-  assert.equal((await readRoster(db)).parties.length, before.length); // rows untouched
+  // Second launch over the same db, EMPTY localStorage: the roster comes
+  // from the rows alone — the blob is no longer needed to load.
+  localStorage.removeItem('effortdex:state');
+  const s2 = idbStore(db);
+  await s2.init();
+  assert.deepEqual(view(s2.state.parties), before);
+  assert.equal(s2.activeParty.slug, s.activeParty.slug);
 });
 
-test('a persisted mutation refreshes the row shadow (P4a keeps it fresh until P4b)', async () => {
+test('a mutation persists to the rows and is there on the next launch', async () => {
   const db = await freshDb();
   localStorage.clear();
 
-  const s = new Store({ mirrorRoster: makeRosterMirror(db) });
+  const s = idbStore(db);
   await s.init();
   s.createParty('Later', '', 'Emerald');
   const e = s.addPokemon({ id: 1, name: 'bulbasaur', sprite: null, baseStats: { hp: 45, atk: 49, def: 49, spa: 65, spd: 65, spe: 45 } }, 6);
+  await new Promise((r) => setTimeout(r, 20)); // let the fire-and-forget mirror settle
 
-  // _save's fire-and-forget mirror is async — let it settle.
-  await new Promise((r) => setTimeout(r, 20));
-
-  const rows = await readRoster(db);
-  const later = rows.parties.find((p) => p.name === 'Later');
-  assert.ok(later, 'new party mirrored');
+  const s2 = idbStore(db);
+  await s2.init();
+  const later = s2.state.parties.find((p) => p.name === 'Later');
+  assert.ok(later, 'new party loaded from rows');
   assert.equal(later.pokemon[0].uid, e.uid);
 });
 
-test('init() without a mirrorRoster dep (no IndexedDB) still completes', async () => {
+test('rev reconciliation: when the blob is ahead of the rows, init() keeps the blob and heals the rows', async () => {
+  const db = await freshDb();
+  localStorage.clear();
+
+  // First launch: import + adopt rows (rev ends at 1 after the backfill save).
+  const s1 = idbStore(db);
+  await s1.init();
+  s1.createParty('P1', '', 'Emerald'); // rev bumps; mirror fires
+  await new Promise((r) => setTimeout(r, 20));
+
+  // Simulate a mirror that never landed: blob has P1 + P2 at a higher
+  // rev, rows are still at the earlier state.
+  const blob = JSON.parse(localStorage.getItem('effortdex:state'));
+  blob.parties.push({ id: 'p2', name: 'P2', description: '', baseGame: 'Emerald', overrides: {}, slug: 'p2', pokemon: [] });
+  blob.rev = (blob.rev ?? 0) + 5;
+  localStorage.setItem('effortdex:state', JSON.stringify(blob));
+
+  const s2 = idbStore(db);
+  await s2.init();
+  assert.deepEqual(s2.state.parties.map((p) => p.name).sort(), ['P1', 'P2'], 'kept the newer blob');
+
+  // ...and the rows were healed to match, so the next launch is consistent.
+  const s3 = idbStore(db);
+  await s3.init();
+  assert.deepEqual(s3.state.parties.map((p) => p.name).sort(), ['P1', 'P2']);
+});
+
+test('init() with no IndexedDB deps still loads the roster from the blob', async () => {
   localStorage.clear();
   localStorage.setItem('effortdex:state', FIXTURE);
   const s = new Store(); // no deps
