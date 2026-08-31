@@ -23,7 +23,7 @@
 import { interceptLinkClick } from '../../../lib/dom.js';
 import { GAME_VERSIONS, GEN_ROMAN } from '../../../lib/game-versions.js';
 import { spriteGroupKey } from '../../../lib/pokeapi-client.js';
-import { prefetchService } from '../../../lib/services.js';
+import { api, prefetchService } from '../../../lib/services.js';
 import { SPRITE_CACHE_NAME } from '../../../lib/sprite-cache.js';
 import { clearAppCache, estimateCacheSize } from '../../../lib/version-check.js';
 import { isCachingDisabled, setCachingDisabled } from '../../../lib/dev-cache.js';
@@ -104,6 +104,11 @@ async function renderClearCacheSize() {
 clearCacheBtn.addEventListener('click', async () => {
   clearCacheBtn.disabled = true;
   clearCacheStatus.textContent = 'Clearing cache… your parties and roster are untouched.';
+  // The localStorage-backed PokéAPI cache (species/generation lists,
+  // per-Pokémon data) as well as Cache Storage — the former is what can
+  // fill an installed PWA's whole quota and block roster saves, and
+  // estimateCacheSize()/this button historically only covered the latter.
+  api.evictLocalCache();
   await clearAppCache();
   clearCacheStatus.textContent = 'Cache cleared — your data is safe. Reloading…';
   window.location.reload();

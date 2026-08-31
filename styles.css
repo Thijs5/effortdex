@@ -1066,6 +1066,25 @@ textarea.ds-field { resize: vertical; }
   margin-top: calc(-1 * var(--space-2));
   font-size: var(--font-size-xs);
 }
+
+/* "Storage is full" banner (index.html #storage-warning, toggled by
+   lib/shell.js). Sits above the header so it can't be missed — losing
+   unsaved edits on the next reload is the stakes. Colours come from
+   tokens.css, so dark mode is handled there. */
+.storage-warning {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radius-sm);
+  border-left: 4px solid var(--poke-red-dark);
+  background: var(--danger-soft);
+  color: var(--ink);
+  font-size: var(--font-size-sm);
+  line-height: 1.4;
+}
+.storage-warning a {
+  color: var(--poke-red-dark);
+  font-weight: 600;
+}
 @media (max-width: 640px) {
   /* Label-beside-control only works while both fit on one line; below
      that a long label and "Auto (from base game)" together wrap
