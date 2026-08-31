@@ -1,3 +1,4 @@
+import 'fake-indexeddb/auto';
 import './support/localstorage-polyfill.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -5,6 +6,10 @@ import { readFileSync } from 'node:fs';
 
 import { Store, projectEntry } from '../lib/store.js';
 import { totalEvs } from '../lib/utils.js';
+import { openDb } from '../lib/db/index.js';
+import { DB_NAME } from '../lib/db/schema.js';
+import { makeRosterMirror } from '../lib/db/roster-import.js';
+import { readRoster, readImportMarker } from '../lib/db/roster-io.js';
 
 // docs/adr/0025 §4/§6: the roster moves from the single
 // `localStorage['effortdex:state']` blob into IndexedDB rows
@@ -233,19 +238,74 @@ test('duplicate slugs SURVIVE the current pipeline unchanged — so P4 must de-d
   assert.deepEqual(slugs, ['run', 'run'], 'collision passes through today');
 });
 
-// P4 (ADR 0025 §6): the actual blob -> IndexedDB import. Turn this on
-// when the importer lands. Run it against EACH of these inputs:
-//   - roster-blob-multi-party.json     (breadth)
-//   - the pre-event-sourcing blob above (_migrateV1, then import)
-//   - state-schema-1.json              (1->2 migrate, then import)
-//   - every MALFORMED case above       (repair, then import)
-// For each: (1) load through the current pipeline -> `before` roster;
-// (2) openDb() on fake-indexeddb and run the importer against the blob
-// state; (3) rebuild a roster purely from the parties/rosterEntries/
-// events rows and project it -> `after`; (4) assert.deepEqual(after,
-// before); (5) assert the raw blob is retained as
-// `effortdex:state.pre-idb-backup`; (6) assert a second import is a
-// no-op (meta.rosterImported guard); (7) for the duplicate-slug case,
-// assert the import still succeeds (slugs re-uniqued before the rows
-// are written, so the UNIQUE index never trips).
-test('P4: importing the blob yields DB rows that re-project to an identical roster', { skip: 'roster importer lands in ADR 0025 P4' }, () => {});
+// P4a (ADR 0025 §6): Store#init() runs the one-time blob -> IndexedDB
+// row import. The blob stays authoritative; the rows are a verified
+// shadow. The row-level round-trip for each fixture (breadth, migration,
+// malformed, slug collision, atomicity) lives in test/roster-io.test.js;
+// here we cover the Store integration.
+
+async function freshDb() {
+  await new Promise((resolve) => {
+    const req = indexedDB.deleteDatabase(DB_NAME);
+    req.onsuccess = req.onerror = req.onblocked = () => resolve(undefined);
+  });
+  return openDb();
+}
+
+/** compact projection-level view for comparison */
+function view(parties) {
+  return parties.map((p) => ({
+    slug: p.slug,
+    pokemon: p.pokemon.map((e) => {
+      projectEntry(e);
+      return { uid: e.uid, level: e.level, evs: e.evs, species: e.speciesName, kinds: e.events.map((v) => v.kind) };
+    }),
+  }));
+}
+
+test('Store#init() imports the multi-party blob into rows once, and stamps the marker', async () => {
+  const db = await freshDb();
+  localStorage.clear();
+  localStorage.setItem('effortdex:state', FIXTURE);
+
+  const s = new Store({ mirrorRoster: makeRosterMirror(db) });
+  const before = view(s.state.parties);
+  await s.init();
+
+  assert.ok(await readImportMarker(db), 'meta.rosterImported stamped');
+  const rows = await readRoster(db);
+  assert.deepEqual(view(rows.parties), before);
+  assert.equal(rows.activePartyId, s.state.activePartyId);
+
+  // Second run over the same db: the marker is present, so the
+  // firstRunOnly import is a no-op.
+  const mirror = makeRosterMirror(db);
+  assert.equal(await mirror({ parties: [] }, { firstRunOnly: true }), false);
+  assert.equal((await readRoster(db)).parties.length, before.length); // rows untouched
+});
+
+test('a persisted mutation refreshes the row shadow (P4a keeps it fresh until P4b)', async () => {
+  const db = await freshDb();
+  localStorage.clear();
+
+  const s = new Store({ mirrorRoster: makeRosterMirror(db) });
+  await s.init();
+  s.createParty('Later', '', 'Emerald');
+  const e = s.addPokemon({ id: 1, name: 'bulbasaur', sprite: null, baseStats: { hp: 45, atk: 49, def: 49, spa: 65, spd: 65, spe: 45 } }, 6);
+
+  // _save's fire-and-forget mirror is async — let it settle.
+  await new Promise((r) => setTimeout(r, 20));
+
+  const rows = await readRoster(db);
+  const later = rows.parties.find((p) => p.name === 'Later');
+  assert.ok(later, 'new party mirrored');
+  assert.equal(later.pokemon[0].uid, e.uid);
+});
+
+test('init() without a mirrorRoster dep (no IndexedDB) still completes', async () => {
+  localStorage.clear();
+  localStorage.setItem('effortdex:state', FIXTURE);
+  const s = new Store(); // no deps
+  await s.init();
+  assert.equal(s.state.parties.length, 2);
+});
