@@ -12,6 +12,12 @@ import { mockPokeApi } from './support/pokeapi-mock.js';
 // e2e/evolution.spec.js for the evolution-chain-specific coverage.
 // Nothing here is applied to the store until Save is pressed: typing a
 // level or a stat value is only a preview.
+//
+// Stat rows are a small table [ Stat | Reading | Adjust ]. A stat with
+// no prior reading is a plain "type what you see" field. A stat that
+// does have one keeps *showing* that reading; a "+1" button and an
+// editable Adjust box drive a "45 → 47" preview of the value Save will
+// record, without ever overwriting the reading itself.
 
 test.describe('Level popup', () => {
   test.beforeEach(async ({ page }) => {
@@ -28,7 +34,8 @@ test.describe('Level popup', () => {
     await expect(dialog.locator('.level-up-from')).toHaveText('Lv. 10 →'); // read-only — only the new-level field is editable
     await expect(dialog.getByLabel('New level')).toHaveValue('10');
     await expect(dialog.getByRole('heading', { name: 'Evolution' })).toBeVisible();
-    await expect(dialog.getByText('Log stat readings at Lv. 10')).toBeVisible();
+    await expect(dialog.getByRole('heading', { name: 'Log stats' })).toBeVisible();
+    await expect(dialog.getByLabel('HP reading')).toBeVisible();
     await expect(dialog.getByRole('button', { name: 'Save' })).toBeVisible();
   });
 
@@ -41,8 +48,7 @@ test.describe('Level popup', () => {
 
     await dialog.getByLabel('New level').fill('12');
     await dialog.getByLabel('New level').blur();
-    await expect(dialog.getByText('Log stat readings at Lv. 12')).toBeVisible(); // the heading previews it
-    await dialog.getByLabel('ATK observed stat value').fill('20');
+    await dialog.getByLabel('ATK reading').fill('20');
 
     // Close without saving — the level and the typed stat must both be discarded.
     await dialog.locator('.level-up-dialog-close').click();
@@ -62,7 +68,7 @@ test.describe('Level popup', () => {
 
     await dialog.getByLabel('New level').fill('12');
     await dialog.getByLabel('New level').blur();
-    await dialog.getByLabel('ATK observed stat value').fill('20');
+    await dialog.getByLabel('ATK reading').fill('20');
     await dialog.getByRole('button', { name: 'Save' }).click();
     await expect(dialog).toBeHidden();
 
@@ -73,22 +79,22 @@ test.describe('Level popup', () => {
     await expect(ivDialog.getByText('Lv. 12 — 20')).toBeVisible();
   });
 
-  test('a stat row is prefilled with its last reading, but Save skips it untouched — only an edited value logs a new reading', async ({ page }) => {
+  test('a stat with a prior reading shows it (unedited Save skips it); only an adjustment logs a new one', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
     await addPokemon(page, 'Bulbasaur', { level: 10 });
     const card = await openDetail(page, 'Bulbasaur');
 
     let dialog = await openLevelUpDialog(card);
-    await dialog.getByLabel('ATK observed stat value').fill('20');
+    await dialog.getByLabel('ATK reading').fill('20');
     await dialog.getByRole('button', { name: 'Save' }).click();
     await expect(dialog).toBeHidden();
 
-    // Reopening prefills ATK from that reading — a starting point, not
-    // assumed still accurate at a new level, so leaving it untouched
-    // must not silently log a second, stale reading.
+    // Reopening shows ATK's last reading as read-only text — a reference
+    // point, not assumed still accurate at a new level, so leaving it
+    // untouched must not silently log a second, stale reading.
     dialog = await openLevelUpDialog(card);
-    await expect(dialog.getByLabel('ATK observed stat value')).toHaveValue('20');
+    await expect(dialog.locator('.level-up-reading-text[data-stat="atk"]')).toHaveText('20');
     await dialog.getByLabel('New level').fill('12');
     await dialog.getByLabel('New level').blur();
     await dialog.getByRole('button', { name: 'Save' }).click();
@@ -98,35 +104,51 @@ test.describe('Level popup', () => {
     await ivDialog.getByText("Don't know an IV?").click();
     await ivDialog.getByLabel('Stat', { exact: true }).selectOption('atk');
     await expect(ivDialog.getByText('Lv. 10 — 20')).toBeVisible();
-    await expect(ivDialog.getByText('Lv. 12 — 20')).toBeHidden(); // untouched prefill, correctly not logged again
+    await expect(ivDialog.getByText('Lv. 12 — 20')).toBeHidden(); // untouched, correctly not logged again
   });
 
-  test('a stat with a prior reading gets +/- nudge buttons; one with none stays a plain field', async ({ page }) => {
+  test('a stat with a prior reading gets an Adjust box + "+1"; the reading holds still and a "→" previews the new value', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
     await addPokemon(page, 'Bulbasaur', { level: 10 });
     const card = await openDetail(page, 'Bulbasaur');
 
-    // Log one ATK reading so, on reopen, ATK has something to anchor to.
+    // Log one ATK reading so, on reopen, ATK has something to adjust from.
     let dialog = await openLevelUpDialog(card);
-    await dialog.getByLabel('ATK observed stat value').fill('20');
+    await dialog.getByLabel('ATK reading').fill('20');
     await dialog.getByRole('button', { name: 'Save' }).click();
     await expect(dialog).toBeHidden();
 
     dialog = await openLevelUpDialog(card);
-    const atk = dialog.getByLabel('ATK observed stat value');
-    await expect(atk).toHaveValue('20');
-    // Steppers only on the row that has a previous reading.
+    const atkReading = dialog.locator('.level-up-reading-text[data-stat="atk"]');
+    const atkAdjust = dialog.getByLabel(/ATK adjustment from last reading/);
+    await expect(atkReading).toHaveText('20'); // just the reading, no "→" yet
+    await expect(atkAdjust).toHaveValue('+0');
+    // Adjust box + "+1" only on the row that has a previous reading; DEF
+    // (no reading) stays a plain editable field.
     await expect(dialog.getByRole('button', { name: 'ATK plus 1' })).toBeVisible();
     await expect(dialog.getByRole('button', { name: 'DEF plus 1' })).toHaveCount(0);
+    await expect(dialog.getByLabel(/DEF adjustment/)).toHaveCount(0);
+    await expect(dialog.getByLabel('DEF reading')).toBeVisible();
 
-    await dialog.getByRole('button', { name: 'ATK plus 5' }).click();
+    // "+1" bumps the Adjust box and the "→" preview, never the reading.
     await dialog.getByRole('button', { name: 'ATK plus 1' }).click();
-    await expect(atk).toHaveValue('26');
-    await dialog.getByRole('button', { name: 'ATK minus 1' }).click();
-    await expect(atk).toHaveValue('25');
+    await dialog.getByRole('button', { name: 'ATK plus 1' }).click();
+    await expect(atkAdjust).toHaveValue('+2');
+    await expect(atkReading.locator('.level-up-reading-prev')).toHaveText('20');
+    await expect(atkReading.locator('.level-up-reading-new')).toHaveText('22');
 
-    // The nudged value is a real edit, so Save logs it as a new reading.
+    // Typing straight into the Adjust box drives the same preview.
+    await atkAdjust.fill('7');
+    await expect(atkReading.locator('.level-up-reading-new')).toHaveText('27');
+
+    // Back to no change — the "→" and the new value disappear.
+    await atkAdjust.fill('0');
+    await expect(atkReading).toHaveText('20');
+    await expect(atkReading.locator('.level-up-reading-new')).toHaveCount(0);
+
+    // A real adjustment is what Save records, at the new level.
+    await atkAdjust.fill('7');
     await dialog.getByLabel('New level').fill('12');
     await dialog.getByLabel('New level').blur();
     await dialog.getByRole('button', { name: 'Save' }).click();
@@ -135,7 +157,7 @@ test.describe('Level popup', () => {
     const ivDialog = await openIvs(card);
     await ivDialog.getByText("Don't know an IV?").click();
     await ivDialog.getByLabel('Stat', { exact: true }).selectOption('atk');
-    await expect(ivDialog.getByText('Lv. 12 — 25')).toBeVisible();
+    await expect(ivDialog.getByText('Lv. 12 — 27')).toBeVisible();
   });
 
   test('Save groups the level change and its stat readings into one collapsible history entry', async ({ page }) => {
@@ -147,8 +169,8 @@ test.describe('Level popup', () => {
 
     await dialog.getByLabel('New level').fill('12');
     await dialog.getByLabel('New level').blur();
-    await dialog.getByLabel('ATK observed stat value').fill('20');
-    await dialog.getByLabel('DEF observed stat value').fill('15');
+    await dialog.getByLabel('ATK reading').fill('20');
+    await dialog.getByLabel('DEF reading').fill('15');
     await dialog.getByRole('button', { name: 'Save' }).click();
     await expect(dialog).toBeHidden();
 
@@ -177,19 +199,18 @@ test.describe('Level popup', () => {
     await expect(card.getByTitle('Set level')).toContainText('Lv. 12');
   });
 
-  test('adjusting the level after typing a stat keeps the typed value, just relabels it', async ({ page }) => {
+  test('changing the level after typing a stat keeps the typed value', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
     await addPokemon(page, 'Bulbasaur', { level: 10 });
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openLevelUpDialog(card);
 
-    await dialog.getByLabel('ATK observed stat value').fill('20');
+    await dialog.getByLabel('ATK reading').fill('20');
     await dialog.getByLabel('New level').fill('13');
     await dialog.getByLabel('New level').blur();
 
-    await expect(dialog.getByText('Log stat readings at Lv. 13')).toBeVisible();
-    await expect(dialog.getByLabel('ATK observed stat value')).toHaveValue('20');
+    await expect(dialog.getByLabel('ATK reading')).toHaveValue('20');
   });
 
   // Regression: on a narrow (mobile) viewport, this dialog and the other
