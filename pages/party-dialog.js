@@ -6,27 +6,34 @@
 import { store, prefetchService } from '../lib/services.js';
 import * as router from '../lib/router.js';
 import { isCachingDisabled } from '../lib/dev-cache.js';
+import { requireElementById } from '../lib/dom.js';
 import '../components/game-ball.js';
 import '../components/game-version-picker.js';
 
-const partyDialog = document.getElementById('party-dialog');
-const partyForm = document.getElementById('party-form');
-const partyDialogTitle = document.getElementById('party-dialog-title');
-const partyNameInput = document.getElementById('party-name-input');
-const partyBaseGame = document.getElementById('party-base-game');
-const dialogGameCart = document.getElementById('dialog-game-cart');
-const partyBaseGameError = document.getElementById('party-base-game-error');
+/** @typedef {import('../lib/store.js').Party} Party */
+/** @typedef {import('../lib/store.js').PartyOverrides} PartyOverrides */
+/** @typedef {import('../components/game-ball.js').GameBall} GameBall */
+/** @typedef {import('../components/game-version-picker.js').GameVersionPicker} GameVersionPicker */
+
+const partyDialog = /** @type {HTMLDialogElement} */ (requireElementById('party-dialog'));
+const partyForm = /** @type {HTMLFormElement} */ (requireElementById('party-form'));
+const partyDialogTitle = requireElementById('party-dialog-title');
+const partyNameInput = /** @type {HTMLInputElement} */ (requireElementById('party-name-input'));
+const partyBaseGame = /** @type {GameVersionPicker} */ (requireElementById('party-base-game'));
+const dialogGameCart = /** @type {GameBall} */ (requireElementById('dialog-game-cart'));
+const partyBaseGameError = requireElementById('party-base-game-error');
 partyBaseGame.addEventListener('version-change', (e) => {
-  dialogGameCart.name = e.detail.value.trim();
-  if (e.detail.value.trim()) partyBaseGameError.hidden = true;
+  const value = /** @type {CustomEvent} */ (e).detail.value.trim();
+  dialogGameCart.name = value;
+  if (value) partyBaseGameError.hidden = true;
 });
-const partyCacheOfflineRow = document.getElementById('party-cache-offline-row');
-const partyCacheOfflineInput = /** @type {HTMLInputElement} */ (document.getElementById('party-cache-offline-input'));
-const partyDescriptionInput = document.getElementById('party-description-input');
-const partyAdvancedRules = document.getElementById('party-advanced-rules');
-const partySubmitBtn = document.getElementById('party-submit-btn');
-const partyDeleteBtn = document.getElementById('party-delete-btn');
-const partyCancelBtn = document.getElementById('party-cancel-btn');
+const partyCacheOfflineRow = requireElementById('party-cache-offline-row');
+const partyCacheOfflineInput = /** @type {HTMLInputElement} */ (requireElementById('party-cache-offline-input'));
+const partyDescriptionInput = /** @type {HTMLTextAreaElement} */ (requireElementById('party-description-input'));
+const partyAdvancedRules = /** @type {HTMLDetailsElement} */ (requireElementById('party-advanced-rules'));
+const partySubmitBtn = requireElementById('party-submit-btn');
+const partyDeleteBtn = requireElementById('party-delete-btn');
+const partyCancelBtn = requireElementById('party-cancel-btn');
 
 // Each field's value round-trips through Store's override shape: '' <->
 // null (auto), 'true'/'false' <-> boolean, (power item bonus only)
@@ -34,19 +41,21 @@ const partyCancelBtn = document.getElementById('party-cancel-btn');
 // itself. One declarative list drives both directions so adding a new
 // overridable rule only means adding one entry here plus its field in
 // index.html.
+/** @type {{ key: keyof PartyOverrides, el: HTMLSelectElement, type: 'number'|'bool'|'string' }[]} */
 const OVERRIDE_FIELDS = [
-  { key: 'powerItemBonus', el: document.getElementById('override-power-item-bonus'), type: 'number' },
-  { key: 'powerItems', el: document.getElementById('override-power-items'), type: 'bool' },
-  { key: 'machoBrace', el: document.getElementById('override-macho-brace'), type: 'bool' },
-  { key: 'vitaminCutoff', el: document.getElementById('override-vitamin-cutoff'), type: 'bool' },
-  { key: 'pokerus', el: document.getElementById('override-pokerus'), type: 'bool' },
-  { key: 'statExpSystem', el: document.getElementById('override-stat-exp-system'), type: 'bool' },
-  { key: 'wings', el: document.getElementById('override-wings'), type: 'bool' },
-  { key: 'evBerries', el: document.getElementById('override-ev-berries'), type: 'bool' },
-  { key: 'nature', el: document.getElementById('override-nature'), type: 'bool' },
-  { key: 'spriteVersion', el: document.getElementById('override-sprite-version'), type: 'string' },
+  { key: 'powerItemBonus', el: /** @type {HTMLSelectElement} */ (requireElementById('override-power-item-bonus')), type: 'number' },
+  { key: 'powerItems', el: /** @type {HTMLSelectElement} */ (requireElementById('override-power-items')), type: 'bool' },
+  { key: 'machoBrace', el: /** @type {HTMLSelectElement} */ (requireElementById('override-macho-brace')), type: 'bool' },
+  { key: 'vitaminCutoff', el: /** @type {HTMLSelectElement} */ (requireElementById('override-vitamin-cutoff')), type: 'bool' },
+  { key: 'pokerus', el: /** @type {HTMLSelectElement} */ (requireElementById('override-pokerus')), type: 'bool' },
+  { key: 'statExpSystem', el: /** @type {HTMLSelectElement} */ (requireElementById('override-stat-exp-system')), type: 'bool' },
+  { key: 'wings', el: /** @type {HTMLSelectElement} */ (requireElementById('override-wings')), type: 'bool' },
+  { key: 'evBerries', el: /** @type {HTMLSelectElement} */ (requireElementById('override-ev-berries')), type: 'bool' },
+  { key: 'nature', el: /** @type {HTMLSelectElement} */ (requireElementById('override-nature')), type: 'bool' },
+  { key: 'spriteVersion', el: /** @type {HTMLSelectElement} */ (requireElementById('override-sprite-version')), type: 'string' },
 ];
 
+/** @param {PartyOverrides|null} overrides */
 function writeOverridesToDialog(overrides) {
   let anySet = false;
   for (const field of OVERRIDE_FIELDS) {
@@ -59,16 +68,19 @@ function writeOverridesToDialog(overrides) {
   partyAdvancedRules.open = anySet;
 }
 
+/** @returns {Partial<PartyOverrides>} */
 function readOverridesFromDialog() {
+  /** @type {Partial<PartyOverrides>} */
   const overrides = {};
   for (const field of OVERRIDE_FIELDS) {
     const raw = field.el.value;
-    overrides[field.key] =
-      raw === '' ? null : field.type === 'number' ? Number(raw) : field.type === 'string' ? raw : raw === 'true';
+    const value = raw === '' ? null : field.type === 'number' ? Number(raw) : field.type === 'string' ? raw : raw === 'true';
+    /** @type {any} */ (overrides)[field.key] = value;
   }
   return overrides;
 }
 
+/** @type {string|null} */
 let dialogEditingId = null;
 
 export function openCreateDialog() {
@@ -94,6 +106,7 @@ export function openCreateDialog() {
   partyNameInput.focus();
 }
 
+/** @param {Party} party */
 export function openEditDialog(party) {
   dialogEditingId = party.id;
   partyDialogTitle.textContent = 'Edit party';
