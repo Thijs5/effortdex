@@ -378,3 +378,60 @@ enough that unbounded-for-now is not the acute problem localStorage's
 **Remaining:** P3 (`await store.init()` async lifecycle) and P4 (roster
 rows + the one-time import — `test/roster-import.test.js`'s skipped stub
 turns on here).
+
+## Addendum — P3 & P4a landed
+
+**P3.** `async Store#init()` — the constructor still loads and projects
+the roster synchronously from the localStorage blob; `init()` warms the
+IndexedDB-backed caches into memory (`PokeApiClient#hydrateCache`), and
+`app.js` `await`s it before the first `render()`. Idempotent,
+best-effort. The ordering (`await store.init(); render()`) is what P4
+needs; `init()` stays fast in P3 so no loading screen.
+
+**P4a — the roster is shadowed into rows; the blob stays authoritative.**
+- `lib/db/roster-io.js`: `writeRoster(db, state)` maps the in-memory
+  state to `parties` / `rosterEntries` / `events` / `meta` rows in one
+  atomic transaction (`order` from array position; duplicate party
+  slugs re-uniqued first — `parties.slug` is UNIQUE and
+  `_normalizeEntries` only backfills *missing* slugs). `readRoster(db)`
+  is the inverse (parties by `order`, entries by `order`, events by
+  `id` = uuidv7 fold order).
+- `lib/db/roster-import.js`: `makeRosterMirror(db)` — `{ firstRunOnly }`
+  writes the rows once and stamps `meta.rosterImported`; a plain call
+  re-writes them.
+- `Store#init()` runs the one-time import (best-effort — logged, not
+  fatal; the blob is untouched). `Store#_writeState()` fires a
+  best-effort re-mirror after every persisted mutation so the shadow
+  stays fresh. `services.js` wires `mirrorRoster` when IndexedDB is
+  available.
+- Tests: `test/roster-io.test.js` round-trips every fixture
+  (multi-party, schema-1, pre-event-sourcing, schema-2) plus slug
+  de-dupe, atomic rollback and wholesale replace;
+  `test/roster-import.test.js`'s former skipped stub is now a live
+  `Store#init()` integration test. 340 unit tests (0 skipped), 119 e2e.
+
+### Remaining P4 — needs the async-`_save` refactor (do supervised)
+
+The safe, blob-authoritative work is done. Flipping the read to rows
+requires making the persistence path async, which is a large mechanical
+change (14 `_save()` + 13 `_append()` call sites → `async`; every
+mutation method → `async`; every UI handler that mutates → `await`;
+tests that reload after mutating → `await`). Sequenced:
+
+- **P4b — self-heal + flip the read.** `init()` compares `readRoster` to
+  the blob's projection and re-mirrors on divergence (covers "mutation
+  then crash before the fire-and-forget mirror finished"). Then `init()`
+  loads `state` from `readRoster` instead of the blob when the marker is
+  set. `_save()` becomes `async` and `await`s the mirror so a fast
+  reload can't lose the last mutation; the blob write stays as a
+  dual-write backup for one release.
+- **P4c — targeted writes.** Replace the whole-roster `writeRoster` on
+  every save with per-mutation row writes (`_append` → one
+  `events.add`; `deleteParty` → cascade delete in one transaction).
+- **P4d — drop the blob write.** `effortdex:state` becomes read-only
+  (`state.pre-idb-backup`), then removed a release later.
+
+Also still open: the per-kind `apiCache` entry cap (P2); the Gen I/II
+Stat-Exp backfill still runs in the constructor against a possibly-cold
+`peekCached` — it moves into `init()` (after `hydrateCache`) as part of
+P4b, where the ~5 affected tests get `await store.init()`.
