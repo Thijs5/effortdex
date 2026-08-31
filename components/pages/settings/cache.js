@@ -93,12 +93,15 @@ const cachingDisabled = isCachingDisabled();
 
 // Shows how much the button is about to delete, e.g. "Clear cache (3.4
 // MB)" — falls back to the plain label while the size is still being
-// computed, or if Cache Storage isn't available at all. Same behavior
-// this button had on Settings before moving here.
+// computed, or if nothing is cached. Covers both stores this button
+// clears: Cache Storage (estimateCacheSize) and the localStorage-backed
+// PokéAPI cache (api.localCacheBytes) — the latter is what can quietly
+// grow large enough to block roster saves.
 async function renderClearCacheSize() {
   clearCacheBtn.textContent = 'Clear cache';
-  const size = await estimateCacheSize();
-  if (size) clearCacheBtn.textContent = `Clear cache (${formatBytes(size)})`;
+  const size = (await estimateCacheSize()) ?? 0;
+  const total = size + api.localCacheBytes();
+  if (total) clearCacheBtn.textContent = `Clear cache (${formatBytes(total)})`;
 }
 
 clearCacheBtn.addEventListener('click', async () => {
