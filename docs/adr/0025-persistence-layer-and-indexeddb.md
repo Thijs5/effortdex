@@ -327,3 +327,54 @@ an "Addendum" per phase as it lands, in the style of
   framework — but `lib/db/` is a genuinely new subsystem boundary, and
   the "no `indexedDB` outside `lib/db/`" rule is stated here as its
   module boundary.
+
+## Addendum — P1 & P2 landed (branch `persistence-layer`)
+
+**P1.** `lib/db/schema.js` (`DB_NAME` / `DB_VERSION` / `STORES` /
+`MIGRATIONS`) and `lib/db/index.js` (`openDb` + the `Db` promise
+wrapper: `get`/`put`/`add`/`delete`/`getAll`/`getAllKeys`/`getAllByIndex`/
+`count`/`transaction`). Guarded by `test/db-schema.test.js` (shape
+consistency) and `test/db.test.js` (`fake-indexeddb`).
+
+Two index shapes changed from the sketch above during review:
+`rosterEntries` uses one compound `partyId+order` index (a bare `order`
+index would mix every party's ordering together), and `events` orders
+by `entryUid+id` rather than `entryUid+timestamp` — `id` is a uuidv7,
+monotonic in creation order even back-to-back, whereas a batched action
+can stamp several events with the same `timestamp`. The P4 importer
+therefore has to synthesise an `order` field on every party and entry
+row (array position), and assert every event has an `id`.
+
+`meta` will **not** hold `activePartyId`: the URL slug
+([ADR 0022](0022-parties-aggregate-root-url-scheme.md)) is already the
+authoritative "which party is open" and `app.js`'s `render()` reconciles
+the in-memory `activePartyId` from it on every render. It stays
+in-memory Store state (the ambient party ~every method operates on) but
+is no longer persisted, and `setActiveParty` stops writing.
+
+**P2.** `MemoCache` takes an injected `CacheBackend`; the default is the
+extracted `LocalStorageBackend`, and `lib/services.js` wires an
+`IdbCacheBackend` (over the `apiCache` store) via a top-level
+`await openDb()` — falling back to the localStorage backend if
+IndexedDB is unavailable (cache data may degrade that way; the roster
+may not — [ADR 0024](0024-graceful-offline-degradation.md)).
+`MemoCache#peek()` is now in-memory only (the disk tier is async);
+`PokeApiClient` fires a best-effort `warm(['effortdex:mon:'])` on
+construction so the Gen I/II backfill's `peekCached` still sees
+disk-cached mons. `dropLegacyLocalStorageCache()` removes the old
+`effortdex:*` cache entries once (not copied — shapes differ, all
+refetchable), which is what actually frees the ~5 MB. `Store#_save()`'s
+evict-and-retry is gone: with the cache in IndexedDB there is nothing
+left in localStorage to reclaim, so a failed write just flips
+`saveHealthy` and shows the banner. The Storage page's "Clear cache"
+and its size label now `await` the async `evictLocalCache()` /
+`localCacheBytes()`.
+
+**Not yet done in P2:** the per-kind entry cap on `apiCache` (the
+`kind` / `fetchedAt` indexes exist for it). IndexedDB's quota is large
+enough that unbounded-for-now is not the acute problem localStorage's
+5 MB wall was.
+
+**Remaining:** P3 (`await store.init()` async lifecycle) and P4 (roster
+rows + the one-time import — `test/roster-import.test.js`'s skipped stub
+turns on here).
