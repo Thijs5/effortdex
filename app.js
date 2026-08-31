@@ -141,6 +141,13 @@ import('./lib/goatcounter-report.js')
   .catch(() => {}); // blocked/missing — analytics just doesn't happen
 router.onRouteChange(() => reportPageview());
 store.addEventListener('change', render);
+// The constructor already loaded and projected the roster synchronously
+// from localStorage; init() only warms the IndexedDB-backed caches
+// (docs/adr/0025 P3). Fast (tens of ms) — the static shell from
+// index.html is already painted, and the roster view is hidden until
+// render() runs — so no loading screen. Awaited so the ordering matches
+// P4, where init() will be what loads the roster.
+await store.init();
 render();
 
 // Warms sw.js's sprite cache ahead of need (docs/adr/0011), and resumes
