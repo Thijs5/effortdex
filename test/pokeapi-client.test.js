@@ -8,7 +8,9 @@ import { PokeApiClient, versionedSpriteUrl, modernSpriteUrl } from '../lib/pokea
 // calls, and can be told to fail. Exercises ADR 0001's cache guarantees
 // (one network call per key, failures never poisoning the cache) without
 // touching the network.
+/** @type {string[]} */
 let fetchCalls;
+/** @type {{ match: string, handler: (url: string) => unknown }[]} */
 let routes;
 
 function respond(data) {

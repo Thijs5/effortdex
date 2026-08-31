@@ -11,6 +11,6 @@
     "types": ["node"],
     "skipLibCheck": true
   },
-  "include": ["lib/**/*.js", "e2e/**/*.js", "playwright.config.js", "components/ds-item-button.js", "components/item-button-grid.js", "components/evolution-chain.js"],
+  "include": ["lib/**/*.js", "e2e/**/*.js", "components/**/*.js", "pages/**/*.js", "test/**/*.js", "app.js", "sw.js", "playwright.config.js"],
   "exclude": ["lib/vendor/**"]
 }

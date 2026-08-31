@@ -6,19 +6,25 @@ import { readFileSync } from 'node:fs';
 import { Store, MIGRATIONS } from '../lib/store.js';
 import { SCHEMA_VERSION } from '../lib/schema-version.js';
 import { STAT_CAP, TOTAL_CAP, VITAMIN_BONUS, MIN_LEVEL, MAX_LEVEL, DEFAULT_LEVEL } from '../lib/constants.js';
+import { emptyEvs } from '../lib/utils.js';
 
+/** @typedef {import('../lib/pokeapi-client.js').DomainPokemon} DomainPokemon */
+
+/** @param {Partial<DomainPokemon>} [overrides] @returns {DomainPokemon} */
 function mon(overrides = {}) {
-  return { id: 1, name: 'bulbasaur', sprite: null, ...overrides };
+  return { id: 1, name: 'bulbasaur', sprite: null, evYield: emptyEvs(), baseStats: emptyEvs(), ...overrides };
 }
 
 // `baseStats` defaults to the same values as `evYield` so every existing
 // call site behaves identically whether the active party reads the modern
 // EV yield or (Gen I-II) the Stat Experience base-stat yield — pass an
 // explicit `baseStats` override to exercise a case where they differ.
+/** @param {import('../lib/constants.js').EvMap} evYield @param {Partial<DomainPokemon>} [overrides] @returns {DomainPokemon} */
 function opponent(evYield, overrides = {}) {
-  return { name: 'rattata', sprite: null, evYield, baseStats: evYield, ...overrides };
+  return { id: 1, name: 'rattata', sprite: null, evYield, baseStats: evYield, ...overrides };
 }
 
+/** @type {Store} */
 let store;
 
 beforeEach(() => {

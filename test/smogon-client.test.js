@@ -4,7 +4,9 @@ import assert from 'node:assert/strict';
 
 import { SmogonClient, parseFormatsData, toShowdownId, smogonSetsKey } from '../lib/smogon-client.js';
 
+/** @type {string[]} */
 let fetchCalls;
+/** @type {{ match: string, handler: (url: string) => unknown }[]} */
 let routes;
 
 function textRes(text) {

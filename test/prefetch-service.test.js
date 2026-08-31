@@ -8,6 +8,7 @@ import { PrefetchService } from '../lib/prefetch-service.js';
 // getGenerationSpecies, mirroring the real PokeApiClient-backed cache)
 // as a plain successful GET, and counts calls so tests can assert on
 // prefetch traffic without a real network.
+/** @type {string[]} */
 let fetchCalls;
 
 beforeEach(() => {
