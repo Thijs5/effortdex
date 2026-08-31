@@ -155,6 +155,28 @@ test('getGenerationSpecies derives ids from the listing URLs and caches the resu
   assert.equal(fetchCalls.length, 1); // second call hit the cache, not the network
 });
 
+test('evictLocalCache drops every cached entry (freeing localStorage) and forces a refetch', async () => {
+  routes.push({ match: '/pokemon/pikachu', handler: () => respond(PIKACHU) });
+  routes.push({
+    match: '/generation/1',
+    handler: () => respond({ pokemon_species: [{ name: 'bulbasaur', url: 'https://pokeapi.co/api/v2/pokemon-species/1/' }] }),
+  });
+  const client = new PokeApiClient();
+  await client.getPokemon('pikachu');
+  await client.getGenerationSpecies(1);
+  // Something unrelated in the same origin's storage must be left alone.
+  localStorage.setItem('effortdex:state', '{"keep":true}');
+
+  const removed = client.evictLocalCache();
+  assert.equal(removed, 2);
+  assert.equal(localStorage.getItem('effortdex:mon:pikachu'), null);
+  assert.equal(localStorage.getItem('effortdex:generation:1'), null);
+  assert.equal(localStorage.getItem('effortdex:state'), '{"keep":true}');
+
+  await client.getPokemon('pikachu'); // memory tier cleared too, so this refetches
+  assert.equal(fetchCalls.length, 3);
+});
+
 test('getGenerationSpecies rejects on a non-ok response and does not cache the failure', async () => {
   let fail = true;
   routes.push({
