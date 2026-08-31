@@ -177,6 +177,23 @@ test('evictLocalCache drops every cached entry (freeing localStorage) and forces
   assert.equal(fetchCalls.length, 3);
 });
 
+test('localCacheBytes counts the client cache entries and nothing else', async () => {
+  routes.push({ match: '/pokemon/pikachu', handler: () => respond(PIKACHU) });
+  const client = new PokeApiClient();
+  assert.equal(client.localCacheBytes(), 0);
+
+  await client.getPokemon('pikachu');
+  localStorage.setItem('effortdex:state', 'x'.repeat(5000)); // not part of the cache
+
+  const monKey = 'effortdex:mon:pikachu';
+  const expected = monKey.length + localStorage.getItem(monKey).length;
+  assert.equal(client.localCacheBytes(), expected);
+
+  client.evictLocalCache();
+  assert.equal(client.localCacheBytes(), 0);
+  assert.equal(localStorage.getItem('effortdex:state').length, 5000); // untouched
+});
+
 test('getGenerationSpecies rejects on a non-ok response and does not cache the failure', async () => {
   let fail = true;
   routes.push({
