@@ -174,8 +174,8 @@ test.describe('IV tracking', () => {
     // at level 90, IV 24 reads 114 and IV 25 reads 115.
     await dialog.locator('.iv-dialog-close').click();
     const levelUpDialog = await openLevelUpDialog(card);
-    await levelUpDialog.getByLabel('Level').fill('90');
-    await levelUpDialog.getByLabel('Level').blur();
+    await levelUpDialog.getByLabel('New level').fill('90');
+    await levelUpDialog.getByLabel('New level').blur();
     await levelUpDialog.getByRole('button', { name: 'Save' }).click();
 
     // The <details> disclosure is already open from earlier in this test —

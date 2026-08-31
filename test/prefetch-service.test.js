@@ -251,6 +251,18 @@ async function waitForIdle(svc) {
   while (svc.pendingCount > 0) await sleep(5);
 }
 
+// Poll for a state the queue is guaranteed to settle into rather than
+// trusting a fixed sleep — the number of async ticks to get there varies
+// with machine speed, but the resting state (breaker tripped, run
+// stalled on the offline check) is deterministic once reached.
+async function waitUntil(predicate, label = 'condition', timeoutMs = 2000) {
+  const deadline = Date.now() + timeoutMs;
+  while (!predicate()) {
+    if (Date.now() > deadline) throw new Error(`waitUntil timed out waiting for ${label}`);
+    await sleep(5);
+  }
+}
+
 test('warms every configured item-icon URL directly, with no species lookup', async () => {
   const urls = ['https://sprites.example/items/protein.png', 'https://sprites.example/items/iron.png'];
   const svc = service({ store: fakeStore([]), itemSpriteUrls: urls });
@@ -679,7 +691,7 @@ test('backs off after failureThreshold consecutive failures, pausing the queue i
   svc.addEventListener('backoff', (e) => backoffEvents.push(e.detail));
 
   svc.prefetchGame('Red'); // deliberately not awaited — backing off leaves the rest un-settled for the rest of this test
-  await sleep(50);
+  await waitUntil(() => svc.isBackingOff, 'the circuit breaker to trip');
 
   assert.equal(calls.length, 3); // stopped after exactly failureThreshold attempts, not all 8
   assert.deepEqual(backoffEvents, [{ resumeInMs: 300 }]);
@@ -802,7 +814,9 @@ test('pauses cleanly if the connection drops mid-queue, and resumes on reconnect
   };
 
   const done = svc.prefetchGame('Red');
-  await sleep(20); // let it run until it stalls on the offline check
+  // Let it run until it stalls on the offline check: 'a' fetched, b/c/d
+  // still queued and not being drained.
+  await waitUntil(() => api.calls.length === 1 && svc.pendingCount === 3, 'the run to stall offline');
   assert.deepEqual(api.calls, ['a']); // stopped before b/c/d
   assert.equal(svc.pendingCount, 3); // b, c, d are still queued, not lost
 
