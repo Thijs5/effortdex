@@ -7,6 +7,9 @@ import { FALLBACK_SPRITE, FALLBACK_ONERROR } from '../lib/constants.js';
 
 const PROMPT_MESSAGE = 'Paste a transfer link, or choose a saved transfer file.';
 
+/** @typedef {import('../lib/store.js').ExportedParty} ExportedParty */
+/** @typedef {ReturnType<import('../lib/store.js').Store['previewImport']>} ImportPreview */
+
 /**
  * <import-review> — the screen a shared transfer link (#/import/<payload>)
  * opens to, or that's reached directly (#/import, no payload) to paste a
@@ -111,19 +114,24 @@ export class ImportReview extends HTMLElement {
         </div>
       </div>
     `;
-    this.$intake = shadow.querySelector('.intake');
-    this.$intakeMessage = shadow.querySelector('.intake-message');
-    this.$pasteForm = shadow.querySelector('.paste-row');
-    this.$pasteInput = shadow.querySelector('.paste-row input');
-    this.$pasteBtn = shadow.querySelector('[data-action="paste"]');
-    this.$fileInput = shadow.querySelector('#transfer-file-input');
-    this.$status = shadow.querySelector('.status');
-    this.$parties = shadow.querySelector('.parties');
-    this.$footer = shadow.querySelector('.footer');
-    this.$importBtn = shadow.querySelector('[data-action="import"]');
+    this.$intake = /** @type {HTMLElement} */ (shadow.querySelector('.intake'));
+    this.$intakeMessage = /** @type {HTMLElement} */ (shadow.querySelector('.intake-message'));
+    this.$pasteForm = /** @type {HTMLFormElement} */ (shadow.querySelector('.paste-row'));
+    this.$pasteInput = /** @type {HTMLInputElement} */ (shadow.querySelector('.paste-row input'));
+    this.$pasteBtn = /** @type {HTMLButtonElement} */ (shadow.querySelector('[data-action="paste"]'));
+    this.$fileInput = /** @type {HTMLInputElement} */ (shadow.querySelector('#transfer-file-input'));
+    this.$status = /** @type {HTMLElement} */ (shadow.querySelector('.status'));
+    this.$parties = /** @type {HTMLElement} */ (shadow.querySelector('.parties'));
+    this.$footer = /** @type {HTMLElement} */ (shadow.querySelector('.footer'));
+    this.$importBtn = /** @type {HTMLButtonElement} */ (shadow.querySelector('[data-action="import"]'));
+    /** @type {ExportedParty[]|null} */
     this._parties = null; // decoded payload (Store#exportPayload shape)
+    /** @type {ImportPreview|null} */
     this._preview = null; // Store#previewImport output
+    /** @type {Set<string>} */
     this._selected = new Set();
+    /** @type {string|null} */
+    this._loadedPayload = null;
 
     this.$importBtn.addEventListener('click', () => this._doImport());
     this.$fileInput.addEventListener('change', () => this._loadFromFile());
@@ -142,6 +150,7 @@ export class ImportReview extends HTMLElement {
   // what's on screen (shareable, bookmarkable, survives a refresh).
   // app.js's route-change handler is what actually calls `_load` below,
   // via the `payload` setter.
+  /** @param {string|null} str */
   set payload(str) {
     if (str === this._loadedPayload) return; // already showing this exact payload
     if (str) this._load(str);
@@ -166,6 +175,7 @@ export class ImportReview extends HTMLElement {
   // Accepts either a full shared link or just its payload substring, in
   // case someone pastes the raw payload (e.g. copied from a file) rather
   // than the whole URL.
+  /** @param {string} text */
   _loadFromPastedText(text) {
     const trimmed = text.trim();
     if (!trimmed) return;
@@ -176,13 +186,14 @@ export class ImportReview extends HTMLElement {
   }
 
   async _loadFromFile() {
-    const file = this.$fileInput.files[0];
+    const file = /** @type {FileList} */ (this.$fileInput.files)[0];
     this.$fileInput.value = ''; // let picking the same file again re-fire 'change'
     if (!file) return;
     const payload = (await file.text()).trim();
     router.navigateToPath(router.importPath(payload));
   }
 
+  /** @param {string} message @param {boolean} [isError] */
   _showIntake(message, isError = false) {
     this._parties = null;
     this._preview = null;
@@ -196,6 +207,7 @@ export class ImportReview extends HTMLElement {
     this.$status.textContent = '';
   }
 
+  /** @param {string} str */
   async _load(str) {
     this._showIntake('Reading transfer data…');
 
@@ -222,7 +234,7 @@ export class ImportReview extends HTMLElement {
 
   _render() {
     this.$parties.innerHTML = '';
-    for (const party of this._preview) {
+    for (const party of /** @type {ImportPreview} */ (this._preview)) {
       const group = document.createElement('div');
       group.className = 'party-group';
 
@@ -242,7 +254,7 @@ export class ImportReview extends HTMLElement {
         <div class="rows"></div>
       `;
 
-      const rows = group.querySelector('.rows');
+      const rows = /** @type {HTMLElement} */ (group.querySelector('.rows'));
       for (const mon of party.pokemon) {
         const p = mon.preview;
         const displayName = p.nickname || titleCase(p.speciesName);
@@ -270,7 +282,7 @@ export class ImportReview extends HTMLElement {
         rows.appendChild(row);
       }
 
-      group.querySelector('[data-select-all]').addEventListener('click', () => {
+      /** @type {HTMLElement} */ (group.querySelector('[data-select-all]')).addEventListener('click', () => {
         if (allSelected) for (const uid of allUids) this._selected.delete(uid);
         else for (const uid of allUids) this._selected.add(uid);
         this._render();

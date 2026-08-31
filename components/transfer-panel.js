@@ -75,14 +75,15 @@ export class TransferPanel extends HTMLElement {
         above instead and send that file however you like.
       </p>
     `;
-    this.$link = shadow.querySelector('.link-field');
-    this.$shareBtn = shadow.querySelector('[data-action="share"]');
-    this.$copyBtn = shadow.querySelector('[data-action="copy"]');
-    this.$downloadBtn = shadow.querySelector('[data-action="download"]');
-    this.$status = shadow.querySelector('.status');
-    this.$longLinkNote = shadow.querySelector('.long-link-note');
+    this.$link = /** @type {HTMLInputElement} */ (shadow.querySelector('.link-field'));
+    this.$shareBtn = /** @type {HTMLButtonElement} */ (shadow.querySelector('[data-action="share"]'));
+    this.$copyBtn = /** @type {HTMLButtonElement} */ (shadow.querySelector('[data-action="copy"]'));
+    this.$downloadBtn = /** @type {HTMLButtonElement} */ (shadow.querySelector('[data-action="download"]'));
+    this.$status = /** @type {HTMLElement} */ (shadow.querySelector('.status'));
+    this.$longLinkNote = /** @type {HTMLElement} */ (shadow.querySelector('.long-link-note'));
     this._url = '';
     this._payload = '';
+    /** @type {ReturnType<typeof setTimeout>|null} */
     this._copyResetTimer = null;
   }
 
@@ -126,7 +127,7 @@ export class TransferPanel extends HTMLElement {
   }
 
   _flashCopied() {
-    clearTimeout(this._copyResetTimer);
+    if (this._copyResetTimer !== null) clearTimeout(this._copyResetTimer);
     this.$copyBtn.innerHTML = `${ICON_CHECK}<span>Copied</span>`;
     this.$copyBtn.classList.add('is-copied');
     this._copyResetTimer = setTimeout(() => {

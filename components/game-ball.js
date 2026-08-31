@@ -57,36 +57,37 @@ export class GameBall extends HTMLElement {
         <path class="fan-mark" hidden></path>
       </svg>
     `;
-    this.$top = shadow.querySelector('.top');
-    this.$bottom = shadow.querySelector('.bottom');
-    this.$band = shadow.querySelector('.band');
-    this.$outline = shadow.querySelector('.outline');
-    this.$shine = shadow.querySelector('.shine');
-    this.$button = shadow.querySelector('.button');
-    this.$genText = shadow.querySelector('.gen-text');
-    this.$fanMark = shadow.querySelector('.fan-mark');
+    this.$top = /** @type {SVGPathElement} */ (shadow.querySelector('.top'));
+    this.$bottom = /** @type {SVGPathElement} */ (shadow.querySelector('.bottom'));
+    this.$band = /** @type {SVGRectElement} */ (shadow.querySelector('.band'));
+    this.$outline = /** @type {SVGCircleElement} */ (shadow.querySelector('.outline'));
+    this.$shine = /** @type {SVGEllipseElement} */ (shadow.querySelector('.shine'));
+    this.$button = /** @type {SVGCircleElement} */ (shadow.querySelector('.button'));
+    this.$genText = /** @type {SVGTextElement} */ (shadow.querySelector('.gen-text'));
+    this.$fanMark = /** @type {SVGPathElement} */ (shadow.querySelector('.fan-mark'));
 
     this.$top.setAttribute('d', `M ${CX - R} ${CY} A ${R} ${R} 0 0 1 ${CX + R} ${CY} Z`);
     this.$bottom.setAttribute('d', `M ${CX - R} ${CY} A ${R} ${R} 0 0 0 ${CX + R} ${CY} Z`);
-    this.$band.setAttribute('x', CX - R);
-    this.$band.setAttribute('y', CY - 1.5);
-    this.$band.setAttribute('width', R * 2);
-    this.$band.setAttribute('height', 3);
-    this.$outline.setAttribute('cx', CX);
-    this.$outline.setAttribute('cy', CY);
-    this.$outline.setAttribute('r', R);
-    this.$shine.setAttribute('cx', CX - R * 0.4);
-    this.$shine.setAttribute('cy', CY - R * 0.45);
-    this.$shine.setAttribute('rx', R * 0.32);
-    this.$shine.setAttribute('ry', R * 0.18);
-    this.$button.setAttribute('cx', CX);
-    this.$button.setAttribute('cy', CY);
-    this.$button.setAttribute('r', BUTTON_R);
-    this.$genText.setAttribute('x', CX);
-    this.$genText.setAttribute('y', CY + 1.9);
+    this.$band.setAttribute('x', String(CX - R));
+    this.$band.setAttribute('y', String(CY - 1.5));
+    this.$band.setAttribute('width', String(R * 2));
+    this.$band.setAttribute('height', String(3));
+    this.$outline.setAttribute('cx', String(CX));
+    this.$outline.setAttribute('cy', String(CY));
+    this.$outline.setAttribute('r', String(R));
+    this.$shine.setAttribute('cx', String(CX - R * 0.4));
+    this.$shine.setAttribute('cy', String(CY - R * 0.45));
+    this.$shine.setAttribute('rx', String(R * 0.32));
+    this.$shine.setAttribute('ry', String(R * 0.18));
+    this.$button.setAttribute('cx', String(CX));
+    this.$button.setAttribute('cy', String(CY));
+    this.$button.setAttribute('r', String(BUTTON_R));
+    this.$genText.setAttribute('x', String(CX));
+    this.$genText.setAttribute('y', String(CY + 1.9));
     this.$fanMark.setAttribute('d', `M ${CX - 2.6} ${CY - 1} l 1.7 3.4 h 2.6`);
   }
 
+  /** @param {string|null|undefined} v */
   set name(v) {
     this._name = v || '';
     this._render();
@@ -104,12 +105,12 @@ export class GameBall extends HTMLElement {
       this.style.setProperty('--cart-color', match.color);
       this.style.setProperty('--cart-gen', GEN_COLORS[match.gen - 1]);
       this.$genText.textContent = GEN_ROMAN[match.gen - 1] || '';
-      this.$fanMark.hidden = true;
+      this.$fanMark.toggleAttribute('hidden', true);
     } else {
       this.style.removeProperty('--cart-color');
       this.style.removeProperty('--cart-gen');
       this.$genText.textContent = '';
-      this.$fanMark.hidden = !this._name; // only show the "fan game" mark when there IS a name, just an unrecognized one
+      this.$fanMark.toggleAttribute('hidden', !this._name); // only show the "fan game" mark when there IS a name, just an unrecognized one
     }
   }
 }

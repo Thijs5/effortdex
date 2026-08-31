@@ -37,6 +37,17 @@ function unwrap(value) {
   return /** @type {NonNullable<T>} */ (value);
 }
 
+/** Narrows a HistoryRecord (or a find() result) to a specific `kind` — the
+ * test already knows which kind it expects; this documents that instead
+ * of leaving `h.kind === 'x'` unnarrowed at every access below.
+ * @template {import('../lib/store.js').HistoryRecord['kind']} K
+ * @param {import('../lib/store.js').HistoryRecord|undefined} record @param {K} kind
+ * @returns {Extract<import('../lib/store.js').HistoryRecord, {kind: K}>} */
+function asKind(record, kind) {
+  assert.equal(record?.kind, kind);
+  return /** @type {any} */ (record);
+}
+
 /** @type {Store} */
 let store;
 
@@ -70,7 +81,7 @@ test('logDefeat applies the opponent EV yield as-is with no modifiers', () => {
   store.logDefeat(entry.uid, opp);
   assert.equal(entry.evs.atk, 1);
   assert.equal(entry.history.length, 2); // battle + the catch seed entry
-  assert.equal(entry.history[0].opponentName, 'rattata');
+  assert.equal(asKind(entry.history[0], 'battle').opponentName, 'rattata');
 });
 
 test('power item adds its flat bonus only to its own stat', () => {
@@ -162,7 +173,7 @@ test('revertEvolution restores the previous identity from the event snapshot —
 test('deleting an evolve event from the history is the same as undoing that evolution', () => {
   const entry = store.catchPokemon(mon());
   store.evolvePokemon(entry.uid, mon({ id: 2, name: 'ivysaur' }));
-  const evolveRecord = entry.history.find((h) => h.kind === 'evolve');
+  const evolveRecord = asKind(entry.history.find((h) => h.kind === 'evolve'), 'evolve');
   assert.equal(evolveRecord.fromName, 'bulbasaur');
   assert.equal(evolveRecord.toName, 'ivysaur');
 
@@ -173,7 +184,7 @@ test('deleting an evolve event from the history is the same as undoing that evol
 
 test('the catch event is never deletable', () => {
   const entry = store.catchPokemon(mon());
-  const catchRecord = entry.history.find((h) => h.kind === 'catch');
+  const catchRecord = asKind(entry.history.find((h) => h.kind === 'catch'), 'catch');
   store.deleteHistoryEntry(entry.uid, catchRecord.id);
   assert.equal(entry.history.length, 1); // still there
   assert.equal(entry.speciesName, 'bulbasaur');
@@ -1068,7 +1079,7 @@ test('a held Macho Brace stops applying when the game version no longer offers i
   store.updateParty(unwrap(store.activeParty).id, { baseGame: 'Sun' });
   store.logDefeat(entry.uid, opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 }));
   assert.equal(entry.evs.atk, 3); // +1 only — the stored brace no longer applies
-  assert.equal(entry.history[0].machoBrace, false); // and the record doesn't claim it did
+  assert.equal(asKind(entry.history[0], 'battle').machoBrace, false); // and the record doesn't claim it did
 });
 
 test('a held power item stops applying when the game version predates power items', () => {
@@ -1077,7 +1088,7 @@ test('a held power item stops applying when the game version predates power item
   store.updateParty(unwrap(store.activeParty).id, { baseGame: 'Red' }); // Gen 1: no power items
   store.logDefeat(entry.uid, opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 }));
   assert.equal(entry.evs.atk, 1); // no +8
-  assert.equal(entry.history[0].powerItem, null);
+  assert.equal(asKind(entry.history[0], 'battle').powerItem, null);
 });
 
 test('spriteBaseGame falls back from the sprite override to the base game to empty', () => {
@@ -1096,7 +1107,7 @@ test('logDefeat records pokerus only when it actually doubled the yield', () => 
   const entry = store.catchPokemon(mon());
   store.setPokerus(entry.uid, true);
   store.logDefeat(entry.uid, opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 }));
-  assert.equal(entry.history[0].pokerus, false); // no misleading "Pokérus ×2" tag
+  assert.equal(asKind(entry.history[0], 'battle').pokerus, false); // no misleading "Pokérus ×2" tag
 });
 
 test('deleteHistoryEntry on the newest level record reverts to the previous level', () => {
@@ -1113,11 +1124,11 @@ test('deleting an older level record does not discard later level-ups', () => {
   store.setLevel(entry.uid, 15);
   const middle = entry.history.find((h) => h.kind === 'level' && h.toLevel === 10);
 
-  store.deleteHistoryEntry(entry.uid, middle.id);
+  store.deleteHistoryEntry(entry.uid, unwrap(middle).id);
   assert.equal(entry.level, 15); // newest remaining record still says 15
 
   const newest = entry.history.find((h) => h.kind === 'level');
-  store.deleteHistoryEntry(entry.uid, newest.id);
+  store.deleteHistoryEntry(entry.uid, unwrap(newest).id);
   assert.equal(entry.level, 5); // back to the catch level once no level records remain
 });
 
@@ -1127,11 +1138,11 @@ test('deleting an older pokerus record keeps the newest toggle in force', () => 
   store.setPokerus(entry.uid, false);
   const older = entry.history.find((h) => h.kind === 'pokerus' && h.active === true);
 
-  store.deleteHistoryEntry(entry.uid, older.id);
+  store.deleteHistoryEntry(entry.uid, unwrap(older).id);
   assert.equal(entry.pokerus, false); // the newer "cleared" record still wins
 
   const newest = entry.history.find((h) => h.kind === 'pokerus');
-  store.deleteHistoryEntry(entry.uid, newest.id);
+  store.deleteHistoryEntry(entry.uid, unwrap(newest).id);
   assert.equal(entry.pokerus, false); // no records left -> off
 });
 
@@ -1183,7 +1194,7 @@ test("a battling Pokémon's held item bonus does not transfer to an Exp.-Share r
   store.logDefeat(battler.uid, opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 }));
   assert.equal(battler.evs.atk, 9); // 1 base + 8 power item bonus
   assert.equal(holder.evs.atk, 1); // holder gets only the unmodified base yield
-  assert.equal(holder.history[0].powerItem, null);
+  assert.equal(asKind(holder.history[0], 'battle').powerItem, null);
 });
 
 test("an Exp.-Share recipient's own held item never applies to the EVs it receives passively", () => {
@@ -1204,7 +1215,7 @@ test("an Exp.-Share recipient's own Pokérus doubles the EVs it receives passive
 
   store.logDefeat(battler.uid, opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 }));
   assert.equal(holder.evs.atk, 2); // 1 base, doubled by the holder's own Pokérus
-  assert.equal(holder.history[0].pokerus, true);
+  assert.equal(asKind(holder.history[0], 'battle').pokerus, true);
 });
 
 test("Exp.-Share EVs are clamped to the recipient's own 252 cap, independent of the battler", () => {

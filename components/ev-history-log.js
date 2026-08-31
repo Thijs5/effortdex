@@ -18,9 +18,13 @@ import { POKERUS_ICON_SVG } from '../lib/icons.js';
  * battle is the parent's job, since it owns the battle status line.
  */
 
+/** @typedef {import('../lib/store.js').RosterEntry} RosterEntry */
+/** @typedef {import('../lib/store.js').HistoryRecord} HistoryRecord */
+
 export class EvHistoryLog extends HTMLElement {
   constructor() {
     super();
+    /** @type {RosterEntry|null} */
     this._entry = null;
     this._open = false;
 
@@ -62,15 +66,16 @@ export class EvHistoryLog extends HTMLElement {
         <ul class="hist-list"></ul>
       </details>
     `;
-    this.$details = shadow.querySelector('details');
-    this.$histCount = shadow.querySelector('.hist-count');
-    this.$histList = shadow.querySelector('.hist-list');
+    this.$details = /** @type {HTMLDetailsElement} */ (shadow.querySelector('details'));
+    this.$histCount = /** @type {HTMLElement} */ (shadow.querySelector('.hist-count'));
+    this.$histList = /** @type {HTMLElement} */ (shadow.querySelector('.hist-list'));
 
     this.$details.addEventListener('toggle', () => {
       this._open = this.$details.open;
     });
     this.$histList.addEventListener('click', (e) => {
-      const redefeatBtn = e.target.closest('.redefeat-btn');
+      const target = /** @type {HTMLElement} */ (e.target);
+      const redefeatBtn = /** @type {HTMLElement|null} */ (target.closest('.redefeat-btn'));
       if (redefeatBtn) {
         this._open = true;
         this.dispatchEvent(
@@ -82,18 +87,20 @@ export class EvHistoryLog extends HTMLElement {
         );
         return;
       }
-      const deleteBtn = e.target.closest('.delete-hist-btn');
+      const deleteBtn = /** @type {HTMLElement|null} */ (target.closest('.delete-hist-btn'));
       if (deleteBtn) {
         this._open = true;
-        store.deleteHistoryEntry(this._entry.uid, deleteBtn.dataset.id);
+        store.deleteHistoryEntry(/** @type {RosterEntry} */ (this._entry).uid, /** @type {string} */ (deleteBtn.dataset.id));
       }
     });
   }
 
+  /** @param {RosterEntry} e */
   set entry(e) {
     this._entry = e;
     this._render();
   }
+  /** @returns {RosterEntry|null} */
   get entry() {
     return this._entry;
   }
@@ -102,7 +109,7 @@ export class EvHistoryLog extends HTMLElement {
     const e = this._entry;
     if (!e) return;
     this.$details.open = this._open;
-    this.$histCount.textContent = e.history.length;
+    this.$histCount.textContent = String(e.history.length);
     this.$histList.innerHTML = e.history.length
       ? this._listHtml(e.history)
       : '<li class="empty">Nothing logged yet.</li>';
@@ -112,8 +119,10 @@ export class EvHistoryLog extends HTMLElement {
   // `history` is already newest-first (each store mutation unshifts), so
   // grouping in place — without re-sorting — keeps both the day order and
   // the entries within each day newest-first.
+  /** @param {HistoryRecord[]} history @returns {string} */
   _listHtml(history) {
     let html = '';
+    /** @type {string|null} */
     let lastKey = null;
     for (const h of history) {
       const key = dayKey(h.timestamp);
@@ -126,6 +135,7 @@ export class EvHistoryLog extends HTMLElement {
     return html;
   }
 
+  /** @param {HistoryRecord} h @returns {string} */
   _itemHtml(h) {
     if (h.kind === 'catch') {
       // No delete button: this is the origin record (the store refuses to
@@ -205,7 +215,7 @@ export class EvHistoryLog extends HTMLElement {
     }
     if (h.kind === 'imported') {
       return `<li>
-        <img src="${this._entry.sprite || FALLBACK_SPRITE}" alt="" ${FALLBACK_ONERROR} />
+        <img src="${this._entry?.sprite || FALLBACK_SPRITE}" alt="" ${FALLBACK_ONERROR} />
         <div>
           <strong>Imported</strong>
           <span class="gain">${formatEvYield(h.evs) || 'No EVs'} — from an old save format</span>
@@ -241,7 +251,7 @@ export class EvHistoryLog extends HTMLElement {
     }
     if (h.kind === 'level') {
       return `<li>
-        <img src="${this._entry.sprite || FALLBACK_SPRITE}" alt="" ${FALLBACK_ONERROR} />
+        <img src="${this._entry?.sprite || FALLBACK_SPRITE}" alt="" ${FALLBACK_ONERROR} />
         <div>
           <strong>${h.toLevel > h.fromLevel ? 'Level up' : 'Level correction'}</strong>
           <span class="gain">Lv. ${h.fromLevel} &rarr; Lv. ${h.toLevel}</span>

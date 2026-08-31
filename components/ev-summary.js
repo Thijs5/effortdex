@@ -3,6 +3,10 @@ import { emptyEvs } from '../lib/utils.js';
 import { attachDesignSystem } from '../lib/design-system.js';
 import './ev-bar.js';
 
+/** @typedef {import('../lib/constants.js').EvMap} EvMap */
+/** @typedef {import('../lib/constants.js').StatKey} StatKey */
+/** @typedef {import('./ev-bar.js').EvBar} EvBar */
+
 /**
  * <ev-summary> — six per-stat <ev-bar>s plus a total bar. Set `.evs` to
  * an { hp, atk, def, spa, spd, spe } object.
@@ -21,16 +25,19 @@ export class EvSummary extends HTMLElement {
       <div class="bars"></div>
       <div class="total"></div>
     `;
-    this.$bars = shadow.querySelector('.bars');
-    this.$totalRow = shadow.querySelector('.total');
+    this.$bars = /** @type {HTMLElement} */ (shadow.querySelector('.bars'));
+    this.$totalRow = /** @type {HTMLElement} */ (shadow.querySelector('.total'));
     this._evs = emptyEvs();
+    /** @type {EvMap|null} */
     this._baseStats = null;
+    /** @type {{ boost: StatKey|null, hinder: StatKey|null }|null} */
     this._nature = null;
     this._statCap = STAT_CAP;
+    /** @type {number|null} */
     this._totalCap = TOTAL_CAP;
     this._mergedSpecial = false;
     for (const { key, label } of STATS) {
-      const bar = document.createElement('ev-bar');
+      const bar = /** @type {EvBar} */ (document.createElement('ev-bar'));
       bar.dataset.key = key;
       bar.dataset.baseLabel = label;
       bar.label = label;
@@ -38,12 +45,13 @@ export class EvSummary extends HTMLElement {
       bar.value = 0;
       this.$bars.appendChild(bar);
     }
-    this.$total = document.createElement('ev-bar');
+    this.$total = /** @type {EvBar} */ (document.createElement('ev-bar'));
     this.$total.label = 'TOT';
     this.$total.max = TOTAL_CAP;
     this.$totalRow.appendChild(this.$total);
   }
 
+  /** @param {EvMap} v */
   set evs(v) {
     this._evs = v;
     this._render();
@@ -51,7 +59,8 @@ export class EvSummary extends HTMLElement {
   get evs() {
     return this._evs;
   }
-  /** The caught Pokémon's species base stats, `{ hp, atk, def, spa, spd, spe }`. Null hides the hint. */
+  /** The caught Pokémon's species base stats, `{ hp, atk, def, spa, spd, spe }`. Null hides the hint.
+   * @param {EvMap|null} v */
   set baseStats(v) {
     this._baseStats = v || null;
     this._render();
@@ -59,7 +68,8 @@ export class EvSummary extends HTMLElement {
   get baseStats() {
     return this._baseStats;
   }
-  /** The caught Pokémon's nature, `{ boost, hinder }` (either may be null). Null/unset colors nothing. */
+  /** The caught Pokémon's nature, `{ boost, hinder }` (either may be null). Null/unset colors nothing.
+   * @param {{ boost: StatKey|null, hinder: StatKey|null }|null} v */
   set nature(v) {
     this._nature = v || null;
     this._render();
@@ -67,7 +77,8 @@ export class EvSummary extends HTMLElement {
   get nature() {
     return this._nature;
   }
-  /** The per-stat cap each bar's `.max` reflects. Defaults to STAT_CAP (252). */
+  /** The per-stat cap each bar's `.max` reflects. Defaults to STAT_CAP (252).
+   * @param {number} v */
   set statCap(v) {
     this._statCap = v || STAT_CAP;
     this._render();
@@ -75,7 +86,8 @@ export class EvSummary extends HTMLElement {
   get statCap() {
     return this._statCap;
   }
-  /** The combined-total cap the `TOT` bar reflects, or `null` to hide that row entirely (uncapped). */
+  /** The combined-total cap the `TOT` bar reflects, or `null` to hide that row entirely (uncapped).
+   * @param {number|null} v */
   set totalCap(v) {
     this._totalCap = v ?? null;
     this._render();
@@ -83,7 +95,8 @@ export class EvSummary extends HTMLElement {
   get totalCap() {
     return this._totalCap;
   }
-  /** Gen I only: Special hasn't split into SpA/SpD yet — hide the `spd` bar and relabel `spa` as `SPC`. */
+  /** Gen I only: Special hasn't split into SpA/SpD yet — hide the `spd` bar and relabel `spa` as `SPC`.
+   * @param {boolean} v */
   set mergedSpecial(v) {
     this._mergedSpecial = !!v;
     this._render();
@@ -94,10 +107,10 @@ export class EvSummary extends HTMLElement {
 
   _render() {
     let total = 0;
-    for (const bar of this.$bars.children) {
-      const key = bar.dataset.key;
+    for (const bar of /** @type {HTMLCollectionOf<EvBar>} */ (this.$bars.children)) {
+      const key = /** @type {StatKey} */ (bar.dataset.key);
       bar.hidden = this._mergedSpecial && key === 'spd';
-      bar.label = this._mergedSpecial && key === 'spa' ? 'SPC' : bar.dataset.baseLabel;
+      bar.label = this._mergedSpecial && key === 'spa' ? 'SPC' : /** @type {string} */ (bar.dataset.baseLabel);
       const val = this._evs[key] || 0;
       bar.max = this._statCap;
       bar.value = val;

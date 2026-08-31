@@ -21,6 +21,7 @@ export class GameVersionPicker extends HTMLElement {
   constructor() {
     super();
     this._activeIndex = -1;
+    /** @type {string[]} */
     this._options = []; // flat list of currently shown pickable names
     this._lastValid = ''; // last committed value; what an invalid entry reverts to
 
@@ -83,8 +84,8 @@ export class GameVersionPicker extends HTMLElement {
              autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" />
       <ul id="gvp-list" role="listbox" hidden></ul>
     `;
-    this.$input = shadow.querySelector('input');
-    this.$list = shadow.querySelector('ul');
+    this.$input = /** @type {HTMLInputElement} */ (shadow.querySelector('input'));
+    this.$list = /** @type {HTMLUListElement} */ (shadow.querySelector('ul'));
   }
 
   connectedCallback() {
@@ -97,7 +98,7 @@ export class GameVersionPicker extends HTMLElement {
     // plain aria-label on the host and it's mirrored onto the shadow
     // input, which is what actually carries the combobox role assistive
     // tech reads.
-    if (this.hasAttribute('aria-label')) this.$input.setAttribute('aria-label', this.getAttribute('aria-label'));
+    if (this.hasAttribute('aria-label')) this.$input.setAttribute('aria-label', /** @type {string} */ (this.getAttribute('aria-label')));
     this._lastValid = this.$input.value;
 
     this.$input.addEventListener('focus', () => this._showList());
@@ -117,7 +118,7 @@ export class GameVersionPicker extends HTMLElement {
         this._hideList();
       }, 120)
     );
-    attachPointerSelection(this.$list, (li) => this._pick(li.dataset.name));
+    attachPointerSelection(this.$list, (li) => this._pick(/** @type {string} */ (li.dataset.name)));
   }
 
   get value() {
@@ -192,7 +193,7 @@ export class GameVersionPicker extends HTMLElement {
     this.$list.innerHTML = html;
     this.$list.hidden = false;
     this.$input.setAttribute('aria-expanded', 'true');
-    syncActiveDescendant(this.$input, [...this.$list.querySelectorAll('li.option')], -1, 'gvp-opt');
+    syncActiveDescendant(this.$input, [...this.$list.querySelectorAll('li.option')].map((el) => /** @type {HTMLElement} */ (el)), -1, 'gvp-opt');
   }
 
   _hideList() {
@@ -202,6 +203,7 @@ export class GameVersionPicker extends HTMLElement {
     this.$input.removeAttribute('aria-activedescendant');
   }
 
+  /** @param {KeyboardEvent} e */
   _onKeydown(e) {
     if (this.$list.hidden) {
       if (e.key === 'ArrowDown') {
@@ -240,12 +242,13 @@ export class GameVersionPicker extends HTMLElement {
   }
 
   _highlight() {
-    const items = [...this.$list.querySelectorAll('li.option')];
+    const items = [...this.$list.querySelectorAll('li.option')].map((el) => /** @type {HTMLElement} */ (el));
     items.forEach((li, i) => li.classList.toggle('active', i === this._activeIndex));
     syncActiveDescendant(this.$input, items, this._activeIndex, 'gvp-opt');
     items[this._activeIndex]?.scrollIntoView({ block: 'nearest' });
   }
 
+  /** @param {string} name */
   _pick(name) {
     this.$input.value = name;
     this._lastValid = name;
