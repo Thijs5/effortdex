@@ -752,6 +752,22 @@ test('setActiveParty switches the active party, ignoring an unrecognized id', ()
   assert.equal(store.activeParty.id, first.id); // unchanged
 });
 
+test('init() awaits hydrateCache once and is idempotent (docs/adr/0025 P3)', async () => {
+  let hydrated = 0;
+  const s = new Store({ hydrateCache: async () => { hydrated++; } });
+  assert.equal(hydrated, 0); // constructor does not hydrate
+  await s.init();
+  await s.init();
+  assert.equal(hydrated, 1);
+  assert.equal(s._initialized, true);
+});
+
+test('init() tolerates a rejecting hydrateCache — startup still completes', async () => {
+  const s = new Store({ hydrateCache: async () => { throw new Error('idb down'); } });
+  await s.init(); // must not reject
+  assert.equal(s._initialized, true);
+});
+
 test('state persists across Store instances via localStorage', () => {
   const entry = store.addPokemon(mon());
   store.renamePokemon(entry.uid, 'Buddy');
