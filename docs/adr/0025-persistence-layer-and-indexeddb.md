@@ -102,25 +102,41 @@ A single module declares everything about the on-disk shape:
 
 - `DB_NAME`, `DB_VERSION`.
 - `STORES` — a declarative map of object-store name → `{ keyPath,
-  indexes }`. This is the "table list."
+  indexes }`, describing the shape as it should look **right now**. Read
+  by the guard test and the dev-time assertion; **never** by a
+  migration.
 - `MIGRATIONS` — an ordered array, one entry per `DB_VERSION`, each a
-  pure function of the upgrade transaction. The exact mirror of
-  `Store`'s existing `MIGRATIONS`
-  ([ADR 0009](0009-automatic-breaking-storage-migrations.md)), applied
-  in `onupgradeneeded` by walking from `oldVersion` to `DB_VERSION`.
+  **frozen snapshot** of that version's schema delta: literal
+  `createObjectStore` / `createIndex` calls, not a loop over `STORES`. A
+  step that read `STORES` would, on a fresh install (`oldVersion` 0),
+  create whatever a *later* step also creates — `ConstraintError`, and
+  the upgrade aborts, so every new user is locked out while existing
+  clients (which skip the step) never see it. Same hazard `Store`'s
+  `MIGRATIONS` avoids ([ADR 0009](0009-automatic-breaking-storage-migrations.md)).
+  Applied in `onupgradeneeded` by walking from `oldVersion` to
+  `DB_VERSION`; a throw inside a step is captured and re-surfaced as the
+  `openDb()` rejection (not the browser's generic `AbortError`).
 
-Changing the schema *is* editing this file and adding a `MIGRATIONS`
-entry — there is nowhere else to change. Guard tests (extending the
-existing `SCHEMA_VERSION`/`MIGRATIONS`-agree test):
+Changing the schema *is* editing this file: update `STORES`, bump
+`DB_VERSION`, and append a `MIGRATIONS` step that spells out the delta.
+Guard tests (`test/db-schema.test.js`, extending the existing
+`SCHEMA_VERSION`/`MIGRATIONS`-agree test):
 
 - `MIGRATIONS.length === DB_VERSION`, steps contiguous and ordered.
-- every store in `STORES` is created by some migration.
-- a frozen fixture per version: a real exported database at version N
-  still opens and reads under current code (the pattern
-  `test/fixtures/state-schema-*.json` already uses for the blob).
-- dev-only runtime assertion: the live DB's `objectStoreNames` and
-  index names match `STORES`, so editing a store definition without
-  bumping `DB_VERSION` fails loudly on the next load.
+- running every step reproduces **exactly** `STORES` (keyPaths,
+  index names, `unique`/`multiEntry`, compound `keyPath`s) — this is
+  only a real check because the steps don't read `STORES`, so adding a
+  store there without a matching step fails here.
+- a compound index (name contains `+`) declares an explicit array
+  `keyPath` — there is no name-based shorthand.
+- `test/db.test.js` (against `fake-indexeddb`) covers `openDb` +
+  migration walk, the promise wrappers, the synchronous-`fn`
+  transaction contract (commit, rollback-on-throw, abort), and the
+  `versionchange` close path.
+- planned: a frozen exported-DB fixture per version (the pattern
+  `test/fixtures/state-schema-*.json` already uses for the blob), and a
+  dev-only runtime assertion that the live DB's `objectStoreNames` /
+  index names match `STORES`.
 
 Initial `STORES` (v1):
 
