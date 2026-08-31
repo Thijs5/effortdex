@@ -136,12 +136,32 @@ Initial `STORES` (v1):
 
 Opens the DB (runs the migration walk), and exposes a small
 promise-based API: `get`, `put`, `add`, `delete`, `getAll`,
-`getAllByIndex`, `count`, and `transaction(stores, mode, fn)` where `fn`
-receives typed store handles and the transaction resolves/rejects
-atomically. No query builder, no schema DSL — the schema lives in
-`schema.js`. Feature-detects `indexedDB` and falls back to an in-memory
-backend when absent (old Safari private mode), matching
-[ADR 0024](0024-graceful-offline-degradation.md).
+`getAllByIndex`, `count`, and `transaction(stores, mode, fn)`. `fn` is
+**synchronous** and issues only IndexedDB requests against the
+transaction — it must not `await`, since an IndexedDB transaction goes
+inactive the moment control returns to the event loop with no pending
+request (an `await` mid-`fn` auto-commits the partial write and the next
+request throws). It builds a result via `request.onsuccess` handlers
+and returns it; the wrapper resolves with that value on `oncomplete`,
+rejects (rolling back) on `abort`/`error` or if `fn` throws. No query
+builder, no schema DSL — the schema lives in `schema.js`.
+
+`indexedDB` genuinely missing (old Safari private mode) throws
+`IndexedDbUnavailableError` — **not** an in-memory fallback:
+[ADR 0024](0024-graceful-offline-degradation.md)'s "degrade, don't
+crash" covers *cached/reference* data, not the roster, and an in-memory
+roster that vanishes on reload is worse than no change at all. Through
+P3 the caller (`Store`) keeps the `localStorage` blob path as its
+fallback; P4 must give this an explicit answer (keep dual-writing the
+blob, or refuse and stay blob-only on such a browser) rather than
+silently not persisting.
+
+A newer tab opening a higher `DB_VERSION` fires `versionchange`; this
+connection closes and every later call throws `DbConnectionClosedError`
+(an `onClose` callback lets the app prompt for a reload — wired in P3),
+rather than a bare `InvalidStateError`. A concurrent old tab that
+*blocks* an upgrade rejects `openDb()` with a "close other tabs and
+reload" error instead of hanging the `await store.init()` behind it.
 
 ### 3. `Store` keeps its shape; its storage changes
 
@@ -233,6 +253,15 @@ backup; two tabs racing the import → the in-transaction
 `rosterImported` check makes the second a no-op; device A upgraded /
 device B not → the same multi-device divergence as today, reconciled by
 a Transfer link ([ADR 0020](0020-transfer-hub-nested-export-import-routes.md)).
+
+One that needs code, not just tolerance: `parties.slug` is a **unique**
+index, but `_normalizeEntries` only *backfills* a missing slug — it
+never de-duplicates existing ones, and a blob with two parties sharing a
+slug (an older bug, a hand-edited Transfer file) would make the second
+`parties` write raise `ConstraintError` and abort the whole import,
+permanently (it retries and re-fails every load). The importer must
+de-duplicate slugs (re-`uniqueSlug` the collisions) as a pre-pass before
+writing rows.
 
 `transfer.js` export/import continues to serialize the in-memory
 `store.state` shape — unchanged, now sourced from rows.
