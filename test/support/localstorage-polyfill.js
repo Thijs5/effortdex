@@ -20,6 +20,16 @@ class MemoryStorage {
   clear() {
     this.#data.clear();
   }
+
+  // Enumeration half of the Web Storage API — MemoCache#clearStored walks
+  // localStorage by index to drop entries by key prefix.
+  get length() {
+    return this.#data.size;
+  }
+
+  key(index) {
+    return [...this.#data.keys()][index] ?? null;
+  }
 }
 
 globalThis.localStorage = new MemoryStorage();
