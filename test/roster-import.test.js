@@ -119,6 +119,64 @@ test('a frozen schema-1 blob migrates and projects — the legacy input P4 must 
   assert.ok(Number.isInteger(entry.level) && entry.level >= 1);
 });
 
+test('a pre-event-sourcing save (no `schema` field) is migrated by _migrateV1, then projects — the oldest input P4 must carry across', () => {
+  // The ADR 0006 §7 shape: flat per-entry fields, a `history[]` /
+  // `evolutions[]` that are dropped by design, and NO `schema` number
+  // (so `_readSchemaVersion` returns null -> `_migrateV1`). A user still
+  // on an install this old upgrades straight into the IndexedDB build,
+  // so its output has to be a valid importer input too.
+  localStorage.clear();
+  localStorage.setItem(
+    'effortdex:state',
+    JSON.stringify({
+      activePartyId: 'p1',
+      parties: [
+        {
+          id: 'p1',
+          name: 'Ancient party', // missing description / baseGame / overrides / slug
+          pokemon: [
+            {
+              uid: 'old-1',
+              speciesName: 'ivysaur',
+              speciesId: 2,
+              sprite: 'https://sprites.example/2.png',
+              baseStats: { hp: 60, atk: 62, def: 63, spa: 80, spd: 80, spe: 60 },
+              nickname: 'Buddy',
+              level: 32,
+              nature: 'adamant',
+              powerItem: 'bracer',
+              machoBrace: false,
+              pokerus: true,
+              evs: { hp: 0, atk: 44, def: 0, spa: 0, spd: 0, spe: 10 },
+              history: [{ id: 'x', kind: 'battle', opponentName: 'rattata' }], // dropped by design
+              evolutions: [{ fromName: 'bulbasaur', toName: 'ivysaur' }], // dropped by design
+            },
+          ],
+        },
+      ],
+    })
+  );
+
+  const store = new Store();
+  const party = store.state.parties[0];
+
+  // Party backfills applied after migration.
+  assert.equal(party.slug, 'ancient-party');
+  assert.equal(party.description, '');
+  assert.ok('availableGeneration' in party.overrides, 'overrides backfilled');
+
+  const entry = party.pokemon[0];
+  // History was synthesized as events, old per-record history dropped.
+  assert.deepEqual(entry.events.map((e) => e.kind), ['add', 'imported', 'pokerus']);
+  // ...and the flat fields survive as a coherent projection.
+  assert.equal(entry.nickname, 'Buddy');
+  assert.equal(entry.nature, 'adamant');
+  assert.equal(entry.speciesName, 'ivysaur');
+  assert.equal(entry.level, 32);
+  assert.equal(entry.pokerus, true);
+  assert.deepEqual(entry.evs, { hp: 0, atk: 44, def: 0, spa: 0, spd: 0, spe: 10 });
+});
+
 // --- resilience: shapes Store never writes, that broke v1.9.1/v1.9.2 ---
 // Authored as literals here (not generated) so they stay exactly as
 // bad as intended. The P4 importer inherits this repair for free by
@@ -177,9 +235,10 @@ test('duplicate slugs SURVIVE the current pipeline unchanged — so P4 must de-d
 
 // P4 (ADR 0025 §6): the actual blob -> IndexedDB import. Turn this on
 // when the importer lands. Run it against EACH of these inputs:
-//   - roster-blob-multi-party.json  (breadth)
-//   - state-schema-1.json           (migrate, then import)
-//   - every MALFORMED case above    (repair, then import)
+//   - roster-blob-multi-party.json     (breadth)
+//   - the pre-event-sourcing blob above (_migrateV1, then import)
+//   - state-schema-1.json              (1->2 migrate, then import)
+//   - every MALFORMED case above       (repair, then import)
 // For each: (1) load through the current pipeline -> `before` roster;
 // (2) openDb() on fake-indexeddb and run the importer against the blob
 // state; (3) rebuild a roster purely from the parties/rosterEntries/
