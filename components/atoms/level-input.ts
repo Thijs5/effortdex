@@ -1,4 +1,4 @@
-import { attachDesignSystem } from '../../lib/design-system.ts';
+import { BaseElement } from '../base-element.ts';
 
 /**
  * <level-input> — the one control for typing a Pokémon's level, wherever
@@ -19,21 +19,20 @@ import { attachDesignSystem } from '../../lib/design-system.ts';
  * as <game-version-picker> — a wrapping `<label>` doesn't auto-associate
  * across the shadow boundary the way it would for a native input.
  */
-export class LevelInput extends HTMLElement {
-  $input: HTMLInputElement;
-
-  constructor() {
-    super();
-    const shadow = this.attachShadow({ mode: 'open' });
-    attachDesignSystem(shadow);
-    shadow.innerHTML = `
+export class LevelInput extends BaseElement {
+  static template = `
       <style>
         :host { display: inline-block; }
         input { width: 100%; }
       </style>
       <input type="text" inputmode="numeric" pattern="[0-9]*" class="ds-field" />
     `;
-    this.$input = shadow.querySelector('input')!;
+
+  $input: HTMLInputElement;
+
+  constructor() {
+    super();
+    this.$input = this.$<HTMLInputElement>('input');
   }
 
   connectedCallback(): void {

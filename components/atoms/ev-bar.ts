@@ -1,28 +1,12 @@
-import { attachDesignSystem } from '../../lib/design-system.ts';
+import { BaseElement } from '../base-element.ts';
 
 /**
  * <ev-bar label max> — one LCD-style segmented progress bar. Set `.value`,
  * `.max`, `.label` as JS properties. Reflects a `maxed` attribute (and
  * shows a Poké Ball badge) once value reaches max.
  */
-export class EvBar extends HTMLElement {
-  $label: HTMLElement;
-  $actualStat: HTMLElement;
-  $track: HTMLElement;
-  $fill: HTMLElement;
-  $value: HTMLElement;
-  $badge: HTMLElement;
-  _label = '';
-  _actualStat: number | null = null;
-  _natureEffect: string | null = null;
-  _value = 0;
-  _max = 252;
-
-  constructor() {
-    super();
-    const shadow = this.attachShadow({ mode: 'open' });
-    attachDesignSystem(shadow);
-    shadow.innerHTML = `
+export class EvBar extends BaseElement {
+  static template = `
       <style>
         :host { display: block; }
         /* No trailing badge column: the maxed badge overlays the track's
@@ -135,17 +119,32 @@ export class EvBar extends HTMLElement {
         <span class="badge" hidden title="Maxed out"></span>
       </div>
     `;
-    this.$label = shadow.querySelector<HTMLElement>('.label-text')!;
-    this.$actualStat = shadow.querySelector<HTMLElement>('.actual-stat')!;
-    this.$track = shadow.querySelector<HTMLElement>('.track')!;
-    this.$fill = shadow.querySelector<HTMLElement>('.fill')!;
-    this.$value = shadow.querySelector<HTMLElement>('.value')!;
-    this.$badge = shadow.querySelector<HTMLElement>('.badge')!;
+
+  $label: HTMLElement;
+  $actualStat: HTMLElement;
+  $track: HTMLElement;
+  $fill: HTMLElement;
+  $value: HTMLElement;
+  $badge: HTMLElement;
+  _label = '';
+  _actualStat: number | null = null;
+  _natureEffect: string | null = null;
+  _value = 0;
+  _max = 252;
+
+  constructor() {
+    super();
+    this.$label = this.$('.label-text');
+    this.$actualStat = this.$('.actual-stat');
+    this.$track = this.$('.track');
+    this.$fill = this.$('.fill');
+    this.$value = this.$('.value');
+    this.$badge = this.$('.badge');
   }
 
   set label(v: string) {
     this._label = v;
-    this._render();
+    this.render();
   }
   get label(): string {
     return this._label;
@@ -153,7 +152,7 @@ export class EvBar extends HTMLElement {
   /** This Pokémon's real current value for this stat (base+IV+EV+level+nature), shown as a small hint next to the label. Null hides it — unknown until this stat's IV is (Gen III+ only; see store.ts's actualStat). */
   set actualStat(v: number | null) {
     this._actualStat = v;
-    this._render();
+    this.render();
   }
   get actualStat(): number | null {
     return this._actualStat;
@@ -161,27 +160,27 @@ export class EvBar extends HTMLElement {
   /** This stat's nature effect: 'boost', 'hinder', or null. Colors the label accordingly. */
   set natureEffect(v: string | null) {
     this._natureEffect = v || null;
-    this._render();
+    this.render();
   }
   get natureEffect(): string | null {
     return this._natureEffect;
   }
   set value(v: number) {
     this._value = v;
-    this._render();
+    this.render();
   }
   get value(): number {
     return this._value;
   }
   set max(v: number) {
     this._max = v;
-    this._render();
+    this.render();
   }
   get max(): number {
     return this._max;
   }
 
-  _render(): void {
+  protected render(): void {
     this.toggleAttribute('bare', !this._label && this._actualStat == null);
     this.$label.textContent = this._label;
     this.$actualStat.textContent = this._actualStat != null ? String(this._actualStat) : '';

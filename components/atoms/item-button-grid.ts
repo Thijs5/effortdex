@@ -1,5 +1,5 @@
-import { attachDesignSystem } from '../../lib/design-system.ts';
 import './ds-item-button.ts';
+import { BaseElement } from '../base-element.ts';
 
 export interface ItemButtonSpec {
   id: string;
@@ -34,19 +34,12 @@ export interface ItemButtonSpec {
  * compute `capped`/`disabled`/`title` themselves.
  * `columns` (attribute) sets the grid's column count, default 3.
  */
-export class ItemButtonGrid extends HTMLElement {
+export class ItemButtonGrid extends BaseElement {
   static get observedAttributes(): string[] {
     return ['columns'];
   }
 
-  _items: ItemButtonSpec[] = [];
-  $grid: HTMLElement;
-
-  constructor() {
-    super();
-    const shadow = this.attachShadow({ mode: 'open' });
-    attachDesignSystem(shadow);
-    shadow.innerHTML = `
+  static template = `
       <style>
         :host { display: block; }
         .grid { display: grid; grid-template-columns: repeat(var(--columns, 3), 1fr); gap: var(--space-2); }
@@ -61,7 +54,13 @@ export class ItemButtonGrid extends HTMLElement {
       </style>
       <div class="grid"></div>
     `;
-    this.$grid = shadow.querySelector<HTMLElement>('.grid')!;
+
+  _items: ItemButtonSpec[] = [];
+  $grid: HTMLElement;
+
+  constructor() {
+    super();
+    this.$grid = this.$('.grid');
     this.$grid.addEventListener('pick', (e) => {
       const btn = (e.target as HTMLElement).closest('[data-id]');
       if (!(btn instanceof HTMLElement)) return;
@@ -75,13 +74,13 @@ export class ItemButtonGrid extends HTMLElement {
 
   set items(items: ItemButtonSpec[]) {
     this._items = items;
-    this._render();
+    this.render();
   }
   get items(): ItemButtonSpec[] {
     return this._items;
   }
 
-  _render(): void {
+  protected render(): void {
     this.$grid.innerHTML = '';
     for (const item of this._items) {
       const btn = document.createElement('ds-item-button');

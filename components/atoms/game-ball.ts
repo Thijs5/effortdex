@@ -1,5 +1,5 @@
 import { matchGameVersion, GEN_ROMAN, GEN_COLORS } from '../../lib/game-versions.ts';
-import { attachDesignSystem } from '../../lib/design-system.ts';
+import { BaseElement } from '../base-element.ts';
 
 const R = 16; // ball radius, viewBox is 0 0 40 40 with center (20, 20)
 const CX = 20;
@@ -19,22 +19,8 @@ const BUTTON_R = 6;
  * plain grey ball with a small "fan game" mark in the button, never a
  * blocked state.
  */
-export class GameBall extends HTMLElement {
-  _name = '';
-  $top: SVGPathElement;
-  $bottom: SVGPathElement;
-  $band: SVGRectElement;
-  $outline: SVGCircleElement;
-  $shine: SVGEllipseElement;
-  $button: SVGCircleElement;
-  $genText: SVGTextElement;
-  $fanMark: SVGPathElement;
-
-  constructor() {
-    super();
-    const shadow = this.attachShadow({ mode: 'open' });
-    attachDesignSystem(shadow);
-    shadow.innerHTML = `
+export class GameBall extends BaseElement {
+  static template = `
       <style>
         /* The literal rgba/#fff values below are deliberate (ADR 0003
            exception): they paint the ball's physical plastic/gloss, which
@@ -66,14 +52,27 @@ export class GameBall extends HTMLElement {
         <path class="fan-mark" hidden></path>
       </svg>
     `;
-    this.$top = shadow.querySelector<SVGPathElement>('.top')!;
-    this.$bottom = shadow.querySelector<SVGPathElement>('.bottom')!;
-    this.$band = shadow.querySelector<SVGRectElement>('.band')!;
-    this.$outline = shadow.querySelector<SVGCircleElement>('.outline')!;
-    this.$shine = shadow.querySelector<SVGEllipseElement>('.shine')!;
-    this.$button = shadow.querySelector<SVGCircleElement>('.button')!;
-    this.$genText = shadow.querySelector<SVGTextElement>('.gen-text')!;
-    this.$fanMark = shadow.querySelector<SVGPathElement>('.fan-mark')!;
+
+  _name = '';
+  $top: SVGPathElement;
+  $bottom: SVGPathElement;
+  $band: SVGRectElement;
+  $outline: SVGCircleElement;
+  $shine: SVGEllipseElement;
+  $button: SVGCircleElement;
+  $genText: SVGTextElement;
+  $fanMark: SVGPathElement;
+
+  constructor() {
+    super();
+    this.$top = this.$<SVGPathElement>('.top');
+    this.$bottom = this.$<SVGPathElement>('.bottom');
+    this.$band = this.$<SVGRectElement>('.band');
+    this.$outline = this.$<SVGCircleElement>('.outline');
+    this.$shine = this.$<SVGEllipseElement>('.shine');
+    this.$button = this.$<SVGCircleElement>('.button');
+    this.$genText = this.$<SVGTextElement>('.gen-text');
+    this.$fanMark = this.$<SVGPathElement>('.fan-mark');
 
     this.$top.setAttribute('d', `M ${CX - R} ${CY} A ${R} ${R} 0 0 1 ${CX + R} ${CY} Z`);
     this.$bottom.setAttribute('d', `M ${CX - R} ${CY} A ${R} ${R} 0 0 0 ${CX + R} ${CY} Z`);
@@ -98,13 +97,13 @@ export class GameBall extends HTMLElement {
 
   set name(v: string) {
     this._name = v || '';
-    this._render();
+    this.render();
   }
   get name(): string {
     return this._name;
   }
 
-  _render(): void {
+  protected render(): void {
     this.toggleAttribute('empty', !this._name);
     this.title = this._name;
     const match = this._name ? matchGameVersion(this._name) : null;
