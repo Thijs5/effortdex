@@ -71,6 +71,17 @@ const SPECIES = [
     baseStats: { hp: 106, atk: 110, def: 90, spa: 154, spd: 90, spe: 130 },
     evYield: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 3 },
   },
+  {
+    // Real PokéAPI has no species-list entry literally named "giratina" —
+    // only its variety names (giratina-altered, giratina-origin), same
+    // pattern as Deoxys, Wormadam, Basculin and Minior. Kept here to catch
+    // any regression of components/pokemon-search.js's Enter-key handling
+    // for exactly that case (see e2e/catching.spec.js).
+    id: 487,
+    name: 'giratina-altered',
+    baseStats: { hp: 150, atk: 100, def: 120, spa: 100, spd: 120, spe: 90 },
+    evYield: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
+  },
 ];
 
 const STAT_ORDER = /** @type {const} */ ([

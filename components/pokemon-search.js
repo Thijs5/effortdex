@@ -493,6 +493,13 @@ export class PokemonSearch extends HTMLElement {
     } else if (e.key === 'Enter') {
       e.preventDefault();
       if (this._activeIndex >= 0) this._pick(this._matches[this._activeIndex].name);
+      // Nothing arrowed to yet — take the top suggestion rather than
+      // requiring an exact name match. Species like Giratina, Deoxys,
+      // Wormadam, Basculin and Minior have no PokeAPI entry named
+      // exactly after the species (only "giratina-altered" etc.), so
+      // typing the species name and hitting Enter would otherwise never
+      // match anything, even with matching suggestions right there.
+      else if (this._matches.length) this._pick(this._matches[0].name);
       else this._tryDirectPick();
     } else if (e.key === 'Escape') {
       // Consume the key: with the list open, Escape means "close the

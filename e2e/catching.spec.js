@@ -49,6 +49,25 @@ test.describe('Catching', () => {
     await expect(rosterRow(page, 'Charmander')).toBeVisible();
   });
 
+  test('pressing Enter without arrowing to a suggestion still catches a species with no bare-name PokéAPI entry', async ({ page }) => {
+    // Giratina (like Deoxys, Wormadam, Basculin, Minior) has no PokéAPI
+    // entry literally named after the species — only "giratina-altered" —
+    // so typing "Giratina" and hitting Enter used to match nothing.
+    await page.goto('/');
+    await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
+    const catchPanel = page.locator('section', { has: page.getByRole('heading', { name: 'Catch a Pokémon' }) });
+    await catchPanel.getByRole('combobox', { name: 'e.g. Bulbasaur', exact: true }).fill('Giratina');
+    await page.getByRole('option').filter({ hasText: /Giratina/i }).first().waitFor();
+    await page.keyboard.press('Enter');
+
+    const dialog = page.locator('dialog#catch-dialog');
+    await dialog.waitFor({ state: 'visible' });
+    await dialog.getByRole('button', { name: 'Catch!' }).click();
+    await dialog.waitFor({ state: 'hidden' });
+
+    await expect(rosterRow(page, 'Giratina Altered')).toBeVisible();
+  });
+
   test('releasing a caught Pokémon removes it from the roster', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
