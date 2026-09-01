@@ -3,7 +3,7 @@ import { titleCase, natureEffectHint, dayLabel } from '../../lib/utils.ts';
 import { api, store } from '../../lib/services.ts';
 import { versionedSpriteUrl, versionedSpriteIsOpaque } from '../../lib/pokeapi-client.ts';
 import { availableSpeciesFor } from '../../lib/species-availability.ts';
-import { attachDesignSystem } from '../../lib/design-system.ts';
+import { BaseElement } from '../base-element.ts';
 import { wireSpriteFallback } from '../../lib/sprite-fallback.ts';
 import { wireDisclosureMenu } from '../../lib/dom.ts';
 import * as router from '../../lib/router.ts';
@@ -28,7 +28,7 @@ import type { Nature } from '../../lib/constants.ts';
  * Store roster entry; it re-renders on assignment. Meant to be mounted
  * one at a time, full width.
  */
-export class PokemonDetail extends HTMLElement {
+export class PokemonDetail extends BaseElement {
   _entry: RosterEntry | null = null;
   _allowedSpeciesToken = 0;
   _openSegment: PokemonDialog | null = null;
@@ -72,9 +72,7 @@ export class PokemonDetail extends HTMLElement {
     // extracted per docs/adr/0008's note that this file was still
     // oversized even after item-button-grid.js).
 
-    const shadow = this.attachShadow({ mode: 'open' });
-    attachDesignSystem(shadow);
-    shadow.innerHTML = `
+    this.shadow.innerHTML = `
       <style>
         :host { display: block; }
         .card {
@@ -370,28 +368,28 @@ export class PokemonDetail extends HTMLElement {
       </article>
     `;
 
-    this.$sprite = shadow.querySelector<HTMLImageElement>('.sprite')!;
-    this.$spriteFrame = shadow.querySelector<HTMLElement>('.sprite-frame')!;
-    this.$speciesNum = shadow.querySelector<HTMLElement>('.species-num')!;
-    this.$nickname = shadow.querySelector<HTMLInputElement>('.nickname')!;
-    this.$species = shadow.querySelector<HTMLElement>('.species')!;
-    this.$levelValue = shadow.querySelector<HTMLElement>('.level-value')!;
-    this.$levelUpBtn = shadow.querySelector<HTMLButtonElement>('.level-up-btn')!;
-    this.$natureBtn = shadow.querySelector<HTMLButtonElement>('.nature-btn')!;
-    this.$natureDialog = shadow.querySelector('nature-dialog');
-    this.$levelDialog = shadow.querySelector('level-up-dialog');
-    this.$ivDialog = shadow.querySelector('iv-dialog');
-    this.$moreBtnWrap = shadow.querySelector<HTMLElement>('.more-btn-wrap')!;
-    this.$moreBtn = shadow.querySelector<HTMLButtonElement>('.more-btn')!;
-    this.$moreMenu = shadow.querySelector<HTMLElement>('.more-menu')!;
-    this.$itemBtn = shadow.querySelector<HTMLButtonElement>('.held-item-btn')!;
-    this.$itemBtnSprite = shadow.querySelector<HTMLImageElement>('.held-item-btn-sprite')!;
-    this.$itemBtnLabel = shadow.querySelector<HTMLElement>('.held-item-btn-label')!;
-    this.$itemsDialog = shadow.querySelector('items-dialog');
-    this.$competitiveDialog = shadow.querySelector('competitive-dialog');
-    this.$evSummary = shadow.querySelector('ev-summary')!;
-    this.$search = shadow.querySelector('pokemon-search')!;
-    this.$sheetExpShareNote = shadow.querySelector<HTMLElement>('.sheet-exp-share-note')!;
+    this.$sprite = this.$<HTMLImageElement>('.sprite');
+    this.$spriteFrame = this.$<HTMLElement>('.sprite-frame');
+    this.$speciesNum = this.$<HTMLElement>('.species-num');
+    this.$nickname = this.$<HTMLInputElement>('.nickname');
+    this.$species = this.$<HTMLElement>('.species');
+    this.$levelValue = this.$<HTMLElement>('.level-value');
+    this.$levelUpBtn = this.$<HTMLButtonElement>('.level-up-btn');
+    this.$natureBtn = this.$<HTMLButtonElement>('.nature-btn');
+    this.$natureDialog = this.$maybe('nature-dialog');
+    this.$levelDialog = this.$maybe('level-up-dialog');
+    this.$ivDialog = this.$maybe('iv-dialog');
+    this.$moreBtnWrap = this.$<HTMLElement>('.more-btn-wrap');
+    this.$moreBtn = this.$<HTMLButtonElement>('.more-btn');
+    this.$moreMenu = this.$<HTMLElement>('.more-menu');
+    this.$itemBtn = this.$<HTMLButtonElement>('.held-item-btn');
+    this.$itemBtnSprite = this.$<HTMLImageElement>('.held-item-btn-sprite');
+    this.$itemBtnLabel = this.$<HTMLElement>('.held-item-btn-label');
+    this.$itemsDialog = this.$maybe('items-dialog');
+    this.$competitiveDialog = this.$maybe('competitive-dialog');
+    this.$evSummary = this.$<import('../molecules/ev-summary.ts').EvSummary>('ev-summary');
+    this.$search = this.$<import('./pokemon-search.ts').PokemonSearch>('pokemon-search');
+    this.$sheetExpShareNote = this.$<HTMLElement>('.sheet-exp-share-note');
     // Shows what battling this opponent would actually add right now —
     // held item, Pokérus and the 252/510 caps folded in — rather than
     // the opponent's raw base yield, since those are what the player
@@ -399,11 +397,11 @@ export class PokemonDetail extends HTMLElement {
     // `this._entry` live at call time, so it stays correct as the entry
     // (or its Pokérus/item state) changes without needing to be reset.
     this.$search.evModifier = (mon) => (this._entry ? store.previewDefeat(this._entry.uid, mon)?.applied : undefined);
-    this.$battleStatus = shadow.querySelector<HTMLElement>('.battle-status')!;
-    this.$histLog = shadow.querySelector('ev-history-log')!;
-    this.$battleFab = shadow.querySelector<HTMLButtonElement>('.battle-fab')!;
-    this.$trainingGuideBtn = shadow.querySelector<HTMLElement>('.training-guide-menu-item')!;
-    this.$trainingGuideDialog = shadow.querySelector('training-guide-dialog');
+    this.$battleStatus = this.$<HTMLElement>('.battle-status');
+    this.$histLog = this.$<import('./ev-history-log.ts').EvHistoryLog>('ev-history-log');
+    this.$battleFab = this.$<HTMLButtonElement>('.battle-fab');
+    this.$trainingGuideBtn = this.$<HTMLElement>('.training-guide-menu-item');
+    this.$trainingGuideDialog = this.$maybe('training-guide-dialog');
 
     this._spriteFallback = wireSpriteFallback(this.$sprite);
 
@@ -453,7 +451,7 @@ export class PokemonDetail extends HTMLElement {
       menu: this.$moreMenu,
       itemSelector: '.more-menu-item',
       boundary: this.$moreBtnWrap,
-      activeRoot: this.shadowRoot!,
+      activeRoot: this.shadow,
     });
     this.$moreMenu.addEventListener('click', (e) => {
       const item = (e.target as HTMLElement).closest<HTMLElement>('.more-menu-item');
@@ -524,7 +522,7 @@ export class PokemonDetail extends HTMLElement {
 
   set entry(e: RosterEntry | null) {
     this._entry = e;
-    this._render();
+    this.render();
   }
   get entry(): RosterEntry | null {
     return this._entry;
@@ -593,7 +591,7 @@ export class PokemonDetail extends HTMLElement {
     }
   }
 
-  _render(): void {
+  protected render(): void {
     const e = this._entry;
     if (!e) return;
     const modernSprite = e.sprite || FALLBACK_SPRITE;

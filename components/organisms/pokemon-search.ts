@@ -1,7 +1,7 @@
 import { api } from '../../lib/services.ts';
 import { titleCase, formatEvYield } from '../../lib/utils.ts';
 import { FALLBACK_SPRITE, FALLBACK_ONERROR } from '../../lib/constants.ts';
-import { attachDesignSystem } from '../../lib/design-system.ts';
+import { BaseElement } from '../base-element.ts';
 import { attachPointerSelection, syncActiveDescendant } from '../../lib/combobox.ts';
 import type { SpeciesListEntry, DomainPokemon } from '../../lib/pokeapi-client.ts';
 import type { EvMap } from '../../lib/constants.ts';
@@ -54,29 +54,8 @@ type EvModifier = (mon: DomainPokemon) => EvMap | undefined;
  * suggestions/direct-pick to that set of species names when set; `null`
  * (default) is unrestricted. See `lib/species-availability.js`.
  */
-export class PokemonSearch extends HTMLElement {
-  _species: SpeciesListEntry[] | null = null; // loaded lazily on first focus
-  _loadingSpecies: Promise<SpeciesListEntry[]> | null = null; // in-flight load promise, so a fast typist isn't lost
-  _matches: SpeciesListEntry[] = [];
-  _activeIndex = -1;
-  _sheetOpen = false;
-  _recent: SpeciesListEntry[] = [];
-  _showingRecent = false;
-  _evModifier: EvModifier | null = null;
-  _allowedSpecies: Set<string> | null = null; // null means unrestricted, see `allowedSpecies` setter
-  _prevBodyOverflow = '';
-  _onViewportChange: () => void = () => {};
-  $wrap: HTMLElement;
-  $input: HTMLInputElement;
-  $list: HTMLUListElement;
-  $sheetTitle: HTMLElement;
-  $sheetClose: HTMLButtonElement;
-
-  constructor() {
-    super();
-    const shadow = this.attachShadow({ mode: 'open' });
-    attachDesignSystem(shadow);
-    shadow.innerHTML = `
+export class PokemonSearch extends BaseElement {
+  static template = `
       <style>
         :host { display: block; position: relative; min-width: 180px; flex: 1; }
         /* Shadow hosts need this spelled out explicitly — the UA default
@@ -228,11 +207,31 @@ export class PokemonSearch extends HTMLElement {
         <ul id="ps-list" class="suggestions" hidden role="listbox"></ul>
       </div>
     `;
-    this.$wrap = shadow.querySelector<HTMLElement>('.wrap')!;
-    this.$input = shadow.querySelector('input')!;
-    this.$list = shadow.querySelector<HTMLUListElement>('.suggestions')!;
-    this.$sheetTitle = shadow.querySelector<HTMLElement>('.sheet-title')!;
-    this.$sheetClose = shadow.querySelector<HTMLButtonElement>('.sheet-close')!;
+
+  _species: SpeciesListEntry[] | null = null; // loaded lazily on first focus
+  _loadingSpecies: Promise<SpeciesListEntry[]> | null = null; // in-flight load promise, so a fast typist isn't lost
+  _matches: SpeciesListEntry[] = [];
+  _activeIndex = -1;
+  _sheetOpen = false;
+  _recent: SpeciesListEntry[] = [];
+  _showingRecent = false;
+  _evModifier: EvModifier | null = null;
+  _allowedSpecies: Set<string> | null = null; // null means unrestricted, see `allowedSpecies` setter
+  _prevBodyOverflow = '';
+  _onViewportChange: () => void = () => {};
+  $wrap: HTMLElement;
+  $input: HTMLInputElement;
+  $list: HTMLUListElement;
+  $sheetTitle: HTMLElement;
+  $sheetClose: HTMLButtonElement;
+
+  constructor() {
+    super();
+    this.$wrap = this.$('.wrap');
+    this.$input = this.$<HTMLInputElement>('input');
+    this.$list = this.$<HTMLUListElement>('.suggestions');
+    this.$sheetTitle = this.$('.sheet-title');
+    this.$sheetClose = this.$<HTMLButtonElement>('.sheet-close');
   }
 
   connectedCallback(): void {
@@ -259,7 +258,7 @@ export class PokemonSearch extends HTMLElement {
         // native <dialog> restores focus to whatever was focused when
         // it opened). Without this check, that stale timeout fires
         // after the refocus and wrongly hides the list it just showed.
-        if (this.shadowRoot!.activeElement === this.$input) return;
+        if (this.shadow.activeElement === this.$input) return;
         this._hideList();
         this._closeSheet();
       }, 120)
@@ -337,7 +336,7 @@ export class PokemonSearch extends HTMLElement {
     if (
       this._showingRecent &&
       !this.$input.value.trim() &&
-      this.shadowRoot!.activeElement === this.$input
+      this.shadow.activeElement === this.$input
     ) {
       this._showRecentOrHide();
     }
@@ -589,7 +588,7 @@ export class PokemonSearch extends HTMLElement {
     );
     if (wasSheet) {
       this.$input.blur();
-    } else if (this.shadowRoot!.activeElement === this.$input) {
+    } else if (this.shadow.activeElement === this.$input) {
       // The input stays focused after a mouse pick (see the pointerdown
       // handler above) — without this, re-picking another recent option
       // needs a full blur-then-refocus, since clicking an already-focused

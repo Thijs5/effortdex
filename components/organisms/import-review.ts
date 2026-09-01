@@ -1,4 +1,4 @@
-import { attachDesignSystem } from '../../lib/design-system.ts';
+import { BaseElement } from '../base-element.ts';
 import { store } from '../../lib/services.ts';
 import { decodeTransferPayload } from '../../lib/transfer.ts';
 import * as router from '../../lib/router.ts';
@@ -22,27 +22,8 @@ type ImportPreview = ReturnType<typeof store.previewImport>;
  * convenience) — nothing is written to this device until "Import
  * selected" is pressed.
  */
-export class ImportReview extends HTMLElement {
-  $intake: HTMLElement;
-  $intakeMessage: HTMLElement;
-  $pasteForm: HTMLFormElement;
-  $pasteInput: HTMLInputElement;
-  $pasteBtn: HTMLButtonElement;
-  $fileInput: HTMLInputElement;
-  $status: HTMLElement;
-  $parties: HTMLElement;
-  $footer: HTMLElement;
-  $importBtn: HTMLButtonElement;
-  _parties: ExportedParty[] | null = null; // decoded payload (Store#exportPayload shape)
-  _preview: ImportPreview | null = null; // Store#previewImport output
-  _selected = new Set<string>();
-  _loadedPayload: string | null = null;
-
-  constructor() {
-    super();
-    const shadow = this.attachShadow({ mode: 'open' });
-    attachDesignSystem(shadow);
-    shadow.innerHTML = `
+export class ImportReview extends BaseElement {
+  static template = `
       <style>
         :host { display: block; }
 
@@ -130,16 +111,34 @@ export class ImportReview extends HTMLElement {
         </div>
       </div>
     `;
-    this.$intake = shadow.querySelector<HTMLElement>('.intake')!;
-    this.$intakeMessage = shadow.querySelector<HTMLElement>('.intake-message')!;
-    this.$pasteForm = shadow.querySelector<HTMLFormElement>('.paste-row')!;
-    this.$pasteInput = shadow.querySelector<HTMLInputElement>('.paste-row input')!;
-    this.$pasteBtn = shadow.querySelector<HTMLButtonElement>('[data-action="paste"]')!;
-    this.$fileInput = shadow.querySelector<HTMLInputElement>('#transfer-file-input')!;
-    this.$status = shadow.querySelector<HTMLElement>('.status')!;
-    this.$parties = shadow.querySelector<HTMLElement>('.parties')!;
-    this.$footer = shadow.querySelector<HTMLElement>('.footer')!;
-    this.$importBtn = shadow.querySelector<HTMLButtonElement>('[data-action="import"]')!;
+
+  $intake: HTMLElement;
+  $intakeMessage: HTMLElement;
+  $pasteForm: HTMLFormElement;
+  $pasteInput: HTMLInputElement;
+  $pasteBtn: HTMLButtonElement;
+  $fileInput: HTMLInputElement;
+  $status: HTMLElement;
+  $parties: HTMLElement;
+  $footer: HTMLElement;
+  $importBtn: HTMLButtonElement;
+  _parties: ExportedParty[] | null = null; // decoded payload (Store#exportPayload shape)
+  _preview: ImportPreview | null = null; // Store#previewImport output
+  _selected = new Set<string>();
+  _loadedPayload: string | null = null;
+
+  constructor() {
+    super();
+    this.$intake = this.$('.intake');
+    this.$intakeMessage = this.$('.intake-message');
+    this.$pasteForm = this.$<HTMLFormElement>('.paste-row');
+    this.$pasteInput = this.$<HTMLInputElement>('.paste-row input');
+    this.$pasteBtn = this.$<HTMLButtonElement>('[data-action="paste"]');
+    this.$fileInput = this.$<HTMLInputElement>('#transfer-file-input');
+    this.$status = this.$('.status');
+    this.$parties = this.$('.parties');
+    this.$footer = this.$('.footer');
+    this.$importBtn = this.$<HTMLButtonElement>('[data-action="import"]');
 
     this.$importBtn.addEventListener('click', () => this._doImport());
     this.$fileInput.addEventListener('change', () => this._loadFromFile());
@@ -233,10 +232,10 @@ export class ImportReview extends HTMLElement {
     this.$intake.hidden = true;
     this.$parties.hidden = false;
     this.$footer.hidden = false;
-    this._render();
+    this.render();
   }
 
-  _render(): void {
+  protected render(): void {
     if (!this._preview) return;
     this.$parties.innerHTML = '';
     for (const party of this._preview) {
@@ -282,7 +281,7 @@ export class ImportReview extends HTMLElement {
         row.addEventListener('click', () => {
           if (this._selected.has(mon.uid)) this._selected.delete(mon.uid);
           else this._selected.add(mon.uid);
-          this._render();
+          this.render();
         });
         rows.appendChild(row);
       }
@@ -290,7 +289,7 @@ export class ImportReview extends HTMLElement {
       group.querySelector('[data-select-all]')!.addEventListener('click', () => {
         if (allSelected) for (const uid of allUids) this._selected.delete(uid);
         else for (const uid of allUids) this._selected.add(uid);
-        this._render();
+        this.render();
       });
 
       this.$parties.appendChild(group);

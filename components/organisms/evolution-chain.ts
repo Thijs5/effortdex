@@ -1,8 +1,8 @@
 import { FALLBACK_SPRITE } from '../../lib/constants.ts';
 import { titleCase, escapeHtml } from '../../lib/utils.ts';
 import { api, store } from '../../lib/services.ts';
-import { attachDesignSystem } from '../../lib/design-system.ts';
 import '../atoms/ds-item-button.ts';
+import { BaseElement } from '../base-element.ts';
 import type { RosterEntry } from '../../lib/store.ts';
 import type { EvolutionNode } from '../../lib/pokeapi-client.ts';
 
@@ -27,18 +27,8 @@ type Pending = { action: 'evolve'; name: string } | { action: 'undo' };
  * never reached never fires the request), or `discard()` when the
  * dialog is closed any other way.
  */
-export class EvolutionChain extends HTMLElement {
-  _entry: RosterEntry | null = null;
-  _pending: Pending | null = null;
-  $note: HTMLElement;
-  $chain: HTMLElement;
-  $status: HTMLElement;
-
-  constructor() {
-    super();
-    const shadow = this.attachShadow({ mode: 'open' });
-    attachDesignSystem(shadow);
-    shadow.innerHTML = `
+export class EvolutionChain extends BaseElement {
+  static template = `
       <style>
         /* min-width: 0 overrides a grid item's default min-width: auto —
            without it, this host refuses to shrink below its widest
@@ -58,9 +48,18 @@ export class EvolutionChain extends HTMLElement {
       <div class="evo-chain"></div>
       <p class="evolve-status" aria-live="polite"></p>
     `;
-    this.$note = shadow.querySelector<HTMLElement>('.evo-note')!;
-    this.$chain = shadow.querySelector<HTMLElement>('.evo-chain')!;
-    this.$status = shadow.querySelector<HTMLElement>('.evolve-status')!;
+
+  _entry: RosterEntry | null = null;
+  _pending: Pending | null = null;
+  $note: HTMLElement;
+  $chain: HTMLElement;
+  $status: HTMLElement;
+
+  constructor() {
+    super();
+    this.$note = this.$('.evo-note');
+    this.$chain = this.$('.evo-chain');
+    this.$status = this.$('.evolve-status');
 
     this.$chain.addEventListener('pick', (e) => {
       const btn = (e.target as HTMLElement).closest('[data-action]');

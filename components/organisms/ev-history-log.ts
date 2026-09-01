@@ -1,7 +1,7 @@
 import { POWER_ITEMS, MACHO_BRACE_SPRITE, VITAMINS, FEATHERS, EV_BERRIES, EXP_SHARE_SPRITE, STAT_LABEL, VITAMIN_STAT_CUTOFF, STAT_EXP_VITAMIN_CEILING, FALLBACK_SPRITE, FALLBACK_ONERROR } from '../../lib/constants.ts';
 import { titleCase, formatEvYield, escapeHtml, dayKey, dayLabel } from '../../lib/utils.ts';
 import { store } from '../../lib/services.ts';
-import { attachDesignSystem } from '../../lib/design-system.ts';
+import { BaseElement } from '../base-element.ts';
 import { POKERUS_ICON_SVG } from '../../lib/icons.ts';
 import type { RosterEntry, StatKey } from '../../lib/store.ts';
 
@@ -19,7 +19,7 @@ import type { RosterEntry, StatKey } from '../../lib/store.ts';
  * battle is the parent's job, since it owns the battle status line.
  */
 
-export class EvHistoryLog extends HTMLElement {
+export class EvHistoryLog extends BaseElement {
   _entry: RosterEntry | null = null;
   _open = false;
   // Which collapsible batch entries are expanded, keyed by
@@ -42,9 +42,7 @@ export class EvHistoryLog extends HTMLElement {
 
   constructor() {
     super();
-    const shadow = this.attachShadow({ mode: 'open' });
-    attachDesignSystem(shadow);
-    shadow.innerHTML = `
+    this.shadow.innerHTML = `
       <style>
         :host { display: block; }
         .hist-toolbar { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); margin: var(--space-3) 0 0; }
@@ -129,14 +127,14 @@ export class EvHistoryLog extends HTMLElement {
         <ul class="hist-list"></ul>
       </details>
     `;
-    this.$details = shadow.querySelector('details')!;
-    this.$histCount = shadow.querySelector<HTMLElement>('.hist-count')!;
-    this.$histList = shadow.querySelector<HTMLElement>('.hist-list')!;
-    this.$histSearch = shadow.querySelector<HTMLInputElement>('.hist-search')!;
-    this.$histKindFilter = shadow.querySelector<HTMLSelectElement>('.hist-kind-filter')!;
-    this.$histKindOptFeather = shadow.querySelector<HTMLOptionElement>('.hist-kind-opt-feather')!;
-    this.$histKindOptBerry = shadow.querySelector<HTMLOptionElement>('.hist-kind-opt-berry')!;
-    this.$histKindOptPokerus = shadow.querySelector<HTMLOptionElement>('.hist-kind-opt-pokerus')!;
+    this.$details = this.$<HTMLDetailsElement>('details');
+    this.$histCount = this.$<HTMLElement>('.hist-count');
+    this.$histList = this.$<HTMLElement>('.hist-list');
+    this.$histSearch = this.$<HTMLInputElement>('.hist-search');
+    this.$histKindFilter = this.$<HTMLSelectElement>('.hist-kind-filter');
+    this.$histKindOptFeather = this.$<HTMLOptionElement>('.hist-kind-opt-feather');
+    this.$histKindOptBerry = this.$<HTMLOptionElement>('.hist-kind-opt-berry');
+    this.$histKindOptPokerus = this.$<HTMLOptionElement>('.hist-kind-opt-pokerus');
 
     this.$details.addEventListener('toggle', () => {
       this._open = this.$details.open;
@@ -192,13 +190,13 @@ export class EvHistoryLog extends HTMLElement {
 
   set entry(e: RosterEntry | null) {
     this._entry = e;
-    this._render();
+    this.render();
   }
   get entry(): RosterEntry | null {
     return this._entry;
   }
 
-  _render(): void {
+  protected render(): void {
     const e = this._entry;
     if (!e) return;
     this.$details.open = this._open;

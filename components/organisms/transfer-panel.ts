@@ -1,7 +1,7 @@
-import { attachDesignSystem } from '../../lib/design-system.ts';
 import { store } from '../../lib/services.ts';
 import { encodeTransferPayload } from '../../lib/transfer.ts';
 import { importPath } from '../../lib/router.ts';
+import { BaseElement } from '../base-element.ts';
 
 // Not a hard browser limit (modern browsers handle hash-fragment URLs far
 // longer than this) — it's a heuristic for "some third-party app this
@@ -35,22 +35,8 @@ const ICON_DOWNLOAD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor
  * an idle tab never pays the encode cost for a screen no one is looking
  * at. app.js does this on every #/transfer/export render.
  */
-export class TransferPanel extends HTMLElement {
-  $link: HTMLInputElement;
-  $shareBtn: HTMLButtonElement;
-  $copyBtn: HTMLButtonElement;
-  $downloadBtn: HTMLButtonElement;
-  $status: HTMLElement;
-  $longLinkNote: HTMLElement;
-  _url = '';
-  _payload = '';
-  _copyResetTimer: ReturnType<typeof setTimeout> | undefined;
-
-  constructor() {
-    super();
-    const shadow = this.attachShadow({ mode: 'open' });
-    attachDesignSystem(shadow);
-    shadow.innerHTML = `
+export class TransferPanel extends BaseElement {
+  static template = `
       <style>
         :host { display: block; }
 
@@ -85,12 +71,25 @@ export class TransferPanel extends HTMLElement {
         above instead and send that file however you like.
       </p>
     `;
-    this.$link = shadow.querySelector<HTMLInputElement>('.link-field')!;
-    this.$shareBtn = shadow.querySelector<HTMLButtonElement>('[data-action="share"]')!;
-    this.$copyBtn = shadow.querySelector<HTMLButtonElement>('[data-action="copy"]')!;
-    this.$downloadBtn = shadow.querySelector<HTMLButtonElement>('[data-action="download"]')!;
-    this.$status = shadow.querySelector<HTMLElement>('.status')!;
-    this.$longLinkNote = shadow.querySelector<HTMLElement>('.long-link-note')!;
+
+  $link: HTMLInputElement;
+  $shareBtn: HTMLButtonElement;
+  $copyBtn: HTMLButtonElement;
+  $downloadBtn: HTMLButtonElement;
+  $status: HTMLElement;
+  $longLinkNote: HTMLElement;
+  _url = '';
+  _payload = '';
+  _copyResetTimer: ReturnType<typeof setTimeout> | undefined;
+
+  constructor() {
+    super();
+    this.$link = this.$<HTMLInputElement>('.link-field');
+    this.$shareBtn = this.$<HTMLButtonElement>('[data-action="share"]');
+    this.$copyBtn = this.$<HTMLButtonElement>('[data-action="copy"]');
+    this.$downloadBtn = this.$<HTMLButtonElement>('[data-action="download"]');
+    this.$status = this.$('.status');
+    this.$longLinkNote = this.$('.long-link-note');
   }
 
   connectedCallback(): void {
