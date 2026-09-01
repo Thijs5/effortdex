@@ -7,7 +7,7 @@ import { attachDesignSystem } from '../../lib/design-system.ts';
 import { wireSpriteFallback } from '../../lib/sprite-fallback.ts';
 import { wireDisclosureMenu } from '../../lib/dom.ts';
 import * as router from '../../lib/router.ts';
-import '../molecules/ev-summary.js';
+import '../molecules/ev-summary.ts';
 import './ev-history-log.js';
 import './pokemon-search.js';
 import '../pages/parties/pokemon/nature.js';

@@ -1,9 +1,9 @@
-// @ts-check
 import { STATS, FALLBACK_SPRITE } from '../../lib/constants.ts';
 import { versionedSpriteUrl, modernSpriteUrl } from '../../lib/pokeapi-client.ts';
 import { titleCase } from '../../lib/utils.ts';
 import { attachDesignSystem } from '../../lib/design-system.ts';
 import '../atoms/item-button-grid.ts';
+import type { GameTrainingSpots } from '../../lib/ev-training-locations.ts';
 
 /**
  * <ev-training-guide> — one section per stat, each an <item-button-grid>
@@ -17,10 +17,12 @@ import '../atoms/item-button-grid.ts';
  * the caller's job, same division as item-button-grid's own `item-pick`).
  */
 export class EvTrainingGuide extends HTMLElement {
+  _locations: GameTrainingSpots | null = null;
+  _spriteGame = '';
+  $sections: HTMLElement;
+
   constructor() {
     super();
-    this._locations = null;
-    this._spriteGame = '';
     const shadow = this.attachShadow({ mode: 'open' });
     attachDesignSystem(shadow);
     shadow.innerHTML = `
@@ -34,25 +36,23 @@ export class EvTrainingGuide extends HTMLElement {
       </style>
       <div class="sections"></div>
     `;
-    this.$sections = /** @type {HTMLElement} */ (shadow.querySelector('.sections'));
+    this.$sections = shadow.querySelector<HTMLElement>('.sections')!;
     this.$sections.addEventListener('item-pick', (e) => {
-      this.dispatchEvent(new CustomEvent('spot-pick', { detail: { name: /** @type {any} */ (e).detail.id }, bubbles: true, composed: true }));
+      this.dispatchEvent(new CustomEvent('spot-pick', { detail: { name: (e as CustomEvent).detail.id }, bubbles: true, composed: true }));
     });
   }
 
-  /** @param {import('../lib/ev-training-locations.ts').GameTrainingSpots|null} v */
-  set locations(v) {
+  set locations(v: GameTrainingSpots | null) {
     this._locations = v;
     this._render();
   }
 
-  /** @param {string} v */
-  set spriteGame(v) {
+  set spriteGame(v: string) {
     this._spriteGame = v;
     this._render();
   }
 
-  _render() {
+  _render(): void {
     this.$sections.innerHTML = '';
     if (!this._locations) return;
     for (const { key, label } of STATS) {
@@ -62,7 +62,7 @@ export class EvTrainingGuide extends HTMLElement {
       const heading = document.createElement('h3');
       heading.className = 'section-title';
       heading.textContent = label;
-      const grid = /** @type {import('./item-button-grid.ts').ItemButtonGrid} */ (document.createElement('item-button-grid'));
+      const grid = document.createElement('item-button-grid');
       grid.setAttribute('columns', '1');
       grid.items = spots.map((spot) => {
         const sprite = versionedSpriteUrl(this._spriteGame, spot.speciesId) || modernSpriteUrl(spot.speciesId) || FALLBACK_SPRITE;

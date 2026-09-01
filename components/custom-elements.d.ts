@@ -1,0 +1,30 @@
+// Augments `HTMLElementTagNameMap` so `document.createElement('ev-bar')`,
+// `querySelector('ev-summary')` etc. return the concrete component class
+// instead of a bare `HTMLElement` — which is what lets a parent set the
+// typed `.value` / `.items` / `.evs` properties without a cast.
+//
+// One entry per registered custom element. Add a line here when a
+// component is converted to `.ts`; the `import type` only resolves once
+// the target file exists as `.ts`.
+
+import type { EvBar } from './atoms/ev-bar.ts';
+import type { GameBall } from './atoms/game-ball.ts';
+import type { LevelInput } from './atoms/level-input.ts';
+import type { DsItemButton } from './atoms/ds-item-button.ts';
+import type { ItemButtonGrid } from './atoms/item-button-grid.ts';
+import type { EvSummary } from './molecules/ev-summary.ts';
+import type { EvTrainingGuide } from './molecules/ev-training-guide.ts';
+import type { GameVersionPicker } from './molecules/game-version-picker.ts';
+
+declare global {
+  interface HTMLElementTagNameMap {
+    'ev-bar': EvBar;
+    'game-ball': GameBall;
+    'level-input': LevelInput;
+    'ds-item-button': DsItemButton;
+    'item-button-grid': ItemButtonGrid;
+    'ev-summary': EvSummary;
+    'ev-training-guide': EvTrainingGuide;
+    'game-version-picker': GameVersionPicker;
+  }
+}
