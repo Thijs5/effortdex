@@ -752,6 +752,22 @@ test('setActiveParty switches the active party, ignoring an unrecognized id', ()
   assert.equal(store.activeParty.id, first.id); // unchanged
 });
 
+test('init() awaits hydrateCache once and is idempotent (docs/adr/0025 P3)', async () => {
+  let hydrated = 0;
+  const s = new Store({ hydrateCache: async () => { hydrated++; } });
+  assert.equal(hydrated, 0); // constructor does not hydrate
+  await s.init();
+  await s.init();
+  assert.equal(hydrated, 1);
+  assert.equal(s._initialized, true);
+});
+
+test('init() tolerates a rejecting hydrateCache — startup still completes', async () => {
+  const s = new Store({ hydrateCache: async () => { throw new Error('idb down'); } });
+  await s.init(); // must not reject
+  assert.equal(s._initialized, true);
+});
+
 test('state persists across Store instances via localStorage', () => {
   const entry = store.addPokemon(mon());
   store.renamePokemon(entry.uid, 'Buddy');
@@ -760,32 +776,29 @@ test('state persists across Store instances via localStorage', () => {
   assert.equal(reloaded.activeParty.pokemon[0].nickname, 'Buddy');
 });
 
-// Regression: on an installed iOS PWA the PokeApiClient localStorage
-// cache can fill the origin's whole quota, so Store#_save()'s setItem
-// throws QuotaExceededError. It used to be unguarded — every roster
-// mutation then died before its dialog closed, and nothing persisted,
-// silently. Now _save() frees the disposable cache and retries once.
-test('_save survives a one-off quota failure by relieving pressure and retrying', () => {
+// Regression: Store#_save()'s setItem used to be unguarded, so a full
+// localStorage (an installed iOS PWA whose PokeApiClient cache filled
+// the quota) made every roster mutation die before its dialog closed,
+// silently. It now degrades: keep the in-memory state, flip saveHealthy,
+// show the "not saving" banner. (docs/adr/0025 P2 moved that cache to
+// IndexedDB, so `_save` no longer has anything to evict-and-retry.)
+test('a mutation still completes in memory when the write keeps failing', () => {
   localStorage.clear();
   const realSetItem = localStorage.setItem.bind(localStorage);
-  let failsLeft = 1;
-  let relieved = 0;
   localStorage.setItem = (key, value) => {
-    if (key === 'effortdex:state' && failsLeft > 0) {
-      failsLeft--;
-      throw new DOMException('exceeded', 'QuotaExceededError');
-    }
+    if (key === 'effortdex:state') throw new DOMException('exceeded', 'QuotaExceededError');
     return realSetItem(key, value);
   };
   try {
-    const s = new Store({ relieveStoragePressure: () => { relieved++; } });
+    const s = new Store();
     s.createParty('Kept');
-    s.addPokemon(mon());
+    const entry = s.addPokemon(mon());
 
-    assert.equal(relieved, 1); // only the first write needed a retry
-    assert.equal(s.saveHealthy, true);
-    assert.equal(new Store().activeParty.name, 'Kept');
-    assert.equal(new Store().activeParty.pokemon.length, 1);
+    assert.equal(s.saveHealthy, false);
+    assert.equal(s.activeParty.name, 'Kept');
+    assert.equal(s.activeParty.pokemon.length, 1); // usable in memory
+    assert.equal(s.activeParty.pokemon[0].uid, entry.uid);
+    assert.equal(localStorage.getItem('effortdex:state'), null); // but not persisted
   } finally {
     localStorage.setItem = realSetItem;
   }
@@ -799,7 +812,7 @@ test('_save flips saveHealthy and fires save-error once when the quota stays ful
     return realSetItem(key, value);
   };
   try {
-    const s = new Store({ relieveStoragePressure: () => {} });
+    const s = new Store();
     let errors = 0;
     let changes = 0;
     s.addEventListener('save-error', () => errors++);
@@ -827,7 +840,7 @@ test('_save fires save-ok and clears the flag once a write lands again', () => {
     return realSetItem(key, value);
   };
   try {
-    const s = new Store({ relieveStoragePressure: () => {} });
+    const s = new Store();
     s.createParty('P');
     assert.equal(s.saveHealthy, false);
 
@@ -921,13 +934,17 @@ test('a migrated save persists as schema 2 and round-trips', () => {
   assert.equal(entry.evs.atk, 4);
 });
 
-test('corrupt or unrecognized saved state falls back to a fresh empty state', () => {
+test('corrupt or unrecognized saved state falls back to a fresh empty state', async () => {
+  // The constructor's raw `_load` fallback (statExpBackfillApplied is set
+  // by `init()`'s backfill pass now, docs/adr/0025 P4b).
   localStorage.setItem('effortdex:state', 'not json {');
-  assert.deepEqual(new Store().state, { schema: SCHEMA_VERSION, statExpBackfillApplied: true, parties: [], activePartyId: null });
+  assert.deepEqual(new Store().state, { schema: SCHEMA_VERSION, parties: [], activePartyId: null });
 
   // The ancient pre-party shape is no longer migrated (ADR 0006 §7).
   localStorage.setItem('effortdex:state', JSON.stringify({ caughtPokemon: [] }));
-  assert.deepEqual(new Store().state, { schema: SCHEMA_VERSION, statExpBackfillApplied: true, parties: [], activePartyId: null });
+  const s = await new Store().init();
+  assert.equal(s.state.statExpBackfillApplied, true); // init() ran the (no-op) backfill and stamped it
+  assert.deepEqual(s.state.parties, []);
 });
 
 // Regression: v1.7.0 bumped SCHEMA_VERSION 1 -> 2 but left
@@ -1222,13 +1239,13 @@ const legacyVitaminEvent = {
 
 const onixMon = { id: 95, name: 'onix', sprite: null, evYield: {}, baseStats: { hp: 35, atk: 45, def: 160, spa: 30, spd: 45, spe: 70 } };
 
-test('the Gen I/II Stat Experience backfill recomputes old battle/vitamin events from the local mon cache', () => {
+test('the Gen I/II Stat Experience backfill recomputes old battle/vitamin events from the local mon cache', async () => {
   localStorage.setItem(
     'effortdex:state',
     JSON.stringify(legacyRedState([legacyAddEvent, legacyBattleEvent, legacyVitaminEvent]))
   );
 
-  const loaded = new Store({ peekCachedMon: (name) => (name === 'onix' ? onixMon : null) });
+  const loaded = await new Store({ peekCachedMon: (name) => (name === 'onix' ? onixMon : null) }).init();
   const entry = loaded.activeParty.pokemon[0];
 
   // Onix's real Attack (45), not the old modern EV yield (1), then +2,560
@@ -1239,51 +1256,51 @@ test('the Gen I/II Stat Experience backfill recomputes old battle/vitamin events
   assert.equal(loaded.state.statExpBackfillApplied, true);
 });
 
-test('the backfill leaves a battle event untouched when its opponent is no longer cached', () => {
+test('the backfill leaves a battle event untouched when its opponent is no longer cached', async () => {
   localStorage.setItem('effortdex:state', JSON.stringify(legacyRedState([legacyAddEvent, legacyBattleEvent])));
 
-  const loaded = new Store({ peekCachedMon: () => null }); // nothing cached
+  const loaded = await new Store({ peekCachedMon: () => null }).init(); // nothing cached
   const entry = loaded.activeParty.pokemon[0];
 
   assert.equal(entry.evs.atk, 1); // old value, best-effort left alone
 });
 
-test('the backfill runs at most once — a second load never re-touches already-corrected events', () => {
+test('the backfill runs at most once — a second load never re-touches already-corrected events', async () => {
   localStorage.setItem(
     'effortdex:state',
     JSON.stringify(legacyRedState([legacyAddEvent, legacyBattleEvent]))
   );
 
-  const first = new Store({ peekCachedMon: (name) => (name === 'onix' ? onixMon : null) });
+  const first = await new Store({ peekCachedMon: (name) => (name === 'onix' ? onixMon : null) }).init();
   assert.equal(first.activeParty.pokemon[0].evs.atk, 45);
 
   // Reloading with a DIFFERENT (wrong) mock proves the flag, not the mock,
   // is what's gating this — a second run would double-count otherwise.
   const secondMon = { ...onixMon, baseStats: { ...onixMon.baseStats, atk: 999 } };
-  const second = new Store({ peekCachedMon: (name) => (name === 'onix' ? secondMon : null) });
+  const second = await new Store({ peekCachedMon: (name) => (name === 'onix' ? secondMon : null) }).init();
   assert.equal(second.activeParty.pokemon[0].evs.atk, 45);
   assert.equal(second.state.statExpBackfillApplied, true);
 });
 
-test('the backfill does not touch a Gen III+ party\'s events at all', () => {
+test('the backfill does not touch a Gen III+ party\'s events at all', async () => {
   const rawState = legacyRedState([legacyAddEvent, legacyBattleEvent, legacyVitaminEvent]);
   rawState.parties[0].baseGame = 'Emerald';
   localStorage.setItem('effortdex:state', JSON.stringify(rawState));
 
-  const loaded = new Store({ peekCachedMon: () => onixMon });
+  const loaded = await new Store({ peekCachedMon: () => onixMon }).init();
   const entry = loaded.activeParty.pokemon[0];
 
   assert.equal(entry.evs.atk, 1 + 10); // untouched: old battle +1, old vitamin +10
 });
 
-test('the backfill merges Gen I\'s Special stat via gen1-special-stats.js, not the opponent\'s raw modern split', () => {
+test('the backfill merges Gen I\'s Special stat via gen1-special-stats.js, not the opponent\'s raw modern split', async () => {
   // Chansey: modern spa 35 / spd 105, real Gen I Special 105 — see
   // lib/gen1-special-stats.js and its own dedicated tests.
   const chansey = { id: 113, name: 'chansey', sprite: null, evYield: {}, baseStats: { hp: 250, atk: 5, def: 5, spa: 35, spd: 105, spe: 50 } };
   const legacyChanseyBattle = { ...legacyBattleEvent, opponentName: 'chansey', applied: { hp: 0, atk: 0, def: 0, spa: 3, spd: 0, spe: 0 } };
   localStorage.setItem('effortdex:state', JSON.stringify(legacyRedState([legacyAddEvent, legacyChanseyBattle])));
 
-  const loaded = new Store({ peekCachedMon: (name) => (name === 'chansey' ? chansey : null) });
+  const loaded = await new Store({ peekCachedMon: (name) => (name === 'chansey' ? chansey : null) }).init();
   const entry = loaded.activeParty.pokemon[0];
 
   assert.equal(entry.evs.spa, 105);

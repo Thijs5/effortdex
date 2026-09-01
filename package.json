@@ -13,6 +13,7 @@
     "@playwright/test": "^1.62.1",
     "@types/node": "^26.2.0",
     "esbuild": "^0.28.2",
+    "fake-indexeddb": "^6.2.5",
     "typescript": "^5.9.3",
     "uuidv7": "^1.2.1"
   }
