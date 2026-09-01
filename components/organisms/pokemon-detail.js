@@ -1,7 +1,7 @@
 import { POWER_ITEMS, MACHO_BRACE_SPRITE, EXP_SHARE_SPRITE, NATURES, STATS, STAT_LABEL, MACHO_BRACE_MULTIPLIER, FALLBACK_SPRITE, FALLBACK_ONERROR } from '../../lib/constants.ts';
 import { titleCase, natureEffectHint, dayLabel } from '../../lib/utils.ts';
 import { api, store } from '../../lib/services.js';
-import { versionedSpriteUrl, versionedSpriteIsOpaque } from '../../lib/pokeapi-client.js';
+import { versionedSpriteUrl, versionedSpriteIsOpaque } from '../../lib/pokeapi-client.ts';
 import { availableSpeciesFor } from '../../lib/species-availability.ts';
 import { attachDesignSystem } from '../../lib/design-system.js';
 import { wireSpriteFallback } from '../../lib/sprite-fallback.ts';

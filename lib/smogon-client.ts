@@ -1,4 +1,3 @@
-// @ts-check
 // Data layer for Smogon competitive data — tiers and common sets. Two
 // CORS-open, backend-free sources (verified live; see docs/adr/0015):
 // - Tiers: Pokémon Showdown's own formats-data.js — MIT-licensed,
@@ -11,12 +10,13 @@
 //   moves, nature, EVs) — the same reuse @pkmn/smogon and Showdown's own
 //   client already rely on.
 //
-// Unlike PokeAPI data (immutable once fetched — see pokeapi-client.js and
+// Unlike PokeAPI data (immutable once fetched — see pokeapi-client.ts and
 // ADR 0001's "deliberately no cache invalidation"), this data changes
 // over time, so cached entries carry a fetch timestamp and expire after
-// CACHE_TTL_MS instead of being cached forever (lib/memo-cache.js's `ttlMs`).
+// CACHE_TTL_MS instead of being cached forever (lib/memo-cache.ts's `ttlMs`).
 
-import { MemoCache } from './memo-cache.js';
+import { MemoCache } from './memo-cache.ts';
+import type { CacheBackend } from './memo-cache.ts';
 
 const FORMATS_DATA_URL = 'https://play.pokemonshowdown.com/data/formats-data.js';
 const SETS_URL_BASE = 'https://pkmn.github.io/smogon/data/sets/';
@@ -36,7 +36,7 @@ const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
 // between them as the metagame shifts — deliberately not framed as "how
 // good this Pokémon is" for that reason. Source:
 // https://www.smogon.com/ingame/battle/tiering-faq
-export const TIER_DESCRIPTIONS = {
+export const TIER_DESCRIPTIONS: Record<string, string> = {
   AG: 'Anything Goes — the one tier with no bans at all.',
   Uber: "Ubers — banned from OU (below) for being too powerful there, not because it's the strongest tier itself.",
   OU: 'OverUsed — the default, most-played competitive tier.',
@@ -57,9 +57,8 @@ export const TIER_DESCRIPTIONS = {
 /** Pokémon Showdown's own internal id scheme ("toID"): lowercase,
  * alphanumeric only — no hyphens, spaces, apostrophes, or periods. This
  * is the key formats-data.js uses (e.g. "raichu-alola" -> "raichualola",
- * "porygon-z" -> "porygonz"), verified against a live fetch.
- * @param {string} name @returns {string} */
-export function toShowdownId(name) {
+ * "porygon-z" -> "porygonz"), verified against a live fetch. */
+export function toShowdownId(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 
@@ -69,14 +68,18 @@ export function toShowdownId(name) {
  * "porygon-z" -> "Porygon-Z"), verified against a live fetch. Known
  * exception, not corrected for: the Jangmo-o line keeps a lowercase
  * trailing "o" ("Jangmo-o", not "Jangmo-O") — those three species just
- * won't find a match here.
- * @param {string} name @returns {string} */
-export function smogonSetsKey(name) {
+ * won't find a match here. */
+export function smogonSetsKey(name: string): string {
   return name
     .split('-')
     .map((part) => (part ? part[0].toUpperCase() + part.slice(1) : part))
     .join('-');
 }
+
+export type FormatsData = Record<
+  string,
+  { tier?: string; doublesTier?: string; natDexTier?: string; isNonstandard?: string }
+>;
 
 /**
  * Parses formats-data.js's `exports.BattleFormatsData = {...}` into a
@@ -88,9 +91,8 @@ export function smogonSetsKey(name) {
  * safe against a live fetch: every value in the file is a string, a
  * nested object, or absent — no numbers, booleans, or array literals to
  * trip up a naive key-quoting regex.
- * @param {string} text @returns {Record<string, { tier?: string, doublesTier?: string, natDexTier?: string, isNonstandard?: string }>}
  */
-export function parseFormatsData(text) {
+export function parseFormatsData(text: string): FormatsData {
   const start = text.indexOf('exports.BattleFormatsData');
   if (start === -1) throw new Error("formats-data.js didn't contain the expected export.");
   const eq = text.indexOf('=', start);
@@ -101,16 +103,17 @@ export function parseFormatsData(text) {
 }
 
 export class SmogonClient {
-  /** @param {{ cacheBackend?: import('./memo-cache.js').CacheBackend }} [opts] */
-  constructor({ cacheBackend } = {}) {
+  private _cache: MemoCache;
+
+  constructor({ cacheBackend }: { cacheBackend?: CacheBackend } = {}) {
     this._cache = new MemoCache({ ttlMs: CACHE_TTL_MS, backend: cacheBackend });
   }
 
   /** Every species' current competitive tier (OU/UU/RU/.../Uber/LC/...),
    * keyed by toShowdownId(name). A species absent from the result has no
    * assigned tier (usually because it's unreleased in the current
-   * format, not because it's untiered). @returns {Promise<Record<string, { tier?: string, doublesTier?: string, natDexTier?: string, isNonstandard?: string }>>} */
-  async getTiers() {
+   * format, not because it's untiered). */
+  async getTiers(): Promise<FormatsData> {
     return this._cache.get(TIERS_KEY, async () => {
       const res = await fetch(FORMATS_DATA_URL);
       if (!res.ok) throw new Error('Could not reach Pokémon Showdown for tier data.');
@@ -122,9 +125,8 @@ export class SmogonClient {
    * analysis in generation `gen` (1-9), keyed by smogonSetsKey(name) ->
    * format (e.g. "ou") -> set name -> `{ moves, item, nature, evs, ... }`.
    * A species/generation with no published analysis simply isn't a key
-   * here — not every species has one.
-   * @param {number} gen @returns {Promise<Record<string, any>>} */
-  async getSets(gen) {
+   * here — not every species has one. */
+  async getSets(gen: number): Promise<Record<string, any>> {
     const key = SETS_KEY_PREFIX + gen;
     return this._cache.get(key, async () => {
       const res = await fetch(`${SETS_URL_BASE}gen${gen}.json`);

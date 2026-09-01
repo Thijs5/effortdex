@@ -7,7 +7,7 @@
 // envelope). `kind` / `fetchedAt` are indexed for the per-kind entry
 // cap in lib/db/cache-cap.ts.
 
-import type { CacheBackend } from '../memo-cache.js';
+import type { CacheBackend } from '../memo-cache.ts';
 import type { Db } from './index.ts';
 import type { ApiCacheRow } from './schema.ts';
 

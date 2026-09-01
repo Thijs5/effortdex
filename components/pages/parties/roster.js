@@ -26,7 +26,7 @@ import {
 import { titleCase, totalEvs, natureOptionsHtml, escapeHtml, sortedNatures, natureLabel } from '../../../lib/utils.ts';
 import { POKERUS_ICON_SVG } from '../../../lib/icons.ts';
 import { api, store } from '../../../lib/services.js';
-import { versionedSpriteUrl, versionedSpriteIsOpaque } from '../../../lib/pokeapi-client.js';
+import { versionedSpriteUrl, versionedSpriteIsOpaque } from '../../../lib/pokeapi-client.ts';
 import { wireSpriteFallback } from '../../../lib/sprite-fallback.ts';
 import { availableSpeciesFor } from '../../../lib/species-availability.ts';
 import * as router from '../../../lib/router.js';

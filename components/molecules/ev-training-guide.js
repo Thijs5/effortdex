@@ -1,6 +1,6 @@
 // @ts-check
 import { STATS, FALLBACK_SPRITE } from '../../lib/constants.ts';
-import { versionedSpriteUrl, modernSpriteUrl } from '../../lib/pokeapi-client.js';
+import { versionedSpriteUrl, modernSpriteUrl } from '../../lib/pokeapi-client.ts';
 import { titleCase } from '../../lib/utils.ts';
 import { attachDesignSystem } from '../../lib/design-system.js';
 import '../atoms/item-button-grid.js';

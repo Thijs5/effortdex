@@ -1,7 +1,7 @@
 // Wires an <img> whose `src` gets reassigned many times over its
 // lifetime (a reused add-Pokémon-dialog sprite, or a detail card's own
 // sprite) to a two-hop fallback: a game-specific sprite
-// (lib/pokeapi-client.js's versionedSpriteUrl) can itself 404 (a
+// (lib/pokeapi-client.ts's versionedSpriteUrl) can itself 404 (a
 // species that didn't exist yet in that title) before the remote CDN is
 // unreachable at all (offline) — retry the modern default sprite once,
 // then finally the local placeholder.

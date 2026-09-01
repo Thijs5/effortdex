@@ -2,7 +2,7 @@ import { STATS, STAT_LABEL } from '../../../../lib/constants.ts';
 import { gen1SpecialStat } from '../../../../lib/gen1-special-stats.ts';
 import { escapeHtml } from '../../../../lib/utils.ts';
 import { store, smogon } from '../../../../lib/services.js';
-import { toShowdownId, smogonSetsKey, TIER_DESCRIPTIONS } from '../../../../lib/smogon-client.js';
+import { toShowdownId, smogonSetsKey, TIER_DESCRIPTIONS } from '../../../../lib/smogon-client.ts';
 import { matchGameVersion } from '../../../../lib/game-versions.ts';
 import { BaseDialog } from '../../../atoms/base-dialog.js';
 
@@ -192,7 +192,7 @@ export class CompetitiveDialog extends BaseDialog {
   }
 
   /**
-   * Fetches (or reads from lib/smogon-client.js's own cache) this
+   * Fetches (or reads from lib/smogon-client.ts's own cache) this
    * species' current tier and common competitive sets, scoped to the
    * active party's own generation — clamped to Smogon's covered range
    * (1-9), defaulting to the current generation for an unrecognized/ROM

@@ -2,7 +2,7 @@ import './support/localstorage-polyfill.js';
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { SmogonClient, parseFormatsData, toShowdownId, smogonSetsKey } from '../lib/smogon-client.js';
+import { SmogonClient, parseFormatsData, toShowdownId, smogonSetsKey } from '../lib/smogon-client.ts';
 
 let fetchCalls;
 let routes;

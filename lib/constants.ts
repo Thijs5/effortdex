@@ -260,7 +260,7 @@ export const FALLBACK_SPRITE =
 export const FALLBACK_ONERROR = `onerror="this.onerror=null;this.src='${FALLBACK_SPRITE}'"`;
 
 // Same idea as FALLBACK_ONERROR, but for an <img> whose primary src is a
-// game-specific sprite (lib/pokeapi-client.js's versionedSpriteUrl) —
+// game-specific sprite (lib/pokeapi-client.ts's versionedSpriteUrl) —
 // that one URL can 404 on its own (a species that didn't exist yet in an
 // older title), so a single hop isn't enough: retry the modern default
 // sprite first, and only fall back to the local placeholder if that

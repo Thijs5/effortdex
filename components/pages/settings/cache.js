@@ -22,7 +22,7 @@
 
 import { interceptLinkClick } from '../../../lib/dom.js';
 import { GAME_VERSIONS, GEN_ROMAN } from '../../../lib/game-versions.ts';
-import { spriteGroupKey } from '../../../lib/pokeapi-client.js';
+import { spriteGroupKey } from '../../../lib/pokeapi-client.ts';
 import { api, prefetchService } from '../../../lib/services.js';
 import { SPRITE_CACHE_NAME } from '../../../lib/sprite-cache.ts';
 import { clearAppCache, estimateCacheSize } from '../../../lib/version-check.js';
@@ -127,7 +127,7 @@ function joinNames(names) {
  * One row per distinct sprite pool in generation `gen` — titles that
  * share PokéAPI's own sprite folder (or share having none at all)
  * collapse into a single row, since caching/clearing one always does
- * the same to the other (lib/pokeapi-client.js's `spriteGroupKey`).
+ * the same to the other (lib/pokeapi-client.ts's `spriteGroupKey`).
  * @param {number} gen @returns {{ groupKey: string, games: string[] }[]} */
 function rowsForGeneration(gen) {
   const titles = GAME_VERSIONS.filter((g) => g.gen === gen);

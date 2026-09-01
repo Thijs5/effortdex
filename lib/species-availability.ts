@@ -30,7 +30,7 @@
 
 import { matchGameVersion } from './game-versions.ts';
 import type { Party } from './store.js';
-import type { PokeApiClient } from './pokeapi-client.js';
+import type { PokeApiClient } from './pokeapi-client.ts';
 
 export async function availableSpeciesFor(
   party: Party | null | undefined,

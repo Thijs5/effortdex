@@ -1,7 +1,7 @@
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { PrefetchService } from '../lib/prefetch-service.js';
+import { PrefetchService } from '../lib/prefetch-service.ts';
 
 // A tiny programmable fetch: treats every call (a sprite fetch — the
 // generation species list itself now goes through the fake api's own

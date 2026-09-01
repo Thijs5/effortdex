@@ -185,7 +185,7 @@ partyForm.addEventListener('submit', (e) => {
   if (dialogEditingId === null) {
     const party = store.createParty(name, description, baseGame, overrides);
     // Deliberately not awaited: this runs in the background (through
-    // lib/prefetch-service.js's shared, throttled queue — ADR 0012) while
+    // lib/prefetch-service.ts's shared, throttled queue — ADR 0012) while
     // the user is immediately dropped onto the new roster and can keep
     // using the app. Unchecking the box just means "don't bother", not
     // "block until this finishes".

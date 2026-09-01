@@ -5,7 +5,7 @@ import { attachDesignSystem } from '../../lib/design-system.js';
 import '../atoms/ds-item-button.js';
 
 /** @typedef {import('../lib/store.js').RosterEntry} RosterEntry */
-/** @typedef {import('../lib/pokeapi-client.js').EvolutionNode} EvolutionNode */
+/** @typedef {import('../lib/pokeapi-client.ts').EvolutionNode} EvolutionNode */
 
 /**
  * <evolution-chain> — a roster Pokémon's whole evolution family rendered

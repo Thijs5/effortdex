@@ -1,7 +1,6 @@
-// @ts-check
 // Two-tier memoizing cache: an in-memory Map in front of a pluggable
-// persistent backend, shared by lib/pokeapi-client.js and
-// lib/smogon-client.js. The in-memory tier makes repeat lookups within a
+// persistent backend, shared by lib/pokeapi-client.ts and
+// lib/smogon-client.ts. The in-memory tier makes repeat lookups within a
 // session free of a backend read + parse, and de-duplicates concurrent
 // in-flight requests for the same key (two callers asking for the same
 // key at once share one fetch instead of racing two); the backend tier
@@ -39,28 +38,29 @@ export class NotFoundError extends Error {}
 // stays well short of the "forever" a real hit gets.
 const NOT_FOUND_TTL_MS = 24 * 60 * 60 * 1000;
 
-/** @param {any} value @returns {boolean} */
-function isNotFoundMarker(value) {
+function isNotFoundMarker(value: any): boolean {
   return !!value && typeof value === 'object' && value.__notFound === true;
 }
 
-/**
- * @typedef {object} CacheBackend
- * @property {(key: string) => Promise<any>} get - parsed value, or null if absent/unreadable
- * @property {(key: string, value: any) => Promise<void>} set - persist; must swallow its own write failures
- * @property {(keyPrefixes: string[]) => Promise<Array<[string, any]>>} entries - every [key, value] whose key equals or starts with one of `keyPrefixes`
- * @property {(keyPrefixes: string[]) => Promise<number>} clear - delete those entries; resolve with how many were removed
- * @property {(keyPrefixes: string[]) => Promise<number>} sizeOf - approximate byte size of those entries
- */
+export interface CacheBackend {
+  /** parsed value, or null if absent/unreadable */
+  get(key: string): Promise<any>;
+  /** persist; must swallow its own write failures */
+  set(key: string, value: any): Promise<void>;
+  /** every [key, value] whose key equals or starts with one of `keyPrefixes` */
+  entries(keyPrefixes: string[]): Promise<Array<[string, any]>>;
+  /** delete those entries; resolve with how many were removed */
+  clear(keyPrefixes: string[]): Promise<number>;
+  /** approximate byte size of those entries */
+  sizeOf(keyPrefixes: string[]): Promise<number>;
+}
 
 /** The default backend: the plain `localStorage` this cache used before
  * it was pluggable. Kept here (not its own file) because it is tightly
  * bound to the stored shapes MemoCache above expects. All methods are
- * async only to satisfy the interface; the work is synchronous.
- * @implements {CacheBackend} */
-export class LocalStorageBackend {
-  /** @param {string} key */
-  async get(key) {
+ * async only to satisfy the interface; the work is synchronous. */
+export class LocalStorageBackend implements CacheBackend {
+  async get(key: string): Promise<any> {
     const raw = localStorage.getItem(key);
     if (!raw) return null;
     try {
@@ -70,8 +70,7 @@ export class LocalStorageBackend {
     }
   }
 
-  /** @param {string} key @param {any} value */
-  async set(key, value) {
+  async set(key: string, value: any): Promise<void> {
     try {
       localStorage.setItem(key, JSON.stringify(value));
     } catch {
@@ -80,10 +79,8 @@ export class LocalStorageBackend {
     }
   }
 
-  /** @param {string[]} keyPrefixes */
-  async entries(keyPrefixes) {
-    /** @type {Array<[string, any]>} */
-    const out = [];
+  async entries(keyPrefixes: string[]): Promise<Array<[string, any]>> {
+    const out: Array<[string, any]> = [];
     for (const key of this._keys(keyPrefixes)) {
       const value = await this.get(key);
       if (value !== null) out.push([key, value]);
@@ -91,8 +88,7 @@ export class LocalStorageBackend {
     return out;
   }
 
-  /** @param {string[]} keyPrefixes */
-  async clear(keyPrefixes) {
+  async clear(keyPrefixes: string[]): Promise<number> {
     let removed = 0;
     try {
       for (const key of this._keys(keyPrefixes)) {
@@ -105,8 +101,7 @@ export class LocalStorageBackend {
     return removed;
   }
 
-  /** @param {string[]} keyPrefixes */
-  async sizeOf(keyPrefixes) {
+  async sizeOf(keyPrefixes: string[]): Promise<number> {
     let bytes = 0;
     try {
       for (const key of this._keys(keyPrefixes)) {
@@ -118,11 +113,9 @@ export class LocalStorageBackend {
     return bytes;
   }
 
-  /** @private @param {string[]} keyPrefixes @returns {string[]} */
-  _keys(keyPrefixes) {
+  private _keys(keyPrefixes: string[]): string[] {
     if (typeof localStorage === 'undefined' || typeof localStorage.key !== 'function') return [];
-    /** @type {string[]} */
-    const matches = [];
+    const matches: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
       if (k && keyPrefixes.some((p) => k === p || k.startsWith(p))) matches.push(k);
@@ -131,29 +124,29 @@ export class LocalStorageBackend {
   }
 }
 
+interface MemoCacheOpts {
+  /** if set, a stored entry older than this is refetched instead of reused; omit for a cache that never expires. */
+  ttlMs?: number;
+  /** persistent tier; defaults to `LocalStorageBackend`. */
+  backend?: CacheBackend;
+}
+
 export class MemoCache {
-  /**
-   * @param {object} [opts]
-   * @param {number} [opts.ttlMs] - if set, a stored entry older than this is refetched instead of reused; omit for a cache that never expires.
-   * @param {CacheBackend} [opts.backend] - persistent tier; defaults to `LocalStorageBackend`.
-   */
-  constructor({ ttlMs, backend } = {}) {
+  private _ttlMs: number | null;
+  private _backend: CacheBackend;
+  private _memory: Map<string, any>;
+
+  constructor({ ttlMs, backend }: MemoCacheOpts = {}) {
     this._ttlMs = ttlMs ?? null;
-    /** @type {CacheBackend} */
     this._backend = backend ?? new LocalStorageBackend();
-    /** @type {Map<string, any>} */
     this._memory = new Map();
   }
 
   /**
    * Resolves `fetcher()` at most once per `key` (per `ttlMs` window, if
    * set), across memory / backend / network.
-   * @template T
-   * @param {string} key
-   * @param {() => Promise<T>} fetcher
-   * @returns {Promise<T>}
    */
-  async get(key, fetcher) {
+  async get<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
     if (this._memory.has(key)) return this._memory.get(key);
 
     const pending = this._ttlMs == null ? this._getForever(key, fetcher) : this._getWithTtl(key, fetcher, this._ttlMs);
@@ -173,8 +166,7 @@ export class MemoCache {
     }
   }
 
-  /** @param {string} key @param {() => Promise<any>} fetcher */
-  async _getForever(key, fetcher) {
+  private async _getForever(key: string, fetcher: () => Promise<any>): Promise<any> {
     const stored = await this._backend.get(key);
     if (stored !== null) {
       if (!isNotFoundMarker(stored)) return stored;
@@ -193,8 +185,7 @@ export class MemoCache {
     }
   }
 
-  /** @param {string} key @param {() => Promise<any>} fetcher @param {number} ttlMs */
-  async _getWithTtl(key, fetcher, ttlMs) {
+  private async _getWithTtl(key: string, fetcher: () => Promise<any>, ttlMs: number): Promise<any> {
     const stored = await this._backend.get(key);
     if (stored) {
       if (isNotFoundMarker(stored.value)) {
@@ -223,9 +214,8 @@ export class MemoCache {
    * pending promise. `null` means the key isn't in memory — not that it
    * isn't cached on disk. Callers that need the disk tier must `await
    * get()`, or `await warm()` first.
-   * @param {string} key @returns {any}
    */
-  peek(key) {
+  peek(key: string): any {
     const mem = this._memory.get(key);
     if (mem && !(mem instanceof Promise)) return mem;
     return null;
@@ -237,9 +227,8 @@ export class MemoCache {
    * `peek()`s can see them. Best-effort: a backend failure resolves
    * quietly. Used to prime `peekCached` before Store's one-time Gen I/II
    * backfill (docs/adr/0010, 0025).
-   * @param {string[]} keyPrefixes
    */
-  async warm(keyPrefixes) {
+  async warm(keyPrefixes: string[]): Promise<void> {
     try {
       for (const [key, stored] of await this._backend.entries(keyPrefixes)) {
         if (this._memory.has(key)) continue;
@@ -256,10 +245,9 @@ export class MemoCache {
    * key equals or starts with one of `keyPrefixes`. Everything this
    * cache holds is refetchable, so this is the space-reclaim the Storage
    * page's "Clear cache" runs.
-   * @param {string[]} keyPrefixes
-   * @returns {Promise<number>} how many backend entries were removed
+   * @returns how many backend entries were removed
    */
-  async clearStored(keyPrefixes) {
+  async clearStored(keyPrefixes: string[]): Promise<number> {
     this._memory.clear();
     return this._backend.clear(keyPrefixes);
   }
@@ -267,10 +255,8 @@ export class MemoCache {
   /**
    * Approximate byte size of what `clearStored(keyPrefixes)` would
    * remove — for the Storage page's "Clear cache (N MB)" label.
-   * @param {string[]} keyPrefixes
-   * @returns {Promise<number>}
    */
-  storedBytes(keyPrefixes) {
+  storedBytes(keyPrefixes: string[]): Promise<number> {
     return this._backend.sizeOf(keyPrefixes);
   }
 }

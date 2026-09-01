@@ -1,4 +1,3 @@
-// @ts-check
 // Data layer: talks to PokeAPI and caches every response. This is the
 // *only* module that knows about PokeAPI's shape or its cache keys —
 // nothing else parses a PokeAPI response.
@@ -10,31 +9,32 @@
 // key (two components asking for the same species at once share one
 // fetch instead of racing two).
 
-// @ts-check
-
 import { emptyEvs } from './utils.ts';
-import { MemoCache, NotFoundError } from './memo-cache.js';
+import { MemoCache, NotFoundError } from './memo-cache.ts';
+import type { CacheBackend } from './memo-cache.ts';
+import type { EvMap, StatKey } from './constants.ts';
 
-/** @typedef {import('./constants.ts').EvMap} EvMap */
+/** The shape every Store method that touches species data expects — one roster/searchable Pokémon. */
+export interface DomainPokemon {
+  id: number;
+  name: string;
+  sprite: string | null;
+  evYield: EvMap;
+  baseStats: EvMap;
+}
 
-/** The shape every Store method that touches species data expects — one roster/searchable Pokémon.
- * @typedef {object} DomainPokemon
- * @property {number} id
- * @property {string} name
- * @property {string|null} sprite
- * @property {EvMap} evYield
- * @property {EvMap} baseStats
- */
+export interface SpeciesListEntry {
+  name: string;
+  id: number | null;
+  sprite: string | null;
+}
 
-/** @typedef {{ name: string, id: number|null, sprite: string|null }} SpeciesListEntry */
-
-/**
- * @typedef {object} EvolutionNode
- * @property {string} name
- * @property {number} depth
- * @property {string|null} parent
- * @property {number|null} minLevel
- */
+export interface EvolutionNode {
+  name: string;
+  depth: number;
+  parent: string | null;
+  minLevel: number | null;
+}
 
 const SPECIES_LIST_KEY = 'effortdex:species-list';
 const MON_KEY_PREFIX = 'effortdex:mon:';
@@ -63,8 +63,7 @@ const CACHE_KEY_PREFIXES = [
 const SPRITE_BASE_URL = 'https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/';
 
 // Species list URLs look like ".../pokemon/25/" — pull the id off the end.
-/** @param {string} url @returns {number|null} */
-function idFromUrl(url) {
+function idFromUrl(url: string): number | null {
   const match = url.match(/\/(\d+)\/?$/);
   return match ? Number(match[1]) : null;
 }
@@ -81,8 +80,7 @@ function idFromUrl(url) {
 // Pikachu/Eevee, Sword/Shield, Legends: Arceus) never got a distinct
 // sprite rip into that repo — looking one up for them is meant to fall
 // back to the modern default, not guess at a sibling title's assets.
-/** @type {Record<string, string>} */
-const SPRITE_VERSION_GROUPS = {
+const SPRITE_VERSION_GROUPS: Record<string, string> = {
   Red: 'generation-i/red-blue',
   Blue: 'generation-i/red-blue',
   Yellow: 'generation-i/yellow',
@@ -122,8 +120,7 @@ const SPRITE_VERSION_GROUPS = {
  * attempt, not a guarantee; callers must keep their own fallback chain
  * for that case too — always end it at a local, always-available image.
  */
-/** @param {string} gameName @param {number|null} speciesId @returns {string|null} */
-export function versionedSpriteUrl(gameName, speciesId) {
+export function versionedSpriteUrl(gameName: string, speciesId: number | null): string | null {
   const path = SPRITE_VERSION_GROUPS[gameName];
   if (!path || !speciesId) return null;
   return `${SPRITE_BASE_URL}versions/${path}/${speciesId}.png`;
@@ -134,9 +131,8 @@ export function versionedSpriteUrl(gameName, speciesId) {
  * titles that return the same key (e.g. Ruby and Sapphire) share the
  * literal same cached sprite images — exposed so UI that lists titles
  * (components/pages/settings/cache.js, ADR 0012) can group them into one row instead
- * of presenting independence that doesn't actually exist.
- * @param {string} gameName @returns {string|null} */
-export function spriteGroupKey(gameName) {
+ * of presenting independence that doesn't actually exist. */
+export function spriteGroupKey(gameName: string): string | null {
   return SPRITE_VERSION_GROUPS[gameName] || null;
 }
 
@@ -144,21 +140,18 @@ export function spriteGroupKey(gameName) {
  * white-background bitmap rather than a transparent PNG — i.e. the Gen I
  * and Gen II sprite rips, the only ones in the mirror with no alpha.
  * UI that draws effects around the sprite (the fully-trained halo) uses
- * this to pick a silhouette treatment vs. a boxed one.
- * @param {string} gameName @returns {boolean} */
-export function versionedSpriteIsOpaque(gameName) {
+ * this to pick a silhouette treatment vs. a boxed one. */
+export function versionedSpriteIsOpaque(gameName: string): boolean {
   const path = SPRITE_VERSION_GROUPS[gameName];
   return !!path && (path.startsWith('generation-i/') || path.startsWith('generation-ii/'));
 }
 
-/** The modern default sprite URL for `speciesId` — same derivation `getAllSpecies`/`getPokemon` use, exposed so callers that only have an id (e.g. from `getGenerationSpecies`, never fetching the full `getPokemon` record) can still build it.
- * @param {number|null} speciesId @returns {string|null} */
-export function modernSpriteUrl(speciesId) {
+/** The modern default sprite URL for `speciesId` — same derivation `getAllSpecies`/`getPokemon` use, exposed so callers that only have an id (e.g. from `getGenerationSpecies`, never fetching the full `getPokemon` record) can still build it. */
+export function modernSpriteUrl(speciesId: number | null): string | null {
   return speciesId ? `${SPRITE_BASE_URL}${speciesId}.png` : null;
 }
 
-/** @type {Record<string, import('./constants.ts').StatKey>} */
-const STAT_NAME_MAP = {
+const STAT_NAME_MAP: Record<string, StatKey> = {
   hp: 'hp',
   attack: 'atk',
   defense: 'def',
@@ -168,27 +161,26 @@ const STAT_NAME_MAP = {
 };
 
 export class PokeApiClient {
-  /** @param {{ cacheBackend?: import('./memo-cache.js').CacheBackend }} [opts] */
-  constructor({ cacheBackend } = {}) {
+  private _cache: MemoCache;
+
+  constructor({ cacheBackend }: { cacheBackend?: CacheBackend } = {}) {
     this._cache = new MemoCache({ backend: cacheBackend });
   }
 
   /** Pulls already-cached `getPokemon` results from the persistent tier
    * into memory so `peekCached` can see them (the disk tier is async
-   * since docs/adr/0025 P2). Awaited by `Store#init()`. Best-effort.
-   * @returns {Promise<void>} */
-  hydrateCache() {
+   * since docs/adr/0025 P2). Awaited by `Store#init()`. Best-effort. */
+  hydrateCache(): Promise<void> {
     return this._cache.warm([MON_KEY_PREFIX]);
   }
 
-  /** Every species as `{ name, id, sprite }`, for the add-Pokémon search's suggestion list.
-   * @returns {Promise<SpeciesListEntry[]>} */
-  async getAllSpecies() {
+  /** Every species as `{ name, id, sprite }`, for the add-Pokémon search's suggestion list. */
+  async getAllSpecies(): Promise<SpeciesListEntry[]> {
     return this._cache.get(SPECIES_LIST_KEY, async () => {
       const res = await fetch('https://pokeapi.co/api/v2/pokemon?limit=2000');
       if (!res.ok) throw new Error('Could not reach PokéAPI for the species list.');
       const data = await res.json();
-      return data.results.map((/** @type {{ name: string, url: string }} */ r) => {
+      return data.results.map((r: { name: string; url: string }) => {
         const id = idFromUrl(r.url);
         return { name: r.name, id, sprite: id ? `${SPRITE_BASE_URL}${id}.png` : null };
       });
@@ -200,27 +192,25 @@ export class PokeApiClient {
    * trick `getAllSpecies` uses), so callers that only need to enumerate
    * a generation's species (the sprite prefetch/cache-manager page,
    * ADR 0011/0012) never have to pay for a `getPokemon` call per
-   * species just to find out what's *in* a generation.
-   * @param {number} gen @returns {Promise<{name: string, id: number|null}[]>} */
-  async getGenerationSpecies(gen) {
+   * species just to find out what's *in* a generation. */
+  async getGenerationSpecies(gen: number): Promise<{ name: string; id: number | null }[]> {
     const key = GENERATION_KEY_PREFIX + gen;
     return this._cache.get(key, async () => {
       const res = await fetch(`https://pokeapi.co/api/v2/generation/${gen}`);
       if (!res.ok) throw new Error(`Could not load generation ${gen}'s species list.`);
       const data = await res.json();
-      return data.pokemon_species.map((/** @type {{ name: string, url: string }} */ s) => ({
+      return data.pokemon_species.map((s: { name: string; url: string }) => ({
         name: s.name,
         id: idFromUrl(s.url),
       }));
     });
   }
 
-  /** @param {string} name @returns {Promise<DomainPokemon>} */
-  async getPokemon(name) {
+  async getPokemon(name: string): Promise<DomainPokemon> {
     const key = MON_KEY_PREFIX + name.toLowerCase();
     return this._cache.get(key, async () => {
       const res = await fetch(
-        `https://pokeapi.co/api/v2/pokemon/${encodeURIComponent(name.toLowerCase())}`
+        `https://pokeapi.co/api/v2/pokemon/${encodeURIComponent(name.toLowerCase())}`,
       );
       if (res.status === 404) throw new NotFoundError(`Unknown Pokémon: "${name}".`);
       if (!res.ok) throw new Error(`Unknown Pokémon: "${name}".`);
@@ -229,15 +219,14 @@ export class PokeApiClient {
     });
   }
 
-  /** Returns the species names this Pokémon can evolve directly into.
-   * @param {string} name @returns {Promise<string[]>} */
-  async getEvolutionOptions(name) {
+  /** Returns the species names this Pokémon can evolve directly into. */
+  async getEvolutionOptions(name: string): Promise<string[]> {
     const key = EVOLUTIONS_KEY_PREFIX + name.toLowerCase();
     return this._cache.get(key, async () => {
       const species = await this._getSpecies(name);
       const chain = await this._getEvolutionChain(species.evolution_chain.url);
       const node = this._findChainNode(chain, name.toLowerCase());
-      return node ? node.evolves_to.map((/** @type {any} */ n) => n.species.name) : [];
+      return node ? node.evolves_to.map((n: any) => n.species.name) : [];
     });
   }
 
@@ -252,24 +241,16 @@ export class PokeApiClient {
    * requirement for evolving *into* that node, when it evolves that way
    * (null for root, and for evolutions triggered by trade/item/etc.).
    */
-  /** @param {string} name @returns {Promise<EvolutionNode[]>} */
-  async getEvolutionChain(name) {
+  async getEvolutionChain(name: string): Promise<EvolutionNode[]> {
     const species = await this._getSpecies(name);
     const chain = await this._getEvolutionChain(species.evolution_chain.url);
-    /** @type {EvolutionNode[]} */
-    const nodes = [];
+    const nodes: EvolutionNode[] = [];
     this._flattenChain(chain, null, nodes);
     return nodes;
   }
 
-  /**
-   * @param {any} node
-   * @param {EvolutionNode|null} parent
-   * @param {EvolutionNode[]} nodes
-   */
-  _flattenChain(node, parent, nodes) {
-    /** @type {EvolutionNode} */
-    const entry = {
+  private _flattenChain(node: any, parent: EvolutionNode | null, nodes: EvolutionNode[]): void {
+    const entry: EvolutionNode = {
       name: node.species.name,
       depth: parent ? parent.depth + 1 : 0,
       parent: parent?.name ?? null,
@@ -291,19 +272,18 @@ export class PokeApiClient {
    * generation's species list (a species-level name from
    * `getGenerationSpecies`, e.g. `"giratina"`) can still be matched
    * against the variety-level names the search dropdown (`getAllSpecies`)
-   * actually lists. See lib/species-availability.js.
-   * @param {string} name @returns {Promise<string[]>} */
-  async getSpeciesVarieties(name) {
+   * actually lists. See lib/species-availability.ts.
+   */
+  async getSpeciesVarieties(name: string): Promise<string[]> {
     const species = await this._getSpecies(name);
-    return species.varieties.map((/** @type {{ pokemon: { name: string } }} */ v) => v.pokemon.name);
+    return species.varieties.map((v: { pokemon: { name: string } }) => v.pokemon.name);
   }
 
-  /** @param {string} name @returns {Promise<any>} */
-  async _getSpecies(name) {
+  private async _getSpecies(name: string): Promise<any> {
     const key = SPECIES_KEY_PREFIX + name.toLowerCase();
     return this._cache.get(key, async () => {
       const res = await fetch(
-        `https://pokeapi.co/api/v2/pokemon-species/${encodeURIComponent(name.toLowerCase())}`
+        `https://pokeapi.co/api/v2/pokemon-species/${encodeURIComponent(name.toLowerCase())}`,
       );
       if (res.status === 404) {
         throw new NotFoundError(`Could not look up evolution data for "${name}".`);
@@ -315,8 +295,7 @@ export class PokeApiClient {
 
   // Keyed by the chain's own URL, so every species in the same evolution
   // family (e.g. Bulbasaur, Ivysaur, Venusaur) shares one fetch of it.
-  /** @param {string} url @returns {Promise<any>} */
-  async _getEvolutionChain(url) {
+  private async _getEvolutionChain(url: string): Promise<any> {
     const key = CHAIN_KEY_PREFIX + url;
     return this._cache.get(key, async () => {
       const res = await fetch(url);
@@ -326,8 +305,7 @@ export class PokeApiClient {
     });
   }
 
-  /** @param {any} node @param {string} name @returns {any} */
-  _findChainNode(node, name) {
+  private _findChainNode(node: any, name: string): any {
     if (node.species.name === name) return node;
     for (const child of node.evolves_to) {
       const found = this._findChainNode(child, name);
@@ -336,8 +314,7 @@ export class PokeApiClient {
     return null;
   }
 
-  /** @param {any} data @returns {DomainPokemon} */
-  _toDomainPokemon(data) {
+  private _toDomainPokemon(data: any): DomainPokemon {
     const evYield = emptyEvs();
     const baseStats = emptyEvs();
     for (const s of data.stats) {
@@ -363,9 +340,8 @@ export class PokeApiClient {
    * backfill (docs/adr/0010) to recompute historical battle events
    * offline, from data that's already sitting here because logging the
    * original battle required looking the opponent up in the first place.
-   * @param {string} name @returns {DomainPokemon|null}
    */
-  peekCached(name) {
+  peekCached(name: string): DomainPokemon | null {
     return this._cache.peek(MON_KEY_PREFIX + name.toLowerCase());
   }
 
@@ -379,9 +355,8 @@ export class PokeApiClient {
    * Gen VIII species list alone), and the Storage page's "Clear cache"
    * runs it so that control frees this cache too, not just Cache
    * Storage. Resolves with the number of entries removed.
-   * @returns {Promise<number>}
    */
-  evictLocalCache() {
+  evictLocalCache(): Promise<number> {
     return this._cache.clearStored(CACHE_KEY_PREFIXES);
   }
 
@@ -389,9 +364,8 @@ export class PokeApiClient {
    * the Storage page's "Clear cache" size label — `estimateCacheSize()`
    * in version-check.js covers Cache Storage, this covers the client's
    * own persistent cache (localStorage or IndexedDB) that same button
-   * also clears.
-   * @returns {Promise<number>} */
-  localCacheBytes() {
+   * also clears. */
+  localCacheBytes(): Promise<number> {
     return this._cache.storedBytes(CACHE_KEY_PREFIXES);
   }
 }

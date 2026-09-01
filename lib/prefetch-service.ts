@@ -1,4 +1,3 @@
-// @ts-check
 // Warms sw.js's sprite cache, and PokeApiClient's own evolution-chain
 // cache, ahead of need — see docs/adr/0011 for the automatic, idle-time
 // background warm-up this started as, docs/adr/0012 for the manual
@@ -24,15 +23,14 @@
 // exact queue too, not a second independent one — the whole point of
 // ADR 0012's rebuild.
 
-/** @typedef {import('./store.js').Store} Store */
-/** @typedef {import('./pokeapi-client.js').PokeApiClient} PokeApiClient */
-
 import { matchGameVersion } from './game-versions.ts';
-import { versionedSpriteUrl, modernSpriteUrl } from './pokeapi-client.js';
+import { versionedSpriteUrl, modernSpriteUrl } from './pokeapi-client.ts';
 import { withoutNetworkActivity } from './network-activity.ts';
 import { SPRITE_CACHE_NAME } from './sprite-cache.ts';
 import { isCachingDisabled } from './dev-cache.ts';
 import { ITEM_SPRITES } from './constants.ts';
+import type { Store } from './store.js';
+import type { DomainPokemon, PokeApiClient } from './pokeapi-client.ts';
 
 const CONCURRENCY = 2;
 const BATCH_DELAY_MS = 500;
@@ -60,10 +58,11 @@ const MAX_BACKOFF_MS = 10 * 60_000;
 // landed in the sprite cache from before the refresh.
 const RESUME_STORAGE_KEY = 'effortdex:prefetch-resume';
 
-/** @typedef {{ kind: 'game', target: string } | { kind: 'generation', target: number }} ResumeIntent */
+export type ResumeIntent =
+  | { kind: 'game'; target: string }
+  | { kind: 'generation'; target: number };
 
-/** @returns {ResumeIntent[]} */
-function readResumeIntentsDefault() {
+function readResumeIntentsDefault(): ResumeIntent[] {
   if (typeof localStorage === 'undefined') return [];
   try {
     const raw = localStorage.getItem(RESUME_STORAGE_KEY);
@@ -73,8 +72,7 @@ function readResumeIntentsDefault() {
   }
 }
 
-/** @param {ResumeIntent[]} intents @returns {void} */
-function writeResumeIntentsDefault(intents) {
+function writeResumeIntentsDefault(intents: ResumeIntent[]): void {
   if (typeof localStorage === 'undefined') return;
   try {
     if (intents.length) localStorage.setItem(RESUME_STORAGE_KEY, JSON.stringify(intents));
@@ -93,17 +91,71 @@ function writeResumeIntentsDefault(intents) {
  * arbitrary async warmer (`warm`) that populates PokeApiClient's own
  * cache as a side effect, with no fetchable sprite URL of its own to
  * cache-check or fetch. Exactly one of the three is set.
- * @typedef {object} QueueTask
- * @property {string} key
- * @property {string} name
- * @property {((mon: import('./pokeapi-client.js').DomainPokemon) => string|null)} [resolveUrl]
- * @property {string} [url]
- * @property {(() => Promise<any>)} [warm]
- * @property {Set<() => void>} onSettled
- * @property {boolean} silent
  */
+interface QueueTask {
+  key: string;
+  name: string;
+  resolveUrl?: (mon: DomainPokemon) => string | null;
+  url?: string;
+  warm?: () => Promise<any>;
+  onSettled: Set<() => void>;
+  silent: boolean;
+}
+
+interface EnqueueItem {
+  name: string;
+  resolveUrl?: (mon: any) => string | null;
+  url?: string;
+  warm?: () => Promise<any>;
+  onSettled?: () => void;
+  silent?: boolean;
+}
+
+interface PrefetchDeps {
+  store: Store;
+  api: PokeApiClient;
+  isOnline?: () => boolean;
+  getConnection?: () => any;
+  onOnlineChange?: (notify: () => void) => void;
+  withoutTracking?: <T>(fn: () => Promise<T>) => Promise<T>;
+  isAlreadyCached?: (url: string) => Promise<boolean>;
+  concurrency?: number;
+  batchDelayMs?: number;
+  failureThreshold?: number;
+  initialBackoffMs?: number;
+  maxBackoffMs?: number;
+  readResumeIntents?: () => ResumeIntent[];
+  writeResumeIntents?: (intents: ResumeIntent[]) => void;
+  isCachingDisabled?: () => boolean;
+  itemSpriteUrls?: string[];
+}
 
 export class PrefetchService extends EventTarget {
+  private _readResumeIntents: () => ResumeIntent[];
+  private _writeResumeIntents: (intents: ResumeIntent[]) => void;
+  private _store: Store;
+  private _api: PokeApiClient;
+  private _isOnline: () => boolean;
+  private _getConnection: () => any;
+  private _withoutTracking: <T>(fn: () => Promise<T>) => Promise<T>;
+  private _isAlreadyCached: (url: string) => Promise<boolean>;
+  private _isCachingDisabled: () => boolean;
+  private _concurrency: number;
+  private _batchDelayMs: number;
+  private _itemSpriteUrls: string[];
+  private _started: boolean;
+  private _failureThreshold: number;
+  private _maxBackoffMs: number;
+  private _initialBackoffMs: number;
+  private _consecutiveFailures: number;
+  private _backoffMs: number;
+  private _backoffTimer: ReturnType<typeof setTimeout> | null;
+  private _queue: QueueTask[];
+  private _pending: Map<string, QueueTask>;
+  private _processing: boolean;
+  private _queueTotal: number;
+  private _queueDone: number;
+
   /**
    * `isOnline`/`getConnection`/`onOnlineChange`/`withoutTracking`/
    * `isAlreadyCached` are injectable (defaulting to the real
@@ -125,13 +177,12 @@ export class PrefetchService extends EventTarget {
    * ITEM_SPRITES) the automatic scan warms unconditionally, alongside
    * whatever generations the store's parties use — overridable so tests
    * can exercise the species-scan behavior in isolation from it.
-   * @param {{ store: Store, api: PokeApiClient, isOnline?: () => boolean, getConnection?: () => any, onOnlineChange?: (notify: () => void) => void, withoutTracking?: <T>(fn: () => Promise<T>) => Promise<T>, isAlreadyCached?: (url: string) => Promise<boolean>, concurrency?: number, batchDelayMs?: number, failureThreshold?: number, initialBackoffMs?: number, maxBackoffMs?: number, readResumeIntents?: () => ResumeIntent[], writeResumeIntents?: (intents: ResumeIntent[]) => void, isCachingDisabled?: () => boolean, itemSpriteUrls?: string[] }} deps
    */
   constructor({
     store,
     api,
     isOnline = () => navigator.onLine,
-    getConnection = () => /** @type {any} */ (navigator).connection,
+    getConnection = () => (navigator as any).connection,
     onOnlineChange,
     withoutTracking = withoutNetworkActivity,
     isAlreadyCached = defaultIsAlreadyCached,
@@ -144,7 +195,7 @@ export class PrefetchService extends EventTarget {
     writeResumeIntents = writeResumeIntentsDefault,
     isCachingDisabled: isCachingDisabledDep = isCachingDisabled,
     itemSpriteUrls = ITEM_SPRITES,
-  }) {
+  }: PrefetchDeps) {
     super();
     this._readResumeIntents = readResumeIntents;
     this._writeResumeIntents = writeResumeIntents;
@@ -165,12 +216,9 @@ export class PrefetchService extends EventTarget {
     this._initialBackoffMs = initialBackoffMs;
     this._consecutiveFailures = 0;
     this._backoffMs = initialBackoffMs;
-    /** @type {ReturnType<typeof setTimeout>|null} */
     this._backoffTimer = null;
 
-    /** @type {QueueTask[]} */
     this._queue = [];
-    /** @type {Map<string, QueueTask>} */
     this._pending = new Map(); // key -> task, for both "still queued" and "currently in flight"
     this._processing = false;
     this._queueTotal = 0;
@@ -189,15 +237,13 @@ export class PrefetchService extends EventTarget {
     }
   }
 
-  /** How many tasks are still queued or in flight right now. Exposed for observability/tests — the `progress` event is the API to actually build UI off of.
-   * @returns {number} */
-  get pendingCount() {
+  /** How many tasks are still queued or in flight right now. Exposed for observability/tests — the `progress` event is the API to actually build UI off of. */
+  get pendingCount(): number {
     return this._pending.size;
   }
 
-  /** Kicks off the automatic background prefetch if conditions allow — scoped to the generations the user's own parties use. Safe to call more than once — only the first call does anything.
-   * @returns {Promise<void>} */
-  start() {
+  /** Kicks off the automatic background prefetch if conditions allow — scoped to the generations the user's own parties use. Safe to call more than once — only the first call does anything. */
+  start(): Promise<void> {
     if (this._started) return Promise.resolve();
     this._started = true;
     if (this._isCachingDisabled() || !this._canRun()) return Promise.resolve();
@@ -230,13 +276,12 @@ export class PrefetchService extends EventTarget {
    * see `_enqueueEvolutionChains`) evolution-chain warming for the same
    * species, so the offline gap this ADR 0011 addendum closes applies to
    * a manually-cached game exactly as much as to the automatic scan.
-   * @param {string} gameName @param {(progress: {done: number, total: number}) => void} [onProgress] @returns {Promise<void>} */
-  async prefetchGame(gameName, onProgress) {
+   */
+  async prefetchGame(gameName: string, onProgress?: (progress: { done: number; total: number }) => void): Promise<void> {
     if (this._isCachingDisabled()) return;
     const match = matchGameVersion(gameName);
     if (!match) return;
-    /** @type {ResumeIntent} */
-    const intent = { kind: 'game', target: gameName };
+    const intent: ResumeIntent = { kind: 'game', target: gameName };
     this._addResumeIntent(intent);
     if (!this._isOnline()) return; // intent stays recorded — resumeInterrupted() retries on a later, online load
     try {
@@ -246,10 +291,9 @@ export class PrefetchService extends EventTarget {
         gameName,
         species.map(({ name }) => ({
           name,
-          resolveUrl: (/** @type {import('./pokeapi-client.js').DomainPokemon} */ mon) =>
-            versionedSpriteUrl(gameName, mon.id) || mon.sprite,
+          resolveUrl: (mon: DomainPokemon) => versionedSpriteUrl(gameName, mon.id) || mon.sprite,
         })),
-        onProgress
+        onProgress,
       );
     } finally {
       this._removeResumeIntent(intent);
@@ -271,11 +315,10 @@ export class PrefetchService extends EventTarget {
    * Also a no-op while caching is disabled — see `prefetchGame`.
    * Also enqueues evolution-chain warming for the same species, same as
    * `prefetchGame` — see that method's own note.
-   * @param {number} gen @param {(progress: {done: number, total: number}) => void} [onProgress] @returns {Promise<void>} */
-  async prefetchGeneration(gen, onProgress) {
+   */
+  async prefetchGeneration(gen: number, onProgress?: (progress: { done: number; total: number }) => void): Promise<void> {
     if (this._isCachingDisabled()) return;
-    /** @type {ResumeIntent} */
-    const intent = { kind: 'generation', target: gen };
+    const intent: ResumeIntent = { kind: 'generation', target: gen };
     this._addResumeIntent(intent);
     if (!this._isOnline()) return;
     try {
@@ -285,9 +328,9 @@ export class PrefetchService extends EventTarget {
         'auto',
         species.map(({ name }) => ({
           name,
-          resolveUrl: (/** @type {import('./pokeapi-client.js').DomainPokemon} */ mon) => mon.sprite,
+          resolveUrl: (mon: DomainPokemon) => mon.sprite,
         })),
-        onProgress
+        onProgress,
       );
     } finally {
       this._removeResumeIntent(intent);
@@ -306,19 +349,18 @@ export class PrefetchService extends EventTarget {
    * task dedup every enqueue goes through. Also a no-op while caching is
    * disabled — doesn't even read the recorded intents in that case,
    * leaving them in place for whenever caching is turned back on.
-   * @returns {Promise<void>} */
-  async resumeInterrupted() {
+   */
+  async resumeInterrupted(): Promise<void> {
     if (this._isCachingDisabled()) return;
     const intents = this._readResumeIntents();
     await Promise.all(
       intents.map((intent) =>
-        intent.kind === 'game' ? this.prefetchGame(intent.target) : this.prefetchGeneration(intent.target)
-      )
+        intent.kind === 'game' ? this.prefetchGame(intent.target) : this.prefetchGeneration(intent.target),
+      ),
     );
   }
 
-  /** @param {ResumeIntent} intent @returns {void} */
-  _addResumeIntent(intent) {
+  private _addResumeIntent(intent: ResumeIntent): void {
     const intents = this._readResumeIntents();
     const key = `${intent.kind}:${intent.target}`;
     if (!intents.some((i) => `${i.kind}:${i.target}` === key)) {
@@ -326,8 +368,7 @@ export class PrefetchService extends EventTarget {
     }
   }
 
-  /** @param {ResumeIntent} intent @returns {void} */
-  _removeResumeIntent(intent) {
+  private _removeResumeIntent(intent: ResumeIntent): void {
     const key = `${intent.kind}:${intent.target}`;
     this._writeResumeIntents(this._readResumeIntents().filter((i) => `${i.kind}:${i.target}` !== key));
   }
@@ -336,18 +377,16 @@ export class PrefetchService extends EventTarget {
    * — derived purely from the (cached-after-first-call) generation
    * species list, no `getPokemon` call needed. Safe to call just to
    * render cache-status counts (components/pages/settings/cache.js) without
-   * triggering any prefetching itself.
-   * @param {string} gameName @returns {Promise<string[]>} */
-  async spriteUrlsForGame(gameName) {
+   * triggering any prefetching itself. */
+  async spriteUrlsForGame(gameName: string): Promise<string[]> {
     const match = matchGameVersion(gameName);
     if (!match) return [];
     const species = await this._speciesForGameGen(match.gen);
     const urls = species.map(({ id }) => versionedSpriteUrl(gameName, id) || modernSpriteUrl(id));
-    return /** @type {string[]} */ (urls.filter((url) => !!url));
+    return urls.filter((url) => !!url) as string[];
   }
 
-  /** @returns {boolean} */
-  _canRun() {
+  private _canRun(): boolean {
     if (!this._isOnline()) return false;
     const conn = this._getConnection();
     if (conn?.saveData) return false;
@@ -369,9 +408,8 @@ export class PrefetchService extends EventTarget {
   // there's no point warming a generation nothing in the roster belongs
   // to. Empty (no parties, or none with a recognized baseGame) is a
   // no-op, not an error.
-  /** @returns {number[]} */
-  _generations() {
-    const gens = new Set();
+  private _generations(): number[] {
+    const gens = new Set<number>();
     for (const party of this._store.state.parties) {
       const gen = matchGameVersion(party.baseGame)?.gen;
       if (gen) gens.add(gen);
@@ -379,8 +417,7 @@ export class PrefetchService extends EventTarget {
     return [...gens];
   }
 
-  /** @returns {Promise<void>} */
-  async _enqueueAutomatic() {
+  private async _enqueueAutomatic(): Promise<void> {
     if (!this._canRun()) return;
     // Item icons (vitamins, held training items, feathers, EV berries,
     // Macho Brace, Exp. Share) aren't scoped to any generation — the same
@@ -392,7 +429,7 @@ export class PrefetchService extends EventTarget {
     // even starts.
     this._enqueueAndWait(
       'items',
-      this._itemSpriteUrls.map((url) => ({ name: url, url, silent: true }))
+      this._itemSpriteUrls.map((url) => ({ name: url, url, silent: true })),
     );
     for (const gen of this._generations()) {
       if (!this._canRun()) return;
@@ -402,7 +439,7 @@ export class PrefetchService extends EventTarget {
         'auto',
         species.map(({ name }) => ({
           name,
-          resolveUrl: (/** @type {import('./pokeapi-client.js').DomainPokemon} */ mon) => mon.sprite,
+          resolveUrl: (mon: DomainPokemon) => mon.sprite,
           // The whole point of this scan is to never be visible around
           // anything the user is doing (see this file's header comment)
           // — including the header LED, which would otherwise flicker
@@ -410,7 +447,7 @@ export class PrefetchService extends EventTarget {
           // work nobody asked for. Manual triggers (prefetchGame/
           // prefetchGeneration) deliberately leave this unset/false.
           silent: true,
-        }))
+        })),
       );
     }
   }
@@ -435,18 +472,18 @@ export class PrefetchService extends EventTarget {
    * `getEvolutionChain` itself already dedupes concurrent/overlapping
    * requests for the same evolution family (it's keyed by the chain's
    * own URL, one level below the per-species call this enqueues —
-   * `lib/pokeapi-client.js`), so enqueuing one task per species here,
+   * `lib/pokeapi-client.ts`), so enqueuing one task per species here,
    * rather than trying to resolve families up front, still only ever
    * fetches each shared chain once.
-   * @param {{ name: string }[]} species @returns {void} */
-  _enqueueEvolutionChains(species) {
+   */
+  private _enqueueEvolutionChains(species: { name: string }[]): void {
     this._enqueueAndWait(
       'evo',
       species.map(({ name }) => ({
         name,
         warm: () => this._api.getEvolutionChain(name),
         silent: true,
-      }))
+      })),
     );
   }
 
@@ -458,12 +495,12 @@ export class PrefetchService extends EventTarget {
    * attempted," never "the whole shared queue is empty."
    * `onProgress`, if given, fires after each item in *this* batch
    * settles with `{done, total}` scoped to this batch alone.
-   * @param {string} sourceTag
-   * @param {{ name: string, resolveUrl?: (mon: any) => string|null, url?: string, warm?: () => Promise<any>, silent?: boolean }[]} items
-   * @param {(progress: {done: number, total: number}) => void} [onProgress]
-   * @returns {Promise<void>}
    */
-  _enqueueAndWait(sourceTag, items, onProgress) {
+  private _enqueueAndWait(
+    sourceTag: string,
+    items: EnqueueItem[],
+    onProgress?: (progress: { done: number; total: number }) => void,
+  ): Promise<void> {
     const total = items.length;
     if (!total) return Promise.resolve();
     return new Promise((resolve) => {
@@ -475,13 +512,12 @@ export class PrefetchService extends EventTarget {
       };
       this._enqueue(
         sourceTag,
-        items.map((item) => ({ ...item, onSettled }))
+        items.map((item) => ({ ...item, onSettled })),
       );
     });
   }
 
-  /** @param {number} gen @returns {Promise<{name: string, id: number|null}[]>} */
-  async _speciesForGen(gen) {
+  private async _speciesForGen(gen: number): Promise<{ name: string; id: number | null }[]> {
     try {
       return await this._api.getGenerationSpecies(gen);
     } catch {
@@ -509,9 +545,9 @@ export class PrefetchService extends EventTarget {
    * on offline. Each generation's own list is still individually cached
    * by `PokeApiClient` (`GENERATION_KEY_PREFIX`), so calling this for
    * successive game generations doesn't refetch earlier ones.
-   * @param {number} gen @returns {Promise<{name: string, id: number|null}[]>} */
-  async _speciesForGameGen(gen) {
-    const byName = new Map();
+   */
+  private async _speciesForGameGen(gen: number): Promise<{ name: string; id: number | null }[]> {
+    const byName = new Map<string, { name: string; id: number | null }>();
     for (let g = 1; g <= gen; g++) {
       for (const s of await this._speciesForGen(g)) byName.set(s.name, s);
     }
@@ -528,10 +564,8 @@ export class PrefetchService extends EventTarget {
    * before the first finishes) reuses the already-queued/in-flight task
    * and just adds this caller's own `onSettled` to it, so every caller
    * still gets notified once, on the one real fetch.
-   * @param {string} sourceTag
-   * @param {{ name: string, resolveUrl?: (mon: any) => string|null, url?: string, warm?: () => Promise<any>, onSettled?: () => void, silent?: boolean }[]} items
    */
-  _enqueue(sourceTag, items) {
+  private _enqueue(sourceTag: string, items: EnqueueItem[]): void {
     for (const item of items) {
       const key = `${sourceTag}:${item.name}`;
       const existing = this._pending.get(key);
@@ -539,8 +573,7 @@ export class PrefetchService extends EventTarget {
         if (item.onSettled) existing.onSettled.add(item.onSettled);
         continue;
       }
-      /** @type {QueueTask} */
-      const task = {
+      const task: QueueTask = {
         key,
         name: item.name,
         resolveUrl: item.resolveUrl,
@@ -556,15 +589,13 @@ export class PrefetchService extends EventTarget {
     this._processQueue();
   }
 
-  /** Whether the queue is currently sitting out a backoff cooldown after repeated failures — exposed for UI (components/pages/settings/cache.js) to explain a stalled "Caching…" state rather than leaving it looking frozen.
-   * @returns {boolean} */
-  get isBackingOff() {
+  /** Whether the queue is currently sitting out a backoff cooldown after repeated failures — exposed for UI (components/pages/settings/cache.js) to explain a stalled "Caching…" state rather than leaving it looking frozen. */
+  get isBackingOff(): boolean {
     return this._backoffTimer !== null;
   }
 
-  /** The single worker loop every enqueue call kicks (idempotently — a call while one is already running just returns). Concurrency-limited and throttled exactly like the original single-purpose version was, just now shared across every source of work.
-   * @returns {Promise<void>} */
-  async _processQueue() {
+  /** The single worker loop every enqueue call kicks (idempotently — a call while one is already running just returns). Concurrency-limited and throttled exactly like the original single-purpose version was, just now shared across every source of work. */
+  private async _processQueue(): Promise<void> {
     if (this._processing || this._backoffTimer) return; // a pending backoff resume will call this itself once its timer fires
     this._processing = true;
     while (this._queue.length) {
@@ -593,9 +624,8 @@ export class PrefetchService extends EventTarget {
    * turns out not to have been long enough, capped at `_maxBackoffMs`.
    * A success anywhere (see `_runTask`) resets both the failure count
    * and the backoff delay back to their starting points.
-   * @returns {void}
    */
-  _scheduleBackoffResume() {
+  private _scheduleBackoffResume(): void {
     if (this._backoffTimer) return; // already scheduled
     this.dispatchEvent(new CustomEvent('backoff', { detail: { resumeInMs: this._backoffMs } }));
     this._backoffTimer = setTimeout(() => {
@@ -606,11 +636,11 @@ export class PrefetchService extends EventTarget {
     }, this._backoffMs);
   }
 
-  /** @param {QueueTask} task @returns {Promise<void>} */
-  async _runTask(task) {
+  private async _runTask(task: QueueTask): Promise<void> {
     let failed = false;
     try {
-      const run = task.silent ? this._withoutTracking : /** @type {<T>(fn: () => Promise<T>) => Promise<T>} */ ((fn) => fn());
+      const passthrough = <T>(fn: () => Promise<T>): Promise<T> => fn();
+      const run: <T>(fn: () => Promise<T>) => Promise<T> = task.silent ? this._withoutTracking : passthrough;
       const warm = task.warm;
       if (warm) {
         // Evolution-chain warming: no sprite URL to cache-check or
@@ -635,12 +665,13 @@ export class PrefetchService extends EventTarget {
         // no way to resume otherwise — the queue lives only in memory)
         // cheap: only the genuinely-missing sprites get re-fetched.
         if (url && !(await this._isAlreadyCached(url))) {
+          const fetchUrl = url;
           // no-cors so this warm-fetch lands the same *opaque* Response in
           // sw.js's sprite cache that a real sprite <img> now produces
           // (see lib/constants.ts's FALLBACK_ONERROR comment) — otherwise
           // the prefetch would cache a cors entry the <img> can't reuse
           // from cache offline on WebKit/iOS.
-          await run(() => fetch(url, { mode: 'no-cors' }));
+          await run(() => fetch(fetchUrl, { mode: 'no-cors' }));
         }
       }
     } catch {
@@ -661,14 +692,12 @@ export class PrefetchService extends EventTarget {
     }
   }
 
-  /** @param {number} ms @returns {Promise<void>} */
-  _sleep(ms) {
+  private _sleep(ms: number): Promise<void> {
     return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
 
-/** @param {string} url @returns {Promise<boolean>} */
-async function defaultIsAlreadyCached(url) {
+async function defaultIsAlreadyCached(url: string): Promise<boolean> {
   if (typeof caches === 'undefined') return false;
   try {
     const cache = await caches.open(SPRITE_CACHE_NAME);

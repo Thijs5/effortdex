@@ -7,7 +7,7 @@ import { openDb } from '../lib/db/index.ts';
 import { DB_NAME } from '../lib/db/schema.ts';
 import { IdbCacheBackend } from '../lib/db/idb-cache-backend.ts';
 import { dropLegacyLocalStorageCache } from '../lib/db/legacy-cache-cleanup.ts';
-import { MemoCache } from '../lib/memo-cache.js';
+import { MemoCache } from '../lib/memo-cache.ts';
 
 async function freshBackend() {
   await new Promise((resolve) => {

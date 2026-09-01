@@ -2,7 +2,7 @@ import './support/localstorage-polyfill.js';
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { PokeApiClient, versionedSpriteUrl, versionedSpriteIsOpaque, modernSpriteUrl } from '../lib/pokeapi-client.js';
+import { PokeApiClient, versionedSpriteUrl, versionedSpriteIsOpaque, modernSpriteUrl } from '../lib/pokeapi-client.ts';
 
 // A tiny programmable fetch: routes by substring match on the URL, counts
 // calls, and can be told to fail. Exercises ADR 0001's cache guarantees
