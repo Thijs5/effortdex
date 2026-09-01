@@ -1,3 +1,4 @@
+// @ts-nocheck -- transitional; removed when this file is converted to .ts (TS migration PR)
 import { STATS, STAT_LABEL } from '../../../../lib/constants.ts';
 import { gen1SpecialStat } from '../../../../lib/gen1-special-stats.ts';
 import { escapeHtml } from '../../../../lib/utils.ts';

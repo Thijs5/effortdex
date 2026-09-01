@@ -1,3 +1,4 @@
+// @ts-nocheck -- transitional; removed when this file is converted to .ts (TS migration PR)
 import { POWER_ITEMS, MACHO_BRACE_SPRITE, EXP_SHARE_SPRITE, VITAMINS, FEATHERS, FEATHER_BONUS, EV_BERRIES, EV_BERRY_REDUCTION, MACHO_BRACE_MULTIPLIER, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, STAT_EXP_VITAMIN_BONUS, STAT_EXP_VITAMIN_CEILING, STAT_LABEL } from '../../../../lib/constants.ts';
 import { sortByLabel } from '../../../../lib/utils.ts';
 import { store } from '../../../../lib/services.ts';

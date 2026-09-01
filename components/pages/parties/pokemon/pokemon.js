@@ -8,7 +8,7 @@
 
 import * as router from '../../../../lib/router.ts';
 import { interceptLinkClick } from '../../../../lib/dom.ts';
-import '../../../organisms/pokemon-detail.js';
+import '../../../organisms/pokemon-detail.ts';
 
 export const view = document.getElementById('pokemon-view');
 const backToRoster = document.getElementById('back-to-roster');

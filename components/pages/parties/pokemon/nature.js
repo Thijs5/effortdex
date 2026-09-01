@@ -1,3 +1,4 @@
+// @ts-nocheck -- transitional; removed when this file is converted to .ts (TS migration PR)
 import { NATURES } from '../../../../lib/constants.ts';
 import { natureEffectHint, natureOptionsHtml } from '../../../../lib/utils.ts';
 import { store } from '../../../../lib/services.ts';

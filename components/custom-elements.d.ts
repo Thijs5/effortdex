@@ -20,6 +20,7 @@ import type { TransferPanel } from './organisms/transfer-panel.ts';
 import type { ImportReview } from './organisms/import-review.ts';
 import type { PokemonSearch } from './organisms/pokemon-search.ts';
 import type { EvHistoryLog } from './organisms/ev-history-log.ts';
+import type { PokemonDetail } from './organisms/pokemon-detail.ts';
 
 declare global {
   interface HTMLElementTagNameMap {
@@ -36,5 +37,6 @@ declare global {
     'import-review': ImportReview;
     'pokemon-search': PokemonSearch;
     'ev-history-log': EvHistoryLog;
+    'pokemon-detail': PokemonDetail;
   }
 }

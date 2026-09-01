@@ -1,3 +1,4 @@
+// @ts-nocheck -- transitional; removed when this file is converted to .ts (TS migration PR)
 import { store } from '../../../../lib/services.ts';
 import { evTrainingLocations } from '../../../../lib/ev-training-locations.ts';
 import { BaseDialog } from '../../../atoms/base-dialog.ts';

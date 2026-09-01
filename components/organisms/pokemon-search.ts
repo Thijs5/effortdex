@@ -15,7 +15,7 @@ const MOBILE_QUERY = '(max-width: 640px) and (pointer: coarse)';
 // when the field is focused with nothing typed yet.
 const RECENT_LIMIT = 5;
 
-type EvModifier = (mon: DomainPokemon) => EvMap;
+type EvModifier = (mon: DomainPokemon) => EvMap | undefined;
 
 /**
  * <pokemon-search placeholder="…" show-ev-yield>
@@ -515,7 +515,7 @@ export class PokemonSearch extends HTMLElement {
           const span = li.querySelector('.option-ev-yield');
           if (!span) return;
           const evs = this._evModifier ? this._evModifier(mon) : mon.evYield;
-          const formatted = formatEvYield(evs);
+          const formatted = evs ? formatEvYield(evs) : '';
           const baseHadYield = formatEvYield(mon.evYield) !== '';
           span.textContent = formatted || (this._evModifier && baseHadYield ? 'Capped' : '');
         })

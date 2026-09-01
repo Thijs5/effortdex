@@ -16,6 +16,9 @@ import '../pages/parties/pokemon/ivs.js';
 import '../pages/parties/pokemon/items.js';
 import '../pages/parties/pokemon/competitive.js';
 import '../pages/parties/pokemon/training-guide.js';
+import type { RosterEntry, Party, StatKey } from '../../lib/store.ts';
+import type { PokemonDialog } from '../../lib/router.ts';
+import type { Nature } from '../../lib/constants.ts';
 
 /**
  * <pokemon-detail> — a roster Pokémon's full detail page: identity,
@@ -26,10 +29,42 @@ import '../pages/parties/pokemon/training-guide.js';
  * one at a time, full width.
  */
 export class PokemonDetail extends HTMLElement {
+  _entry: RosterEntry | null = null;
+  _allowedSpeciesToken = 0;
+  _openSegment: PokemonDialog | null = null;
+  _spriteFallback: ReturnType<typeof wireSpriteFallback>;
+  $sprite: HTMLImageElement;
+  $spriteFrame: HTMLElement;
+  $speciesNum: HTMLElement;
+  $nickname: HTMLInputElement;
+  $species: HTMLElement;
+  $levelValue: HTMLElement;
+  $levelUpBtn: HTMLButtonElement;
+  $natureBtn: HTMLButtonElement;
+  // The six dialog subclasses are still plain `.js` (BaseDialog subclasses);
+  // typed `any` until components/pages/parties/pokemon/*.ts land.
+  $natureDialog: any;
+  $levelDialog: any;
+  $ivDialog: any;
+  $moreBtnWrap: HTMLElement;
+  $moreBtn: HTMLButtonElement;
+  $moreMenu: HTMLElement;
+  $itemBtn: HTMLButtonElement;
+  $itemBtnSprite: HTMLImageElement;
+  $itemBtnLabel: HTMLElement;
+  $itemsDialog: any;
+  $competitiveDialog: any;
+  $evSummary: import('../molecules/ev-summary.ts').EvSummary;
+  $search: import('./pokemon-search.ts').PokemonSearch;
+  $sheetExpShareNote: HTMLElement;
+  $battleStatus: HTMLElement;
+  $histLog: import('./ev-history-log.ts').EvHistoryLog;
+  $battleFab: HTMLButtonElement;
+  $trainingGuideBtn: HTMLElement;
+  $trainingGuideDialog: any;
+
   constructor() {
     super();
-    this._entry = null;
-    this._allowedSpeciesToken = 0;
     // The Nature dialog's own preview-then-Save state (docs/adr/0017)
     // lives directly on its <select> value — no separate pending field
     // needed. IVs/Items/Competitive each own their own dialog and pending
@@ -335,59 +370,53 @@ export class PokemonDetail extends HTMLElement {
       </article>
     `;
 
-    this.$sprite = shadow.querySelector('.sprite');
-    this.$spriteFrame = shadow.querySelector('.sprite-frame');
-    this.$speciesNum = shadow.querySelector('.species-num');
-    this.$nickname = shadow.querySelector('.nickname');
-    this.$species = shadow.querySelector('.species');
-    this.$levelValue = shadow.querySelector('.level-value');
-    this.$levelUpBtn = shadow.querySelector('.level-up-btn');
-    this.$natureBtn = shadow.querySelector('.nature-btn');
+    this.$sprite = shadow.querySelector<HTMLImageElement>('.sprite')!;
+    this.$spriteFrame = shadow.querySelector<HTMLElement>('.sprite-frame')!;
+    this.$speciesNum = shadow.querySelector<HTMLElement>('.species-num')!;
+    this.$nickname = shadow.querySelector<HTMLInputElement>('.nickname')!;
+    this.$species = shadow.querySelector<HTMLElement>('.species')!;
+    this.$levelValue = shadow.querySelector<HTMLElement>('.level-value')!;
+    this.$levelUpBtn = shadow.querySelector<HTMLButtonElement>('.level-up-btn')!;
+    this.$natureBtn = shadow.querySelector<HTMLButtonElement>('.nature-btn')!;
     this.$natureDialog = shadow.querySelector('nature-dialog');
     this.$levelDialog = shadow.querySelector('level-up-dialog');
     this.$ivDialog = shadow.querySelector('iv-dialog');
-    this.$moreBtnWrap = shadow.querySelector('.more-btn-wrap');
-    this.$moreBtn = shadow.querySelector('.more-btn');
-    this.$moreMenu = shadow.querySelector('.more-menu');
-    this.$itemBtn = shadow.querySelector('.held-item-btn');
-    this.$itemBtnSprite = shadow.querySelector('.held-item-btn-sprite');
-    this.$itemBtnLabel = shadow.querySelector('.held-item-btn-label');
+    this.$moreBtnWrap = shadow.querySelector<HTMLElement>('.more-btn-wrap')!;
+    this.$moreBtn = shadow.querySelector<HTMLButtonElement>('.more-btn')!;
+    this.$moreMenu = shadow.querySelector<HTMLElement>('.more-menu')!;
+    this.$itemBtn = shadow.querySelector<HTMLButtonElement>('.held-item-btn')!;
+    this.$itemBtnSprite = shadow.querySelector<HTMLImageElement>('.held-item-btn-sprite')!;
+    this.$itemBtnLabel = shadow.querySelector<HTMLElement>('.held-item-btn-label')!;
     this.$itemsDialog = shadow.querySelector('items-dialog');
     this.$competitiveDialog = shadow.querySelector('competitive-dialog');
-    this.$evSummary = shadow.querySelector('ev-summary');
-    this.$search = shadow.querySelector('pokemon-search');
-    this.$sheetExpShareNote = shadow.querySelector('.sheet-exp-share-note');
+    this.$evSummary = shadow.querySelector('ev-summary')!;
+    this.$search = shadow.querySelector('pokemon-search')!;
+    this.$sheetExpShareNote = shadow.querySelector<HTMLElement>('.sheet-exp-share-note')!;
     // Shows what battling this opponent would actually add right now —
     // held item, Pokérus and the 252/510 caps folded in — rather than
     // the opponent's raw base yield, since those are what the player
     // actually cares about when picking who to grind against. Reads
     // `this._entry` live at call time, so it stays correct as the entry
     // (or its Pokérus/item state) changes without needing to be reset.
-    this.$search.evModifier = (mon) => store.previewDefeat(this._entry.uid, mon)?.applied;
-    this.$battleStatus = shadow.querySelector('.battle-status');
-    this.$histLog = shadow.querySelector('ev-history-log');
-    this.$battleFab = shadow.querySelector('.battle-fab');
-    this.$trainingGuideBtn = shadow.querySelector('.training-guide-menu-item');
+    this.$search.evModifier = (mon) => (this._entry ? store.previewDefeat(this._entry.uid, mon)?.applied : undefined);
+    this.$battleStatus = shadow.querySelector<HTMLElement>('.battle-status')!;
+    this.$histLog = shadow.querySelector('ev-history-log')!;
+    this.$battleFab = shadow.querySelector<HTMLButtonElement>('.battle-fab')!;
+    this.$trainingGuideBtn = shadow.querySelector<HTMLElement>('.training-guide-menu-item')!;
     this.$trainingGuideDialog = shadow.querySelector('training-guide-dialog');
 
     this._spriteFallback = wireSpriteFallback(this.$sprite);
 
-    // Which of the six dialog routes (docs/adr/0023), if any, is
-    // currently shown — set by syncDialog(), read there and in
-    // closeDialogs() to avoid a redundant close+reopen of the same
-    // dialog on a re-render that doesn't actually change the route
-    // (showModal() throws on an already-open <dialog>).
-    this._openSegment = null;
     this._wireEvents();
   }
 
-  _wireEvents() {
+  _wireEvents(): void {
     // Nickname stays instant, unlike Nature/Pokérus/Exp. Share/IVs below
     // (docs/adr/0017) — it isn't inside any dialog at all (it's always
     // editable right on the card header), so there's no Save button it
     // could sensibly defer to.
     this.$nickname.addEventListener('change', () => {
-      store.renamePokemon(this._entry.uid, this.$nickname.value.trim());
+      if (this._entry) store.renamePokemon(this._entry.uid, this.$nickname.value.trim());
     });
     this.$levelUpBtn.addEventListener('click', () => this._navigateToDialog('level'));
 
@@ -401,14 +430,14 @@ export class PokemonDetail extends HTMLElement {
     // dialog through syncDialog()). base-dialog.js re-dispatches its
     // inner <dialog>'s own 'close' on the host element for exactly this
     // — the inner event doesn't cross the shadow boundary on its own.
-    for (const [dialogEl, segment] of /** @type {[any, import('../../lib/router.ts').PokemonDialog][]} */ ([
+    for (const [dialogEl, segment] of [
       [this.$natureDialog, 'nature'],
       [this.$levelDialog, 'level'],
       [this.$ivDialog, 'ivs'],
       [this.$itemsDialog, 'items'],
       [this.$competitiveDialog, 'competitive'],
       [this.$trainingGuideDialog, 'training-guide'],
-    ])) {
+    ] as [any, PokemonDialog][]) {
       dialogEl.addEventListener('close', () => this._syncRouteOnClose(segment));
     }
 
@@ -424,10 +453,10 @@ export class PokemonDetail extends HTMLElement {
       menu: this.$moreMenu,
       itemSelector: '.more-menu-item',
       boundary: this.$moreBtnWrap,
-      activeRoot: this.shadowRoot,
+      activeRoot: this.shadowRoot!,
     });
     this.$moreMenu.addEventListener('click', (e) => {
-      const item = /** @type {HTMLElement} */ (e.target).closest('.more-menu-item');
+      const item = (e.target as HTMLElement).closest<HTMLElement>('.more-menu-item');
       if (!item) return;
       setMoreMenuOpen(false);
       if (item.dataset.open === 'ivs') this._navigateToDialog('ivs');
@@ -457,44 +486,47 @@ export class PokemonDetail extends HTMLElement {
     });
     this.$itemBtn.addEventListener('click', () => this._navigateToDialog('items'));
     this.$search.addEventListener('pokemon-pick', (e) => {
-      this._battle(e.detail.name, 'Looking up battle data…');
+      this._battle((e as CustomEvent).detail.name, 'Looking up battle data…');
     });
     this.$histLog.addEventListener('redefeat', (e) => {
       // Already knows the opponent's name — no need to open the search at
       // all, just the always-on-page status line.
-      this._battle(e.detail.name, `Re-logging battle vs ${titleCase(e.detail.name)}…`);
+      const name = (e as CustomEvent).detail.name;
+      this._battle(name, `Re-logging battle vs ${titleCase(name)}…`);
     });
     // Already knows the opponent's name — no search UI needed, just the
     // always-on-page status line. training-guide.js already closes
     // itself before dispatching this.
-    this.$trainingGuideDialog.addEventListener('spot-pick', (e) => {
+    this.$trainingGuideDialog.addEventListener('spot-pick', (e: CustomEvent) => {
       this._battle(e.detail.name, `Logging battle vs ${titleCase(e.detail.name)}…`);
     });
   }
 
-  /** @param {import('../../lib/router.ts').PokemonDialog} segment */
-  _navigateToDialog(segment) {
+  _navigateToDialog(segment: PokemonDialog): void {
     const partySlug = store.activeParty?.slug;
     if (partySlug && this._entry) router.navigateToPokemonDialog(partySlug, this._entry.uid, segment);
   }
 
-  /** @param {import('../../lib/router.ts').PokemonDialog} segment */
-  _syncRouteOnClose(segment) {
+  _syncRouteOnClose(segment: PokemonDialog): void {
     const route = router.currentRoute();
-    if (route.pokemonDialog === segment) router.navigateToPokemon(route.partySlug, route.pokemonUid);
+    if (route.pokemonDialog === segment && route.partySlug && route.pokemonUid) {
+      router.navigateToPokemon(route.partySlug, route.pokemonUid);
+    }
   }
 
   /** Removing a Pokémon from the roster is destructive and irreversible, so it's gated behind a native confirm() with no dialog of its own. */
-  _removePokemon() {
-    const label = titleCase(this._entry.nickname || this._entry.speciesName);
-    if (confirm(`Remove ${label}? Its EV log will be deleted.`)) store.removePokemon(this._entry.uid);
+  _removePokemon(): void {
+    const e = this._entry;
+    if (!e) return;
+    const label = titleCase(e.nickname || e.speciesName);
+    if (confirm(`Remove ${label}? Its EV log will be deleted.`)) store.removePokemon(e.uid);
   }
 
-  set entry(e) {
+  set entry(e: RosterEntry | null) {
     this._entry = e;
     this._render();
   }
-  get entry() {
+  get entry(): RosterEntry | null {
     return this._entry;
   }
 
@@ -506,17 +538,15 @@ export class PokemonDetail extends HTMLElement {
    * components/pages/parties/pokemon/pokemon.js's `render()`.
    * `PokeApiClient`'s own cache (docs/adr/0001) makes recomputing this on
    * every render cheap after the first lookup.
-   * @param {import('../../lib/store.ts').Party|null} p
    */
-  set party(p) {
+  set party(p: Party | null) {
     const token = ++this._allowedSpeciesToken;
     availableSpeciesFor(p, api).then((allowed) => {
       if (token === this._allowedSpeciesToken) this.$search.allowedSpecies = allowed;
     });
   }
 
-  /** @param {import('../../lib/router.ts').PokemonDialog} segment @returns {any} */
-  _dialogFor(segment) {
+  _dialogFor(segment: PokemonDialog): any {
     return {
       nature: this.$natureDialog,
       level: this.$levelDialog,
@@ -528,8 +558,8 @@ export class PokemonDetail extends HTMLElement {
   }
 
   /** Closes whichever of the six dialogs is open — a harmless no-op if none are. */
-  closeDialogs() {
-    for (const segment of /** @type {import('../../lib/router.ts').PokemonDialog[]} */ (['nature', 'level', 'ivs', 'items', 'competitive', 'training-guide'])) {
+  closeDialogs(): void {
+    for (const segment of ['nature', 'level', 'ivs', 'items', 'competitive', 'training-guide'] as PokemonDialog[]) {
       this._dialogFor(segment).close();
     }
     this._openSegment = null;
@@ -544,27 +574,26 @@ export class PokemonDetail extends HTMLElement {
    * unrelated store change) doesn't close-then-reopen the same one —
    * `showModal()` throws on an already-open `<dialog>`, and closing an
    * in-progress edit out from under the user would discard it.
-   * @param {import('../../lib/router.ts').PokemonDialog|null} segment
    */
-  syncDialog(segment) {
+  syncDialog(segment: PokemonDialog | null): void {
     if (segment === this._openSegment) return;
     this.closeDialogs();
     this._openSegment = segment;
     if (segment) this._dialogFor(segment).open();
   }
 
-  async _battle(name, statusText) {
+  async _battle(name: string, statusText: string): Promise<void> {
     this.$battleStatus.textContent = statusText;
     try {
       const mon = await api.getPokemon(name);
-      store.logBattle(this._entry.uid, mon);
+      if (this._entry) store.logBattle(this._entry.uid, mon);
       this.$battleStatus.textContent = '';
     } catch (err) {
-      this.$battleStatus.textContent = err.message || 'Could not log that battle.';
+      this.$battleStatus.textContent = (err instanceof Error && err.message) || 'Could not log that battle.';
     }
   }
 
-  _render() {
+  _render(): void {
     const e = this._entry;
     if (!e) return;
     const modernSprite = e.sprite || FALLBACK_SPRITE;
@@ -588,7 +617,7 @@ export class PokemonDetail extends HTMLElement {
     const natureAvailable = store.natureAvailable();
     this.$natureDialog.entry = e;
     this.$levelDialog.entry = e;
-    const nature = natureAvailable ? NATURES.find((n) => n.id === e.nature) : null;
+    const nature = natureAvailable ? NATURES.find((n) => n.id === e.nature) ?? null : null;
     this._renderNatureBadge(nature, natureAvailable);
     this._renderItemBadge(e);
     // Only relevant while this Pokémon actually holds an Exp. Share.
@@ -611,8 +640,9 @@ export class PokemonDetail extends HTMLElement {
     // Null (blank) under Stat Experience (Gen I/II — store.actualStat
     // doesn't attempt that era's own rounding) or wherever this stat's
     // IV isn't known yet, same as store.actualStat's own contract.
-    this.$evSummary.actualStats = e.baseStats
-      ? Object.fromEntries(STATS.map(({ key }) => [key, store.actualStat(e, key, e.baseStats[key])]))
+    const bs = e.baseStats;
+    this.$evSummary.actualStats = bs
+      ? (Object.fromEntries(STATS.map(({ key }) => [key, store.actualStat(e, key, bs[key])] as [StatKey, number | null])) as Record<StatKey, number | null>)
       : null;
     this.$evSummary.nature = nature;
     this.$evSummary.statCap = store.statCap();
@@ -652,7 +682,7 @@ export class PokemonDetail extends HTMLElement {
   // .held-item-btn's "the badge is the trigger" pattern. Unlike the
   // held-item badge, an unset nature still needs a visible, tappable
   // "Set nature" — there'd otherwise be no way to ever set one.
-  _renderNatureBadge(nature, natureAvailable) {
+  _renderNatureBadge(nature: Nature | null, natureAvailable: boolean): void {
     this.$natureBtn.hidden = !natureAvailable;
     if (!natureAvailable) return;
     this.$natureBtn.classList.toggle('nature-btn--empty', !nature);
@@ -676,11 +706,11 @@ export class PokemonDetail extends HTMLElement {
   // that isn't granted. Pre-Gen III, where holding an item isn't a
   // mechanic at all, falls back to the dialog's own generic "Items"
   // label instead of a misleading "No item".
-  _renderItemBadge(e) {
+  _renderItemBadge(e: RosterEntry): void {
     this.$itemBtn.hidden = false;
     const aids = store.effectiveAids(e);
-    let sprite = null;
-    let label;
+    let sprite: string | null = null;
+    let label: string | undefined;
     let empty = true;
     if (e.expShare) {
       sprite = EXP_SHARE_SPRITE;
@@ -708,6 +738,5 @@ export class PokemonDetail extends HTMLElement {
     this.$itemBtnSprite.src = sprite || '';
     this.$itemBtnLabel.textContent = label;
   }
-
 }
 customElements.define('pokemon-detail', PokemonDetail);
