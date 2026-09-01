@@ -1,9 +1,7 @@
-// @ts-check
 // Party roster ("/parties/<slug>") — the active party's identity header,
 // the add panel (species search -> add-Pokémon dialog), the per-game
-// rules legend, and the roster itself: summary rows linking to each
-// Pokémon's own detail page. Rebuilt from scratch on every render, same
-// pattern as the picker (see docs/adr/0002, point 5).
+// rules legend, and the roster itself. Rebuilt from scratch on every
+// render, same pattern as the picker (see docs/adr/0002, point 5).
 
 import {
   STAT_CAP,
@@ -36,51 +34,47 @@ import '../../atoms/game-ball.ts';
 import '../../organisms/pokemon-search.ts';
 import '../../atoms/ev-bar.ts';
 import '../../atoms/level-input.ts';
+import type { Party, RosterEntry } from '../../../lib/store.ts';
 
-export const view = document.getElementById('party-view');
-const backToParties = document.getElementById('back-to-parties');
-const activePartyName = document.getElementById('active-party-name');
-const activePartyGame = document.getElementById('active-party-game');
-const activePartyGameCart = activePartyGame.querySelector('game-ball');
-const activePartyGameLabel = document.getElementById('active-party-game-label');
-const activePartyDescription = document.getElementById('active-party-description');
-const editPartyBtn = document.getElementById('edit-party-btn');
+export const view = document.getElementById('party-view')!;
+const backToParties = document.getElementById('back-to-parties') as HTMLAnchorElement;
+const activePartyName = document.getElementById('active-party-name')!;
+const activePartyGame = document.getElementById('active-party-game')!;
+const activePartyGameCart = activePartyGame.querySelector('game-ball')!;
+const activePartyGameLabel = document.getElementById('active-party-game-label')!;
+const activePartyDescription = document.getElementById('active-party-description')!;
+const editPartyBtn = document.getElementById('edit-party-btn')!;
 
-const addSearch = document.getElementById('add-search');
-const addStatus = document.getElementById('add-status');
-const roster = document.getElementById('roster');
-const emptyState = document.getElementById('empty-state');
-const rosterToolbar = document.getElementById('roster-toolbar');
-const rosterSearchInput = document.getElementById('roster-search');
-const rosterSortSelect = document.getElementById('roster-sort');
-const rosterNoResults = document.getElementById('roster-no-results');
-const rosterFilterBtn = document.getElementById('roster-filter-btn');
-const rosterFilterDialog = document.getElementById('roster-filter-dialog');
-const rosterFilterDialogClose = document.getElementById('roster-filter-dialog-close');
-const rosterFilterCount = document.getElementById('roster-filter-count');
-const rosterFilterLevelMin = /** @type {HTMLInputElement} */ (document.getElementById('roster-filter-level-min'));
-const rosterFilterLevelMax = /** @type {HTMLInputElement} */ (document.getElementById('roster-filter-level-max'));
-const rosterFilterExpShare = document.getElementById('roster-filter-exp-share');
-const rosterFilterPokerus = document.getElementById('roster-filter-pokerus');
-const rosterFilterTrainedGroup = document.getElementById('roster-filter-trained-group');
-const rosterFilterTrainedRadios = [...document.getElementsByName('roster-filter-trained')];
-const rosterFilterItemRow = document.getElementById('roster-filter-item-row');
-const rosterFilterItem = document.getElementById('roster-filter-item');
-const rosterFilterNatureField = document.getElementById('roster-filter-nature-field');
-const rosterFilterNature = /** @type {HTMLSelectElement} */ (document.getElementById('roster-filter-nature'));
-const rosterFilterClear = document.getElementById('roster-filter-clear');
-const rosterFilterDone = document.getElementById('roster-filter-done');
-const rosterFilterDoneCount = document.getElementById('roster-filter-done-count');
+const addSearch = document.getElementById('add-search') as import('../../organisms/pokemon-search.ts').PokemonSearch;
+const addStatus = document.getElementById('add-status')!;
+const roster = document.getElementById('roster')!;
+const emptyState = document.getElementById('empty-state')!;
+const rosterToolbar = document.getElementById('roster-toolbar')!;
+const rosterSearchInput = document.getElementById('roster-search') as HTMLInputElement;
+const rosterSortSelect = document.getElementById('roster-sort') as HTMLSelectElement;
+const rosterNoResults = document.getElementById('roster-no-results')!;
+const rosterFilterBtn = document.getElementById('roster-filter-btn')!;
+const rosterFilterDialog = document.getElementById('roster-filter-dialog') as HTMLDialogElement;
+const rosterFilterDialogClose = document.getElementById('roster-filter-dialog-close')!;
+const rosterFilterCount = document.getElementById('roster-filter-count')!;
+const rosterFilterLevelMin = document.getElementById('roster-filter-level-min') as HTMLInputElement;
+const rosterFilterLevelMax = document.getElementById('roster-filter-level-max') as HTMLInputElement;
+const rosterFilterExpShare = document.getElementById('roster-filter-exp-share')!;
+const rosterFilterPokerus = document.getElementById('roster-filter-pokerus')!;
+const rosterFilterTrainedGroup = document.getElementById('roster-filter-trained-group')!;
+const rosterFilterTrainedRadios = [...document.getElementsByName('roster-filter-trained')] as HTMLInputElement[];
+const rosterFilterItemRow = document.getElementById('roster-filter-item-row')!;
+const rosterFilterItem = document.getElementById('roster-filter-item')!;
+const rosterFilterNatureField = document.getElementById('roster-filter-nature-field')!;
+const rosterFilterNature = document.getElementById('roster-filter-nature') as HTMLSelectElement;
+const rosterFilterClear = document.getElementById('roster-filter-clear')!;
+const rosterFilterDone = document.getElementById('roster-filter-done')!;
+const rosterFilterDoneCount = document.getElementById('roster-filter-done-count')!;
 
-// Populated once — same icons the detail page's own Pokérus/Exp. Share/
-// Macho Brace controls use, so each filter reads as "the same thing"
-// wherever it shows up. Macho Brace stands in as the generic "a training
-// item is held" glyph — there's no single icon for "Power item or Macho
-// Brace", and it's the training item every generation this filter can
-// apply to (Gen III+) recognizes.
-document.getElementById('roster-filter-pokerus-icon').innerHTML = POKERUS_ICON_SVG;
-/** @type {HTMLImageElement} */ (document.getElementById('roster-filter-exp-share-icon')).src = EXP_SHARE_SPRITE;
-/** @type {HTMLImageElement} */ (document.getElementById('roster-filter-item-icon')).src = MACHO_BRACE_SPRITE;
+// Populated once — same icons the detail page's own controls use.
+document.getElementById('roster-filter-pokerus-icon')!.innerHTML = POKERUS_ICON_SVG;
+(document.getElementById('roster-filter-exp-share-icon') as HTMLImageElement).src = EXP_SHARE_SPRITE;
+(document.getElementById('roster-filter-item-icon') as HTMLImageElement).src = MACHO_BRACE_SPRITE;
 rosterFilterLevelMin.min = rosterFilterLevelMax.min = String(MIN_LEVEL);
 rosterFilterLevelMin.max = rosterFilterLevelMax.max = String(MAX_LEVEL);
 rosterFilterNature.innerHTML =
@@ -89,50 +83,43 @@ rosterFilterNature.innerHTML =
     .map((n) => `<option value="${n.id}">${natureLabel(n)}</option>`)
     .join('');
 
-const addDialog = document.getElementById('add-pokemon-dialog');
-const addForm = document.getElementById('add-pokemon-form');
-const addDialogTitle = document.getElementById('add-pokemon-dialog-title');
-const addDialogSprite = document.getElementById('add-pokemon-dialog-sprite');
-const addDialogName = document.getElementById('add-pokemon-dialog-name');
-const addDialogStatus = document.getElementById('add-pokemon-dialog-status');
-const addDialogLevel = document.getElementById('add-pokemon-dialog-level');
-const addDialogNatureField = document.getElementById('add-pokemon-dialog-nature-field');
-const addDialogNature = document.getElementById('add-pokemon-dialog-nature');
-const addDialogSubmitBtn = document.getElementById('add-pokemon-dialog-submit-btn');
-const addDialogCancelBtn = document.getElementById('add-pokemon-dialog-cancel-btn');
+const addDialog = document.getElementById('add-pokemon-dialog') as HTMLDialogElement;
+const addForm = document.getElementById('add-pokemon-form') as HTMLFormElement;
+const addDialogTitle = document.getElementById('add-pokemon-dialog-title')!;
+const addDialogSprite = document.getElementById('add-pokemon-dialog-sprite') as HTMLImageElement;
+const addDialogName = document.getElementById('add-pokemon-dialog-name')!;
+const addDialogStatus = document.getElementById('add-pokemon-dialog-status')!;
+const addDialogLevel = document.getElementById('add-pokemon-dialog-level') as import('../../atoms/level-input.ts').LevelInput;
+const addDialogNatureField = document.getElementById('add-pokemon-dialog-nature-field')!;
+const addDialogNature = document.getElementById('add-pokemon-dialog-nature') as HTMLSelectElement;
+const addDialogSubmitBtn = document.getElementById('add-pokemon-dialog-submit-btn') as HTMLButtonElement;
+const addDialogCancelBtn = document.getElementById('add-pokemon-dialog-cancel-btn')!;
 
-// Populated once — the nature list doesn't depend on species or game
-// version. Same shared markup the detail card's picker uses.
+// Populated once — the nature list doesn't depend on species or game version.
 addDialogNature.innerHTML = natureOptionsHtml();
 
 const addDialogSpriteFallback = wireSpriteFallback(addDialogSprite);
 
 backToParties.href = router.partyPath(null);
 interceptLinkClick(backToParties, () => router.navigateHome());
-// Navigates to "/parties/<slug>/edit" rather than opening the dialog
-// directly — app.js dispatches to party-dialog.js's openEditDialog() in
-// response to that route (docs/adr/0008 point 3).
-editPartyBtn.addEventListener('click', () => router.navigateToPartyEdit(store.activeParty.slug));
+// Navigates to "/parties/<slug>/edit" rather than opening the dialog directly.
+editPartyBtn.addEventListener('click', () => {
+  const slug = store.activeParty?.slug;
+  if (slug) router.navigateToPartyEdit(slug);
+});
 
 /* ------------------------------------------------------------------ */
 /* Add panel                                                           */
 /* ------------------------------------------------------------------ */
 
-// Picking a species opens a modal (sprite, a level field) rather than
-// adding it immediately — level is decided at add time, not fixed to
-// DEFAULT_LEVEL, since that's when the user actually knows it. EV yield
-// isn't shown here: it doesn't matter until the Pokémon is trained.
-let pendingAddMon = null;
+let pendingAddMon: import('../../../lib/pokeapi-client.ts').DomainPokemon | null = null;
 
-// Guards against a stale lookup: open the dialog for a slow-loading
-// species, cancel, open it for another — without the token check, the
-// first fetch resolving late would overwrite the second dialog's sprite
-// and pendingAddMon, so submitting would add the wrong species.
+// Guards against a stale lookup landing after a cancel/re-open.
 let addDialogToken = 0;
 
-addSearch.addEventListener('pokemon-pick', (e) => openAddPokemonDialog(e.detail.name));
+addSearch.addEventListener('pokemon-pick', (e) => openAddPokemonDialog((e as CustomEvent).detail.name));
 
-async function openAddPokemonDialog(name) {
+async function openAddPokemonDialog(name: string): Promise<void> {
   const token = ++addDialogToken;
   pendingAddMon = null;
   addDialogTitle.textContent = `Add ${titleCase(name)}`;
@@ -159,42 +146,34 @@ async function openAddPokemonDialog(name) {
     addDialogLevel.select();
   } catch (err) {
     if (token !== addDialogToken) return;
-    addDialogStatus.textContent = err.message || 'Could not look up that Pokémon.';
+    addDialogStatus.textContent = (err instanceof Error && err.message) || 'Could not look up that Pokémon.';
   }
 }
 
 addDialogCancelBtn.addEventListener('click', () => addDialog.close());
 
-// A native <dialog> doesn't close on a backdrop click by default — this
-// was missing entirely before (Escape already works natively; Cancel/✕
-// are wired explicitly). Same pattern components/atoms/base-dialog.js's
-// own dialogs (and now components/pages/parties/party-dialog.js) use.
+// A native <dialog> doesn't close on a backdrop click by default.
 addDialog.addEventListener('click', (e) => {
   if (e.target === addDialog) addDialog.close();
 });
 
 // A <dialog> closing restores focus to whatever was focused when it
-// opened — here, addSearch's input, since that's what the pick that
-// opened this dialog left focused. Left alone, that refocus re-opens
-// the suggestions dropdown (or the mobile full-screen sheet) right
-// after every add. One 'close' listener covers every path this
-// dialog can close by: submit, Cancel, Esc, and backdrop click.
+// opened — here, addSearch's input. Left alone, that refocus re-opens
+// the suggestions dropdown right after every add.
 addDialog.addEventListener('close', () => addSearch.blur());
 
-let addStatusTimer = null;
+let addStatusTimer: ReturnType<typeof setTimeout> | undefined;
 
 addForm.addEventListener('submit', (e) => {
   e.preventDefault();
   if (!pendingAddMon) return;
   const mon = pendingAddMon;
-  store.addPokemon(mon, addDialogLevel.value, addDialogNature.value || null);
+  store.addPokemon(mon, Number(addDialogLevel.value), addDialogNature.value || null);
   addDialog.close();
   addStatus.textContent = `Added ${titleCase(mon.name)}!`;
-  // Warm the evolution-chain cache now, so its detail page's Evolve
-  // button doesn't have to wait on (or be offline-blocked by) a fetch.
+  // Warm the evolution-chain cache now.
   api.getEvolutionOptions(mon.name).catch(() => {});
-  // Restart (not stack) the toast timer, so adding twice quickly
-  // doesn't let the first timer wipe the second message early.
+  // Restart (not stack) the toast timer.
   clearTimeout(addStatusTimer);
   addStatusTimer = setTimeout(() => {
     addStatus.textContent = '';
@@ -205,43 +184,32 @@ addForm.addEventListener('submit', (e) => {
 /* Roster rows — link to each Pokémon's own detail page                */
 /* ------------------------------------------------------------------ */
 
-// Keyed by <select id="roster-sort">'s option values. 'add' is a no-op
-// since `party.pokemon` is already append-ordered (see render()'s
-// addSearch.recent comment, and store.reorderPokemon) — that's the
-// roster's long-standing default order, add-order or manually
-// reordered alike, so leave it alone rather than re-sort it.
-const ROSTER_SORTS = {
+const ROSTER_SORTS: Record<string, (entries: RosterEntry[]) => RosterEntry[]> = {
   add: (entries) => entries,
   name: (entries) =>
-    [...entries].sort((a, b) =>
-      (a.nickname || a.speciesName).localeCompare(b.nickname || b.speciesName)
-    ),
+    [...entries].sort((a, b) => (a.nickname || a.speciesName).localeCompare(b.nickname || b.speciesName)),
   level: (entries) => [...entries].sort((a, b) => b.level - a.level),
   evs: (entries) => [...entries].sort((a, b) => totalEvs(b.evs) - totalEvs(a.evs)),
 };
 
-function matchesRosterQuery(entry, query) {
+function matchesRosterQuery(entry: RosterEntry, query: string): boolean {
   if (!query) return true;
   return (
-    (entry.nickname && entry.nickname.toLowerCase().includes(query)) ||
+    (!!entry.nickname && entry.nickname.toLowerCase().includes(query)) ||
     entry.speciesName.toLowerCase().includes(query)
   );
 }
 
-// Pokérus/Exp. Share are .ds-item-btn toggles, not checkboxes — same
-// pressed-state convention as the detail page's own Pokérus/Exp. Share
-// toggles (components/organisms/pokemon-detail.js).
-function isToggleActive(btn) {
+// Pokérus/Exp. Share are .ds-item-btn toggles, not checkboxes.
+function isToggleActive(btn: HTMLElement): boolean {
   return btn.getAttribute('aria-pressed') === 'true';
 }
-function setToggleActive(btn, active) {
+function setToggleActive(btn: HTMLElement, active: boolean): void {
   btn.setAttribute('aria-pressed', String(active));
   btn.classList.toggle('ds-item-btn--active', active);
 }
 
-/** Reads the filter panel's controls into a plain object — called fresh
- * each render rather than cached, since the controls are the source of
- * truth (same reasoning as reading rosterSearchInput.value directly). */
+/** Reads the filter panel's controls into a plain object — called fresh each render. */
 function readRosterFilters() {
   return {
     levelMin: rosterFilterLevelMin.value ? Number(rosterFilterLevelMin.value) : null,
@@ -254,7 +222,11 @@ function readRosterFilters() {
   };
 }
 
-function matchesRosterFilters(entry, filters, totalCap) {
+function matchesRosterFilters(
+  entry: RosterEntry,
+  filters: ReturnType<typeof readRosterFilters>,
+  totalCap: number | null
+): boolean {
   if (filters.levelMin != null && entry.level < filters.levelMin) return false;
   if (filters.levelMax != null && entry.level > filters.levelMax) return false;
   if (filters.expShare && !entry.expShare) return false;
@@ -273,15 +245,14 @@ function matchesRosterFilters(entry, filters, totalCap) {
 }
 
 // The roster's search/sort/filter picks round-trip through the URL's
-// query string (ADR 0013) — reloading or sharing a link lands back on
-// the same view instead of the roster's bare defaults.
+// query string (ADR 0013).
 const ROSTER_SORT_VALUES = ['add', 'name', 'level', 'evs'];
 const ROSTER_TRAINED_VALUES = ['all', 'trained', 'training'];
 
 function readRosterStateFromQuery() {
   const params = new URLSearchParams(window.location.search);
-  const sort = params.get('sort');
-  const trained = params.get('trained');
+  const sort = params.get('sort') ?? '';
+  const trained = params.get('trained') ?? '';
   const levelMin = Number(params.get('levelMin'));
   const levelMax = Number(params.get('levelMax'));
   return {
@@ -298,7 +269,7 @@ function readRosterStateFromQuery() {
   };
 }
 
-function writeRosterStateToQuery() {
+function writeRosterStateToQuery(): void {
   const params = new URLSearchParams();
   const q = rosterSearchInput.value.trim();
   if (q) params.set('q', q);
@@ -314,18 +285,15 @@ function writeRosterStateToQuery() {
   if (rosterFilterDialog.open) params.set('filterOpen', '1');
   const qs = params.toString();
   const url = `${window.location.pathname}${qs ? `?${qs}` : ''}${window.location.hash}`;
-  // replaceState, not pushState: every keystroke/toggle shouldn't grow
-  // browser history — only actual navigation (lib/router.js) should.
+  // replaceState, not pushState: every keystroke/toggle shouldn't grow history.
   history.replaceState(null, '', url);
 }
 
-// Restricts addSearch's suggestions to species actually reachable in the
-// active party's generation — GitHub issue #31. Keyed by a signature so
-// the frequent, keystroke-driven renderRoster() calls (search/filter
-// inputs) don't re-derive this on every call; only an actual
-// party/game/override change does.
-let addSearchAllowedFor = null;
-function refreshAddSearchAllowedSpecies(party) {
+// Restricts addSearch's suggestions to species reachable in the active
+// party's generation — GitHub issue #31. Keyed by a signature so the
+// keystroke-driven renderRoster() calls don't re-derive this every time.
+let addSearchAllowedFor: string | null = null;
+function refreshAddSearchAllowedSpecies(party: Party): void {
   const signature = `${party.id}|${party.baseGame}|${party.overrides?.availableGeneration ?? ''}`;
   if (signature === addSearchAllowedFor) return;
   addSearchAllowedFor = signature;
@@ -334,11 +302,8 @@ function refreshAddSearchAllowedSpecies(party) {
   });
 }
 
-function renderRoster(party) {
+function renderRoster(party: Party): void {
   refreshAddSearchAllowedSpecies(party);
-  // Hide filter options a party's game version makes meaningless, same
-  // gating the rules legend below uses — an always-empty filter reads as
-  // broken, not as "nothing matches."
   const totalCap = store.totalCap();
   const { machoBrace, powerItems } = store.trainingItemAvailability();
   rosterFilterTrainedGroup.hidden = totalCap == null;
@@ -376,27 +341,19 @@ function renderRoster(party) {
   const natureAvailable = store.natureAvailable();
   const spriteGame = store.spriteBaseGame();
   // Dragging to reorder only makes sense against the roster's own array
-  // order with nothing hiding or re-sorting it — otherwise a card's
-  // on-screen position wouldn't map onto a stable index to move it to.
+  // order with nothing hiding or re-sorting it.
   const reorderable = rosterSortSelect.value === 'add' && entries.length === party.pokemon.length;
   for (const entry of entries) {
-    const trained = store.isFullyTrained(entry); // 510 total, or every stat maxed under Stat Exp
+    const trained = store.isFullyTrained(entry);
     const pokerusActive = store.effectiveAids(entry).pokerus;
-    // "Adamant Fangs McGee" (nickname) or plain "Slowpoke" (no nickname)
-    // — same nature-prefix convention as the detail page's title, minus
-    // its Dex number (no room for it at this card's width).
     const nature = natureAvailable ? NATURES.find((n) => n.id === entry.nature) : null;
     const displayName = entry.nickname || titleCase(entry.speciesName);
     const namePrefix = nature ? `${escapeHtml(nature.label)} ` : '';
-    // The species name is only worth a second mention when a nickname
-    // is hiding it — same rule as the detail header.
     const speciesAside = entry.nickname ? ` &middot; ${escapeHtml(titleCase(entry.speciesName))}` : '';
     const modernSprite = entry.sprite || FALLBACK_SPRITE;
     const versionedSprite = versionedSpriteUrl(spriteGame, entry.speciesId);
     const spriteSrc = versionedSprite || modernSprite;
     const spriteOnError = versionedSprite ? versionedSpriteOnError(modernSprite) : FALLBACK_ONERROR;
-    // Gen I/II sprites have an opaque white background — the fully-trained
-    // halo boxes them instead of tracing a silhouette (see styles.css).
     const spriteOpaque = !!versionedSprite && versionedSpriteIsOpaque(spriteGame);
 
     const row = document.createElement('div');
@@ -419,21 +376,21 @@ function renderRoster(party) {
         <ev-bar class="roster-card-evbar"></ev-bar>
       </a>
     `;
-    const link = row.querySelector('.roster-card-link');
-    const evBar = row.querySelector('ev-bar');
+    const link = row.querySelector<HTMLElement>('.roster-card-link')!;
+    const evBar = row.querySelector('ev-bar')!;
     evBar.hidden = totalCap == null;
-    evBar.max = totalCap;
+    evBar.max = totalCap ?? 0;
     evBar.value = totalEvs(entry.evs);
     interceptLinkClick(link, () => router.navigateToPokemon(party.slug, entry.uid));
     if (reorderable) {
       wireDragHandle({
-        handle: row.querySelector('.roster-card-handle'),
+        handle: row.querySelector<HTMLElement>('.roster-card-handle')!,
         item: row,
         container: roster,
         itemSelector: '.roster-card',
         draggingClass: 'roster-card--dragging',
         dropTargetClass: 'roster-card--drop-target',
-        onDrop: (item, endIndex) => store.reorderPokemon(item.dataset.uid, endIndex),
+        onDrop: (item, endIndex) => store.reorderPokemon((item as HTMLElement).dataset.uid ?? '', endIndex),
       });
     }
     roster.appendChild(row);
@@ -442,15 +399,13 @@ function renderRoster(party) {
 }
 
 /* ------------------------------------------------------------------ */
-/* Per-game rules legend — the add panel's cheat sheet, rendered from   */
-/* the same Store logic that actually applies these mechanics, so the   */
-/* text can never drift from the behavior again.                        */
+/* Per-game rules legend                                               */
 /* ------------------------------------------------------------------ */
 
-const trainingLegend = document.getElementById('training-legend');
+const trainingLegend = document.getElementById('training-legend')!;
 
-function renderLegend() {
-  const items = [];
+function renderLegend(): void {
+  const items: string[] = [];
   const { machoBrace, powerItems } = store.trainingItemAvailability();
   if (powerItems) {
     items.push(`<strong>Power items</strong> add a flat +${store.powerItemBonus()} EVs to one stat every battle.`);
@@ -489,7 +444,7 @@ function renderLegend() {
   trainingLegend.innerHTML = items.map((i) => `<li>${i}</li>`).join('');
 }
 
-function resetRosterFilters() {
+function resetRosterFilters(): void {
   rosterFilterLevelMin.value = '';
   rosterFilterLevelMax.value = '';
   setToggleActive(rosterFilterExpShare, false);
@@ -499,60 +454,50 @@ function resetRosterFilters() {
   rosterFilterNature.value = '';
 }
 
-// The search/sort/filter controls are static markup, not rebuilt by
-// renderRoster, so their value survives a same-party re-render (e.g.
-// adding another Pokémon while filtered) — only reset them on an
-// actual party switch.
-let currentPartySlug = null;
+// The search/sort/filter controls are static markup — only reset them
+// on an actual party switch.
+let currentPartySlug: string | null = null;
 
-rosterSearchInput.addEventListener('input', () => renderRoster(store.activeParty));
-rosterSortSelect.addEventListener('change', () => renderRoster(store.activeParty));
-rosterFilterLevelMin.addEventListener('input', () => renderRoster(store.activeParty));
-rosterFilterLevelMax.addEventListener('input', () => renderRoster(store.activeParty));
+const rerender = () => {
+  if (store.activeParty) renderRoster(store.activeParty);
+};
+rosterSearchInput.addEventListener('input', rerender);
+rosterSortSelect.addEventListener('change', rerender);
+rosterFilterLevelMin.addEventListener('input', rerender);
+rosterFilterLevelMax.addEventListener('input', rerender);
 rosterFilterExpShare.addEventListener('click', () => {
   setToggleActive(rosterFilterExpShare, !isToggleActive(rosterFilterExpShare));
-  renderRoster(store.activeParty);
+  rerender();
 });
 rosterFilterPokerus.addEventListener('click', () => {
   setToggleActive(rosterFilterPokerus, !isToggleActive(rosterFilterPokerus));
-  renderRoster(store.activeParty);
+  rerender();
 });
 for (const radio of rosterFilterTrainedRadios) {
-  radio.addEventListener('change', () => renderRoster(store.activeParty));
+  radio.addEventListener('change', rerender);
 }
 rosterFilterItem.addEventListener('click', () => {
   setToggleActive(rosterFilterItem, !isToggleActive(rosterFilterItem));
-  renderRoster(store.activeParty);
+  rerender();
 });
-rosterFilterNature.addEventListener('change', () => renderRoster(store.activeParty));
+rosterFilterNature.addEventListener('change', rerender);
 rosterFilterClear.addEventListener('click', () => {
   resetRosterFilters();
-  renderRoster(store.activeParty);
+  rerender();
 });
 rosterFilterBtn.addEventListener('click', () => {
   rosterFilterDialog.showModal();
   focusDialogStart(rosterFilterDialog);
-  // Opening alone doesn't trigger renderRoster (nothing filterable has
-  // changed yet) — without this, filterOpen only reached the URL once
-  // something inside the dialog did.
   writeRosterStateToQuery();
 });
 rosterFilterDialogClose.addEventListener('click', () => rosterFilterDialog.close());
 rosterFilterDone.addEventListener('click', () => rosterFilterDialog.close());
-// One 'close' listener covers every way the dialog can close — Done,
-// the X, Escape, and a backdrop click — same reasoning as addDialog's
-// own 'close' listener below. The dialog's own open/closed state isn't
-// touched by any of the listeners above, so it needs this hook to stay
-// synced to the URL.
 rosterFilterDialog.addEventListener('close', () => writeRosterStateToQuery());
 
-/** @param {ReturnType<typeof store.getPartyBySlug>} party */
-export function render(party) {
+export function render(party: Party): void {
   if (party.slug !== currentPartySlug) {
     // The very first render since this page loaded doubles as "did the
-    // user land here with a URL that already encodes a view" (a reload,
-    // or a shared link) — ADR 0013. Anything after that is an in-app
-    // party switch, which starts the new party's roster from scratch.
+    // user land here with a URL that already encodes a view" (ADR 0013).
     const isFreshLoad = currentPartySlug === null;
     currentPartySlug = party.slug;
     if (isFreshLoad) {
@@ -585,8 +530,7 @@ export function render(party) {
   activePartyDescription.textContent = party.description;
   renderLegend();
   renderRoster(party);
-  // Most-recently-added species first, deduped — `party.pokemon` is
-  // append-ordered, so the party's own add order is the recency order.
+  // Most-recently-added species first, deduped.
   addSearch.recent = [...party.pokemon]
     .reverse()
     .map((e) => ({ name: e.speciesName, sprite: e.sprite, id: e.speciesId }));

@@ -1,4 +1,3 @@
-// @ts-check
 // Party picker ("/parties") — every saved party as a card linking to its
 // roster. "New party" navigates to "/parties/create" rather than opening
 // the dialog directly — app.js (the composition root for routing, docs/
@@ -11,16 +10,16 @@ import * as router from '../../../lib/router.ts';
 import { interceptLinkClick } from '../../../lib/dom.ts';
 import '../../atoms/game-ball.ts';
 
-export const view = document.getElementById('picker-view');
-const partyList = document.getElementById('party-list');
-const pickerEmpty = document.getElementById('picker-empty');
-const pickerNewPartyBtn = document.getElementById('picker-new-party-btn');
-const pickerImportBtn = document.getElementById('picker-import-btn');
+export const view = document.getElementById('picker-view')!;
+const partyList = document.getElementById('party-list')!;
+const pickerEmpty = document.getElementById('picker-empty')!;
+const pickerNewPartyBtn = document.getElementById('picker-new-party-btn')!;
+const pickerImportBtn = document.getElementById('picker-import-btn')!;
 
 pickerNewPartyBtn.addEventListener('click', () => router.navigateToPartyCreate());
 pickerImportBtn.addEventListener('click', () => router.navigateToImport());
 
-export function render() {
+export function render(): void {
   const parties = store.state.parties;
   pickerEmpty.hidden = parties.length > 0;
   partyList.innerHTML = '';
@@ -44,7 +43,7 @@ export function render() {
         </div>
       </div>
     `;
-    card.querySelector('game-ball').name = party.baseGame;
+    card.querySelector('game-ball')!.name = party.baseGame;
     interceptLinkClick(card, () => router.navigateToParty(party.slug));
     partyList.appendChild(card);
   }

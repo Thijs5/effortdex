@@ -12,6 +12,6 @@
     "types": ["node"],
     "skipLibCheck": true
   },
-  "include": ["lib/**/*.js", "lib/**/*.ts", "components/**/*.ts", "e2e/**/*.js", "e2e/**/*.ts", "playwright.config.ts"],
-  "exclude": ["lib/vendor/**"]
+  "include": ["**/*.ts", "e2e/**/*.js"],
+  "exclude": ["node_modules", "dist", "lib/vendor", "test-results", "playwright-report"]
 }

@@ -1,24 +1,12 @@
-// @ts-check
 // Storage management ("/settings/cache") — the blanket "Clear cache"
-// button (moved here from Settings, which now only teases this page)
-// plus per-generation, per-game control over sw.js's sprite cache
+// button plus per-generation, per-game control over sw.js's sprite cache
 // (docs/adr/0012): warm up (or clear) exactly the titles someone cares
-// about, by hand, rather than waiting for the automatic idle-time scan
-// (docs/adr/0011) to get to them or nuking everything.
+// about, by hand.
 //
-// Nested under Settings, and *not* using lib/dom.js's
-// wireUtilityBackLink like Import (components/pages/transfer/import.js)
-// does: that helper returns to whatever party/roster content was last
-// open, which is right for pages reachable from arbitrary places — this
-// page has exactly one entry point (Settings' "Manage storage" button),
-// so its back link always targets Settings specifically, a fixed
-// destination, not "wherever you came from" (same reasoning
-// components/pages/transfer/export.js's own back link now uses, one
-// level down from the Transfer hub). Still carries Settings' own
-// "?returnTo=" through as passthrough baggage (router.navigateToCache()
-// embeds it, router.settingsReturnPath()/navigateToSettings() read it
-// back out) — otherwise a Settings -> Cache -> back round trip would
-// silently drop where the user was before they ever opened Settings.
+// Nested under Settings, and *not* using lib/dom.js's wireUtilityBackLink:
+// this page has exactly one entry point (Settings' "Manage storage"
+// button), so its back link always targets Settings specifically. Still
+// carries Settings' own "?returnTo=" through as passthrough baggage.
 
 import { interceptLinkClick } from '../../../lib/dom.ts';
 import { GAME_VERSIONS, GEN_ROMAN } from '../../../lib/game-versions.ts';
@@ -37,20 +25,17 @@ import {
 import { escapeHtml, formatBytes } from '../../../lib/utils.ts';
 import * as router from '../../../lib/router.ts';
 
-export const view = document.getElementById('cache-view');
-const backFromCache = /** @type {HTMLAnchorElement} */ (document.getElementById('back-from-cache'));
-const generationsEl = document.getElementById('sprite-cache-generations');
-const clearCacheBtn = /** @type {HTMLButtonElement} */ (document.getElementById('clear-cache-btn'));
-const clearCacheStatus = /** @type {HTMLElement} */ (document.getElementById('clear-cache-status'));
-const disableCachingInput = /** @type {HTMLInputElement} */ (document.getElementById('disable-caching-input'));
-const notifyCacheDoneInput = /** @type {HTMLInputElement} */ (document.getElementById('notify-cache-done-input'));
-const notifyCacheDoneStatus = /** @type {HTMLElement} */ (document.getElementById('notify-cache-done-status'));
+export const view = document.getElementById('cache-view')!;
+const backFromCache = document.getElementById('back-from-cache') as HTMLAnchorElement;
+const generationsEl = document.getElementById('sprite-cache-generations')!;
+const clearCacheBtn = document.getElementById('clear-cache-btn') as HTMLButtonElement;
+const clearCacheStatus = document.getElementById('clear-cache-status')!;
+const disableCachingInput = document.getElementById('disable-caching-input') as HTMLInputElement;
+const notifyCacheDoneInput = document.getElementById('notify-cache-done-input') as HTMLInputElement;
+const notifyCacheDoneStatus = document.getElementById('notify-cache-done-status')!;
 
 // Turning the checkbox on is the only moment this ever prompts for
-// permission — never on page load, and never just from `render()`
-// reflecting a previously-enabled preference. Denying (or dismissing)
-// the browser prompt leaves the preference off and explains why, rather
-// than silently reverting the checkbox with no feedback.
+// permission. Denying leaves the preference off and explains why.
 if (!isNotificationSupported()) {
   notifyCacheDoneInput.disabled = true;
   notifyCacheDoneInput.title = "Notifications aren't supported in this browser";
@@ -66,13 +51,14 @@ notifyCacheDoneInput.addEventListener('change', async () => {
   notifyCacheDoneInput.disabled = false;
   setCacheDoneNotifyEnabled(granted);
   notifyCacheDoneInput.checked = granted;
-  notifyCacheDoneStatus.textContent = granted ? '' : "Notifications are blocked — allow them for this site in your browser's settings.";
+  notifyCacheDoneStatus.textContent = granted
+    ? ''
+    : "Notifications are blocked — allow them for this site in your browser's settings.";
 });
 
-// lib/shell.js reads this same flag (lib/dev-cache.js) once, at load, to
-// decide whether to register the service worker at all — so toggling it
-// only actually takes effect on the next load, hence the reload here
-// rather than trying to register/unregister live.
+// lib/shell.js reads this flag once, at load, to decide whether to
+// register the service worker — so toggling it only takes effect on the
+// next load, hence the reload here.
 disableCachingInput.addEventListener('change', () => {
   setCachingDisabled(disableCachingInput.checked);
   window.location.reload();
@@ -81,23 +67,13 @@ disableCachingInput.addEventListener('change', () => {
 backFromCache.href = router.settingsReturnPath();
 interceptLinkClick(backFromCache, () => router.navigateToSettings());
 
-// Read once — the toggle above reloads the page on change, so this
-// can't go stale mid-session. Cache/Cache-all buttons are disabled
-// under it: lib/prefetch-service.js already refuses to do anything
-// while it's set (no service worker means nothing can actually land in
-// Cache Storage), so a clickable button here would just look broken —
-// clicks that silently do nothing. Clear stays enabled regardless:
-// clearing whatever's left over from before caching was turned off is
-// still meaningful.
+// Read once — the toggle above reloads the page on change.
 const cachingDisabled = isCachingDisabled();
 
 // Shows how much the button is about to delete, e.g. "Clear cache (3.4
-// MB)" — falls back to the plain label while the size is still being
-// computed, or if nothing is cached. Covers both stores this button
-// clears: Cache Storage (estimateCacheSize) and the localStorage-backed
-// PokéAPI cache (api.localCacheBytes) — the latter is what can quietly
-// grow large enough to block roster saves.
-async function renderClearCacheSize() {
+// MB)". Covers both stores: Cache Storage and the localStorage-backed
+// PokéAPI cache.
+async function renderClearCacheSize(): Promise<void> {
   clearCacheBtn.textContent = 'Clear cache';
   const [cacheStorage, clientCache] = await Promise.all([estimateCacheSize(), api.localCacheBytes()]);
   const total = (cacheStorage ?? 0) + (clientCache ?? 0);
@@ -107,18 +83,13 @@ async function renderClearCacheSize() {
 clearCacheBtn.addEventListener('click', async () => {
   clearCacheBtn.disabled = true;
   clearCacheStatus.textContent = 'Clearing cache… your parties and roster are untouched.';
-  // The client's own response cache (species/generation lists,
-  // per-Pokémon data — now in IndexedDB, docs/adr/0025) as well as Cache
-  // Storage; estimateCacheSize()/this button historically only covered
-  // the latter.
   await api.evictLocalCache();
   await clearAppCache();
   clearCacheStatus.textContent = 'Cache cleared — your data is safe. Reloading…';
   window.location.reload();
 });
 
-/** @param {string[]} names @returns {string} */
-function joinNames(names) {
+function joinNames(names: string[]): string {
   if (names.length <= 1) return names[0] || '';
   return `${names.slice(0, -1).join(', ')} & ${names.at(-1)}`;
 }
@@ -126,36 +97,31 @@ function joinNames(names) {
 /**
  * One row per distinct sprite pool in generation `gen` — titles that
  * share PokéAPI's own sprite folder (or share having none at all)
- * collapse into a single row, since caching/clearing one always does
- * the same to the other (lib/pokeapi-client.ts's `spriteGroupKey`).
- * @param {number} gen @returns {{ groupKey: string, games: string[] }[]} */
-function rowsForGeneration(gen) {
+ * collapse into a single row.
+ */
+function rowsForGeneration(gen: number): { groupKey: string; games: string[] }[] {
   const titles = GAME_VERSIONS.filter((g) => g.gen === gen);
-  /** @type {Map<string, string[]>} */
-  const groups = new Map();
+  const groups = new Map<string, string[]>();
   for (const title of titles) {
     const key = spriteGroupKey(title.name) || 'default';
     if (!groups.has(key)) groups.set(key, []);
-    /** @type {string[]} */ (groups.get(key)).push(title.name);
+    groups.get(key)!.push(title.name);
   }
   return [...groups.entries()].map(([groupKey, games]) => ({ groupKey, games }));
 }
 
-/** @returns {boolean} */
-function hasCacheStorage() {
+function hasCacheStorage(): boolean {
   return 'caches' in window;
 }
 
 // Reads both how many of `urls` are already cached and their total byte
-// size — one pass over the cache so a row's "42/151 sprites cached
-// (8.4 MB)" line doesn't need two separate sweeps.
-/** @param {string[]} urls @returns {Promise<{cached: number, bytes: number}>} */
-async function inspectCache(urls) {
+// size — one pass over the cache.
+async function inspectCache(urls: string[]): Promise<{ cached: number; bytes: number }> {
   if (!urls.length || !hasCacheStorage()) return { cached: 0, bytes: 0 };
   try {
     const cache = await caches.open(SPRITE_CACHE_NAME);
     const responses = await Promise.all(urls.map((u) => cache.match(u)));
-    const hits = /** @type {Response[]} */ (responses.filter(Boolean));
+    const hits = responses.filter(Boolean) as Response[];
     const sizes = await Promise.all(hits.map((r) => r.blob().then((b) => b.size)));
     return { cached: hits.length, bytes: sizes.reduce((a, b) => a + b, 0) };
   } catch {
@@ -163,8 +129,7 @@ async function inspectCache(urls) {
   }
 }
 
-/** @param {string[]} urls @returns {Promise<void>} */
-async function clearUrls(urls) {
+async function clearUrls(urls: string[]): Promise<void> {
   if (!urls.length || !hasCacheStorage()) return;
   try {
     const cache = await caches.open(SPRITE_CACHE_NAME);
@@ -174,20 +139,19 @@ async function clearUrls(urls) {
   }
 }
 
-/** @param {number} cached @param {number} total @param {number} bytes @returns {string} */
-function formatCountLine(cached, total, bytes) {
+function formatCountLine(cached: number, total: number, bytes: number): string {
   const base = `${cached} / ${total} sprites cached`;
   return cached > 0 ? `${base} (${formatBytes(bytes)})` : base;
 }
 
-/**
- * @param {{groupKey: string, games: string[]}} row
- * @param {number} gen
- * @param {(active: boolean) => void} onCachingChange
- * @returns {{ el: HTMLElement, primaryGame: string, refresh: () => Promise<{cached: number, total: number, bytes: number}|null> }}
- */
-function buildRow(row, gen, onCachingChange) {
-  const primaryGame = row.games[0]; // any title in the group resolves to the same URLs — see rowsForGeneration
+type RowResult = { cached: number; total: number; bytes: number };
+
+function buildRow(
+  row: { groupKey: string; games: string[] },
+  gen: number,
+  onCachingChange: (active: boolean) => void
+): { el: HTMLElement; primaryGame: string; refresh: () => Promise<RowResult | null> } {
+  const primaryGame = row.games[0]; // any title in the group resolves to the same URLs
   const isDefault = row.groupKey === 'default';
 
   const el = document.createElement('div');
@@ -208,17 +172,16 @@ function buildRow(row, gen, onCachingChange) {
     </div>
   `;
 
-  const countEl = /** @type {HTMLElement} */ (el.querySelector('[data-count]'));
-  const cacheBtn = /** @type {HTMLButtonElement} */ (el.querySelector('[data-action="cache"]'));
-  const clearBtn = /** @type {HTMLButtonElement} */ (el.querySelector('[data-action="clear"]'));
+  const countEl = el.querySelector<HTMLElement>('[data-count]')!;
+  const cacheBtn = el.querySelector<HTMLButtonElement>('[data-action="cache"]')!;
+  const clearBtn = el.querySelector<HTMLButtonElement>('[data-action="clear"]')!;
 
   if (cachingDisabled) {
     cacheBtn.disabled = true;
     cacheBtn.title = 'Caching is disabled — see "Developer: disable caching" below';
   }
 
-  /** @returns {Promise<{cached: number, total: number, bytes: number}|null>} */
-  async function refresh() {
+  async function refresh(): Promise<RowResult | null> {
     if (!hasCacheStorage()) {
       countEl.textContent = "Cache Storage isn't available in this browser";
       return null;
@@ -233,46 +196,26 @@ function buildRow(row, gen, onCachingChange) {
     return { cached, total: urls.length, bytes };
   }
 
-  /** @param {boolean} v */
-  function setDisabled(v) {
+  function setDisabled(v: boolean): void {
     cacheBtn.disabled = v;
     clearBtn.disabled = v;
   }
 
   // If the connection drops mid-fetch, prefetchGame/prefetchGeneration's
-  // returned promise only resolves once back online (lib/prefetch-
-  // service.js resumes automatically on reconnect) — which, if the user
-  // never reconnects while this tab stays open, could otherwise leave
-  // the button frozen on a stale "Caching… 4/151" forever with no
-  // explanation. Surface *why* it's stuck instead.
+  // returned promise only resolves once back online — surface *why* it's
+  // stuck instead of leaving the button frozen on a stale count.
   let cachingInFlight = false;
   window.addEventListener('offline', () => {
     if (cachingInFlight) cacheBtn.textContent = 'Paused — waiting for connection…';
   });
-  // Same idea for the circuit breaker (docs/adr/0012's PokéAPI fair-use
-  // addendum): several failures in a row pauses the *whole* shared
-  // queue, not just this row, so a stall here can be caused by another
-  // row/button entirely — still worth explaining rather than leaving
-  // this button looking frozen on a stale count.
   prefetchService.addEventListener('backoff', () => {
     if (cachingInFlight) cacheBtn.textContent = 'Paused — repeated errors, retrying soon…';
   });
 
-  // A "default" row's own Cache button targets the exact same species
-  // set (and exact same URLs) as this generation's "Cache all" button
-  // and the automatic background scan — routing it through
-  // prefetchGeneration rather than prefetchGame means all three share
-  // one 'auto'-tagged dedup key instead of each fetching the same
-  // sprites under their own separate key (see docs/adr/0012).
   cacheBtn.addEventListener('click', async () => {
     setDisabled(true);
     cachingInFlight = true;
     onCachingChange(true);
-    // Immediate feedback the instant the click registers, before we
-    // even know the real total — spriteUrlsForGame resolves fast (the
-    // species list is cached after the very first read, ADR 0001) but
-    // isn't instant, and a click that visibly does nothing for a moment
-    // reads as broken.
     cacheBtn.textContent = 'Caching…';
     try {
       const urls = await prefetchService.spriteUrlsForGame(primaryGame);
@@ -280,13 +223,8 @@ function buildRow(row, gen, onCachingChange) {
         cacheBtn.textContent = `Caching… 0/${urls.length}`;
         countEl.textContent = `0 / ${urls.length} sprites cached`;
       }
-      const onCacheProgress = (/** @type {{done: number, total: number}} */ { done, total }) => {
+      const onCacheProgress = ({ done, total }: { done: number; total: number }) => {
         cacheBtn.textContent = `Caching… ${done}/${total}`;
-        // Live-updates the row's own count too, not just the button —
-        // prefetch-service.js skips re-fetching a sprite that's already
-        // cached, so `done` closely tracks "now cached" in practice
-        // (the rare failure just under-counts slightly until refresh()
-        // corrects it below).
         countEl.textContent = `${done} / ${total} sprites cached`;
       };
       if (isDefault) await prefetchService.prefetchGeneration(gen, onCacheProgress);
@@ -315,10 +253,9 @@ function buildRow(row, gen, onCachingChange) {
   return { el, primaryGame, refresh };
 }
 
-/** @param {number} gen @returns {{ details: HTMLDetailsElement, refreshSummary: () => Promise<void> }} */
-function buildGeneration(gen) {
+function buildGeneration(gen: number): { details: HTMLDetailsElement; refreshSummary: () => Promise<void> } {
   const genLabel = `Generation ${GEN_ROMAN[gen - 1]}`;
-  const details = /** @type {HTMLDetailsElement} */ (document.createElement('details'));
+  const details = document.createElement('details');
   details.className = 'ds-disclosure sprite-cache-generation';
 
   const summary = document.createElement('summary');
@@ -343,14 +280,11 @@ function buildGeneration(gen) {
   }
   body.appendChild(cacheAllBtn);
 
-  // Visible in the collapsed <summary> without opening the section —
-  // "Caching…" while any row's (or this button's) own cache action is
-  // in flight, otherwise the aggregate cached/total fraction plus total
-  // byte size. A signed counter rather than a boolean since more than
-  // one row can be in flight at once.
+  // Visible in the collapsed <summary> without opening the section. A
+  // signed counter rather than a boolean since more than one row can be
+  // in flight at once.
   let busyCount = 0;
-  /** @param {boolean} active */
-  function onCachingChange(active) {
+  function onCachingChange(active: boolean): void {
     busyCount += active ? 1 : -1;
     if (busyCount > 0) {
       summaryStatus.textContent = 'Caching…';
@@ -365,11 +299,11 @@ function buildGeneration(gen) {
   for (const { el } of rows) body.appendChild(el);
   details.appendChild(body);
 
-  async function refreshSummary() {
-    if (busyCount > 0) return; // a click came in while we were about to refresh — don't clobber "Caching…"
+  async function refreshSummary(): Promise<void> {
+    if (busyCount > 0) return; // a click came in while we were about to refresh
     const results = await Promise.all(rows.map((r) => r.refresh()));
-    if (busyCount > 0) return; // same race, the other direction — something started mid-await
-    const valid = /** @type {{cached: number, total: number, bytes: number}[]} */ (results.filter(Boolean));
+    if (busyCount > 0) return; // same race, the other direction
+    const valid = results.filter(Boolean) as RowResult[];
     if (!valid.length) {
       summaryStatus.textContent = '';
       return;
@@ -393,7 +327,7 @@ function buildGeneration(gen) {
     onCachingChange(true);
     cacheAllBtn.textContent = 'Caching…';
     try {
-      await prefetchService.prefetchGeneration(gen, ({ done, total }) => {
+      await prefetchService.prefetchGeneration(gen, ({ done, total }: { done: number; total: number }) => {
         cacheAllBtn.textContent = `Caching… ${done}/${total}`;
       });
       notifyCacheDone('Effortdex', { body: `${genLabel}'s sprites are cached.` });
@@ -408,18 +342,13 @@ function buildGeneration(gen) {
   return { details, refreshSummary };
 }
 
-/** @type {{ details: HTMLDetailsElement, refreshSummary: () => Promise<void> }[]} */
-let generationBlocks = [];
+let generationBlocks: { details: HTMLDetailsElement; refreshSummary: () => Promise<void> }[] = [];
 
-export function render() {
+export function render(): void {
   backFromCache.href = router.settingsReturnPath();
   renderClearCacheSize();
   clearCacheStatus.textContent = '';
   disableCachingInput.checked = isCachingDisabled();
-  // Permission can be revoked from outside the app (browser/OS settings)
-  // between visits — reflect that, not just the stored preference, so
-  // the checkbox never shows "on" when a completed run would actually
-  // stay silent.
   notifyCacheDoneInput.checked =
     isCacheDoneNotifyEnabled() && isNotificationSupported() && Notification.permission === 'granted';
   notifyCacheDoneStatus.textContent = '';
@@ -427,13 +356,8 @@ export function render() {
     for (let gen = 1; gen <= 9; gen++) {
       const block = buildGeneration(gen);
       generationBlocks.push(block);
-      /** @type {HTMLElement} */ (generationsEl).appendChild(block.details);
+      generationsEl.appendChild(block.details);
     }
   }
-  // Every visit re-checks every generation's summary (cheap: a cached
-  // species list per generation plus local Cache Storage reads, no
-  // repeat network calls after the first) — keeps the collapsed headers
-  // honest if the cache changed elsewhere (the blanket "Clear cache"
-  // above, the automatic background scan) since last time.
   for (const block of generationBlocks) block.refreshSummary();
 }

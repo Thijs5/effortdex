@@ -14,15 +14,15 @@ import { wireDialogCloseButtons } from './lib/dom.ts';
 import * as router from './lib/router.ts';
 import './lib/shell.ts';
 import './lib/app-version.ts';
-import * as parties from './components/pages/parties/parties.js';
-import * as roster from './components/pages/parties/roster.js';
-import * as pokemon from './components/pages/parties/pokemon/pokemon.js';
-import * as partyDialog from './components/pages/parties/party-dialog.js';
-import * as settings from './components/pages/settings/settings.js';
-import * as transferHub from './components/pages/transfer/transfer.js';
-import * as transferExport from './components/pages/transfer/export.js';
-import * as spriteCache from './components/pages/settings/cache.js';
-import * as importPage from './components/pages/transfer/import.js';
+import * as parties from './components/pages/parties/parties.ts';
+import * as roster from './components/pages/parties/roster.ts';
+import * as pokemon from './components/pages/parties/pokemon/pokemon.ts';
+import * as partyDialog from './components/pages/parties/party-dialog.ts';
+import * as settings from './components/pages/settings/settings.ts';
+import * as transferHub from './components/pages/transfer/transfer.ts';
+import * as transferExport from './components/pages/transfer/export.ts';
+import * as spriteCache from './components/pages/settings/cache.ts';
+import * as importPage from './components/pages/transfer/import.ts';
 
 // Let light-DOM markup (the party dialog) use the same .ds-field/.ds-btn
 // primitives every shadow-DOM component uses — one shared stylesheet.

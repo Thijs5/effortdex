@@ -1,4 +1,3 @@
-// @ts-check
 // A single roster Pokémon's detail page ("/parties/<slug>/<uid>") — thin:
 // all the rendering lives in <pokemon-detail> itself. Its six dialogs
 // (Nature/Level/IVs/Items/Competitive/Where-to-train, this same folder)
@@ -9,17 +8,18 @@
 import * as router from '../../../../lib/router.ts';
 import { interceptLinkClick } from '../../../../lib/dom.ts';
 import '../../../organisms/pokemon-detail.ts';
+import type { Party, RosterEntry } from '../../../../lib/store.ts';
+import type { PokemonDialog } from '../../../../lib/router.ts';
 
-export const view = document.getElementById('pokemon-view');
-const backToRoster = document.getElementById('back-to-roster');
-const pokemonDetail = /** @type {any} */ (document.createElement('pokemon-detail'));
+export const view = document.getElementById('pokemon-view')!;
+const backToRoster = document.getElementById('back-to-roster') as HTMLAnchorElement;
+const pokemonDetail = document.createElement('pokemon-detail');
 view.appendChild(pokemonDetail);
 
-let backToRosterSlug = null;
+let backToRosterSlug: string | null = null;
 interceptLinkClick(backToRoster, () => router.navigateToParty(backToRosterSlug));
 
-/** @param {import('../../../../lib/store.ts').Party} party @param {object} entry @param {import('../../../../lib/router.ts').PokemonDialog|null} [dialog] */
-export function render(party, entry, dialog = null) {
+export function render(party: Party, entry: RosterEntry, dialog: PokemonDialog | null = null): void {
   backToRosterSlug = party.slug;
   backToRoster.href = router.partyPath(party.slug);
   backToRoster.textContent = `← ${party.name}`;
@@ -29,6 +29,6 @@ export function render(party, entry, dialog = null) {
 }
 
 /** Called by app.js from every route that isn't this Pokémon's own page — a harmless no-op if nothing was open. */
-export function closeDialogsIfOpen() {
+export function closeDialogsIfOpen(): void {
   pokemonDetail.syncDialog(null);
 }
