@@ -2,8 +2,8 @@
 
 ## Status
 
-Accepted. P1–P4c are merged to `main` (undeployed); P4d and P5 are
-still open.
+Accepted. P1–P4c shipped as `v1.10.0`; P4d is implemented (unshipped);
+P5 is still open.
 
 **Versioning — all minors.** Every phase carries data forward
 automatically: the one-time blob→rows import needs no user action, and
@@ -12,9 +12,10 @@ through to stay readable. So `SCHEMA_VERSION` never moves and neither
 does the SemVer major ([ADR 0009](0009-automatic-breaking-storage-migrations.md)
 §8 keeps the two aligned by convention). P1–P4c ship together as
 `v1.10.0`; P4d as `v1.11.0`. P4d makes *downgrading* to a pre-v1.10
-build lossy (it stops updating `effortdex:state`), but SemVer doesn't
-cover downgrades and neither does §8's "migration required to move
-forward" rule. A `v2.0.0` would only come from a future `DB_VERSION`
+build lossy up to the last checkpoint (`effortdex:state` is snapshotted
+on tab-hide / a 60 s interval instead of per mutation), but SemVer
+doesn't cover downgrades and neither does §8's "migration required to
+move forward" rule. A `v2.0.0` would only come from a future `DB_VERSION`
 bump that needs a real object-store migration.
 
 Amends: [ADR 0001](0001-external-data-caching.md) (the disk cache tier
@@ -273,15 +274,31 @@ app uses what `_load` salvages; malformed parties/entries →
 device B not → the same multi-device divergence as today, reconciled by
 a Transfer link ([ADR 0020](0020-transfer-hub-nested-export-import-routes.md)).
 
-**P4d (not done) — `v1.11.0`:** once P1–P4c (`v1.10.0`) have shipped
-and run clean for real users, `effortdex:state` becomes read-only
-(`state.pre-idb-backup`), then is removed a release later. This is where
-*downgrading* to a pre-v1.10 build becomes lossy, but it needs no
-forward migration and no `SCHEMA_VERSION` bump. It waits because until
-then the blob is the recovery path if a row read/write bug surfaces,
-and the `rev` reconciliation depends on it; the remaining structural
-mutations likely want targeting first so a killed transaction can't
-lose a write with no blob to fall back on.
+**P4d — `v1.11.0` (implemented):** `_save` stops writing the full
+`effortdex:state` blob on every mutation. With IndexedDB it mirrors to
+the rows (as before) and writes only a tiny `effortdex:rev` marker (the
+`rev` it just persisted). The full blob becomes a **checkpoint** —
+`Store#checkpoint()`, fired from `lib/shell.js` on `pagehide`, on
+`visibilitychange` to hidden, on a 60 s interval, and once at the end of
+`init()`. So the hot-path per-mutation full-JSON write is gone, but a
+recent, downgrade-safe snapshot of `effortdex:state` always exists.
+
+`init()` reconciles three numbers: `rows.rev` (the object stores),
+`checkpointRev` (the `effortdex:state` the constructor loaded), and the
+`effortdex:rev` marker (the last `_save` *attempt*). Rows win when
+`rows.rev >= checkpointRev`; otherwise the checkpoint is ahead (a lost
+row mirror) and heals the rows. If the marker is ahead of both, some
+mutations post-dating the last checkpoint were genuinely lost — `init()`
+fires `save-gap` so `shell.js` can warn, rather than fail silently.
+
+Without IndexedDB, `_save` still writes the full `effortdex:state` blob
+per mutation and `checkpoint()` is a no-op.
+
+*Downgrading* to a pre-v1.10 build is now lossy up to the last
+checkpoint (≤ 60 s / one tab-hide of edits), but this needs no forward
+migration and no `SCHEMA_VERSION` bump. A later release removes
+`effortdex:state` entirely once the rows have proven reliable in the
+field.
 
 ### 7. Status by phase
 
@@ -293,8 +310,8 @@ lose a write with no blob to fall back on.
 | P4a | roster shadowed into rows (blob authoritative) | done |
 | P4b | rows are the read path; `rev` reconciliation; backfill → `init()` | done |
 | P4c | targeted event writes for `_append`/`deleteHistoryEntry` | done (structural mutations still whole-roster) |
-| — | **P1–P4c ship together as `v1.10.0`** (additive, downgrade-safe) | merged, undeployed |
-| P4d | drop the blob write — **`v1.11.0`** (no migration, no `SCHEMA_VERSION` bump; downgrade becomes lossy) | deferred until v1.10.0 ships and bakes |
+| — | **P1–P4c shipped as `v1.10.0`** | released |
+| P4d | blob write leaves the hot path — becomes a pagehide/interval **checkpoint** + a `rev` marker; `init()` reconciles the three. **`v1.11.0`** (no migration, no `SCHEMA_VERSION` bump) | implemented, unshipped |
 | P5 | periodic full-snapshot backup + "Restore from backup" on the Storage page | not started |
 
 ## Consequences
