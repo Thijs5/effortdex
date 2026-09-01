@@ -2,10 +2,18 @@
 
 ## Status
 
-Accepted. Implemented through P4c on the `persistence-layer` branch
-(P1–P4c below); P4d and P5 are still open. Ships as a SemVer major when
-the branch merges (a data-shape change, per
-[ADR 0009](0009-automatic-breaking-storage-migrations.md) §1).
+Accepted. P1–P4c are merged to `main` (undeployed); P4d and P5 are
+still open.
+
+**Versioning.** P1–P4c ship as a **minor (`v1.10.0`)**: additive and
+non-destructive. `SCHEMA_VERSION` (the blob's shape) is unchanged, the
+blob is still fully dual-written on every mutation, and a downgrade to
+v1.x reads it and loses nothing. The **major (`v2.0.0`)** is **P4d** —
+dropping the blob write is the one-way door: `effortdex:state` stops
+being maintained, downgrade breaks, and `SCHEMA_VERSION` ticks (or gains
+a marker) to signal "this data can't go back", per
+[ADR 0009](0009-automatic-breaking-storage-migrations.md) §8's rule that
+a breaking storage change and a SemVer major move together.
 
 Amends: [ADR 0001](0001-external-data-caching.md) (the disk cache tier
 moves off `localStorage`), [ADR 0009](0009-automatic-breaking-storage-migrations.md)
@@ -263,13 +271,14 @@ app uses what `_load` salvages; malformed parties/entries →
 device B not → the same multi-device divergence as today, reconciled by
 a Transfer link ([ADR 0020](0020-transfer-hub-nested-export-import-routes.md)).
 
-**P4d (not done):** once P4b/P4c have shipped and run clean for real
-users, `effortdex:state` becomes read-only (`state.pre-idb-backup`),
-then is removed a release later. It waits because the blob is the
-recovery path if a row read/write bug surfaces and the `rev`
-reconciliation depends on it; the remaining structural mutations likely
-want targeting first so a killed transaction can't lose a write with no
-blob to fall back on.
+**P4d (not done) — the `v2.0.0`:** once P1–P4c (`v1.10.0`) have shipped
+and run clean for real users, `effortdex:state` becomes read-only
+(`state.pre-idb-backup`), then is removed a release later. This is the
+point downgrade breaks, so `SCHEMA_VERSION` ticks with it. It waits
+because until then the blob is the recovery path if a row read/write
+bug surfaces, and the `rev` reconciliation depends on it; the remaining
+structural mutations likely want targeting first so a killed
+transaction can't lose a write with no blob to fall back on.
 
 ### 7. Status by phase
 
@@ -281,7 +290,8 @@ blob to fall back on.
 | P4a | roster shadowed into rows (blob authoritative) | done |
 | P4b | rows are the read path; `rev` reconciliation; backfill → `init()` | done |
 | P4c | targeted event writes for `_append`/`deleteHistoryEntry` | done (structural mutations still whole-roster) |
-| P4d | drop the blob write | deferred until P4b/c ship |
+| — | **P1–P4c ship together as `v1.10.0`** (additive, downgrade-safe) | merged, undeployed |
+| P4d | drop the blob write — **`v2.0.0`**, `SCHEMA_VERSION` ticks | deferred until v1.10.0 ships and bakes |
 | P5 | periodic full-snapshot backup + "Restore from backup" on the Storage page | not started |
 
 ## Consequences
