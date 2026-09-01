@@ -313,14 +313,15 @@ test('rev reconciliation: when the blob is ahead of the rows, init() keeps the b
   const db = await freshDb();
   localStorage.clear();
 
-  // First launch: import + adopt rows (rev ends at 1 after the backfill save).
+  // First launch: import + adopt rows.
   const s1 = idbStore(db);
   await s1.init();
-  s1.createParty('P1', '', 'Emerald'); // rev bumps; mirror fires
+  s1.createParty('P1', '', 'Emerald'); // rev bumps; row mirror fires
   await new Promise((r) => setTimeout(r, 20));
+  s1.checkpoint(); // the periodic snapshot captures P1
 
-  // Simulate a mirror that never landed: blob has P1 + P2 at a higher
-  // rev, rows are still at the earlier state.
+  // Simulate a checkpoint that got ahead of the rows: it also holds P2
+  // at a higher rev, but P2's row mirror never landed.
   const blob = JSON.parse(localStorage.getItem('effortdex:state'));
   blob.parties.push({ id: 'p2', name: 'P2', description: '', baseGame: 'Emerald', overrides: {}, slug: 'p2', pokemon: [] });
   blob.rev = (blob.rev ?? 0) + 5;
@@ -342,4 +343,58 @@ test('init() with no IndexedDB deps still loads the roster from the blob', async
   const s = new Store(); // no deps
   await s.init();
   assert.equal(s.state.parties.length, 2);
+});
+
+// --- P4d: the blob write leaves the mutation hot path ---
+
+test('with IndexedDB, a mutation writes the `rev` marker but not the full blob; checkpoint() writes the blob', async () => {
+  const db = await freshDb();
+  localStorage.clear();
+
+  const s = idbStore(db);
+  await s.init();
+  const afterInit = localStorage.getItem('effortdex:state'); // init() checkpoints once
+
+  s.createParty('P', '', 'Emerald');
+  s.addPokemon({ id: 1, name: 'bulbasaur', sprite: null, baseStats: { hp: 45, atk: 49, def: 49, spa: 65, spd: 65, spe: 45 } }, 5);
+
+  assert.equal(localStorage.getItem('effortdex:state'), afterInit, 'blob not rewritten per mutation');
+  assert.equal(Number(localStorage.getItem('effortdex:rev')), s.state.rev, 'rev marker tracks each save');
+
+  s.checkpoint();
+  const blob = JSON.parse(localStorage.getItem('effortdex:state'));
+  assert.equal(blob.rev, s.state.rev);
+  assert.deepEqual(blob.parties.map((p) => p.name), ['P']);
+});
+
+test('checkpoint() is a no-op without IndexedDB (the _save path already writes the blob)', () => {
+  localStorage.clear();
+  const s = new Store(); // no deps
+  s.createParty('P', '', 'Emerald'); // _save writes effortdex:state
+  const blob = localStorage.getItem('effortdex:state');
+  s.checkpoint();
+  assert.equal(localStorage.getItem('effortdex:state'), blob, 'unchanged');
+});
+
+test('init() fires save-gap when the rev marker is ahead of both the rows and the checkpoint', async () => {
+  const db = await freshDb();
+  localStorage.clear();
+
+  const s1 = idbStore(db);
+  await s1.init();
+  s1.createParty('P1', '', 'Emerald');
+  await new Promise((r) => setTimeout(r, 20));
+  s1.checkpoint(); // checkpoint + rows both at this rev
+
+  // Simulate two more mutations whose row mirrors were lost and that
+  // never got checkpointed: only the rev marker advanced.
+  localStorage.setItem('effortdex:rev', String((s1.state.rev ?? 0) + 2));
+
+  const s2 = idbStore(db);
+  let gaps = 0;
+  s2.addEventListener('save-gap', () => gaps++);
+  await s2.init();
+  assert.equal(gaps, 1);
+  // The roster still loads — from the best copy available (the checkpoint / rows).
+  assert.deepEqual(s2.state.parties.map((p) => p.name), ['P1']);
 });
