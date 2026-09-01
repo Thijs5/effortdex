@@ -1,0 +1,26 @@
+# `npm run dev:docker` -> `docker compose watch`: builds the image,
+# starts the esbuild dev server on http://localhost:5173, and keeps the
+# container's /app in sync with the working tree. Editing lib/**,
+# components/**, app.ts, index.html or the CSS syncs the file straight
+# in (the dev server transforms it on the next request and the page
+# live-reloads); changing the lockfile rebuilds the image so `npm ci`
+# re-runs.
+services:
+  dev:
+    build: .
+    ports:
+      - "5173:5173"
+    develop:
+      watch:
+        - action: sync
+          path: .
+          target: /app
+          ignore:
+            - node_modules/
+            - dist/
+            - test-results/
+            - playwright-report/
+            - blob-report/
+            - .git/
+        - action: rebuild
+          path: package-lock.json
