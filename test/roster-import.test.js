@@ -397,4 +397,11 @@ test('init() fires save-gap when the rev marker is ahead of both the rows and th
   assert.equal(gaps, 1);
   // The roster still loads — from the best copy available (the checkpoint / rows).
   assert.deepEqual(s2.state.parties.map((p) => p.name), ['P1']);
+
+  // The marker was realigned, so a third launch does not re-nag.
+  const s3 = idbStore(db);
+  let gaps3 = 0;
+  s3.addEventListener('save-gap', () => gaps3++);
+  await s3.init();
+  assert.equal(gaps3, 0);
 });

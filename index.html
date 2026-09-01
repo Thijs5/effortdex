@@ -57,10 +57,10 @@
          write to localStorage (quota exhausted — an installed PWA can
          fill its bucket with PokéAPI cache). Warns that edits aren't
          being persisted, and points at the fix. -->
-    <div id="storage-warning" class="storage-warning" role="alert" hidden>
-      <span><strong>Storage is full &mdash; your recent changes aren't being saved.</strong>
-      Open <a href="#/settings/cache">Storage</a> and tap &ldquo;Clear cache&rdquo; to free space (your parties are safe).</span>
-    </div>
+    <!-- Text is set by lib/shell.js: a "storage full, not saving" state
+         (with the Clear-cache link) or a one-off "a recent change may
+         not have saved" notice (docs/adr/0025 P4d). -->
+    <div id="storage-warning" class="storage-warning" role="alert" hidden></div>
     <header class="bezel">
       <h1><a id="header-home-link" href="#/parties"><span class="power-led" aria-hidden="true"></span>Effort<span class="e-accent">dex</span></a></h1>
       <div class="bezel-menu">
