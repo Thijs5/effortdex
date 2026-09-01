@@ -1,7 +1,7 @@
-import { attachDesignSystem } from '../../lib/design-system.js';
-import { store } from '../../lib/services.js';
+import { attachDesignSystem } from '../../lib/design-system.ts';
+import { store } from '../../lib/services.ts';
 import { encodeTransferPayload } from '../../lib/transfer.ts';
-import { importPath } from '../../lib/router.js';
+import { importPath } from '../../lib/router.ts';
 
 // Not a hard browser limit (modern browsers handle hash-fragment URLs far
 // longer than this) — it's a heuristic for "some third-party app this

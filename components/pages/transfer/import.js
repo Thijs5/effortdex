@@ -9,7 +9,7 @@
 // link needs the same "wherever you came from" flexibility as Settings,
 // not export.js's fixed-to-parent destination.
 
-import { wireUtilityBackLink } from '../../../lib/dom.js';
+import { wireUtilityBackLink } from '../../../lib/dom.ts';
 import '../../organisms/import-review.js';
 
 export const view = document.getElementById('import-view');

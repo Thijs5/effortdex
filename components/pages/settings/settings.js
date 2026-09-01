@@ -9,9 +9,9 @@
 // Settings itself stays a short list of entry points, not a dumping
 // ground for every sub-feature's own UI.
 
-import * as router from '../../../lib/router.js';
-import { wireUtilityBackLink } from '../../../lib/dom.js';
-import { getAppVersion, hasResolvedAppVersion, onAppVersion } from '../../../lib/app-version.js';
+import * as router from '../../../lib/router.ts';
+import { wireUtilityBackLink } from '../../../lib/dom.ts';
+import { getAppVersion, hasResolvedAppVersion, onAppVersion } from '../../../lib/app-version.ts';
 import { readPreMigrationBackup } from '../../../lib/store.ts';
 
 export const view = document.getElementById('settings-view');

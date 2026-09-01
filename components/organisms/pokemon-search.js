@@ -1,7 +1,7 @@
-import { api } from '../../lib/services.js';
+import { api } from '../../lib/services.ts';
 import { titleCase, formatEvYield } from '../../lib/utils.ts';
 import { FALLBACK_SPRITE, FALLBACK_ONERROR } from '../../lib/constants.ts';
-import { attachDesignSystem } from '../../lib/design-system.js';
+import { attachDesignSystem } from '../../lib/design-system.ts';
 import { attachPointerSelection, syncActiveDescendant } from '../../lib/combobox.ts';
 
 // Narrow + coarse-pointer only, so a resized desktop window (narrow but

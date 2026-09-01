@@ -1,5 +1,5 @@
 import { GAME_VERSIONS, GEN_ROMAN, normalizeGameName } from '../../lib/game-versions.ts';
-import { attachDesignSystem } from '../../lib/design-system.js';
+import { attachDesignSystem } from '../../lib/design-system.ts';
 import { attachPointerSelection, syncActiveDescendant } from '../../lib/combobox.ts';
 
 /**

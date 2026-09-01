@@ -1,4 +1,3 @@
-// @ts-check
 // App-version awareness: version.json is a static, one-line "endpoint"
 // bumped on every release alongside sw.js's CACHE_NAME (see sw.js and
 // docs/adr/0004). Precisely speaking, getRunningVersion() is "the version
@@ -17,8 +16,7 @@
 // here needs to know about that; app updates and data migrations are
 // deliberately kept independent.
 
-/** @param {RequestInit} [opts] @returns {Promise<string|null>} */
-async function readVersion(opts) {
+async function readVersion(opts?: RequestInit): Promise<string | null> {
   try {
     const res = await fetch('version.json', opts);
     if (!res.ok) return null;
@@ -28,13 +26,11 @@ async function readVersion(opts) {
   }
 }
 
-/** @returns {Promise<string|null>} */
-export function getRunningVersion() {
+export function getRunningVersion(): Promise<string | null> {
   return readVersion();
 }
 
-/** @returns {Promise<string|null>} */
-export function fetchLatestVersion() {
+export function fetchLatestVersion(): Promise<string | null> {
   return readVersion({ cache: 'no-store' });
 }
 
@@ -43,8 +39,7 @@ export function fetchLatestVersion() {
 // user how much they're about to delete. Doesn't cover the separate
 // localStorage-backed PokeApiClient cache (lib/pokeapi-client.js), since
 // clearAppCache() doesn't touch that either.
-/** @returns {Promise<number|null>} */
-export async function estimateCacheSize() {
+export async function estimateCacheSize(): Promise<number | null> {
   if (!('caches' in window)) return null;
   const keys = await caches.keys();
   const cacheSizes = await Promise.all(
@@ -68,8 +63,7 @@ export async function estimateCacheSize() {
 // Wipes the offline app shell so the next load re-fetches everything
 // fresh, then unregisters the worker so it re-installs from scratch
 // rather than possibly re-caching what it already had.
-/** @returns {Promise<void>} */
-export async function clearAppCache() {
+export async function clearAppCache(): Promise<void> {
   if ('caches' in window) {
     const keys = await caches.keys();
     await Promise.all(keys.map((k) => caches.delete(k)));

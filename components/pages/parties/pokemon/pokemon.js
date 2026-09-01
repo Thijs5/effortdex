@@ -6,8 +6,8 @@
 // docs/adr/0023) — this module just forwards the route's own
 // `pokemonDialog` field to <pokemon-detail>'s `syncDialog()`.
 
-import * as router from '../../../../lib/router.js';
-import { interceptLinkClick } from '../../../../lib/dom.js';
+import * as router from '../../../../lib/router.ts';
+import { interceptLinkClick } from '../../../../lib/dom.ts';
 import '../../../organisms/pokemon-detail.js';
 
 export const view = document.getElementById('pokemon-view');
@@ -18,7 +18,7 @@ view.appendChild(pokemonDetail);
 let backToRosterSlug = null;
 interceptLinkClick(backToRoster, () => router.navigateToParty(backToRosterSlug));
 
-/** @param {import('../../../../lib/store.ts').Party} party @param {object} entry @param {import('../../../../lib/router.js').PokemonDialog|null} [dialog] */
+/** @param {import('../../../../lib/store.ts').Party} party @param {object} entry @param {import('../../../../lib/router.ts').PokemonDialog|null} [dialog] */
 export function render(party, entry, dialog = null) {
   backToRosterSlug = party.slug;
   backToRoster.href = router.partyPath(party.slug);

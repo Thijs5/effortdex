@@ -8,7 +8,7 @@ import assert from 'node:assert/strict';
 globalThis.location = { hostname: 'effortdex.example', pathname: '/', search: '', hash: '' };
 globalThis.document = { title: 'Effortdex' };
 
-const { trackEvent, trackPageview } = await import('../lib/goatcounter-report.js');
+const { trackEvent, trackPageview } = await import('../lib/goatcounter-report.ts');
 
 /** @type {any[]} */
 let calls;

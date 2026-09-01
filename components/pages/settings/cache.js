@@ -20,12 +20,12 @@
 // back out) — otherwise a Settings -> Cache -> back round trip would
 // silently drop where the user was before they ever opened Settings.
 
-import { interceptLinkClick } from '../../../lib/dom.js';
+import { interceptLinkClick } from '../../../lib/dom.ts';
 import { GAME_VERSIONS, GEN_ROMAN } from '../../../lib/game-versions.ts';
 import { spriteGroupKey } from '../../../lib/pokeapi-client.ts';
-import { api, prefetchService } from '../../../lib/services.js';
+import { api, prefetchService } from '../../../lib/services.ts';
 import { SPRITE_CACHE_NAME } from '../../../lib/sprite-cache.ts';
-import { clearAppCache, estimateCacheSize } from '../../../lib/version-check.js';
+import { clearAppCache, estimateCacheSize } from '../../../lib/version-check.ts';
 import { isCachingDisabled, setCachingDisabled } from '../../../lib/dev-cache.ts';
 import {
   isNotificationSupported,
@@ -35,7 +35,7 @@ import {
   notifyCacheDone,
 } from '../../../lib/notifications.ts';
 import { escapeHtml, formatBytes } from '../../../lib/utils.ts';
-import * as router from '../../../lib/router.js';
+import * as router from '../../../lib/router.ts';
 
 export const view = document.getElementById('cache-view');
 const backFromCache = /** @type {HTMLAnchorElement} */ (document.getElementById('back-from-cache'));

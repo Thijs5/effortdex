@@ -25,10 +25,10 @@
 //    success paths (they've already navigated away by the time `close`
 //    fires) instead of double-navigating.
 
-import { store, prefetchService } from '../../../lib/services.js';
-import * as router from '../../../lib/router.js';
+import { store, prefetchService } from '../../../lib/services.ts';
+import * as router from '../../../lib/router.ts';
 import { isCachingDisabled } from '../../../lib/dev-cache.ts';
-import { focusDialogStart } from '../../../lib/dom.js';
+import { focusDialogStart } from '../../../lib/dom.ts';
 import '../../atoms/game-ball.js';
 import '../../molecules/game-version-picker.js';
 

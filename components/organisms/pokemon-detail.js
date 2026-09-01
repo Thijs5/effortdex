@@ -1,12 +1,12 @@
 import { POWER_ITEMS, MACHO_BRACE_SPRITE, EXP_SHARE_SPRITE, NATURES, STATS, STAT_LABEL, MACHO_BRACE_MULTIPLIER, FALLBACK_SPRITE, FALLBACK_ONERROR } from '../../lib/constants.ts';
 import { titleCase, natureEffectHint, dayLabel } from '../../lib/utils.ts';
-import { api, store } from '../../lib/services.js';
+import { api, store } from '../../lib/services.ts';
 import { versionedSpriteUrl, versionedSpriteIsOpaque } from '../../lib/pokeapi-client.ts';
 import { availableSpeciesFor } from '../../lib/species-availability.ts';
-import { attachDesignSystem } from '../../lib/design-system.js';
+import { attachDesignSystem } from '../../lib/design-system.ts';
 import { wireSpriteFallback } from '../../lib/sprite-fallback.ts';
-import { wireDisclosureMenu } from '../../lib/dom.js';
-import * as router from '../../lib/router.js';
+import { wireDisclosureMenu } from '../../lib/dom.ts';
+import * as router from '../../lib/router.ts';
 import '../molecules/ev-summary.js';
 import './ev-history-log.js';
 import './pokemon-search.js';
@@ -401,7 +401,7 @@ export class PokemonDetail extends HTMLElement {
     // dialog through syncDialog()). base-dialog.js re-dispatches its
     // inner <dialog>'s own 'close' on the host element for exactly this
     // — the inner event doesn't cross the shadow boundary on its own.
-    for (const [dialogEl, segment] of /** @type {[any, import('../../lib/router.js').PokemonDialog][]} */ ([
+    for (const [dialogEl, segment] of /** @type {[any, import('../../lib/router.ts').PokemonDialog][]} */ ([
       [this.$natureDialog, 'nature'],
       [this.$levelDialog, 'level'],
       [this.$ivDialog, 'ivs'],
@@ -472,13 +472,13 @@ export class PokemonDetail extends HTMLElement {
     });
   }
 
-  /** @param {import('../../lib/router.js').PokemonDialog} segment */
+  /** @param {import('../../lib/router.ts').PokemonDialog} segment */
   _navigateToDialog(segment) {
     const partySlug = store.activeParty?.slug;
     if (partySlug && this._entry) router.navigateToPokemonDialog(partySlug, this._entry.uid, segment);
   }
 
-  /** @param {import('../../lib/router.js').PokemonDialog} segment */
+  /** @param {import('../../lib/router.ts').PokemonDialog} segment */
   _syncRouteOnClose(segment) {
     const route = router.currentRoute();
     if (route.pokemonDialog === segment) router.navigateToPokemon(route.partySlug, route.pokemonUid);
@@ -515,7 +515,7 @@ export class PokemonDetail extends HTMLElement {
     });
   }
 
-  /** @param {import('../../lib/router.js').PokemonDialog} segment @returns {any} */
+  /** @param {import('../../lib/router.ts').PokemonDialog} segment @returns {any} */
   _dialogFor(segment) {
     return {
       nature: this.$natureDialog,
@@ -529,7 +529,7 @@ export class PokemonDetail extends HTMLElement {
 
   /** Closes whichever of the six dialogs is open — a harmless no-op if none are. */
   closeDialogs() {
-    for (const segment of /** @type {import('../../lib/router.js').PokemonDialog[]} */ (['nature', 'level', 'ivs', 'items', 'competitive', 'training-guide'])) {
+    for (const segment of /** @type {import('../../lib/router.ts').PokemonDialog[]} */ (['nature', 'level', 'ivs', 'items', 'competitive', 'training-guide'])) {
       this._dialogFor(segment).close();
     }
     this._openSegment = null;
@@ -544,7 +544,7 @@ export class PokemonDetail extends HTMLElement {
    * unrelated store change) doesn't close-then-reopen the same one —
    * `showModal()` throws on an already-open `<dialog>`, and closing an
    * in-progress edit out from under the user would discard it.
-   * @param {import('../../lib/router.js').PokemonDialog|null} segment
+   * @param {import('../../lib/router.ts').PokemonDialog|null} segment
    */
   syncDialog(segment) {
     if (segment === this._openSegment) return;

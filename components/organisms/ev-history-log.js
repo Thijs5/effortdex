@@ -1,7 +1,7 @@
 import { POWER_ITEMS, MACHO_BRACE_SPRITE, VITAMINS, FEATHERS, EV_BERRIES, EXP_SHARE_SPRITE, STAT_LABEL, VITAMIN_STAT_CUTOFF, STAT_EXP_VITAMIN_CEILING, FALLBACK_SPRITE, FALLBACK_ONERROR } from '../../lib/constants.ts';
 import { titleCase, formatEvYield, escapeHtml, dayKey, dayLabel } from '../../lib/utils.ts';
-import { store } from '../../lib/services.js';
-import { attachDesignSystem } from '../../lib/design-system.js';
+import { store } from '../../lib/services.ts';
+import { attachDesignSystem } from '../../lib/design-system.ts';
 import { POKERUS_ICON_SVG } from '../../lib/icons.ts';
 
 /**

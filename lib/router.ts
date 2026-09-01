@@ -1,4 +1,3 @@
-// @ts-check
 // Minimal hash-based router. Parties are the app's top-level aggregate
 // root: "#/parties" (bare "#/", or no hash at all — the real GitHub
 // Pages entry URL — degrades to the same picker view) lists every
@@ -56,15 +55,21 @@
 // link survives a reload: the return path lives in the URL, not in
 // fragile in-memory state — see lib/dom.js's wireUtilityBackLink.
 
-/** @typedef {'nature'|'level'|'ivs'|'items'|'competitive'|'training-guide'} PokemonDialog */
+export type PokemonDialog = 'nature' | 'level' | 'ivs' | 'items' | 'competitive' | 'training-guide';
 
-/** @typedef {{ page: 'settings'|'transfer'|'transfer-export'|'cache'|'import'|null, partySlug: string|null, pokemonUid: string|null, payload: string|null, dialog: 'create-party'|'edit-party'|null, pokemonDialog: PokemonDialog|null, returnTo: string|null }} Route */
+export interface Route {
+  page: 'settings' | 'transfer' | 'transfer-export' | 'cache' | 'import' | null;
+  partySlug: string | null;
+  pokemonUid: string | null;
+  payload: string | null;
+  dialog: 'create-party' | 'edit-party' | null;
+  pokemonDialog: PokemonDialog | null;
+  returnTo: string | null;
+}
 
-/** @type {Set<PokemonDialog>} */
-const POKEMON_DIALOGS = new Set(['nature', 'level', 'ivs', 'items', 'competitive', 'training-guide']);
+const POKEMON_DIALOGS = new Set<PokemonDialog>(['nature', 'level', 'ivs', 'items', 'competitive', 'training-guide']);
 
-/** @param {string} hash @returns {string[]} */
-function parseHash(hash) {
+function parseHash(hash: string): string[] {
   return hash
     .split('?')[0]
     .replace(/^#\/?/, '')
@@ -74,15 +79,13 @@ function parseHash(hash) {
     .filter(Boolean);
 }
 
-/** @returns {URLSearchParams} */
-function hashQueryParams() {
+function hashQueryParams(): URLSearchParams {
   const idx = window.location.hash.indexOf('?');
   return new URLSearchParams(idx === -1 ? '' : window.location.hash.slice(idx + 1));
 }
 
-/** The current route: `{ page, partySlug, pokemonUid, payload, dialog, returnTo }`, all possibly null.
- * @returns {Route} */
-export function currentRoute() {
+/** The current route: `{ page, partySlug, pokemonUid, payload, dialog, returnTo }`, all possibly null. */
+export function currentRoute(): Route {
   const parts = parseHash(window.location.hash);
   const returnTo = hashQueryParams().get('returnTo');
   if (parts[0] === 'settings' && parts[1] === 'cache') {
@@ -110,8 +113,8 @@ export function currentRoute() {
     if (parts[2] === 'edit') {
       return { page: null, partySlug: parts[1], pokemonUid: null, payload: null, dialog: 'edit-party', pokemonDialog: null, returnTo: null };
     }
-    if (parts[2] && POKEMON_DIALOGS.has(/** @type {PokemonDialog} */ (parts[3]))) {
-      return { page: null, partySlug: parts[1], pokemonUid: parts[2], payload: null, dialog: null, pokemonDialog: /** @type {PokemonDialog} */ (parts[3]), returnTo: null };
+    if (parts[2] && POKEMON_DIALOGS.has(parts[3] as PokemonDialog)) {
+      return { page: null, partySlug: parts[1], pokemonUid: parts[2], payload: null, dialog: null, pokemonDialog: parts[3] as PokemonDialog, returnTo: null };
     }
     return { page: null, partySlug: parts[1] || null, pokemonUid: parts[2] || null, payload: null, dialog: null, pokemonDialog: null, returnTo: null };
   }
@@ -124,9 +127,8 @@ export function currentRoute() {
  * table as `currentRoute()` above, branches in the same order; keep the
  * two in sync when a route shape is added. Used for analytics path
  * normalization (issue #36), where per-entity URLs must aggregate into
- * one row per page shape instead of one row per entity.
- * @returns {string} */
-export function currentRoutePattern() {
+ * one row per page shape instead of one row per entity. */
+export function currentRoutePattern(): string {
   const r = currentRoute();
   if (r.page === 'cache') return '#/settings/cache';
   if (r.page === 'settings') return '#/settings';
@@ -141,53 +143,44 @@ export function currentRoutePattern() {
   return '#/parties';
 }
 
-/** @param {string|null} [slug] @returns {string} */
-export function partyPath(slug) {
+export function partyPath(slug?: string | null): string {
   return slug ? `#/parties/${slug}` : '#/parties';
 }
 
-/** @returns {string} */
-export function partyCreatePath() {
+export function partyCreatePath(): string {
   return '#/parties/create';
 }
 
-/** @param {string} slug @returns {string} */
-export function partyEditPath(slug) {
+export function partyEditPath(slug: string): string {
   return `#/parties/${slug}/edit`;
 }
 
-/** @param {string} partySlug @param {string} uid @returns {string} */
-export function pokemonPath(partySlug, uid) {
+export function pokemonPath(partySlug: string, uid: string): string {
   return `#/parties/${partySlug}/${uid}`;
 }
 
-/** @param {string} partySlug @param {string} uid @param {PokemonDialog} segment @returns {string} */
-export function pokemonDialogPath(partySlug, uid, segment) {
+export function pokemonDialogPath(partySlug: string, uid: string, segment: PokemonDialog): string {
   return `#/parties/${partySlug}/${uid}/${segment}`;
 }
 
-/** @returns {string} */
-export function settingsPath() {
+export function settingsPath(): string {
   return '#/settings';
 }
 
-/** The Transfer hub — Export/Import entry points. @returns {string} */
-export function transferPath() {
+/** The Transfer hub — Export/Import entry points. */
+export function transferPath(): string {
   return '#/transfer';
 }
 
-/** @returns {string} */
-export function transferExportPath() {
+export function transferExportPath(): string {
   return '#/transfer/export';
 }
 
-/** @returns {string} */
-export function cachePath() {
+export function cachePath(): string {
   return '#/settings/cache';
 }
 
-/** @param {string} payload @returns {string} */
-export function importPath(payload) {
+export function importPath(payload: string): string {
   return `#/transfer/import/${payload}`;
 }
 
@@ -204,9 +197,8 @@ export function importPath(payload) {
  * *use* this value for their own back link (that always targets a
  * fixed parent — ADR 0012/0020), but still need to carry it as
  * passthrough baggage, or their parent would lose it on the round trip.
- * @returns {string}
  */
-function currentReturnPath() {
+function currentReturnPath(): string {
   const route = currentRoute();
   if (route.page === 'settings' || route.page === 'transfer' || route.page === 'import' || route.page === 'cache' || route.page === 'transfer-export') {
     return route.returnTo || partyPath(null);
@@ -214,23 +206,21 @@ function currentReturnPath() {
   return window.location.hash.split('?')[0] || partyPath(null);
 }
 
-/** @param {string} path @returns {string} */
-function withReturnTo(path) {
+function withReturnTo(path: string): string {
   return `${path}?returnTo=${encodeURIComponent(currentReturnPath())}`;
 }
 
-/** What `navigateToSettings()` would currently navigate to — for a fixed-parent link (Cache's back link) that needs the *string*, not just the side effect, to keep a static `href` in sync for right-click/middle-click. @returns {string} */
-export function settingsReturnPath() {
+/** What `navigateToSettings()` would currently navigate to — for a fixed-parent link (Cache's back link) that needs the *string*, not just the side effect, to keep a static `href` in sync for right-click/middle-click. */
+export function settingsReturnPath(): string {
   return withReturnTo(settingsPath());
 }
 
-/** Same as `settingsReturnPath()`, for the Transfer hub (Export's back link). @returns {string} */
-export function transferReturnPath() {
+/** Same as `settingsReturnPath()`, for the Transfer hub (Export's back link). */
+export function transferReturnPath(): string {
   return withReturnTo(transferPath());
 }
 
-/** @param {string} path */
-function goTo(path) {
+function goTo(path: string): void {
   if (window.location.hash !== path) {
     window.location.hash = path;
   } else {
@@ -238,72 +228,65 @@ function goTo(path) {
   }
 }
 
-/** Navigates to an already-built path (e.g. one saved from a past `currentRoute()`/path-builder call) — for "back" links on utility pages (Settings/Transfer/Import) that need to return wherever the user actually came from, not a fixed destination.
- * @param {string} path */
-export function navigateToPath(path) {
+/** Navigates to an already-built path (e.g. one saved from a past `currentRoute()`/path-builder call) — for "back" links on utility pages (Settings/Transfer/Import) that need to return wherever the user actually came from, not a fixed destination. */
+export function navigateToPath(path: string): void {
   goTo(path);
 }
 
-/** @param {string|null} [slug] */
-export function navigateToParty(slug) {
+export function navigateToParty(slug?: string | null): void {
   goTo(partyPath(slug));
 }
 
-export function navigateToPartyCreate() {
+export function navigateToPartyCreate(): void {
   goTo(partyCreatePath());
 }
 
-/** @param {string} slug */
-export function navigateToPartyEdit(slug) {
+export function navigateToPartyEdit(slug: string): void {
   goTo(partyEditPath(slug));
 }
 
-/** @param {string} partySlug @param {string} uid */
-export function navigateToPokemon(partySlug, uid) {
+export function navigateToPokemon(partySlug: string, uid: string): void {
   goTo(pokemonPath(partySlug, uid));
 }
 
-/** @param {string} partySlug @param {string} uid @param {PokemonDialog} segment */
-export function navigateToPokemonDialog(partySlug, uid, segment) {
+export function navigateToPokemonDialog(partySlug: string, uid: string, segment: PokemonDialog): void {
   goTo(pokemonDialogPath(partySlug, uid, segment));
 }
 
-export function navigateHome() {
+export function navigateHome(): void {
   navigateToParty(null);
 }
 
-export function navigateToSettings() {
+export function navigateToSettings(): void {
   goTo(withReturnTo(settingsPath()));
 }
 
-export function navigateToTransfer() {
+export function navigateToTransfer(): void {
   goTo(withReturnTo(transferPath()));
 }
 
-export function navigateToTransferExport() {
+export function navigateToTransferExport(): void {
   goTo(withReturnTo(transferExportPath()));
 }
 
-export function navigateToCache() {
+export function navigateToCache(): void {
   goTo(withReturnTo(cachePath()));
 }
 
 /** The bare import screen, with no payload — for pasting a link or loading a saved transfer file. */
-export function navigateToImport() {
+export function navigateToImport(): void {
   goTo(withReturnTo('#/transfer/import'));
 }
 
-/** @type {Set<() => void>} */
-const listeners = new Set();
+const listeners = new Set<() => void>();
 
-/** Calls `fn()` on every route change (back/forward and programmatic).
- * @param {() => void} fn @returns {() => boolean} */
-export function onRouteChange(fn) {
+/** Calls `fn()` on every route change (back/forward and programmatic). */
+export function onRouteChange(fn: () => void): () => boolean {
   listeners.add(fn);
   return () => listeners.delete(fn);
 }
 
-function notify() {
+function notify(): void {
   for (const fn of listeners) fn();
 }
 

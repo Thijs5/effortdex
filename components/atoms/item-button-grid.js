@@ -1,4 +1,4 @@
-import { attachDesignSystem } from '../../lib/design-system.js';
+import { attachDesignSystem } from '../../lib/design-system.ts';
 import './ds-item-button.js';
 
 /** @typedef {{ id: string, label: string, sprite: string, boost: string, title: string, active?: boolean, capped?: boolean, count?: number, disabled?: boolean }} ItemButtonSpec */

@@ -1,7 +1,7 @@
-import { attachDesignSystem } from '../../lib/design-system.js';
-import { store } from '../../lib/services.js';
+import { attachDesignSystem } from '../../lib/design-system.ts';
+import { store } from '../../lib/services.ts';
 import { decodeTransferPayload } from '../../lib/transfer.ts';
-import * as router from '../../lib/router.js';
+import * as router from '../../lib/router.ts';
 import { titleCase, totalEvs, escapeHtml } from '../../lib/utils.ts';
 import { FALLBACK_SPRITE, FALLBACK_ONERROR } from '../../lib/constants.ts';
 

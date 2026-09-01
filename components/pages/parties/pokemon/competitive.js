@@ -1,7 +1,7 @@
 import { STATS, STAT_LABEL } from '../../../../lib/constants.ts';
 import { gen1SpecialStat } from '../../../../lib/gen1-special-stats.ts';
 import { escapeHtml } from '../../../../lib/utils.ts';
-import { store, smogon } from '../../../../lib/services.js';
+import { store, smogon } from '../../../../lib/services.ts';
 import { toShowdownId, smogonSetsKey, TIER_DESCRIPTIONS } from '../../../../lib/smogon-client.ts';
 import { matchGameVersion } from '../../../../lib/game-versions.ts';
 import { BaseDialog } from '../../../atoms/base-dialog.js';

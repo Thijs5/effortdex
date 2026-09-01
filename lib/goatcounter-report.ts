@@ -1,4 +1,3 @@
-// @ts-check
 // The one module aware that GoatCounter (https://www.goatcounter.com/)
 // exists — deliberately isolated per issue #24's "easy to strip out"
 // requirement: delete this file, the count-script tag plus the
@@ -53,10 +52,9 @@
 // only has to strip the query string, since count.js never puts the
 // hash route in the path.
 
-import { currentRoutePattern } from './router.js';
+import { currentRoutePattern } from './router.ts';
 
-/** @returns {boolean} */
-function isLocalDev() {
+function isLocalDev(): boolean {
   return typeof location !== 'undefined' && (location.hostname === 'localhost' || location.hostname === '127.0.0.1');
 }
 
@@ -64,9 +62,8 @@ function isLocalDev() {
  * change (the very first load is already counted by the count script
  * itself, so this is for subsequent in-app navigation). The path is
  * normalized to a placeholder pattern and stripped of its query
- * string first — see this file's header comment (issue #36).
- * @returns {void} */
-export function trackPageview() {
+ * string first — see this file's header comment (issue #36). */
+export function trackPageview(): void {
   if (isLocalDev()) return;
   const path = `${location.pathname}${currentRoutePattern()}`;
   // @ts-ignore — window.goatcounter is injected by the third-party count script, untyped.
@@ -79,9 +76,8 @@ export function trackPageview() {
  * invisible to a script that only runs online, so the one guaranteed
  * network call (the update check) doubles as an "active online client,
  * running version X" heartbeat — the version rides in the event name
- * since hosted GoatCounter has no custom event dimensions.
- * @param {string} name @returns {void} */
-export function trackEvent(name) {
+ * since hosted GoatCounter has no custom event dimensions. */
+export function trackEvent(name: string): void {
   if (isLocalDev()) return;
   // @ts-ignore — window.goatcounter is injected by the third-party count script, untyped.
   window.goatcounter?.count?.({ path: name, title: '', event: true });

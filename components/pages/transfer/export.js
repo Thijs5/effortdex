@@ -16,8 +16,8 @@
 // otherwise a hub -> Export -> back round trip would silently drop
 // where the user was before they ever opened the hub.
 
-import { interceptLinkClick } from '../../../lib/dom.js';
-import * as router from '../../../lib/router.js';
+import { interceptLinkClick } from '../../../lib/dom.ts';
+import * as router from '../../../lib/router.ts';
 import '../../organisms/transfer-panel.js';
 
 export const view = document.getElementById('transfer-view');

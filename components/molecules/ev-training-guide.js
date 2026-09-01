@@ -2,7 +2,7 @@
 import { STATS, FALLBACK_SPRITE } from '../../lib/constants.ts';
 import { versionedSpriteUrl, modernSpriteUrl } from '../../lib/pokeapi-client.ts';
 import { titleCase } from '../../lib/utils.ts';
-import { attachDesignSystem } from '../../lib/design-system.js';
+import { attachDesignSystem } from '../../lib/design-system.ts';
 import '../atoms/item-button-grid.js';
 
 /**

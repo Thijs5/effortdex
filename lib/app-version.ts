@@ -1,4 +1,3 @@
-// @ts-check
 // App-version display + update check. Shown in two places — the footer
 // badge (this module's own concern) and the Settings page's "Version"
 // line (components/pages/settings/settings.js reads getAppVersion()/onAppVersion from here
@@ -11,8 +10,8 @@
 // updates here stay fully automatic too, matching how a web app is
 // expected to behave (no "check for updates" ritual).
 
-import { getRunningVersion, fetchLatestVersion, clearAppCache } from './version-check.js';
-import { requireElementById } from './dom.js';
+import { getRunningVersion, fetchLatestVersion, clearAppCache } from './version-check.ts';
+import { requireElementById } from './dom.ts';
 
 const appVersionLabel = requireElementById('app-version');
 
@@ -22,9 +21,8 @@ const appVersionLabel = requireElementById('app-version');
 // ad-blocker incident and same fix as app.js's own import of it; see
 // that file and goatcounter-report.js's header. A failed import just
 // means the daily version ping goes unreported.
-/** @type {(name: string) => void} */
-let reportEvent = () => {};
-import('./goatcounter-report.js')
+let reportEvent: (name: string) => void = () => {};
+import('./goatcounter-report.ts')
   .then((m) => {
     reportEvent = m.trackEvent;
   })
@@ -35,28 +33,23 @@ import('./goatcounter-report.js')
 // Undefined until the initial check settles, then either a version
 // string or null (settled, but couldn't determine one) — one variable,
 // three states, rather than a version plus a separate "resolved" flag.
-/** @type {string|null|undefined} */
-let runningVersion;
+let runningVersion: string | null | undefined;
 
-/** @type {Set<(version: string|null) => void>} */
-const listeners = new Set();
+const listeners = new Set<(version: string | null) => void>();
 
-/** Calls `fn(version)` once the running version has resolved (or re-resolved).
- * @param {(version: string|null) => void} fn */
-export function onAppVersion(fn) {
+/** Calls `fn(version)` once the running version has resolved (or re-resolved). */
+export function onAppVersion(fn: (version: string | null) => void): void {
   listeners.add(fn);
 }
 
-/** @returns {string|null} */
-export function getAppVersion() {
+export function getAppVersion(): string | null {
   return runningVersion ?? null;
 }
 
 /** True once the initial version check has settled (successfully or not) —
  * distinguishes "still loading" from "loaded, but couldn't determine a
- * version" for callers that show a different label for each.
- * @returns {boolean} */
-export function hasResolvedAppVersion() {
+ * version" for callers that show a different label for each. */
+export function hasResolvedAppVersion(): boolean {
   return runningVersion !== undefined;
 }
 

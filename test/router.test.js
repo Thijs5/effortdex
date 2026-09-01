@@ -2,9 +2,9 @@ import './support/window-polyfill.js';
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
-import * as router from '../lib/router.js';
+import * as router from '../lib/router.ts';
 
-/** @param {Partial<import('../lib/router.js').Route>} overrides */
+/** @param {Partial<import('../lib/router.ts').Route>} overrides */
 function route(overrides = {}) {
   return { page: null, partySlug: null, pokemonUid: null, payload: null, dialog: null, pokemonDialog: null, returnTo: null, ...overrides };
 }

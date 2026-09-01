@@ -1,4 +1,4 @@
-import { attachDesignSystem } from '../../lib/design-system.js';
+import { attachDesignSystem } from '../../lib/design-system.ts';
 
 /**
  * <ev-bar label max> — one LCD-style segmented progress bar. Set `.value`,

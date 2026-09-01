@@ -1,4 +1,3 @@
-// @ts-check
 // Design system for Shadow DOM components: a single CSSStyleSheet, adopted
 // by every custom element, that carries (a) baseline resets components
 // would otherwise each have to repeat, and (b) shared primitives (fields,
@@ -256,8 +255,7 @@ const css = `
   }
 `;
 
-/** @type {CSSStyleSheet|null} */
-let sharedSheet = null;
+let sharedSheet: CSSStyleSheet | null = null;
 try {
   sharedSheet = new CSSStyleSheet();
   sharedSheet.replaceSync(css);
@@ -265,9 +263,9 @@ try {
   sharedSheet = null; // Constructable stylesheets unsupported; fall back below.
 }
 
-/** Adopts the shared design-system styles into a component's shadow root. */
-/** @param {ShadowRoot} shadowRoot */
-export function attachDesignSystem(shadowRoot) {
+/** Adopts the shared design-system styles into a component's shadow root
+ * (or the top-level `document`, for the light-DOM party dialog). */
+export function attachDesignSystem(shadowRoot: ShadowRoot | Document): void {
   if (sharedSheet) {
     shadowRoot.adoptedStyleSheets = [sharedSheet, ...shadowRoot.adoptedStyleSheets];
     return;

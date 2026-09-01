@@ -1,5 +1,5 @@
-import { attachDesignSystem } from '../../lib/design-system.js';
-import { openShadowDialog, clearShadowDialogFlag } from '../../lib/dom.js';
+import { attachDesignSystem } from '../../lib/design-system.ts';
+import { openShadowDialog, clearShadowDialogFlag } from '../../lib/dom.ts';
 
 /**
  * BaseDialog — the open/close/backdrop-click/Enter-to-confirm wiring and

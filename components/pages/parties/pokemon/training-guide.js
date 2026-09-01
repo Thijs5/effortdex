@@ -1,4 +1,4 @@
-import { store } from '../../../../lib/services.js';
+import { store } from '../../../../lib/services.ts';
 import { evTrainingLocations } from '../../../../lib/ev-training-locations.ts';
 import { BaseDialog } from '../../../atoms/base-dialog.js';
 import '../../../molecules/ev-training-guide.js';

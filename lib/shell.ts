@@ -1,19 +1,18 @@
-// @ts-check
 // App-wide chrome: the header's bezel menu (Settings link + theme
 // choices), the online/offline power LED, and offline app-shell (service
 // worker) registration. None of this is tied to any one route — it runs
 // once, regardless of page — so it doesn't belong in any page module.
 // App-version display and update polling is a separate concern (see
-// lib/app-version.js): it's driven by the same header but also reaches
+// lib/app-version.ts): it's driven by the same header but also reaches
 // into the Settings page, so it's kept apart from this purely chrome-only
 // wiring.
 
-import * as router from './router.js';
-import { interceptLinkClick, requireElementById, requireQuery, wireDisclosureMenu } from './dom.js';
-import { getAppVersion } from './app-version.js';
+import * as router from './router.ts';
+import { interceptLinkClick, requireElementById, requireQuery, wireDisclosureMenu } from './dom.ts';
+import { getAppVersion } from './app-version.ts';
 import { SCHEMA_VERSION } from './schema-version.ts';
 import { summarizeState, readPreMigrationBackup } from './store.ts';
-import { store } from './services.js';
+import { store } from './services.ts';
 import { networkActivity } from './network-activity.ts';
 import { isCachingDisabled } from './dev-cache.ts';
 
@@ -28,7 +27,7 @@ interceptLinkClick(headerHomeLink, () => router.navigateHome());
 // gets attached to a *public* GitHub issue automatically, unlike the
 // full pre-migration backup (components/pages/settings/settings.js's explicit, user-
 // triggered "Copy to clipboard" for that). See docs/adr/0009.
-function buildBugReportDiagnostics() {
+function buildBugReportDiagnostics(): string {
   const version = getAppVersion();
   const lines = [`app: ${version ? `v${version}` : 'unknown'}`, `schema: ${SCHEMA_VERSION}`];
 
@@ -49,7 +48,7 @@ function buildBugReportDiagnostics() {
   return lines.join('\n');
 }
 
-const reportBugLink = /** @type {HTMLAnchorElement} */ (requireElementById('report-bug-link'));
+const reportBugLink = requireElementById('report-bug-link') as HTMLAnchorElement;
 reportBugLink.addEventListener('click', () => {
   const url = new URL(reportBugLink.href);
   url.searchParams.set('diagnostics', buildBugReportDiagnostics());
@@ -127,17 +126,15 @@ const setMenuOpen = wireDisclosureMenu({ button: menuBtn, menu: headerMenu, item
 
 // Any item click performs its action (own listener) and closes the menu.
 headerMenu.addEventListener('click', (e) => {
-  if (/** @type {Element|null} */ (e.target)?.closest('.header-menu-item')) setMenuOpen(false);
+  if ((e.target as Element | null)?.closest('.header-menu-item')) setMenuOpen(false);
 });
 
 settingsBtn.addEventListener('click', () => router.navigateToSettings());
 
 const THEME_KEY = 'effortdex:theme';
-/** @type {HTMLElement[]} */
-const themeChoices = [...headerMenu.querySelectorAll('[data-theme-choice]')].map((el) => /** @type {HTMLElement} */ (el));
+const themeChoices = [...headerMenu.querySelectorAll('[data-theme-choice]')].map((el) => el as HTMLElement);
 
-/** @param {string} theme */
-function applyTheme(theme) {
+function applyTheme(theme: string): void {
   if (theme === 'auto') {
     delete document.documentElement.dataset.theme;
     localStorage.removeItem(THEME_KEY);
@@ -152,7 +149,7 @@ function applyTheme(theme) {
 
 applyTheme(localStorage.getItem(THEME_KEY) || 'auto');
 for (const choice of themeChoices) {
-  choice.addEventListener('click', () => applyTheme(/** @type {string} */ (choice.dataset.themeChoice)));
+  choice.addEventListener('click', () => applyTheme(choice.dataset.themeChoice as string));
 }
 
 /* Power LED in the header: a router-style network activity indicator

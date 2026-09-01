@@ -31,7 +31,7 @@ async function main() {
   // only fetch a .map when DevTools is actually open, so this costs
   // ordinary visitors nothing.
   await build({
-    entryPoints: [path.join(root, 'app.js')],
+    entryPoints: [path.join(root, 'app.ts')],
     outdir: outDir,
     outbase: root,
     bundle: true,

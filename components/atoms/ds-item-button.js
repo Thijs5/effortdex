@@ -1,5 +1,5 @@
 // @ts-check
-import { attachDesignSystem } from '../../lib/design-system.js';
+import { attachDesignSystem } from '../../lib/design-system.ts';
 import { FALLBACK_ONERROR } from '../../lib/constants.ts';
 
 /**

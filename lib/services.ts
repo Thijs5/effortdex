@@ -14,6 +14,7 @@ import { makeRosterMirror } from './db/roster-import.ts';
 import { readRoster } from './db/roster-io.ts';
 import { makeRosterOpsApplier } from './db/roster-ops.ts';
 import { trimApiCache } from './db/cache-cap.ts';
+import type { CacheBackend } from './memo-cache.ts';
 
 // The PokéAPI / Smogon response cache lives in IndexedDB (docs/adr/0025
 // §4) so it no longer competes with the roster for localStorage's ~5 MB
@@ -22,14 +23,10 @@ import { trimApiCache } from './db/cache-cap.ts';
 // private mode), MemoCache falls back to its own LocalStorageBackend —
 // cache data may safely degrade that way, unlike the roster
 // (docs/adr/0024).
-/** @type {import('./memo-cache.ts').CacheBackend | undefined} */
-let cacheBackend;
-/** @type {ReturnType<typeof makeRosterMirror> | null} */
-let mirrorRoster = null;
-/** @type {(() => ReturnType<typeof readRoster>) | null} */
-let loadRoster = null;
-/** @type {ReturnType<typeof makeRosterOpsApplier> | null} */
-let rosterOps = null;
+let cacheBackend: CacheBackend | undefined;
+let mirrorRoster: ReturnType<typeof makeRosterMirror> | null = null;
+let loadRoster: (() => ReturnType<typeof readRoster>) | null = null;
+let rosterOps: ReturnType<typeof makeRosterOpsApplier> | null = null;
 try {
   const db = await openDb();
   cacheBackend = new IdbCacheBackend(db);

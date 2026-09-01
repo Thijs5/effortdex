@@ -1,19 +1,19 @@
 // Effortdex — EV training tracker built with native Web Components.
-// No frameworks, no build step. This file is the composition root: it
-// wires the design system into the light DOM, initializes app-wide
-// chrome (lib/shell.js, lib/app-version.js), and dispatches each route
-// to its page module (components/pages/*.js) — no page-specific DOM or
-// rendering lives here. All domain logic lives in lib/, and each custom
-// element owns its own rendering. Also the one place that opens/closes
-// the party create/edit dialog, in response to a route's `dialog` field
-// (docs/adr/0022) — party-dialog.js itself never opens on its own.
+// This file is the composition root: it wires the design system into the
+// light DOM, initializes app-wide chrome (lib/shell.ts, lib/app-version.ts),
+// and dispatches each route to its page module (components/pages/*.js) —
+// no page-specific DOM or rendering lives here. All domain logic lives in
+// lib/, and each custom element owns its own rendering. Also the one
+// place that opens/closes the party create/edit dialog, in response to a
+// route's `dialog` field (docs/adr/0022) — party-dialog.js itself never
+// opens on its own.
 
-import { store, prefetchService } from './lib/services.js';
-import { attachDesignSystem } from './lib/design-system.js';
-import { wireDialogCloseButtons } from './lib/dom.js';
-import * as router from './lib/router.js';
-import './lib/shell.js';
-import './lib/app-version.js';
+import { store, prefetchService } from './lib/services.ts';
+import { attachDesignSystem } from './lib/design-system.ts';
+import { wireDialogCloseButtons } from './lib/dom.ts';
+import * as router from './lib/router.ts';
+import './lib/shell.ts';
+import './lib/app-version.ts';
 import * as parties from './components/pages/parties/parties.js';
 import * as roster from './components/pages/parties/roster.js';
 import * as pokemon from './components/pages/parties/pokemon/pokemon.js';
@@ -33,12 +33,12 @@ wireDialogCloseButtons();
 /* Router <-> page                                                     */
 /* ------------------------------------------------------------------ */
 
-const VIEWS = [parties.view, roster.view, pokemon.view, settings.view, transferHub.view, transferExport.view, spriteCache.view, importPage.view];
-function showView(view) {
+const VIEWS: HTMLElement[] = [parties.view, roster.view, pokemon.view, settings.view, transferHub.view, transferExport.view, spriteCache.view, importPage.view];
+function showView(view: HTMLElement): void {
   for (const v of VIEWS) v.hidden = v !== view;
 }
 
-function render() {
+function render(): void {
   const { page, partySlug, pokemonUid, payload, dialog, pokemonDialog } = router.currentRoute();
 
   if (page === 'settings') {
@@ -128,13 +128,13 @@ router.onRouteChange(render);
 // Imported dynamically, not statically: a static import is one failed
 // network request away from taking the entire module graph down with
 // it (an ad-blocker filter list blocking this file by name did exactly
-// that — see lib/goatcounter-report.js's own header comment). A
+// that — see lib/goatcounter-report.ts's own header comment). A
 // dynamic import failing here only means pageviews go unreported;
 // nothing else about the app is affected, matching this feature's own
 // "no dependency on the analytics server" promise (issue #24) for the
 // local file itself, not just the third-party script it loads.
-let reportPageview = () => {};
-import('./lib/goatcounter-report.js')
+let reportPageview: () => void = () => {};
+import('./lib/goatcounter-report.ts')
   .then((m) => {
     reportPageview = m.trackPageview;
   })

@@ -1,6 +1,6 @@
 import { STATS } from '../../../../lib/constants.ts';
 import { escapeHtml } from '../../../../lib/utils.ts';
-import { store } from '../../../../lib/services.js';
+import { store } from '../../../../lib/services.ts';
 import { BaseDialog } from '../../../atoms/base-dialog.js';
 
 /** @typedef {import('../lib/store.ts').RosterEntry} RosterEntry */

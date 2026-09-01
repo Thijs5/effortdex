@@ -1,4 +1,4 @@
-import { attachDesignSystem } from '../../lib/design-system.js';
+import { attachDesignSystem } from '../../lib/design-system.ts';
 
 /**
  * <level-input> — the one control for typing a Pokémon's level, wherever

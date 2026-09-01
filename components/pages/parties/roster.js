@@ -25,12 +25,12 @@ import {
 } from '../../../lib/constants.ts';
 import { titleCase, totalEvs, natureOptionsHtml, escapeHtml, sortedNatures, natureLabel } from '../../../lib/utils.ts';
 import { POKERUS_ICON_SVG } from '../../../lib/icons.ts';
-import { api, store } from '../../../lib/services.js';
+import { api, store } from '../../../lib/services.ts';
 import { versionedSpriteUrl, versionedSpriteIsOpaque } from '../../../lib/pokeapi-client.ts';
 import { wireSpriteFallback } from '../../../lib/sprite-fallback.ts';
 import { availableSpeciesFor } from '../../../lib/species-availability.ts';
-import * as router from '../../../lib/router.js';
-import { interceptLinkClick, focusDialogStart } from '../../../lib/dom.js';
+import * as router from '../../../lib/router.ts';
+import { interceptLinkClick, focusDialogStart } from '../../../lib/dom.ts';
 import { wireDragHandle } from '../../../lib/drag-reorder.ts';
 import '../../atoms/game-ball.js';
 import '../../organisms/pokemon-search.js';

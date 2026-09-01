@@ -4,8 +4,8 @@
 // Reachable from Settings' "Transfer to another device" button, and
 // itself the parent both Export and Import nest under in the URL.
 
-import { wireUtilityBackLink } from '../../../lib/dom.js';
-import * as router from '../../../lib/router.js';
+import { wireUtilityBackLink } from '../../../lib/dom.ts';
+import * as router from '../../../lib/router.ts';
 
 export const view = document.getElementById('transfer-hub-view');
 const backFromHub = document.getElementById('back-from-transfer-hub');

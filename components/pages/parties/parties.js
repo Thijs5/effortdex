@@ -6,9 +6,9 @@
 // party-dialog.js's openCreateDialog(), in response to that route.
 
 import { totalEvs, escapeHtml } from '../../../lib/utils.ts';
-import { store } from '../../../lib/services.js';
-import * as router from '../../../lib/router.js';
-import { interceptLinkClick } from '../../../lib/dom.js';
+import { store } from '../../../lib/services.ts';
+import * as router from '../../../lib/router.ts';
+import { interceptLinkClick } from '../../../lib/dom.ts';
 import '../../atoms/game-ball.js';
 
 export const view = document.getElementById('picker-view');
