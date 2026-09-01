@@ -3,11 +3,27 @@ import assert from 'node:assert/strict';
 
 import { availableSpeciesFor } from '../lib/species-availability.js';
 
-function fakeApi(generations) {
+/**
+ * @param {Record<number, string[]|Error>} generations
+ * @param {{ catalog?: string[], varieties?: Record<string, string[]> }} [opts]
+ *   `catalog` is the full variety-level species list (getAllSpecies) —
+ *   defaults to every generation root being its own sole variety, so
+ *   existing tests that don't care about the split don't need to name
+ *   one. `varieties` maps a root whose name isn't itself in `catalog`
+ *   (Giratina, Minior, ...) to its real variety names.
+ */
+function fakeApi(generations, { catalog, varieties = {} } = {}) {
+  const roots = Object.values(generations).flatMap((v) => (v instanceof Error ? [] : v));
   return {
     async getGenerationSpecies(gen) {
       if (generations[gen] instanceof Error) throw generations[gen];
       return (generations[gen] || []).map((name) => ({ name, id: null }));
+    },
+    async getAllSpecies() {
+      return (catalog ?? roots.filter((r) => !varieties[r])).map((name) => ({ name, id: null, sprite: null }));
+    },
+    async getSpeciesVarieties(name) {
+      return varieties[name] ?? [name];
     },
   };
 }
@@ -46,4 +62,20 @@ test('availableSpeciesFor uses the generation override even for an unrecognized 
   const party = { baseGame: 'Radical Red', overrides: { availableGeneration: 1 } };
   const result = await availableSpeciesFor(party, api);
   assert.deepEqual([...result], ['bulbasaur']);
+});
+
+test('availableSpeciesFor resolves a species whose default variety is not named after the species itself', async () => {
+  // Real PokéAPI: generation 4's pokemon_species list names it "giratina",
+  // but no /pokemon (variety) entry is ever literally named that — only
+  // "giratina-altered" and "giratina-origin" are. Without resolving through
+  // getSpeciesVarieties, the allowed set would contain "giratina", which
+  // never matches anything the search dropdown's candidate list (variety
+  // names) actually has, silently hiding it.
+  const api = fakeApi(
+    { 1: ['bulbasaur'], 2: [], 3: [], 4: ['giratina'] },
+    { varieties: { giratina: ['giratina-altered', 'giratina-origin'] } }
+  );
+  const party = { baseGame: 'Platinum', overrides: {} }; // gen 4
+  const result = await availableSpeciesFor(party, api);
+  assert.deepEqual([...result].sort(), ['bulbasaur', 'giratina-altered', 'giratina-origin']);
 });

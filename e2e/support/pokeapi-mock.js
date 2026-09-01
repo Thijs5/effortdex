@@ -19,6 +19,13 @@ const TINY_PNG_BASE64 =
  * @typedef {object} MockSpecies
  * @property {number} id
  * @property {string} name
+ * @property {number} gen the generation `/api/v2/generation/{gen}` lists this species' root under
+ * @property {string} [root] the species-level (pokemon-species) name, when it differs from `name` —
+ *   PokéAPI's generation listing and lib/species-availability.js's `availableSpeciesFor` deal in this
+ *   name, not the variety-level `name` the search dropdown (getAllSpecies) actually lists
+ * @property {string[]} [extraVarieties] other variety names PokéAPI lists alongside this one under
+ *   the same `root` (e.g. Giratina's "-origin" form) — never fetched directly by any spec, just part
+ *   of the root's pokemon-species `varieties` payload
  * @property {{hp:number,atk:number,def:number,spa:number,spd:number,spe:number}} baseStats
  * @property {{hp:number,atk:number,def:number,spa:number,spd:number,spe:number}} evYield
  * @property {string} [evolvesTo] name of the species this evolves into, if any
@@ -30,6 +37,7 @@ const SPECIES = [
   {
     id: 1,
     name: 'bulbasaur',
+    gen: 1,
     baseStats: { hp: 45, atk: 49, def: 49, spa: 65, spd: 65, spe: 45 },
     evYield: { hp: 0, atk: 0, def: 0, spa: 1, spd: 0, spe: 0 },
     evolvesTo: 'ivysaur',
@@ -38,36 +46,42 @@ const SPECIES = [
   {
     id: 2,
     name: 'ivysaur',
+    gen: 1,
     baseStats: { hp: 60, atk: 62, def: 63, spa: 80, spd: 80, spe: 60 },
     evYield: { hp: 0, atk: 0, def: 0, spa: 2, spd: 0, spe: 0 },
   },
   {
     id: 4,
     name: 'charmander',
+    gen: 1,
     baseStats: { hp: 39, atk: 52, def: 43, spa: 60, spd: 50, spe: 65 },
     evYield: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 1 },
   },
   {
     id: 10,
     name: 'caterpie',
+    gen: 1,
     baseStats: { hp: 45, atk: 30, def: 35, spa: 20, spd: 20, spe: 45 },
     evYield: { hp: 1, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
   },
   {
     id: 95,
     name: 'onix',
+    gen: 1,
     baseStats: { hp: 35, atk: 45, def: 160, spa: 30, spd: 45, spe: 70 },
     evYield: { hp: 0, atk: 0, def: 1, spa: 0, spd: 0, spe: 0 },
   },
   {
     id: 113,
     name: 'chansey',
+    gen: 1,
     baseStats: { hp: 250, atk: 5, def: 5, spa: 35, spd: 105, spe: 50 },
     evYield: { hp: 2, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
   },
   {
     id: 150,
     name: 'mewtwo',
+    gen: 1,
     baseStats: { hp: 106, atk: 110, def: 90, spa: 154, spd: 90, spe: 130 },
     evYield: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 3 },
   },
@@ -76,17 +90,23 @@ const SPECIES = [
     // (lib/ev-training-locations.js) — used by ev-training-guide.spec.js.
     id: 293,
     name: 'whismur',
+    gen: 3,
     baseStats: { hp: 64, atk: 51, def: 23, spa: 51, spd: 23, spe: 28 },
     evYield: { hp: 1, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
   },
   {
     // Real PokéAPI has no species-list entry literally named "giratina" —
     // only its variety names (giratina-altered, giratina-origin), same
-    // pattern as Deoxys, Wormadam, Basculin and Minior. Kept here to catch
-    // any regression of components/organisms/pokemon-search.js's Enter-key
-    // handling for exactly that case (see e2e/add-pokemon.spec.js).
+    // pattern as Deoxys, Wormadam, Basculin and Minior. `root` and
+    // `extraVarieties` reproduce that split so specs can exercise both
+    // components/organisms/pokemon-search.js's Enter-key handling and
+    // lib/species-availability.js's root->variety resolution for exactly
+    // this case (see e2e/add-pokemon.spec.js).
     id: 487,
     name: 'giratina-altered',
+    gen: 4,
+    root: 'giratina',
+    extraVarieties: ['giratina-origin'],
     baseStats: { hp: 150, atk: 100, def: 120, spa: 100, spd: 120, spe: 90 },
     evYield: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
   },
@@ -131,6 +151,7 @@ function familyRoot(species) {
 function speciesPayload(species) {
   return {
     evolution_chain: { url: `https://pokeapi.co/api/v2/evolution-chain/${familyRoot(species).id}/` },
+    varieties: [species.name, ...(species.extraVarieties ?? [])].map((name) => ({ pokemon: { name } })),
   };
 }
 
@@ -147,12 +168,14 @@ function chainNode(species) {
 /**
  * Mocks every PokéAPI/sprite endpoint lib/pokeapi-client.js calls, for the
  * fixed roster of species declared in SPECIES above (Bulbasaur, Ivysaur,
- * Charmander, Caterpie, Onix, Chansey, Mewtwo — every species any spec
- * actually searches for, adds, or battles). Does not mock
- * `/api/v2/generation/*` — the sprite-prefetch scan (lib/prefetch-service.js)
- * that would call it no-ops while caching is disabled, which every e2e
- * test runs under (playwright.config.js's pre-seeded
- * `effortdex:dev-no-cache` flag).
+ * Charmander, Caterpie, Onix, Chansey, Mewtwo, Whismur, Giratina — every
+ * species any spec actually searches for, adds, or battles). Also mocks
+ * `/api/v2/generation/*` — lib/species-availability.js's
+ * `availableSpeciesFor` calls it for every party (not just the
+ * sprite-prefetch scan, which does no-op while caching is disabled), so
+ * leaving it unmocked let that fetch fail and `availableSpeciesFor` fail
+ * open (null, unrestricted) — silently *not* exercising the restriction
+ * at all in any spec.
  * @param {import('@playwright/test').Page} page
  */
 export async function mockPokeApi(page) {
@@ -177,9 +200,29 @@ export async function mockPokeApi(page) {
 
   await page.route('**/pokeapi.co/api/v2/pokemon-species/*', (route) => {
     const slug = decodeURIComponent(route.request().url().split('/').filter(Boolean).pop() ?? '');
-    const species = SPECIES.find((s) => s.name === slug.toLowerCase());
+    // A root name (e.g. "giratina") never equals any species' own variety
+    // `name` — fall back to matching it against `root` so getSpeciesVarieties
+    // (called for exactly that mismatch) resolves the same way real PokéAPI
+    // does.
+    const species =
+      SPECIES.find((s) => s.name === slug.toLowerCase()) ?? SPECIES.find((s) => s.root === slug.toLowerCase());
     if (!species) return route.fulfill({ status: 404, body: 'not mocked' });
     route.fulfill({ contentType: 'application/json', body: JSON.stringify(speciesPayload(species)) });
+  });
+
+  await page.route('**/pokeapi.co/api/v2/generation/*', (route) => {
+    const gen = Number(route.request().url().split('/').filter(Boolean).pop());
+    const roots = new Map(); // root name -> the species carrying it, deduped
+    for (const s of SPECIES) if (s.gen === gen) roots.set(s.root ?? s.name, s);
+    route.fulfill({
+      contentType: 'application/json',
+      body: JSON.stringify({
+        pokemon_species: [...roots].map(([name, s]) => ({
+          name,
+          url: `https://pokeapi.co/api/v2/pokemon-species/${s.id}/`,
+        })),
+      }),
+    });
   });
 
   await page.route('**/pokeapi.co/api/v2/evolution-chain/*', (route) => {
