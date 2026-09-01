@@ -102,3 +102,20 @@ letting it stand on inertia:
   instead of importing `api` from `services.js` are all red flags worth
   catching on sight, the same way ADR 0001 already flags a stray
   `fetch()` as a bug.
+
+## Addendum — TypeScript migration (ADR 0026)
+
+This ADR is amended, not reversed:
+
+- There is now a **dev-time transform** (`scripts/dev-server.mjs`, an
+  on-demand per-file esbuild `transform` — not a bundler, not a
+  framework). The module boundaries this ADR cares about are unaffected:
+  the browser still walks the real relative-import graph, one request
+  per module.
+- **`components/base-element.ts`** ([ADR 0027](0027-project-owned-base-element.md))
+  is a ~60-line project-owned base class with **no runtime dependency** —
+  it factors out repeated shadow-root/ref/render boilerplate, not the
+  per-component DOM-sync work a library like Lit would own. The Rule
+  Review above still stands: revisit Lit when component count /
+  interaction complexity, not organization, is the bottleneck.
+- Point 5 ("views rebuild from scratch") is unchanged.

@@ -130,3 +130,14 @@ localStorage-backed cache with different rules (see ADR 0001).
   already seed Cache Storage directly rather than depend on a real SW,
   for exactly this reason), so restoring the fresh-files-only behavior
   it was built against was the correct fix, not a suite rewrite.
+
+## Addendum — TypeScript migration (ADR 0026)
+
+Local development now serves *transformed* source: `scripts/dev-server.mjs`
+runs each `.ts`/`.js` module through esbuild on request (no bundling).
+Nothing in this ADR changes — the dev server also serves `sw.js`, the
+manifest and `version.json` verbatim, so the offline shell, the Cache
+Storage behaviour, and the version-probe update flow can all be
+exercised against a real HTTP origin exactly as before. The production
+`dist/` bundle and `sw.js`'s `SHELL_PATHS` are untouched (esbuild's
+entry is `app.ts` now; the output is still `dist/app.js`).
