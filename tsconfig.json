@@ -7,10 +7,11 @@
     "target": "ES2022",
     "module": "ES2022",
     "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
     "lib": ["ES2023", "DOM", "DOM.Iterable"],
     "types": ["node"],
     "skipLibCheck": true
   },
-  "include": ["lib/**/*.js", "e2e/**/*.js", "playwright.config.js", "components/ds-item-button.js", "components/item-button-grid.js", "components/evolution-chain.js", "components/ev-training-guide.js"],
+  "include": ["lib/**/*.js", "lib/**/*.ts", "e2e/**/*.js", "e2e/**/*.ts", "playwright.config.ts"],
   "exclude": ["lib/vendor/**"]
 }

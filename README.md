@@ -110,17 +110,29 @@ graph behind them.
 
 ### Running it locally
 
-Any static file server works, since this is plain HTML/CSS/JS with no
-build step:
+Needs Node ≥ 24.
 
 ```sh
-npx serve .
+npm run dev
 ```
 
-Then open the printed `localhost` URL. (Opening `index.html` directly
-via `file://` also mostly works, but a real HTTP server is required to
-test the service worker / offline install, since service workers need a
-secure context.)
+Then open `http://localhost:59387`. `scripts/dev-server.mjs` is a small
+esbuild-backed dev server (docs/adr/0026): no bundling, one request per
+source module, each transformed on demand, with the real import graph
+left intact in the browser. It also serves the service worker / manifest
+so offline install can be tested against a real HTTP origin.
+
+Flags (or the `PORT` / `HOST` / `LIVERELOAD` env vars) override the
+defaults — `node scripts/dev-server.mjs --port 3000`, or add
+live reload with a file watcher by dropping the `--no-reload` the `dev`
+script passes: `node scripts/dev-server.mjs`.
+
+To run it in a container instead (Node 24 image, source synced on
+change):
+
+```sh
+npm run dev:docker   # docker compose watch
+```
 
 ### Testing
 
