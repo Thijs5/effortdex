@@ -53,9 +53,12 @@ test.describe('Adding a Pokémon', () => {
   test('pressing Enter without arrowing to a suggestion still adds a species with no bare-name PokéAPI entry', async ({ page }) => {
     // Giratina (like Deoxys, Wormadam, Basculin, Minior) has no PokéAPI
     // entry literally named after the species — only "giratina-altered" —
-    // so typing "Giratina" and hitting Enter used to match nothing.
+    // so typing "Giratina" and hitting Enter used to match nothing. Uses a
+    // Gen IV+ party (Platinum) since Giratina — introduced in gen 4 — is
+    // itself correctly excluded from an earlier-gen party's allowed
+    // species (lib/species-availability.js).
     await page.goto('/');
-    await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
+    await createParty(page, { name: 'Platinum Run', baseGame: 'Platinum' });
     const addPanel = page.locator('section', { has: page.getByRole('heading', { name: 'Add a Pokémon' }) });
     await addPanel.getByRole('combobox', { name: 'e.g. Bulbasaur', exact: true }).fill('Giratina');
     await page.getByRole('option').filter({ hasText: /Giratina/i }).first().waitFor();
