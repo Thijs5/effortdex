@@ -1,6 +1,6 @@
 import { GAME_VERSIONS, GEN_ROMAN, normalizeGameName } from '../../lib/game-versions.ts';
-import { attachDesignSystem } from '../../lib/design-system.ts';
 import { attachPointerSelection, syncActiveDescendant } from '../../lib/combobox.ts';
+import { BaseElement } from '../base-element.ts';
 
 /**
  * <game-version-picker> — a text input with its own suggestion dropdown
@@ -17,18 +17,8 @@ import { attachPointerSelection, syncActiveDescendant } from '../../lib/combobox
  * Dispatches a composed `version-change` CustomEvent (detail: { value })
  * on every input or pick.
  */
-export class GameVersionPicker extends HTMLElement {
-  _activeIndex = -1;
-  _options: string[] = []; // flat list of currently shown pickable names
-  _lastValid = ''; // last committed value; what an invalid entry reverts to
-  $input: HTMLInputElement;
-  $list: HTMLUListElement;
-
-  constructor() {
-    super();
-    const shadow = this.attachShadow({ mode: 'open' });
-    attachDesignSystem(shadow);
-    shadow.innerHTML = `
+export class GameVersionPicker extends BaseElement {
+  static template = `
       <style>
         :host { display: block; position: relative; flex: 1; min-width: 0; }
         ul {
@@ -85,8 +75,17 @@ export class GameVersionPicker extends HTMLElement {
              autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false" />
       <ul id="gvp-list" role="listbox" hidden></ul>
     `;
-    this.$input = shadow.querySelector('input')!;
-    this.$list = shadow.querySelector('ul')!;
+
+  _activeIndex = -1;
+  _options: string[] = []; // flat list of currently shown pickable names
+  _lastValid = ''; // last committed value; what an invalid entry reverts to
+  $input: HTMLInputElement;
+  $list: HTMLUListElement;
+
+  constructor() {
+    super();
+    this.$input = this.$<HTMLInputElement>('input');
+    this.$list = this.$<HTMLUListElement>('ul');
   }
 
   connectedCallback(): void {

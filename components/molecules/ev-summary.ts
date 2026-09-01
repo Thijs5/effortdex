@@ -1,14 +1,24 @@
 import { STATS, STAT_CAP, TOTAL_CAP } from '../../lib/constants.ts';
 import type { StatKey, EvMap } from '../../lib/constants.ts';
 import { emptyEvs } from '../../lib/utils.ts';
-import { attachDesignSystem } from '../../lib/design-system.ts';
 import '../atoms/ev-bar.ts';
+import { BaseElement } from '../base-element.ts';
 
 /**
  * <ev-summary> — six per-stat <ev-bar>s plus a total bar. Set `.evs` to
  * an { hp, atk, def, spa, spd, spe } object.
  */
-export class EvSummary extends HTMLElement {
+export class EvSummary extends BaseElement {
+  static template = `
+      <style>
+        :host { display: block; }
+        .bars { display: grid; gap: var(--space-2); }
+        .total { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px dashed var(--lcd-line); }
+      </style>
+      <div class="bars"></div>
+      <div class="total"></div>
+    `;
+
   $bars: HTMLElement;
   $totalRow: HTMLElement;
   $total: import('../atoms/ev-bar.ts').EvBar;
@@ -21,19 +31,8 @@ export class EvSummary extends HTMLElement {
 
   constructor() {
     super();
-    const shadow = this.attachShadow({ mode: 'open' });
-    attachDesignSystem(shadow);
-    shadow.innerHTML = `
-      <style>
-        :host { display: block; }
-        .bars { display: grid; gap: var(--space-2); }
-        .total { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px dashed var(--lcd-line); }
-      </style>
-      <div class="bars"></div>
-      <div class="total"></div>
-    `;
-    this.$bars = shadow.querySelector<HTMLElement>('.bars')!;
-    this.$totalRow = shadow.querySelector<HTMLElement>('.total')!;
+    this.$bars = this.$('.bars');
+    this.$totalRow = this.$('.total');
     for (const { key, label } of STATS) {
       const bar = document.createElement('ev-bar');
       bar.dataset.key = key;
@@ -51,7 +50,7 @@ export class EvSummary extends HTMLElement {
 
   set evs(v: EvMap) {
     this._evs = v;
-    this._render();
+    this.render();
   }
   get evs(): EvMap {
     return this._evs;
@@ -59,7 +58,7 @@ export class EvSummary extends HTMLElement {
   /** The roster Pokémon's real current stat values, `{ hp, atk, def, spa, spd, spe }` (each entry null if that stat's IV isn't known yet — see store.ts's actualStat). Null hides every hint. */
   set actualStats(v: Record<StatKey, number | null> | null) {
     this._actualStats = v || null;
-    this._render();
+    this.render();
   }
   get actualStats(): Record<StatKey, number | null> | null {
     return this._actualStats;
@@ -67,7 +66,7 @@ export class EvSummary extends HTMLElement {
   /** The roster Pokémon's nature, `{ boost, hinder }` (either may be null). Null/unset colors nothing. */
   set nature(v: { boost: StatKey | null; hinder: StatKey | null } | null) {
     this._nature = v || null;
-    this._render();
+    this.render();
   }
   get nature(): { boost: StatKey | null; hinder: StatKey | null } | null {
     return this._nature;
@@ -75,7 +74,7 @@ export class EvSummary extends HTMLElement {
   /** The per-stat cap each bar's `.max` reflects. Defaults to STAT_CAP (252). */
   set statCap(v: number) {
     this._statCap = v || STAT_CAP;
-    this._render();
+    this.render();
   }
   get statCap(): number {
     return this._statCap;
@@ -83,7 +82,7 @@ export class EvSummary extends HTMLElement {
   /** The combined-total cap the `TOT` bar reflects, or `null` to hide that row entirely (uncapped). */
   set totalCap(v: number | null) {
     this._totalCap = v ?? null;
-    this._render();
+    this.render();
   }
   get totalCap(): number | null {
     return this._totalCap;
@@ -91,13 +90,13 @@ export class EvSummary extends HTMLElement {
   /** Gen I only: Special hasn't split into SpA/SpD yet — hide the `spd` bar and relabel `spa` as `SPC`. */
   set mergedSpecial(v: boolean) {
     this._mergedSpecial = !!v;
-    this._render();
+    this.render();
   }
   get mergedSpecial(): boolean {
     return this._mergedSpecial;
   }
 
-  _render(): void {
+  protected render(): void {
     let total = 0;
     for (const bar of this.$bars.querySelectorAll('ev-bar')) {
       const key = bar.dataset.key as StatKey;

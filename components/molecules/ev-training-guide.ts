@@ -1,8 +1,8 @@
 import { STATS, FALLBACK_SPRITE } from '../../lib/constants.ts';
 import { versionedSpriteUrl, modernSpriteUrl } from '../../lib/pokeapi-client.ts';
 import { titleCase } from '../../lib/utils.ts';
-import { attachDesignSystem } from '../../lib/design-system.ts';
 import '../atoms/item-button-grid.ts';
+import { BaseElement } from '../base-element.ts';
 import type { GameTrainingSpots } from '../../lib/ev-training-locations.ts';
 
 /**
@@ -16,16 +16,8 @@ import type { GameTrainingSpots } from '../../lib/ev-training-locations.ts';
  * this element has no idea what picking one means (logging a battle is
  * the caller's job, same division as item-button-grid's own `item-pick`).
  */
-export class EvTrainingGuide extends HTMLElement {
-  _locations: GameTrainingSpots | null = null;
-  _spriteGame = '';
-  $sections: HTMLElement;
-
-  constructor() {
-    super();
-    const shadow = this.attachShadow({ mode: 'open' });
-    attachDesignSystem(shadow);
-    shadow.innerHTML = `
+export class EvTrainingGuide extends BaseElement {
+  static template = `
       <style>
         :host { display: block; }
         .sections { display: grid; gap: var(--space-4); }
@@ -36,7 +28,14 @@ export class EvTrainingGuide extends HTMLElement {
       </style>
       <div class="sections"></div>
     `;
-    this.$sections = shadow.querySelector<HTMLElement>('.sections')!;
+
+  _locations: GameTrainingSpots | null = null;
+  _spriteGame = '';
+  $sections: HTMLElement;
+
+  constructor() {
+    super();
+    this.$sections = this.$('.sections');
     this.$sections.addEventListener('item-pick', (e) => {
       this.dispatchEvent(new CustomEvent('spot-pick', { detail: { name: (e as CustomEvent).detail.id }, bubbles: true, composed: true }));
     });
@@ -44,15 +43,15 @@ export class EvTrainingGuide extends HTMLElement {
 
   set locations(v: GameTrainingSpots | null) {
     this._locations = v;
-    this._render();
+    this.render();
   }
 
   set spriteGame(v: string) {
     this._spriteGame = v;
-    this._render();
+    this.render();
   }
 
-  _render(): void {
+  protected render(): void {
     this.$sections.innerHTML = '';
     if (!this._locations) return;
     for (const { key, label } of STATS) {
