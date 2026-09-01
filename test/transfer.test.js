@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { encodeTransferPayload, decodeTransferPayload } from '../lib/transfer.js';
+import { encodeTransferPayload, decodeTransferPayload } from '../lib/transfer.ts';
 
 function sampleParties() {
   return [

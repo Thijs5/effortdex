@@ -5,7 +5,7 @@
 // adr/0008 point 3) is the one place that actually calls
 // party-dialog.js's openCreateDialog(), in response to that route.
 
-import { totalEvs, escapeHtml } from '../../../lib/utils.js';
+import { totalEvs, escapeHtml } from '../../../lib/utils.ts';
 import { store } from '../../../lib/services.js';
 import * as router from '../../../lib/router.js';
 import { interceptLinkClick } from '../../../lib/dom.js';

@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { NetworkActivity, withoutNetworkActivity } from '../lib/network-activity.js';
+import { NetworkActivity, withoutNetworkActivity } from '../lib/network-activity.ts';
 
 function tracker({ online = true, flashMs = 0 } = {}) {
   let isOnline = online;

@@ -9,7 +9,7 @@
 // reads from `readRoster` (docs/adr/0025 §3); the localStorage blob is a
 // dual-write backup reconciled by `rev`.
 
-import { uniqueSlug } from '../slug.js';
+import { uniqueSlug } from '../slug.ts';
 import type { Db } from './index.ts';
 import type { EventRow, MetaRow, PartyRow, RosterEntryRow } from './schema.ts';
 

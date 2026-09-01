@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { slugify, uniqueSlug } from '../lib/slug.js';
+import { slugify, uniqueSlug } from '../lib/slug.ts';
 
 test('slugify lowercases, strips diacritics and collapses non-alphanumerics', () => {
   assert.equal(slugify('Emerald Nuzlocke'), 'emerald-nuzlocke');

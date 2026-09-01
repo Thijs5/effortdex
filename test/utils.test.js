@@ -1,8 +1,8 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { titleCase, emptyEvs, totalEvs, formatEvYield, natureLabel, natureEffectHint, sortedNatures, natureOptionsHtml, escapeHtml, dayKey, dayLabel, formatBytes } from '../lib/utils.js';
-import { NATURES } from '../lib/constants.js';
+import { titleCase, emptyEvs, totalEvs, formatEvYield, natureLabel, natureEffectHint, sortedNatures, natureOptionsHtml, escapeHtml, dayKey, dayLabel, formatBytes } from '../lib/utils.ts';
+import { NATURES } from '../lib/constants.ts';
 
 test('titleCase capitalizes words and replaces hyphens with spaces', () => {
   assert.equal(titleCase('bulbasaur'), 'Bulbasaur');

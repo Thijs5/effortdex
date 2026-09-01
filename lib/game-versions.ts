@@ -1,4 +1,3 @@
-// @ts-check
 // Known official game titles, one entry per title. Party.baseGame must be
 // one of these titles' names (or empty) — a ROM hack or fan game is
 // entered by picking whichever official title it's a hack *of*, not by
@@ -20,18 +19,16 @@
 // 110 EVs snaps straight to 100 instead of -10), fixed as of HeartGold/
 // SoulSilver — see https://bulbapedia.bulbagarden.net/wiki/Pomeg_Berry.
 
-/**
- * @typedef {object} GameVersion
- * @property {string} name
- * @property {number} gen
- * @property {string} color
- * @property {boolean} [noPokerus]
- * @property {boolean} [noEvBerries]
- * @property {boolean} [berrySnapTo100]
- */
+export interface GameVersion {
+  name: string;
+  gen: number;
+  color: string;
+  noPokerus?: boolean;
+  noEvBerries?: boolean;
+  berrySnapTo100?: boolean;
+}
 
-/** @type {GameVersion[]} */
-export const GAME_VERSIONS = [
+export const GAME_VERSIONS: GameVersion[] = [
   { name: 'Red', gen: 1, color: '#ee1515' },
   { name: 'Blue', gen: 1, color: '#2a5ea8' },
   { name: 'Green', gen: 1, color: '#2f9b4e' },
@@ -102,8 +99,7 @@ export const GEN_COLORS = [
 // "firered" all match one entry regardless of spacing/punctuation.
 // Exported so UI that filters this list (game-version-picker) normalizes
 // input the exact same way matchGameVersion will later recognize it.
-/** @param {string} s @returns {string} */
-export function normalizeGameName(s) {
+export function normalizeGameName(s: string): string {
   return s.toLowerCase().replace(/[^a-z0-9]/g, '');
 }
 const normalize = normalizeGameName;
@@ -118,8 +114,7 @@ export const KNOWN_GAME_NAMES = GAME_VERSIONS.map((g) => g.name);
  * unrecognized (including every ROM hack), which callers should treat
  * as a perfectly valid, just uncategorized, game version.
  */
-/** @param {string|null|undefined} text @returns {GameVersion|null} */
-export function matchGameVersion(text) {
+export function matchGameVersion(text: string | null | undefined): GameVersion | null {
   if (!text) return null;
   const norm = normalize(text);
   return GAME_VERSIONS.find((entry) => normalize(entry.name) === norm) || null;

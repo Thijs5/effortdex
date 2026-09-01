@@ -1,9 +1,9 @@
-import { STATS, STAT_LABEL } from '../../../../lib/constants.js';
-import { gen1SpecialStat } from '../../../../lib/gen1-special-stats.js';
-import { escapeHtml } from '../../../../lib/utils.js';
+import { STATS, STAT_LABEL } from '../../../../lib/constants.ts';
+import { gen1SpecialStat } from '../../../../lib/gen1-special-stats.ts';
+import { escapeHtml } from '../../../../lib/utils.ts';
 import { store, smogon } from '../../../../lib/services.js';
 import { toShowdownId, smogonSetsKey, TIER_DESCRIPTIONS } from '../../../../lib/smogon-client.js';
-import { matchGameVersion } from '../../../../lib/game-versions.js';
+import { matchGameVersion } from '../../../../lib/game-versions.ts';
 import { BaseDialog } from '../../../atoms/base-dialog.js';
 
 /** @typedef {import('../lib/store.js').RosterEntry} RosterEntry */
@@ -270,7 +270,7 @@ export class CompetitiveDialog extends BaseDialog {
     const evs = first(set.evs);
     const evsText = evs
       ? Object.entries(evs)
-          .map(([key, value]) => `${value} ${STAT_LABEL[/** @type {import('../lib/constants.js').StatKey} */ (key)] || key.toUpperCase()}`)
+          .map(([key, value]) => `${value} ${STAT_LABEL[/** @type {import('../lib/constants.ts').StatKey} */ (key)] || key.toUpperCase()}`)
           .join(' / ')
       : '';
     return `

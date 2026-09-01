@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { GEN1_SPECIAL_STAT, gen1SpecialStat } from '../lib/gen1-special-stats.js';
+import { GEN1_SPECIAL_STAT, gen1SpecialStat } from '../lib/gen1-special-stats.ts';
 
 test('GEN1_SPECIAL_STAT covers exactly the 151 Gen I species, each a plausible stat value', () => {
   const keys = Object.keys(GEN1_SPECIAL_STAT).map(Number);

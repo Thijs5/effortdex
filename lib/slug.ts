@@ -1,11 +1,9 @@
-// @ts-check
 // URL-slug helpers, kept separate from the general-purpose utils because
 // they encode one specific policy: how a party name becomes a path segment.
 
 const COMBINING_DIACRITICS = /[̀-ͯ]/g;
 
-/** @param {string} text @returns {string} */
-export function slugify(text) {
+export function slugify(text: string): string {
   return text
     .normalize('NFKD')
     .replace(COMBINING_DIACRITICS, '') // é -> e, etc.
@@ -25,9 +23,8 @@ export function slugify(text) {
 // with directly.
 const RESERVED_SLUGS = new Set(['create']);
 
-/** Slugifies `name`, disambiguating against `existingSlugs` (a Set).
- * @param {string} name @param {Set<string>} existingSlugs @returns {string} */
-export function uniqueSlug(name, existingSlugs) {
+/** Slugifies `name`, disambiguating against `existingSlugs` (a Set). */
+export function uniqueSlug(name: string, existingSlugs: Set<string>): string {
   const base = slugify(name) || 'party';
   let slug = base;
   let n = 2;

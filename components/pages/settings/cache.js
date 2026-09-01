@@ -21,20 +21,20 @@
 // silently drop where the user was before they ever opened Settings.
 
 import { interceptLinkClick } from '../../../lib/dom.js';
-import { GAME_VERSIONS, GEN_ROMAN } from '../../../lib/game-versions.js';
+import { GAME_VERSIONS, GEN_ROMAN } from '../../../lib/game-versions.ts';
 import { spriteGroupKey } from '../../../lib/pokeapi-client.js';
 import { api, prefetchService } from '../../../lib/services.js';
-import { SPRITE_CACHE_NAME } from '../../../lib/sprite-cache.js';
+import { SPRITE_CACHE_NAME } from '../../../lib/sprite-cache.ts';
 import { clearAppCache, estimateCacheSize } from '../../../lib/version-check.js';
-import { isCachingDisabled, setCachingDisabled } from '../../../lib/dev-cache.js';
+import { isCachingDisabled, setCachingDisabled } from '../../../lib/dev-cache.ts';
 import {
   isNotificationSupported,
   isCacheDoneNotifyEnabled,
   setCacheDoneNotifyEnabled,
   ensureNotificationPermission,
   notifyCacheDone,
-} from '../../../lib/notifications.js';
-import { escapeHtml, formatBytes } from '../../../lib/utils.js';
+} from '../../../lib/notifications.ts';
+import { escapeHtml, formatBytes } from '../../../lib/utils.ts';
 import * as router from '../../../lib/router.js';
 
 export const view = document.getElementById('cache-view');

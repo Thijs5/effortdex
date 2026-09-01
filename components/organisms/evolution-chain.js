@@ -1,5 +1,5 @@
-import { FALLBACK_SPRITE } from '../../lib/constants.js';
-import { titleCase, escapeHtml } from '../../lib/utils.js';
+import { FALLBACK_SPRITE } from '../../lib/constants.ts';
+import { titleCase, escapeHtml } from '../../lib/utils.ts';
 import { api, store } from '../../lib/services.js';
 import { attachDesignSystem } from '../../lib/design-system.js';
 import '../atoms/ds-item-button.js';

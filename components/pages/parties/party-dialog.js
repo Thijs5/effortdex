@@ -27,7 +27,7 @@
 
 import { store, prefetchService } from '../../../lib/services.js';
 import * as router from '../../../lib/router.js';
-import { isCachingDisabled } from '../../../lib/dev-cache.js';
+import { isCachingDisabled } from '../../../lib/dev-cache.ts';
 import { focusDialogStart } from '../../../lib/dom.js';
 import '../../atoms/game-ball.js';
 import '../../molecules/game-version-picker.js';

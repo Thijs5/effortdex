@@ -1,4 +1,3 @@
-// @ts-check
 // Curated, hand-picked wild-encounter spots for grinding each stat's EVs,
 // per official title — bundled data, not a live lookup. This app is
 // offline-first (docs/adr/0001, docs/adr/0004): a raw fetch() here would
@@ -37,21 +36,25 @@
 // individually against those sources at authoring time — a wrong route
 // here is worse than no route at all for the players this feature is for.
 
-import { matchGameVersion } from './game-versions.js';
+import { matchGameVersion } from './game-versions.ts';
+import type { StatKey } from './constants.ts';
 
-/**
- * @typedef {object} TrainingSpot
- * @property {string} species PokéAPI species name (lowercase, hyphenated)
- * @property {number} speciesId National Dex number — lets a sprite URL be built with no fetch
- * @property {string} location Where to find it, named the way the game itself names the place
- * @property {number} amount EVs of this section's stat per defeat, in this title's generation
- * @property {string} [note] One short caveat (e.g. "needs Dive", "surfing")
- */
-/** @typedef {Record<import('./constants.js').StatKey, TrainingSpot[]>} GameTrainingSpots */
+export interface TrainingSpot {
+  /** PokéAPI species name (lowercase, hyphenated) */
+  species: string;
+  /** National Dex number — lets a sprite URL be built with no fetch */
+  speciesId: number;
+  /** Where to find it, named the way the game itself names the place */
+  location: string;
+  /** EVs of this section's stat per defeat, in this title's generation */
+  amount: number;
+  /** One short caveat (e.g. "needs Dive", "surfing") */
+  note?: string;
+}
+export type GameTrainingSpots = Record<StatKey, TrainingSpot[]>;
 
 // Hoenn: Ruby, Sapphire, Emerald (Gen III).
-/** @type {GameTrainingSpots} */
-const RSE = {
+const RSE: GameTrainingSpots = {
   hp: [{ species: 'whismur', speciesId: 293, location: 'Rusturf Tunnel', amount: 1 }],
   atk: [{ species: 'corphish', speciesId: 341, location: 'Route 102, Route 117, or Petalburg City', amount: 1 }],
   def: [{ species: 'clamperl', speciesId: 366, location: 'underwater near Route 124 or 126', amount: 1, note: 'needs Dive' }],
@@ -61,8 +64,7 @@ const RSE = {
 };
 
 // Kanto (remade): FireRed, LeafGreen (Gen III).
-/** @type {GameTrainingSpots} */
-const KANTO_FRLG = {
+const KANTO_FRLG: GameTrainingSpots = {
   hp: [{ species: 'slowpoke', speciesId: 79, location: 'Route 6, Route 22, Route 23, Route 25, Viridian City, or Fuchsia City', amount: 1 }],
   atk: [{ species: 'machop', speciesId: 66, location: 'Rock Tunnel or Victory Road', amount: 1 }],
   def: [{ species: 'weezing', speciesId: 110, location: 'Route 17 (Cycling Road)', amount: 2 }],
@@ -72,8 +74,7 @@ const KANTO_FRLG = {
 };
 
 // Sinnoh: Diamond, Pearl, Platinum (Gen IV).
-/** @type {GameTrainingSpots} */
-const SINNOH_DPPT = {
+const SINNOH_DPPT: GameTrainingSpots = {
   hp: [{ species: 'bidoof', speciesId: 399, location: 'Route 201', amount: 1 }],
   atk: [{ species: 'machop', speciesId: 66, location: 'Mt. Coronet or Route 215 (Platinum)', amount: 1 }],
   def: [{ species: 'geodude', speciesId: 74, location: 'the Maniac Tunnel on Route 214', amount: 1 }],
@@ -83,8 +84,7 @@ const SINNOH_DPPT = {
 };
 
 // Johto (remade): HeartGold, SoulSilver (Gen IV mechanics).
-/** @type {GameTrainingSpots} */
-const JOHTO_HGSS = {
+const JOHTO_HGSS: GameTrainingSpots = {
   hp: [{ species: 'slowpoke', speciesId: 79, location: 'Slowpoke Well', amount: 1, note: 'surfing' }],
   atk: [{ species: 'seaking', speciesId: 119, location: 'Route 4, Route 24, Route 25, or Cerulean City', amount: 2, note: 'surfing' }],
   def: [{ species: 'tangela', speciesId: 114, location: 'Route 21', amount: 1 }],
@@ -94,8 +94,7 @@ const JOHTO_HGSS = {
 };
 
 // Unova: Black, White (Gen V).
-/** @type {GameTrainingSpots} */
-const UNOVA_BW = {
+const UNOVA_BW: GameTrainingSpots = {
   hp: [{ species: 'stunfisk', speciesId: 618, location: 'Route 8, Icirrus City, or the Moor of Icirrus', amount: 2 }],
   atk: [{ species: 'druddigon', speciesId: 621, location: 'Dragonspiral Tower', amount: 2 }],
   def: [{ species: 'cofagrigus', speciesId: 563, location: 'Relic Castle B2F', amount: 2 }],
@@ -106,8 +105,7 @@ const UNOVA_BW = {
 
 // Unova: Black 2, White 2 (Gen V) — the remap of Unova's map moves several
 // of the best spots, so this gets its own set rather than reusing UNOVA_BW.
-/** @type {GameTrainingSpots} */
-const UNOVA_B2W2 = {
+const UNOVA_B2W2: GameTrainingSpots = {
   hp: [{ species: 'audino', speciesId: 531, location: 'the Virbank Complex', amount: 2, note: 'shaking grass' }],
   atk: [{ species: 'golurk', speciesId: 623, location: 'Dragonspiral Tower 2F', amount: 2 }],
   def: [{ species: 'yamask', speciesId: 562, location: 'Relic Castle B1F-B2F', amount: 1 }],
@@ -117,8 +115,7 @@ const UNOVA_B2W2 = {
 };
 
 // Kalos: X, Y (Gen VI).
-/** @type {GameTrainingSpots} */
-const KALOS_XY = {
+const KALOS_XY: GameTrainingSpots = {
   hp: [{ species: 'whismur', speciesId: 293, location: 'Connecting Cave', amount: 1 }],
   atk: [{ species: 'weepinbell', speciesId: 70, location: 'Route 20 (Winding Woods)', amount: 2 }],
   def: [{ species: 'durant', speciesId: 632, location: 'Terminus Cave', amount: 2 }],
@@ -128,8 +125,7 @@ const KALOS_XY = {
 };
 
 // Hoenn (remade): Omega Ruby, Alpha Sapphire (Gen VI mechanics).
-/** @type {GameTrainingSpots} */
-const HOENN_ORAS = {
+const HOENN_ORAS: GameTrainingSpots = {
   hp: [{ species: 'whismur', speciesId: 293, location: 'Rusturf Tunnel', amount: 1 }],
   atk: [{ species: 'machop', speciesId: 66, location: 'Jagged Pass', amount: 1 }],
   def: [{ species: 'sandshrew', speciesId: 27, location: 'Route 111 (the desert)', amount: 1 }],
@@ -139,8 +135,7 @@ const HOENN_ORAS = {
 };
 
 // Galar: Sword, Shield (Gen VIII).
-/** @type {GameTrainingSpots} */
-const GALAR = {
+const GALAR: GameTrainingSpots = {
   hp: [{ species: 'skwovet', speciesId: 819, location: 'Route 1', amount: 1 }],
   atk: [{ species: 'timburr', speciesId: 532, location: 'the Galar Mine', amount: 1 }],
   def: [{ species: 'rolycoly', speciesId: 837, location: 'Route 3, south of the Galar Mine', amount: 1 }],
@@ -150,8 +145,7 @@ const GALAR = {
 };
 
 // Paldea: Scarlet, Violet (Gen IX).
-/** @type {GameTrainingSpots} */
-const PALDEA = {
+const PALDEA: GameTrainingSpots = {
   hp: [{ species: 'azurill', speciesId: 298, location: 'south of Los Platos, by the river', amount: 1 }],
   atk: [{ species: 'shinx', speciesId: 403, location: 'east of Mesagoza', amount: 1 }],
   def: [{ species: 'tarountula', speciesId: 917, location: 'south of Mesagoza', amount: 1 }],
@@ -160,8 +154,7 @@ const PALDEA = {
   spe: [{ species: 'fletchling', speciesId: 661, location: 'south of Mesagoza', amount: 1 }],
 };
 
-/** @type {Record<string, GameTrainingSpots>} */
-const BY_TITLE = {
+const BY_TITLE: Record<string, GameTrainingSpots> = {
   Ruby: RSE,
   Sapphire: RSE,
   Emerald: RSE,
@@ -193,10 +186,8 @@ export const EV_TRAINING_LOCATIONS = BY_TITLE;
  * The curated EV-training spots for `gameName`'s own title, or `null` when
  * this title isn't recognized or isn't curated (Gen I/II, Let's Go, Legends:
  * Arceus, or any ROM hack — see this module's header comment).
- * @param {string|null|undefined} gameName
- * @returns {GameTrainingSpots|null}
  */
-export function evTrainingLocations(gameName) {
+export function evTrainingLocations(gameName: string | null | undefined): GameTrainingSpots | null {
   const match = matchGameVersion(gameName);
   return (match && BY_TITLE[match.name]) || null;
 }

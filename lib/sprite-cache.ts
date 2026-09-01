@@ -1,4 +1,3 @@
-// @ts-check
 // The one place page-side code (lib/prefetch-service.js,
 // components/pages/settings/cache.js) gets sw.js's sprite Cache Storage
 // name from. sw.js itself

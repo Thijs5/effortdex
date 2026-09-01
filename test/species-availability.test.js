@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { availableSpeciesFor } from '../lib/species-availability.js';
+import { availableSpeciesFor } from '../lib/species-availability.ts';
 
 /**
  * @param {Record<number, string[]|Error>} generations

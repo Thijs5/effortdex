@@ -4,8 +4,8 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { Store, MIGRATIONS } from '../lib/store.js';
-import { SCHEMA_VERSION } from '../lib/schema-version.js';
-import { STAT_CAP, TOTAL_CAP, VITAMIN_BONUS, MIN_LEVEL, MAX_LEVEL, DEFAULT_LEVEL } from '../lib/constants.js';
+import { SCHEMA_VERSION } from '../lib/schema-version.ts';
+import { STAT_CAP, TOTAL_CAP, VITAMIN_BONUS, MIN_LEVEL, MAX_LEVEL, DEFAULT_LEVEL } from '../lib/constants.ts';
 
 function mon(overrides = {}) {
   return { id: 1, name: 'bulbasaur', sprite: null, ...overrides };

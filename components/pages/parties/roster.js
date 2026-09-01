@@ -22,16 +22,16 @@ import {
   EXP_SHARE_SPRITE,
   versionedSpriteOnError,
   NATURES,
-} from '../../../lib/constants.js';
-import { titleCase, totalEvs, natureOptionsHtml, escapeHtml, sortedNatures, natureLabel } from '../../../lib/utils.js';
-import { POKERUS_ICON_SVG } from '../../../lib/icons.js';
+} from '../../../lib/constants.ts';
+import { titleCase, totalEvs, natureOptionsHtml, escapeHtml, sortedNatures, natureLabel } from '../../../lib/utils.ts';
+import { POKERUS_ICON_SVG } from '../../../lib/icons.ts';
 import { api, store } from '../../../lib/services.js';
 import { versionedSpriteUrl, versionedSpriteIsOpaque } from '../../../lib/pokeapi-client.js';
-import { wireSpriteFallback } from '../../../lib/sprite-fallback.js';
-import { availableSpeciesFor } from '../../../lib/species-availability.js';
+import { wireSpriteFallback } from '../../../lib/sprite-fallback.ts';
+import { availableSpeciesFor } from '../../../lib/species-availability.ts';
 import * as router from '../../../lib/router.js';
 import { interceptLinkClick, focusDialogStart } from '../../../lib/dom.js';
-import { wireDragHandle } from '../../../lib/drag-reorder.js';
+import { wireDragHandle } from '../../../lib/drag-reorder.ts';
 import '../../atoms/game-ball.js';
 import '../../organisms/pokemon-search.js';
 import '../../atoms/ev-bar.js';

@@ -1,9 +1,9 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { EV_TRAINING_LOCATIONS, evTrainingLocations } from '../lib/ev-training-locations.js';
-import { matchGameVersion } from '../lib/game-versions.js';
-import { STATS } from '../lib/constants.js';
+import { EV_TRAINING_LOCATIONS, evTrainingLocations } from '../lib/ev-training-locations.ts';
+import { matchGameVersion } from '../lib/game-versions.ts';
+import { STATS } from '../lib/constants.ts';
 
 // The highest National Dex number that existed at the end of each
 // generation — used below to catch the classic authoring slip of pasting

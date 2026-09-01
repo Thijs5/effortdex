@@ -1,5 +1,5 @@
-import { STATS, STAT_CAP, TOTAL_CAP } from '../../lib/constants.js';
-import { emptyEvs } from '../../lib/utils.js';
+import { STATS, STAT_CAP, TOTAL_CAP } from '../../lib/constants.ts';
+import { emptyEvs } from '../../lib/utils.ts';
 import { attachDesignSystem } from '../../lib/design-system.js';
 import '../atoms/ev-bar.js';
 

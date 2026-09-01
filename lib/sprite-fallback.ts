@@ -1,4 +1,3 @@
-// @ts-check
 // Wires an <img> whose `src` gets reassigned many times over its
 // lifetime (a reused add-Pokémon-dialog sprite, or a detail card's own
 // sprite) to a two-hop fallback: a game-specific sprite
@@ -7,13 +6,11 @@
 // unreachable at all (offline) — retry the modern default sprite once,
 // then finally the local placeholder.
 
-import { FALLBACK_SPRITE } from './constants.js';
+import { FALLBACK_SPRITE } from './constants.ts';
 
-/**
- * @param {HTMLImageElement} img
- * @returns {{ setVersionedSprite: (versioned: string|null, modern: string) => void }}
- */
-export function wireSpriteFallback(img) {
+export function wireSpriteFallback(img: HTMLImageElement): {
+  setVersionedSprite: (versioned: string | null, modern: string) => void;
+} {
   // Deliberately NOT setting img.crossOrigin: these sprites are only ever
   // painted, never read back through a canvas, so cors mode buys nothing
   // — and a cors Response served from Cache Storage offline is exactly
@@ -22,8 +19,7 @@ export function wireSpriteFallback(img) {
   // Response instead, which iOS *does* replay from cache offline. See
   // constants.js's FALLBACK_ONERROR comment and sw.js for the full story.
 
-  /** @type {string|null} */
-  let modernFallback = null;
+  let modernFallback: string | null = null;
   img.addEventListener('error', () => {
     if (modernFallback && img.src !== modernFallback) {
       const modern = modernFallback;
@@ -34,9 +30,8 @@ export function wireSpriteFallback(img) {
     }
   });
   return {
-    /** Assigns `versioned || modern`, stashing `modern` as the one-time retry if `versioned` fails.
-     * @param {string|null} versioned @param {string} modern */
-    setVersionedSprite(versioned, modern) {
+    /** Assigns `versioned || modern`, stashing `modern` as the one-time retry if `versioned` fails. */
+    setVersionedSprite(versioned: string | null, modern: string) {
       modernFallback = versioned ? modern : null;
       img.src = versioned || modern;
     },

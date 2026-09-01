@@ -1,4 +1,3 @@
-// @ts-check
 // Pointer-driven drag-to-reorder for a grid/list of sibling elements —
 // not native HTML5 drag-and-drop, which doesn't fire from touch on mobile
 // browsers. Press the handle, drag up/down; whichever neighbor the
@@ -19,22 +18,37 @@
 // drops that capture in Chromium, ending the drag after a single move
 // event.
 
-/**
- * @param {object} opts
- * @param {HTMLElement} opts.handle - the element that starts the drag on pointerdown
- * @param {HTMLElement} opts.item - the sibling element that actually moves
- * @param {HTMLElement} opts.container - the shared parent whose children are reordered
- * @param {string} opts.itemSelector - selector (within `container`) matching every reorderable sibling, including `item`
- * @param {string} opts.draggingClass - class applied to `item` for the duration of the drag
- * @param {string} opts.dropTargetClass - class applied to whichever sibling is currently the drop target
- * @param {(item: HTMLElement, endIndex: number) => void} opts.onDrop - called once, only if the drop actually changed `item`'s index
- */
-export function wireDragHandle({ handle, item, container, itemSelector, draggingClass, dropTargetClass, onDrop }) {
+interface WireDragHandleOpts {
+  /** the element that starts the drag on pointerdown */
+  handle: HTMLElement;
+  /** the sibling element that actually moves */
+  item: HTMLElement;
+  /** the shared parent whose children are reordered */
+  container: HTMLElement;
+  /** selector (within `container`) matching every reorderable sibling, including `item` */
+  itemSelector: string;
+  /** class applied to `item` for the duration of the drag */
+  draggingClass: string;
+  /** class applied to whichever sibling is currently the drop target */
+  dropTargetClass: string;
+  /** called once, only if the drop actually changed `item`'s index */
+  onDrop: (item: HTMLElement, endIndex: number) => void;
+}
+
+export function wireDragHandle({
+  handle,
+  item,
+  container,
+  itemSelector,
+  draggingClass,
+  dropTargetClass,
+  onDrop,
+}: WireDragHandleOpts): void {
   handle.addEventListener('pointerdown', (e) => {
     if (e.pointerType === 'mouse' && e.button !== 0) return;
     e.preventDefault();
     handle.setPointerCapture(e.pointerId);
-    const itemsNow = () => [...container.querySelectorAll(itemSelector)];
+    const itemsNow = () => [...container.querySelectorAll<HTMLElement>(itemSelector)];
     const startIndex = itemsNow().indexOf(item);
     item.classList.add(draggingClass);
 
@@ -46,12 +60,11 @@ export function wireDragHandle({ handle, item, container, itemSelector, dragging
         return { el, rect, cx: rect.left + rect.width / 2, cy: rect.top + rect.height / 2 };
       });
 
-    /** @type {{ el: Element, before: boolean } | null} */
-    let dropTarget = null;
+    let dropTarget: { el: Element; before: boolean } | null = null;
 
-    const onMove = (/** @type {PointerEvent} */ moveEvent) => {
+    const onMove = (moveEvent: PointerEvent) => {
       const { clientX: x, clientY: y } = moveEvent;
-      let closest = null;
+      let closest: (typeof others)[number] | null = null;
       let closestDist = Infinity;
       for (const candidate of others) {
         const dist = (x - candidate.cx) ** 2 + (y - candidate.cy) ** 2;

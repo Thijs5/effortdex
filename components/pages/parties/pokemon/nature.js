@@ -1,5 +1,5 @@
-import { NATURES } from '../../../../lib/constants.js';
-import { natureEffectHint, natureOptionsHtml } from '../../../../lib/utils.js';
+import { NATURES } from '../../../../lib/constants.ts';
+import { natureEffectHint, natureOptionsHtml } from '../../../../lib/utils.ts';
 import { store } from '../../../../lib/services.js';
 import { BaseDialog } from '../../../atoms/base-dialog.js';
 

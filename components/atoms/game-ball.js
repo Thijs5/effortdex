@@ -1,4 +1,4 @@
-import { matchGameVersion, GEN_ROMAN, GEN_COLORS } from '../../lib/game-versions.js';
+import { matchGameVersion, GEN_ROMAN, GEN_COLORS } from '../../lib/game-versions.ts';
 import { attachDesignSystem } from '../../lib/design-system.js';
 
 const R = 16; // ball radius, viewBox is 0 0 40 40 with center (20, 20)

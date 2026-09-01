@@ -1,6 +1,6 @@
 import { attachDesignSystem } from '../../lib/design-system.js';
 import { store } from '../../lib/services.js';
-import { encodeTransferPayload } from '../../lib/transfer.js';
+import { encodeTransferPayload } from '../../lib/transfer.ts';
 import { importPath } from '../../lib/router.js';
 
 // Not a hard browser limit (modern browsers handle hash-fragment URLs far

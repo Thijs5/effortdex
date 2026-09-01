@@ -1,7 +1,7 @@
 // @ts-check
-import { STATS, FALLBACK_SPRITE } from '../../lib/constants.js';
+import { STATS, FALLBACK_SPRITE } from '../../lib/constants.ts';
 import { versionedSpriteUrl, modernSpriteUrl } from '../../lib/pokeapi-client.js';
-import { titleCase } from '../../lib/utils.js';
+import { titleCase } from '../../lib/utils.ts';
 import { attachDesignSystem } from '../../lib/design-system.js';
 import '../atoms/item-button-grid.js';
 
@@ -40,7 +40,7 @@ export class EvTrainingGuide extends HTMLElement {
     });
   }
 
-  /** @param {import('../lib/ev-training-locations.js').GameTrainingSpots|null} v */
+  /** @param {import('../lib/ev-training-locations.ts').GameTrainingSpots|null} v */
   set locations(v) {
     this._locations = v;
     this._render();

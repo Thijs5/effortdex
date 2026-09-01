@@ -1,4 +1,3 @@
-// @ts-check
 // Which species names a party's Pokémon pickers (battle log, add-to-
 // roster) should offer — see GitHub issue #31 and docs/adr/0024.
 //
@@ -29,14 +28,14 @@
 // variety names so the allowed set is expressed in the same vocabulary
 // the picker actually compares against.
 
-import { matchGameVersion } from './game-versions.js';
+import { matchGameVersion } from './game-versions.ts';
+import type { Party } from './store.js';
+import type { PokeApiClient } from './pokeapi-client.js';
 
-/**
- * @param {import('./store.js').Party|null|undefined} party
- * @param {import('./pokeapi-client.js').PokeApiClient} api
- * @returns {Promise<Set<string>|null>}
- */
-export async function availableSpeciesFor(party, api) {
+export async function availableSpeciesFor(
+  party: Party | null | undefined,
+  api: PokeApiClient,
+): Promise<Set<string> | null> {
   if (!party) return null;
   const gen = party.overrides?.availableGeneration ?? matchGameVersion(party.baseGame)?.gen;
   if (!gen) return null;
@@ -49,8 +48,8 @@ export async function availableSpeciesFor(party, api) {
     const varietyNames = new Set(allVarieties.map((s) => s.name));
     const roots = [...new Set(perGeneration.flat().map((s) => s.name))];
 
-    const allowed = new Set();
-    const mismatched = [];
+    const allowed = new Set<string>();
+    const mismatched: string[] = [];
     for (const root of roots) {
       if (varietyNames.has(root)) allowed.add(root);
       else mismatched.push(root);

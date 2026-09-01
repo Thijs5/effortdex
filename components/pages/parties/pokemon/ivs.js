@@ -1,10 +1,10 @@
-import { STATS } from '../../../../lib/constants.js';
-import { escapeHtml } from '../../../../lib/utils.js';
+import { STATS } from '../../../../lib/constants.ts';
+import { escapeHtml } from '../../../../lib/utils.ts';
 import { store } from '../../../../lib/services.js';
 import { BaseDialog } from '../../../atoms/base-dialog.js';
 
 /** @typedef {import('../lib/store.js').RosterEntry} RosterEntry */
-/** @typedef {import('../lib/constants.js').StatKey} StatKey */
+/** @typedef {import('../lib/constants.ts').StatKey} StatKey */
 
 /**
  * <iv-dialog> — a roster Pokémon's IVs dialog: the six-stat grid plus

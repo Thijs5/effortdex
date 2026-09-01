@@ -1,6 +1,6 @@
 // @ts-check
 import { attachDesignSystem } from '../../lib/design-system.js';
-import { FALLBACK_ONERROR } from '../../lib/constants.js';
+import { FALLBACK_ONERROR } from '../../lib/constants.ts';
 
 /**
  * <ds-item-button> — the sprite + label (+ lighter boost line) choice

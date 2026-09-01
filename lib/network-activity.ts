@@ -1,4 +1,3 @@
-// @ts-check
 // Drives the header's power LED as a network activity indicator, styled
 // after a router's link light rather than a plain on/off dot: "ready"
 // (blue) while online and idle, "sending" (orange) while a request is
@@ -30,9 +29,8 @@ const RECEIVING_FLASH_MS = 250;
 let suppressDepth = 0;
 
 /** Runs `fn` (which performs some `fetch()` calls, directly or several
- * layers deep) without those calls driving the power LED. Safe to nest.
- * @template T @param {() => Promise<T>} fn @returns {Promise<T>} */
-export async function withoutNetworkActivity(fn) {
+ * layers deep) without those calls driving the power LED. Safe to nest. */
+export async function withoutNetworkActivity<T>(fn: () => Promise<T>): Promise<T> {
   suppressDepth++;
   try {
     return await fn();
@@ -41,23 +39,30 @@ export async function withoutNetworkActivity(fn) {
   }
 }
 
-/** @typedef {'off'|'ready'|'sending'|'receiving'} NetworkStatus */
+export type NetworkStatus = 'off' | 'ready' | 'sending' | 'receiving';
+
+interface NetworkActivityDeps {
+  isOnline?: () => boolean;
+  onOnlineChange?: (notify: () => void) => void;
+  flashMs?: number;
+}
 
 export class NetworkActivity extends EventTarget {
+  private _isOnline: () => boolean;
+  private _flashMs: number;
+  private _pending = 0;
+  private _flashTimer: ReturnType<typeof setTimeout> | null = null;
+  private _attached = false;
+
   /**
    * `isOnline`/`onOnlineChange` are injectable (defaulting to the real
    * `navigator`/`window`) purely so tests can drive online/offline
    * transitions without touching global state.
-   * @param {{ isOnline?: () => boolean, onOnlineChange?: (notify: () => void) => void, flashMs?: number }} [deps]
    */
-  constructor({ isOnline = () => navigator.onLine, onOnlineChange, flashMs = RECEIVING_FLASH_MS } = {}) {
+  constructor({ isOnline = () => navigator.onLine, onOnlineChange, flashMs = RECEIVING_FLASH_MS }: NetworkActivityDeps = {}) {
     super();
     this._isOnline = isOnline;
     this._flashMs = flashMs;
-    this._pending = 0;
-    /** @type {ReturnType<typeof setTimeout>|null} */
-    this._flashTimer = null;
-    this._attached = false;
 
     const notify = () => this._notify();
     if (onOnlineChange) {
@@ -68,8 +73,7 @@ export class NetworkActivity extends EventTarget {
     }
   }
 
-  /** @returns {NetworkStatus} */
-  get status() {
+  get status(): NetworkStatus {
     if (!this._isOnline()) return 'off';
     // "Sending" wins over a "receiving" flash from an already-finished
     // sibling request — with several requests in flight at once, the
@@ -79,12 +83,12 @@ export class NetworkActivity extends EventTarget {
     return this._flashTimer ? 'receiving' : 'ready';
   }
 
-  _notify() {
+  _notify(): void {
     this.dispatchEvent(new CustomEvent('change', { detail: { status: this.status } }));
   }
 
   /** Marks one request as started — call before it goes out. */
-  begin() {
+  begin(): void {
     this._pending++;
     // A fresh request always reads as "sending", even mid-flash from a
     // just-finished one — the light shouldn't sit on green while new
@@ -97,7 +101,7 @@ export class NetworkActivity extends EventTarget {
   }
 
   /** Marks one request as settled (success or failure) — call once it resolves/rejects. */
-  end() {
+  end(): void {
     this._pending = Math.max(0, this._pending - 1);
     if (this._flashTimer) clearTimeout(this._flashTimer);
     this._flashTimer = setTimeout(() => {
@@ -108,11 +112,11 @@ export class NetworkActivity extends EventTarget {
   }
 
   /** Wraps `window.fetch` in place so every call anywhere in the app is tracked. Safe to call more than once — only the first call does anything. */
-  attach() {
+  attach(): void {
     if (this._attached) return;
     this._attached = true;
     const realFetch = window.fetch.bind(window);
-    window.fetch = async (...args) => {
+    window.fetch = async (...args: Parameters<typeof fetch>) => {
       if (suppressDepth > 0) return realFetch(...args);
       this.begin();
       try {

@@ -1,7 +1,7 @@
-import { POWER_ITEMS, MACHO_BRACE_SPRITE, EXP_SHARE_SPRITE, VITAMINS, FEATHERS, FEATHER_BONUS, EV_BERRIES, EV_BERRY_REDUCTION, MACHO_BRACE_MULTIPLIER, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, STAT_EXP_VITAMIN_BONUS, STAT_EXP_VITAMIN_CEILING, STAT_LABEL } from '../../../../lib/constants.js';
-import { sortByLabel } from '../../../../lib/utils.js';
+import { POWER_ITEMS, MACHO_BRACE_SPRITE, EXP_SHARE_SPRITE, VITAMINS, FEATHERS, FEATHER_BONUS, EV_BERRIES, EV_BERRY_REDUCTION, MACHO_BRACE_MULTIPLIER, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, STAT_EXP_VITAMIN_BONUS, STAT_EXP_VITAMIN_CEILING, STAT_LABEL } from '../../../../lib/constants.ts';
+import { sortByLabel } from '../../../../lib/utils.ts';
 import { store } from '../../../../lib/services.js';
-import { POKERUS_ICON_SVG } from '../../../../lib/icons.js';
+import { POKERUS_ICON_SVG } from '../../../../lib/icons.ts';
 import { BaseDialog } from '../../../atoms/base-dialog.js';
 import '../../../atoms/item-button-grid.js';
 import '../../../atoms/ds-item-button.js';

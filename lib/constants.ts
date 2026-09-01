@@ -1,22 +1,33 @@
-// @ts-check
 // Domain constants — the vocabulary shared by the store and every
 // component. Changing EV mechanics (a new stat, a new power item) means
 // editing data here, not logic elsewhere (open/closed).
 
-/** @typedef {'hp'|'atk'|'def'|'spa'|'spd'|'spe'} StatKey */
-/** @typedef {{ key: StatKey, label: string }} Stat */
-/** @typedef {Record<StatKey, number>} EvMap */
+export type StatKey = 'hp' | 'atk' | 'def' | 'spa' | 'spd' | 'spe';
+export interface Stat {
+  key: StatKey;
+  label: string;
+}
+export type EvMap = Record<StatKey, number>;
 
 /**
  * The shape shared by every trainable-stat item (power items, vitamins,
  * feathers, EV berries) — each is one item tied to one stat.
- * @typedef {{ id: string, label: string, stat: StatKey, sprite: string }} StatItem
  */
+export interface StatItem {
+  id: string;
+  label: string;
+  stat: StatKey;
+  sprite: string;
+}
 
-/** @typedef {{ id: string, label: string, boost: StatKey|null, hinder: StatKey|null }} Nature */
+export interface Nature {
+  id: string;
+  label: string;
+  boost: StatKey | null;
+  hinder: StatKey | null;
+}
 
-/** @type {Stat[]} */
-export const STATS = [
+export const STATS: Stat[] = [
   { key: 'hp', label: 'HP' },
   { key: 'atk', label: 'ATK' },
   { key: 'def', label: 'DEF' },
@@ -33,8 +44,7 @@ const ITEM_SPRITE_BASE = 'https://raw.githubusercontent.com/PokeAPI/sprites/mast
 export const MACHO_BRACE_SPRITE = `${ITEM_SPRITE_BASE}macho-brace.png`;
 export const EXP_SHARE_SPRITE = `${ITEM_SPRITE_BASE}exp-share.png`;
 
-/** @type {StatItem[]} */
-export const POWER_ITEMS = [
+export const POWER_ITEMS: StatItem[] = [
   { id: 'weight', label: 'Power Weight', stat: 'hp', sprite: `${ITEM_SPRITE_BASE}power-weight.png` },
   { id: 'bracer', label: 'Power Bracer', stat: 'atk', sprite: `${ITEM_SPRITE_BASE}power-bracer.png` },
   { id: 'belt', label: 'Power Belt', stat: 'def', sprite: `${ITEM_SPRITE_BASE}power-belt.png` },
@@ -43,8 +53,7 @@ export const POWER_ITEMS = [
   { id: 'anklet', label: 'Power Anklet', stat: 'spe', sprite: `${ITEM_SPRITE_BASE}power-anklet.png` },
 ];
 
-/** @type {StatItem[]} */
-export const VITAMINS = [
+export const VITAMINS: StatItem[] = [
   { id: 'hp-up', label: 'HP Up', stat: 'hp', sprite: `${ITEM_SPRITE_BASE}hp-up.png` },
   { id: 'protein', label: 'Protein', stat: 'atk', sprite: `${ITEM_SPRITE_BASE}protein.png` },
   { id: 'iron', label: 'Iron', stat: 'def', sprite: `${ITEM_SPRITE_BASE}iron.png` },
@@ -59,8 +68,7 @@ export const VITAMINS = [
 // https://bulbapedia.bulbagarden.net/wiki/Effort_values
 export const FEATHER_MIN_GEN = 5;
 export const FEATHER_BONUS = 1;
-/** @type {StatItem[]} */
-export const FEATHERS = [
+export const FEATHERS: StatItem[] = [
   { id: 'health-wing', label: 'Health Wing', stat: 'hp', sprite: `${ITEM_SPRITE_BASE}health-wing.png` },
   { id: 'muscle-wing', label: 'Muscle Wing', stat: 'atk', sprite: `${ITEM_SPRITE_BASE}muscle-wing.png` },
   { id: 'resist-wing', label: 'Resist Wing', stat: 'def', sprite: `${ITEM_SPRITE_BASE}resist-wing.png` },
@@ -81,8 +89,7 @@ export const EV_BERRY_MIN_GEN = 3;
 export const EV_BERRY_REDUCTION = 10;
 export const EV_BERRY_SNAP_THRESHOLD = 110;
 export const EV_BERRY_SNAP_TARGET = 100;
-/** @type {StatItem[]} */
-export const EV_BERRIES = [
+export const EV_BERRIES: StatItem[] = [
   { id: 'pomeg', label: 'Pomeg Berry', stat: 'hp', sprite: `${ITEM_SPRITE_BASE}pomeg-berry.png` },
   { id: 'kelpsy', label: 'Kelpsy Berry', stat: 'atk', sprite: `${ITEM_SPRITE_BASE}kelpsy-berry.png` },
   { id: 'qualot', label: 'Qualot Berry', stat: 'def', sprite: `${ITEM_SPRITE_BASE}qualot-berry.png` },
@@ -91,18 +98,16 @@ export const EV_BERRIES = [
   { id: 'tamato', label: 'Tamato Berry', stat: 'spe', sprite: `${ITEM_SPRITE_BASE}tamato-berry.png` },
 ];
 
-/** @type {Record<StatKey, string>} */
-export const STAT_LABEL = /** @type {Record<StatKey, string>} */ (
-  Object.fromEntries(STATS.map((s) => [s.key, s.label]))
-);
+export const STAT_LABEL: Record<StatKey, string> = Object.fromEntries(
+  STATS.map((s) => [s.key, s.label] as [StatKey, string]),
+) as Record<StatKey, string>;
 
 // Every item-icon sprite this app can ever display, regardless of
 // generation or base game — unlike Pokémon sprites, this set is small,
 // fixed, and always relevant (a power item or vitamin looks the same no
 // matter which title's party is using it), so lib/prefetch-service.js
 // warms all of them unconditionally rather than scoping to a generation.
-/** @type {string[]} */
-export const ITEM_SPRITES = [
+export const ITEM_SPRITES: string[] = [
   ...POWER_ITEMS.map((i) => i.sprite),
   ...VITAMINS.map((i) => i.sprite),
   ...FEATHERS.map((i) => i.sprite),
@@ -125,8 +130,7 @@ export const NATURE_MIN_GEN = 3;
 // boosted one) or deprioritizing (the hindered one) for a given nature.
 // HP is never boosted or hindered by any nature. Source:
 // https://bulbapedia.bulbagarden.net/wiki/Nature
-/** @type {Nature[]} */
-export const NATURES = [
+export const NATURES: Nature[] = [
   { id: 'hardy', label: 'Hardy', boost: null, hinder: null },
   { id: 'lonely', label: 'Lonely', boost: 'atk', hinder: 'def' },
   { id: 'brave', label: 'Brave', boost: 'atk', hinder: 'spe' },
@@ -231,7 +235,7 @@ export const FALLBACK_SPRITE =
       '<circle cx="32" cy="32" r="28" fill="#e3350d"/>' +
       '<path d="M4 32h56" stroke="#1b1f1c" stroke-width="5"/>' +
       '<circle cx="32" cy="32" r="11" fill="#fff" stroke="#1b1f1c" stroke-width="5"/>' +
-      '</svg>'
+      '</svg>',
   );
 
 // Inline attribute for template-built <img> tags whose src is a remote
@@ -263,11 +267,7 @@ export const FALLBACK_ONERROR = `onerror="this.onerror=null;this.src='${FALLBACK
 // fails too. `modernSrc` is trusted the same way entry.sprite already is
 // elsewhere (a plain https URL from PokeAPI's own CDN, no quotes). Loaded
 // no-cors, same as FALLBACK_ONERROR — see its comment.
-/**
- * @param {string|null} modernSrc
- * @returns {string}
- */
-export function versionedSpriteOnError(modernSrc) {
+export function versionedSpriteOnError(modernSrc: string | null): string {
   const modern = modernSrc || FALLBACK_SPRITE;
   return `onerror="if(!this.dataset.spriteFb){this.dataset.spriteFb='1';this.src='${modern}'}else{this.onerror=null;this.src='${FALLBACK_SPRITE}'}"`;
 }

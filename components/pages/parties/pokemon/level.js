@@ -1,12 +1,12 @@
-import { STATS, MIN_LEVEL, MAX_LEVEL } from '../../../../lib/constants.js';
-import { escapeHtml } from '../../../../lib/utils.js';
+import { STATS, MIN_LEVEL, MAX_LEVEL } from '../../../../lib/constants.ts';
+import { escapeHtml } from '../../../../lib/utils.ts';
 import { store } from '../../../../lib/services.js';
 import { BaseDialog } from '../../../atoms/base-dialog.js';
 import '../../../organisms/evolution-chain.js';
 import '../../../atoms/level-input.js';
 
 /** @typedef {import('../../../../lib/store.js').RosterEntry} RosterEntry */
-/** @typedef {import('../../../../lib/constants.js').StatKey} StatKey */
+/** @typedef {import('../../../../lib/constants.ts').StatKey} StatKey */
 
 /** The signed form the offset field shows: `+3`, `+0`, `-2`. */
 const fmtOffset = (n) => (n >= 0 ? `+${n}` : String(n));

@@ -1,6 +1,6 @@
-import { GAME_VERSIONS, GEN_ROMAN, normalizeGameName } from '../../lib/game-versions.js';
+import { GAME_VERSIONS, GEN_ROMAN, normalizeGameName } from '../../lib/game-versions.ts';
 import { attachDesignSystem } from '../../lib/design-system.js';
-import { attachPointerSelection, syncActiveDescendant } from '../../lib/combobox.js';
+import { attachPointerSelection, syncActiveDescendant } from '../../lib/combobox.ts';
 
 /**
  * <game-version-picker> — a text input with its own suggestion dropdown

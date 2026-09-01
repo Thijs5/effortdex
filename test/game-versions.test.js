@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { matchGameVersion, normalizeGameName, GAME_VERSIONS, GEN_ROMAN } from '../lib/game-versions.js';
+import { matchGameVersion, normalizeGameName, GAME_VERSIONS, GEN_ROMAN } from '../lib/game-versions.ts';
 
 test('matchGameVersion recognizes titles regardless of spacing, case and punctuation', () => {
   assert.equal(matchGameVersion('FireRed')?.gen, 3);

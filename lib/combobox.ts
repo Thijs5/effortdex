@@ -1,4 +1,3 @@
-// @ts-check
 // Shared combobox behavior for the two suggestion-dropdown components
 // (<pokemon-search> and <game-version-picker>). Extracted after the two
 // diverged on exactly this logic: pokemon-search fixed an iOS bug where
@@ -15,16 +14,14 @@
  * scrolling. A small movement threshold tells a tap from the start of a
  * scroll drag. Calls `pick(li)` with the chosen row.
  */
-/** @param {HTMLElement} $list @param {(li: HTMLElement) => void} pick */
-export function attachPointerSelection($list, pick) {
-  /** @type {HTMLElement|null} */
-  let downLi = null;
+export function attachPointerSelection($list: HTMLElement, pick: (li: HTMLElement) => void): void {
+  let downLi: HTMLElement | null = null;
   let downX = 0;
   let downY = 0;
   $list.addEventListener('pointerdown', (e) => {
-    const li = /** @type {HTMLElement} */ (e.target).closest('li.option');
+    const li = (e.target as HTMLElement).closest<HTMLElement>('li.option');
     if (!li) return;
-    downLi = /** @type {HTMLElement} */ (li);
+    downLi = li;
     downX = e.clientX;
     downY = e.clientY;
     if (e.pointerType === 'mouse') e.preventDefault();
@@ -34,7 +31,7 @@ export function attachPointerSelection($list, pick) {
     downLi = null;
     if (!li) return;
     const movedTooFar = Math.hypot(e.clientX - downX, e.clientY - downY) > 10;
-    if (movedTooFar || /** @type {HTMLElement} */ (e.target).closest('li.option') !== li) return;
+    if (movedTooFar || (e.target as HTMLElement).closest('li.option') !== li) return;
     pick(li);
   });
 }
@@ -46,13 +43,12 @@ export function attachPointerSelection($list, pick) {
  * (clearing it when nothing is active). Call on every highlight change;
  * call with activeIndex -1 after (re)rendering the list.
  */
-/**
- * @param {HTMLElement} $input
- * @param {HTMLElement[]} items
- * @param {number} activeIndex
- * @param {string} idPrefix
- */
-export function syncActiveDescendant($input, items, activeIndex, idPrefix) {
+export function syncActiveDescendant(
+  $input: HTMLElement,
+  items: HTMLElement[],
+  activeIndex: number,
+  idPrefix: string,
+): void {
   items.forEach((li, i) => {
     if (!li.id) li.id = `${idPrefix}-${i}`;
     li.setAttribute('aria-selected', String(i === activeIndex));

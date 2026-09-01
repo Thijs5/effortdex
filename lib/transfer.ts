@@ -1,4 +1,3 @@
-// @ts-check
 // Encodes/decodes a device-transfer payload (the array `Store#exportPayload`
 // returns) into a single string safe to embed as one hash path segment,
 // for sharing via a link (see lib/router.js's #/transfer/import/<payload>
@@ -11,39 +10,36 @@
 // base64url alphabet (+/  ->  -_, no padding) needs no extra encoding to
 // live safely inside a URL hash.
 
+import type { ExportedParty } from './store.js';
+
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
-/** @param {Uint8Array} bytes @returns {string} */
-function toBase64Url(bytes) {
+function toBase64Url(bytes: Uint8Array): string {
   let binary = '';
   for (const b of bytes) binary += String.fromCharCode(b);
   return btoa(binary).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
 }
 
-/** @param {string} str @returns {Uint8Array} */
-function fromBase64Url(str) {
+function fromBase64Url(str: string): Uint8Array {
   const base64 = str.replace(/-/g, '+').replace(/_/g, '/');
   const padded = base64.padEnd(Math.ceil(base64.length / 4) * 4, '=');
   const binary = atob(padded);
   return Uint8Array.from(binary, (c) => c.charCodeAt(0));
 }
 
-/** @param {Uint8Array} bytes @returns {Promise<Uint8Array>} */
-async function gzip(bytes) {
-  const stream = new Blob([/** @type {BlobPart} */ (bytes)]).stream().pipeThrough(new CompressionStream('gzip'));
+async function gzip(bytes: Uint8Array): Promise<Uint8Array> {
+  const stream = new Blob([bytes as BlobPart]).stream().pipeThrough(new CompressionStream('gzip'));
   return new Uint8Array(await new Response(stream).arrayBuffer());
 }
 
-/** @param {Uint8Array} bytes @returns {Promise<Uint8Array>} */
-async function gunzip(bytes) {
-  const stream = new Blob([/** @type {BlobPart} */ (bytes)]).stream().pipeThrough(new DecompressionStream('gzip'));
+async function gunzip(bytes: Uint8Array): Promise<Uint8Array> {
+  const stream = new Blob([bytes as BlobPart]).stream().pipeThrough(new DecompressionStream('gzip'));
   return new Uint8Array(await new Response(stream).arrayBuffer());
 }
 
-/** `parties` is the array from `Store#exportPayload()`. Resolves to a shareable string.
- * @param {import('./store.js').ExportedParty[]} parties @returns {Promise<string>} */
-export async function encodeTransferPayload(parties) {
+/** `parties` is the array from `Store#exportPayload()`. Resolves to a shareable string. */
+export async function encodeTransferPayload(parties: ExportedParty[]): Promise<string> {
   const json = textEncoder.encode(JSON.stringify(parties));
   if (typeof CompressionStream === 'function') {
     return `1:${toBase64Url(await gzip(json))}`;
@@ -51,9 +47,8 @@ export async function encodeTransferPayload(parties) {
   return `0:${toBase64Url(json)}`;
 }
 
-/** Reverses `encodeTransferPayload`. Throws on malformed input.
- * @param {string} str @returns {Promise<import('./store.js').ExportedParty[]>} */
-export async function decodeTransferPayload(str) {
+/** Reverses `encodeTransferPayload`. Throws on malformed input. */
+export async function decodeTransferPayload(str: string): Promise<ExportedParty[]> {
   const sep = str.indexOf(':');
   if (sep === -1) throw new Error('Malformed transfer payload');
   const version = str.slice(0, sep);

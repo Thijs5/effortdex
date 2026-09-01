@@ -1,9 +1,9 @@
 import { attachDesignSystem } from '../../lib/design-system.js';
 import { store } from '../../lib/services.js';
-import { decodeTransferPayload } from '../../lib/transfer.js';
+import { decodeTransferPayload } from '../../lib/transfer.ts';
 import * as router from '../../lib/router.js';
-import { titleCase, totalEvs, escapeHtml } from '../../lib/utils.js';
-import { FALLBACK_SPRITE, FALLBACK_ONERROR } from '../../lib/constants.js';
+import { titleCase, totalEvs, escapeHtml } from '../../lib/utils.ts';
+import { FALLBACK_SPRITE, FALLBACK_ONERROR } from '../../lib/constants.ts';
 
 const PROMPT_MESSAGE = 'Paste a transfer link, or choose a saved transfer file.';
 

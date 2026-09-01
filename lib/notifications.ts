@@ -1,4 +1,3 @@
-// @ts-check
 // Opt-in desktop/mobile notification (the real Notification API, not an
 // in-page toast) for when a manual sprite-cache run
 // (components/pages/settings/cache.js's per-row "Cache" or per-generation
@@ -16,19 +15,16 @@
 
 const ENABLED_KEY = 'effortdex:notify-on-cache-done';
 
-/** @returns {boolean} */
-export function isNotificationSupported() {
+export function isNotificationSupported(): boolean {
   return typeof Notification !== 'undefined';
 }
 
-/** @returns {boolean} */
-export function isCacheDoneNotifyEnabled() {
+export function isCacheDoneNotifyEnabled(): boolean {
   if (typeof localStorage === 'undefined') return false;
   return localStorage.getItem(ENABLED_KEY) === '1';
 }
 
-/** @param {boolean} enabled */
-export function setCacheDoneNotifyEnabled(enabled) {
+export function setCacheDoneNotifyEnabled(enabled: boolean): void {
   if (typeof localStorage === 'undefined') return;
   if (enabled) localStorage.setItem(ENABLED_KEY, '1');
   else localStorage.removeItem(ENABLED_KEY);
@@ -40,9 +36,8 @@ export function setCacheDoneNotifyEnabled(enabled) {
  * throws — `requestPermission` can be dismissed, blocked by browser/OS
  * policy, or simply unsupported (e.g. Safari on iOS outside a installed
  * PWA), none of which should break the caller's own flow.
- * @returns {Promise<boolean>}
  */
-export async function ensureNotificationPermission() {
+export async function ensureNotificationPermission(): Promise<boolean> {
   if (!isNotificationSupported()) return false;
   if (Notification.permission === 'granted') return true;
   if (Notification.permission === 'denied') return false;
@@ -59,9 +54,8 @@ export async function ensureNotificationPermission() {
  * a silent no-op otherwise, e.g. permission was revoked from outside
  * the app since the checkbox was last ticked, so a stale "enabled" flag
  * alone is never enough to actually fire one.
- * @param {string} title @param {NotificationOptions} [options] @returns {void}
  */
-export function notifyCacheDone(title, options) {
+export function notifyCacheDone(title: string, options?: NotificationOptions): void {
   if (!isCacheDoneNotifyEnabled()) return;
   if (!isNotificationSupported() || Notification.permission !== 'granted') return;
   try {

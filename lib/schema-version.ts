@@ -1,4 +1,3 @@
-// @ts-check
 // The persisted roster data's shape version (docs/adr/0009). Bumping
 // this number always means a breaking change — something a user
 // already saved can't be carried forward as-is without running the

@@ -5,7 +5,7 @@ import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
 import { Store, projectEntry } from '../lib/store.js';
-import { totalEvs } from '../lib/utils.js';
+import { totalEvs } from '../lib/utils.ts';
 import { openDb } from '../lib/db/index.ts';
 import { DB_NAME } from '../lib/db/schema.ts';
 import { makeRosterMirror } from '../lib/db/roster-import.ts';
