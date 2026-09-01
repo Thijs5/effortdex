@@ -1,7 +1,7 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { DB_VERSION, STORES, MIGRATIONS } from '../lib/db/schema.js';
+import { DB_VERSION, STORES, MIGRATIONS } from '../lib/db/schema.ts';
 
 // docs/adr/0025's guard: the declared schema (STORES / DB_VERSION) and
 // the MIGRATIONS chain that builds it must stay in lock-step, so editing

@@ -1,6 +1,5 @@
-// @ts-check
 // The only module that talks to IndexedDB (docs/adr/0025). Owns opening
-// the database, running the `schema.js` migration chain on
+// the database, running the `schema.ts` migration chain on
 // `upgradeneeded`, and a small promise API over it. Everything else in
 // the app goes through the handles this returns and never names an
 // object store or `indexedDB` directly — that's this layer's module
@@ -9,9 +8,9 @@
 // The open + migration path and the per-store operations are covered by
 // test/db.test.js (against fake-indexeddb). Consumers: MemoCache's
 // IndexedDB backend (docs/adr/0025 §4) and the roster row IO
-// (roster-io.js / roster-ops.js, §3).
+// (roster-io.ts / roster-ops.ts, §3).
 
-import { DB_NAME, DB_VERSION, MIGRATIONS } from './schema.js';
+import { DB_NAME, DB_VERSION, MIGRATIONS } from './schema.ts';
 
 /** Thrown by `openDb()` when the environment has no IndexedDB at all
  * (e.g. old Safari private mode). There is no in-memory substitute for
@@ -26,8 +25,7 @@ export class IndexedDbUnavailableError extends Error {}
  * (`versionchange`). The app should prompt for a reload. */
 export class DbConnectionClosedError extends Error {}
 
-/** @template T @param {IDBRequest<T>} req @returns {Promise<T>} */
-function promisify(req) {
+function promisify<T>(req: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error);
@@ -37,13 +35,12 @@ function promisify(req) {
 /**
  * Opens (and migrates) the database.
  *
- * @param {{ onClose?: () => void }} [opts] - `onClose` fires if another
- *   tab's newer-version upgrade forces this connection shut; the app
- *   should surface "reload to continue" (wired up in P3).
- * @returns {Promise<Db>}
+ * @param opts - `onClose` fires if another tab's newer-version upgrade
+ *   forces this connection shut; the app should surface "reload to
+ *   continue" (wired up in P3).
  * @throws {IndexedDbUnavailableError} when `indexedDB` is missing.
  */
-export async function openDb(opts = {}) {
+export async function openDb(opts: { onClose?: () => void } = {}): Promise<Db> {
   if (typeof indexedDB === 'undefined') {
     throw new IndexedDbUnavailableError('IndexedDB is not available in this browser context');
   }
@@ -53,12 +50,11 @@ export async function openDb(opts = {}) {
   // A throw inside a migration aborts the versionchange transaction and
   // surfaces to us only as a generic AbortError on `req.error`. Capture
   // the real cause here so the rejection names the failing step.
-  /** @type {unknown} */
-  let migrationError;
+  let migrationError: unknown;
   req.onupgradeneeded = (event) => {
     try {
       const db = req.result;
-      const tx = /** @type {IDBTransaction} */ (req.transaction);
+      const tx = req.transaction as IDBTransaction;
       const from = event.oldVersion;
       for (const step of MIGRATIONS) {
         if (step.to > from) step.migrate({ db, tx, from });
@@ -73,8 +69,7 @@ export async function openDb(opts = {}) {
     }
   };
 
-  /** @type {IDBDatabase} */
-  const idb = await new Promise((resolve, reject) => {
+  const idb = await new Promise<IDBDatabase>((resolve, reject) => {
     let settled = false;
     req.onsuccess = () => {
       if (settled) {
@@ -115,13 +110,12 @@ export async function openDb(opts = {}) {
 
 /** Thin promise wrapper over one open connection. */
 export class Db {
-  /** @param {IDBDatabase} idb @param {(() => void)} [onClose] */
-  constructor(idb, onClose) {
-    /** @private */
+  private _idb: IDBDatabase;
+  private _closed = false;
+  private _onClose: (() => void) | undefined;
+
+  constructor(idb: IDBDatabase, onClose?: () => void) {
     this._idb = idb;
-    /** @private */
-    this._closed = false;
-    /** @private */
     this._onClose = onClose;
     // Belt for an *abnormal* close (the browser evicting the database
     // under storage pressure, a device disconnect): `close` fires only
@@ -130,46 +124,39 @@ export class Db {
     idb.addEventListener('close', () => this._markClosed());
   }
 
-  /** @param {string} store @param {IDBValidKey} key @returns {Promise<any>} */
-  get(store, key) {
+  get<T = unknown>(store: string, key: IDBValidKey): Promise<T | undefined> {
     return this._request(() => this._store(store, 'readonly').get(key));
   }
 
-  /** @param {string} store @param {any} value @returns {Promise<IDBValidKey>} */
-  put(store, value) {
+  put(store: string, value: unknown): Promise<IDBValidKey> {
     return this._request(() => this._store(store, 'readwrite').put(value));
   }
 
-  /** @param {string} store @param {any} value @returns {Promise<IDBValidKey>} */
-  add(store, value) {
+  add(store: string, value: unknown): Promise<IDBValidKey> {
     return this._request(() => this._store(store, 'readwrite').add(value));
   }
 
-  /** @param {string} store @param {IDBValidKey} key @returns {Promise<void>} */
-  delete(store, key) {
+  delete(store: string, key: IDBValidKey): Promise<void> {
     return this._request(() => this._store(store, 'readwrite').delete(key));
   }
 
-  /** @param {string} store @param {IDBValidKey | IDBKeyRange} [query] @returns {Promise<any[]>} */
-  getAll(store, query) {
+  getAll<T = unknown>(store: string, query?: IDBValidKey | IDBKeyRange): Promise<T[]> {
     return this._request(() => this._store(store, 'readonly').getAll(query ?? null));
   }
 
-  /** @param {string} store @param {IDBValidKey | IDBKeyRange} [query] @returns {Promise<IDBValidKey[]>} */
-  getAllKeys(store, query) {
+  getAllKeys(store: string, query?: IDBValidKey | IDBKeyRange): Promise<IDBValidKey[]> {
     return this._request(() => this._store(store, 'readonly').getAllKeys(query ?? null));
   }
 
-  /**
-   * @param {string} store @param {string} index
-   * @param {IDBValidKey | IDBKeyRange} [query] @returns {Promise<any[]>}
-   */
-  getAllByIndex(store, index, query) {
+  getAllByIndex<T = unknown>(
+    store: string,
+    index: string,
+    query?: IDBValidKey | IDBKeyRange,
+  ): Promise<T[]> {
     return this._request(() => this._store(store, 'readonly').index(index).getAll(query ?? null));
   }
 
-  /** @param {string} store @param {IDBValidKey | IDBKeyRange} [query] @returns {Promise<number>} */
-  count(store, query) {
+  count(store: string, query?: IDBValidKey | IDBKeyRange): Promise<number> {
     return this._request(() => this._store(store, 'readonly').count(query ?? undefined));
   }
 
@@ -187,16 +174,9 @@ export class Db {
    * `TransactionInactiveError`. To build a result from reads, attach
    * `request.onsuccess` handlers that assign into a closure variable and
    * return it (it's read on `oncomplete`, by which point those have run).
-   *
-   * @template T
-   * @param {string[]} stores
-   * @param {IDBTransactionMode} mode
-   * @param {(tx: IDBTransaction) => T} fn
-   * @returns {Promise<T>}
    */
-  transaction(stores, mode, fn) {
-    /** @type {IDBTransaction} */
-    let tx;
+  transaction<T>(stores: string[], mode: IDBTransactionMode, fn: (tx: IDBTransaction) => T): Promise<T> {
+    let tx: IDBTransaction;
     try {
       this._assertOpen();
       tx = this._idb.transaction(stores, mode);
@@ -204,8 +184,7 @@ export class Db {
       return Promise.reject(err);
     }
     return new Promise((resolve, reject) => {
-      /** @type {T} */
-      let result;
+      let result: T;
       // `oncomplete` and `onabort` are the only reliable outcome
       // signals. `tx.onerror` also fires for a *request* error that `fn`
       // handled with `preventDefault()` (the event bubbles to the
@@ -227,25 +206,19 @@ export class Db {
   }
 
   /** @internal — called by openDb() on `versionchange`. */
-  _forceClose() {
+  _forceClose(): void {
     if (this._closed) return;
     this._idb.close();
     this._markClosed();
   }
 
-  /** @private */
-  _markClosed() {
+  private _markClosed(): void {
     if (this._closed) return;
     this._closed = true;
     this._onClose?.();
   }
 
-  /**
-   * @private @template T
-   * @param {() => IDBRequest<T>} makeRequest
-   * @returns {Promise<T>}
-   */
-  _request(makeRequest) {
+  private _request<T>(makeRequest: () => IDBRequest<T>): Promise<T> {
     try {
       return promisify(makeRequest());
     } catch (err) {
@@ -256,14 +229,12 @@ export class Db {
     }
   }
 
-  /** @private @param {string} name @param {IDBTransactionMode} mode @returns {IDBObjectStore} */
-  _store(name, mode) {
+  private _store(name: string, mode: IDBTransactionMode): IDBObjectStore {
     this._assertOpen();
     return this._idb.transaction(name, mode).objectStore(name);
   }
 
-  /** @private */
-  _assertOpen() {
+  private _assertOpen(): void {
     if (this._closed) {
       throw new DbConnectionClosedError('database connection closed by a newer tab — reload the app');
     }

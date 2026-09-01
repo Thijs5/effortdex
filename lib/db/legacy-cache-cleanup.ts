@@ -1,4 +1,3 @@
-// @ts-check
 // One-time transition for docs/adr/0025 P2: the PokeApiClient /
 // SmogonClient cache moved from localStorage to IndexedDB. The old
 // entries are NOT copied over — the stored shape differs and every entry
@@ -22,12 +21,11 @@ const LEGACY_PREFIXES = [
 
 /** Removes the legacy localStorage cache entries once. Safe to call on
  * every startup — a no-op after the first run, or if localStorage is
- * unavailable. @returns {number} keys removed (0 if already done) */
-export function dropLegacyLocalStorageCache() {
+ * unavailable. @returns keys removed (0 if already done) */
+export function dropLegacyLocalStorageCache(): number {
   try {
     if (localStorage.getItem(MARKER_KEY)) return 0;
-    /** @type {string[]} */
-    const doomed = [];
+    const doomed: string[] = [];
     for (let i = 0; i < localStorage.length; i++) {
       const k = localStorage.key(i);
       if (k && LEGACY_PREFIXES.some((p) => k === p || k.startsWith(p))) doomed.push(k);

@@ -1,4 +1,3 @@
-// @ts-check
 // The one module in lib/db/ that knows the roster's shape: it maps the
 // `{ rev, statExpBackfillApplied, activePartyId, parties: [...] }` state
 // Store keeps in memory to and from the relational `parties` /
@@ -11,6 +10,8 @@
 // dual-write backup reconciled by `rev`.
 
 import { uniqueSlug } from '../slug.js';
+import type { Db } from './index.ts';
+import type { EventRow, MetaRow, PartyRow, RosterEntryRow } from './schema.ts';
 
 const META_ACTIVE_PARTY = 'activePartyId';
 const META_BACKFILL = 'statExpBackfillApplied';
@@ -22,10 +23,8 @@ const PARTY_FIELDS = ['id', 'name', 'description', 'baseGame', 'overrides', 'slu
 /** The source-of-truth columns of a `rosterEntries` row (everything but `events`, plus `partyId`/`order`). */
 const ENTRY_FIELDS = ['uid', 'nickname', 'nature', 'powerItem', 'machoBrace', 'ivs'];
 
-/** @param {any} obj @param {string[]} keys */
-function pick(obj, keys) {
-  /** @type {any} */
-  const out = {};
+function pick(obj: any, keys: string[]): Record<string, any> {
+  const out: Record<string, any> = {};
   for (const k of keys) out[k] = obj[k];
   return out;
 }
@@ -38,17 +37,14 @@ function pick(obj, keys) {
  * `_normalizeEntries` only backfills *missing* slugs, never collisions
  * (docs/adr/0025 §6).
  *
- * @param {import('./index.js').Db} db
- * @param {any} state - `{ statExpBackfillApplied?, activePartyId, parties: [...] }`
- * @returns {Promise<void>}
+ * @param state - `{ statExpBackfillApplied?, activePartyId, parties: [...] }`
  */
-export function writeRoster(db, state) {
-  const parties = Array.isArray(state.parties) ? state.parties : [];
+export function writeRoster(db: Db, state: any): Promise<void> {
+  const parties: any[] = Array.isArray(state.parties) ? state.parties : [];
 
   // Slug de-dupe pre-pass (outside the transaction — pure).
-  /** @type {Set<string>} */
-  const seen = new Set();
-  const slugs = parties.map((/** @type {any} */ p) => {
+  const seen = new Set<string>();
+  const slugs = parties.map((p: any) => {
     let slug = p.slug || uniqueSlug(p.name || 'Party', seen);
     if (seen.has(slug)) slug = uniqueSlug(p.name || 'Party', seen);
     seen.add(slug);
@@ -65,12 +61,12 @@ export function writeRoster(db, state) {
     entriesOS.clear();
     eventsOS.clear();
 
-    parties.forEach((/** @type {any} */ party, /** @type {number} */ pi) => {
+    parties.forEach((party: any, pi: number) => {
       partiesOS.put({ ...pick(party, PARTY_FIELDS), slug: slugs[pi], order: pi });
-      const pokemon = Array.isArray(party.pokemon) ? party.pokemon : [];
-      pokemon.forEach((/** @type {any} */ entry, /** @type {number} */ ei) => {
+      const pokemon: any[] = Array.isArray(party.pokemon) ? party.pokemon : [];
+      pokemon.forEach((entry: any, ei: number) => {
         entriesOS.put({ ...pick(entry, ENTRY_FIELDS), partyId: party.id, order: ei });
-        const events = Array.isArray(entry.events) ? entry.events : [];
+        const events: any[] = Array.isArray(entry.events) ? entry.events : [];
         for (const ev of events) eventsOS.put({ ...ev, entryUid: entry.uid });
       });
     });
@@ -81,24 +77,27 @@ export function writeRoster(db, state) {
   });
 }
 
+export interface RosterState {
+  rev: number;
+  statExpBackfillApplied: boolean;
+  activePartyId: string | null;
+  parties: any[];
+}
+
 /**
  * Reconstructs the in-memory roster state from the object stores —
  * `parties` in `order`, each party's `rosterEntries` in `order`, each
  * entry's `events` in `entryUid+id` order (uuidv7 == fold order).
- *
- * @param {import('./index.js').Db} db
- * @returns {Promise<{ rev: number, statExpBackfillApplied: boolean, activePartyId: string|null, parties: any[] }>}
  */
-export async function readRoster(db) {
+export async function readRoster(db: Db): Promise<RosterState> {
   const [partyRows, entryRows, eventRows, metaRows] = await Promise.all([
-    db.getAll('parties'),
-    db.getAll('rosterEntries'),
-    db.getAll('events'),
-    db.getAll('meta'),
+    db.getAll<PartyRow>('parties'),
+    db.getAll<RosterEntryRow>('rosterEntries'),
+    db.getAll<EventRow>('events'),
+    db.getAll<MetaRow>('meta'),
   ]);
 
-  /** @type {Map<string, any[]>} */
-  const eventsByEntry = new Map();
+  const eventsByEntry = new Map<string, any[]>();
   for (const ev of eventRows.sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))) {
     const list = eventsByEntry.get(ev.entryUid) ?? [];
     const { entryUid, ...event } = ev;
@@ -106,12 +105,11 @@ export async function readRoster(db) {
     eventsByEntry.set(ev.entryUid, list);
   }
 
-  /** @type {Map<string, any[]>} */
-  const entriesByParty = new Map();
+  const entriesByParty = new Map<string, any[]>();
   for (const row of entryRows.sort((a, b) => a.order - b.order)) {
     const list = entriesByParty.get(row.partyId) ?? [];
     const { partyId, order, ...entry } = row;
-    entry.events = eventsByEntry.get(entry.uid) ?? [];
+    (entry as any).events = eventsByEntry.get(entry.uid) ?? [];
     list.push(entry);
     entriesByParty.set(row.partyId, list);
   }
@@ -120,21 +118,19 @@ export async function readRoster(db) {
     .sort((a, b) => a.order - b.order)
     .map(({ order, ...party }) => ({ ...party, pokemon: entriesByParty.get(party.id) ?? [] }));
 
-  const meta = Object.fromEntries(metaRows.map((r) => [r.key, r.value]));
+  const meta = Object.fromEntries(metaRows.map((r) => [r.key, r.value] as [string, unknown]));
   return {
     rev: Number(meta[META_REV]) || 0,
     statExpBackfillApplied: !!meta[META_BACKFILL],
-    activePartyId: meta[META_ACTIVE_PARTY] ?? null,
+    activePartyId: (meta[META_ACTIVE_PARTY] as string | null) ?? null,
     parties,
   };
 }
 
-/** @param {import('./index.js').Db} db @returns {Promise<any|null>} */
-export async function readImportMarker(db) {
+export async function readImportMarker(db: Db): Promise<any | null> {
   return (await db.get('meta', META_IMPORTED)) ?? null;
 }
 
-/** @param {import('./index.js').Db} db @param {any} info */
-export function writeImportMarker(db, info) {
+export function writeImportMarker(db: Db, info: any): Promise<IDBValidKey> {
   return db.put('meta', { key: META_IMPORTED, value: info });
 }

@@ -2,8 +2,8 @@ import 'fake-indexeddb/auto';
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { openDb, Db, DbConnectionClosedError, IndexedDbUnavailableError } from '../lib/db/index.js';
-import { DB_NAME, STORES } from '../lib/db/schema.js';
+import { openDb, Db, DbConnectionClosedError, IndexedDbUnavailableError } from '../lib/db/index.ts';
+import { DB_NAME, STORES } from '../lib/db/schema.ts';
 
 beforeEach(async () => {
   await new Promise((resolve) => {

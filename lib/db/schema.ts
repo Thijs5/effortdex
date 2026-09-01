@@ -1,4 +1,3 @@
-// @ts-check
 // The one and only description of Effortdex's IndexedDB shape — see
 // docs/adr/0025. Changing what's on disk means editing THIS file: add or
 // alter a `STORES` entry, bump `DB_VERSION`, and append a `MIGRATIONS`
@@ -17,18 +16,17 @@ export const DB_NAME = 'effortdex';
 // Bump on every shape change. Must equal `MIGRATIONS.length`.
 export const DB_VERSION = 1;
 
-/**
- * @typedef {object} IndexDef
- * @property {boolean} [unique]
- * @property {boolean} [multiEntry]
- * @property {string|string[]} [keyPath] - defaults to the index's own name
- */
+export interface IndexDef {
+  unique?: boolean;
+  multiEntry?: boolean;
+  /** defaults to the index's own name */
+  keyPath?: string | string[];
+}
 
-/**
- * @typedef {object} StoreDef
- * @property {string} keyPath
- * @property {Record<string, IndexDef>} [indexes]
- */
+export interface StoreDef {
+  keyPath: string;
+  indexes?: Record<string, IndexDef>;
+}
 
 /**
  * The "tables", as they should look RIGHT NOW. This is the current
@@ -38,9 +36,8 @@ export const DB_VERSION = 1;
  * migration step must never read this object (see `MIGRATIONS` below).
  * A compound index gives an explicit array `keyPath`; there is no
  * name-based shorthand.
- * @type {Record<string, StoreDef>}
  */
-export const STORES = {
+export const STORES: Record<string, StoreDef> = {
   parties: {
     keyPath: 'id',
     indexes: { slug: { unique: true }, order: {} },
@@ -76,6 +73,53 @@ export const STORES = {
   },
 };
 
+// --- row shapes -----------------------------------------------------
+// What each store actually holds. `roster-io.ts` is the only code that
+// composes/decomposes these against the in-memory roster; the party and
+// entry rows stay structural until `lib/store.js` is TypeScript and the
+// real `Party` / `PersistedEntry` types can back them.
+
+export interface MetaRow {
+  key: string;
+  value: unknown;
+}
+
+export interface ApiCacheRow {
+  key: string;
+  kind: string;
+  fetchedAt: number;
+  value: unknown;
+}
+
+export interface PartyRow {
+  id: string;
+  name: string;
+  description: string;
+  baseGame: string;
+  overrides: unknown;
+  slug: string;
+  order: number;
+}
+
+export interface RosterEntryRow {
+  uid: string;
+  nickname: string;
+  nature: string | null;
+  powerItem: string | null;
+  machoBrace: boolean;
+  ivs: Record<string, number | null>;
+  partyId: string;
+  order: number;
+}
+
+export interface EventRow {
+  id: string;
+  entryUid: string;
+  kind: string;
+  timestamp: number;
+  [extra: string]: unknown;
+}
+
 /**
  * One entry per `DB_VERSION`, applied in order inside `onupgradeneeded`
  * for any database whose stored version is below `to`.
@@ -89,11 +133,10 @@ export const STORES = {
  * today — that is a coincidence the guard test verifies, not a
  * dependency. `migrate` may only touch schema and data reachable
  * through `tx`.
- *
- * @typedef {(ctx: { db: IDBDatabase, tx: IDBTransaction, from: number }) => void} MigrateFn
- * @type {{ to: number, migrate: MigrateFn }[]}
  */
-export const MIGRATIONS = [
+export type MigrateFn = (ctx: { db: IDBDatabase; tx: IDBTransaction; from: number }) => void;
+
+export const MIGRATIONS: { to: number; migrate: MigrateFn }[] = [
   {
     to: 1,
     migrate: ({ db }) => {

@@ -1,4 +1,3 @@
-// @ts-check
 // A CacheBackend (see lib/memo-cache.js) over the `apiCache` object store
 // — the persistent tier for PokeApiClient / SmogonClient once the app
 // moves off localStorage (docs/adr/0025 §4). Rows are
@@ -6,14 +5,17 @@
 // verbatim (e.g. `effortdex:mon:pikachu`), `value` is whatever MemoCache
 // stores under it (a bare value, or a `{fetchedAt, value}` TTL
 // envelope). `kind` / `fetchedAt` are indexed for the per-kind entry
-// cap in lib/db/cache-cap.js.
+// cap in lib/db/cache-cap.ts.
+
+import type { CacheBackend } from '../memo-cache.js';
+import type { Db } from './index.ts';
+import type { ApiCacheRow } from './schema.ts';
 
 const STORE = 'apiCache';
 
 /** The grouping token: everything before the first ':' in the key, or
- * the whole key when it has none (only `effortdex:species-list`).
- * @param {string} key */
-function kindOf(key) {
+ * the whole key when it has none (only `effortdex:species-list`). */
+function kindOf(key: string): string {
   const bare = key.replace(/^effortdex:/, '');
   const i = bare.indexOf(':');
   return i === -1 ? bare : bare.slice(0, i);
@@ -21,48 +23,40 @@ function kindOf(key) {
 
 /** String prefix -> the key range that matches it (`￿` sorts after
  * any realistic key char, so this covers `prefix` itself and anything
- * starting with it). @param {string} prefix */
-function prefixRange(prefix) {
+ * starting with it). */
+function prefixRange(prefix: string): IDBKeyRange {
   return IDBKeyRange.bound(prefix, prefix + '￿');
 }
 
-/** @typedef {import('../memo-cache.js').CacheBackend} CacheBackend */
+export class IdbCacheBackend implements CacheBackend {
+  private _db: Db;
 
-/** @implements {CacheBackend} */
-export class IdbCacheBackend {
-  /** @param {import('./index.js').Db} db */
-  constructor(db) {
+  constructor(db: Db) {
     this._db = db;
   }
 
-  /** @param {string} key */
-  async get(key) {
-    const row = await this._db.get(STORE, key).catch(() => null);
+  async get(key: string): Promise<any> {
+    const row = await this._db.get<ApiCacheRow>(STORE, key).catch(() => null);
     return row ? row.value : null;
   }
 
-  /** @param {string} key @param {any} value */
-  async set(key, value) {
+  async set(key: string, value: any): Promise<void> {
     // Best-effort, like LocalStorageBackend#set — a cache write failing
     // must never surface to the caller.
     await this._db.put(STORE, { key, kind: kindOf(key), fetchedAt: Date.now(), value }).catch(() => {});
   }
 
-  /** @param {string[]} keyPrefixes */
-  async entries(keyPrefixes) {
-    /** @type {Array<[string, any]>} */
-    const out = [];
+  async entries(keyPrefixes: string[]): Promise<Array<[string, any]>> {
+    const out: Array<[string, any]> = [];
     for (const prefix of keyPrefixes) {
-      const rows = await this._db.getAll(STORE, prefixRange(prefix)).catch(() => []);
+      const rows = await this._db.getAll<ApiCacheRow>(STORE, prefixRange(prefix)).catch(() => []);
       for (const row of rows) out.push([row.key, row.value]);
     }
     return out;
   }
 
-  /** @param {string[]} keyPrefixes */
-  async clear(keyPrefixes) {
-    /** @type {IDBValidKey[]} */
-    let keys = [];
+  async clear(keyPrefixes: string[]): Promise<number> {
+    let keys: IDBValidKey[] = [];
     for (const prefix of keyPrefixes) {
       keys = keys.concat(await this._db.getAllKeys(STORE, prefixRange(prefix)).catch(() => []));
     }
@@ -76,8 +70,7 @@ export class IdbCacheBackend {
     return keys.length;
   }
 
-  /** @param {string[]} keyPrefixes */
-  async sizeOf(keyPrefixes) {
+  async sizeOf(keyPrefixes: string[]): Promise<number> {
     let bytes = 0;
     for (const [key, value] of await this.entries(keyPrefixes)) {
       bytes += key.length + JSON.stringify(value).length;

@@ -1,4 +1,3 @@
-// @ts-check
 // A ceiling on the `apiCache` object store (docs/adr/0025 P2). ADR 0001
 // says PokéAPI data is cached "forever" — that means "never goes stale",
 // not "unbounded". IndexedDB's quota is large, but an ever-growing cache
@@ -9,13 +8,16 @@
 // single idle-time sweep per session keeps it within a session's growth
 // of the cap, which is plenty.
 
+import type { Db } from './index.ts';
+import type { ApiCacheRow } from './schema.ts';
+
 const STORE = 'apiCache';
 
 // Per `kind` (the token before the first ':' in the key). Sized to a
 // heavy user: every species looked up in battle-logging + adding, a few
 // evolution families, all nine generation lists. Kinds not listed
 // (`species-list`, `smogon`) are tiny and fixed — left alone.
-const CAPS = {
+const CAPS: Record<string, number> = {
   mon: 2000,
   species: 1500,
   evochain: 1500,
@@ -27,14 +29,13 @@ const CAPS = {
  * Trims each capped `kind` down to its limit, evicting the entries with
  * the oldest `fetchedAt` first. One `readwrite` transaction. Best-effort
  * — resolves quietly on any failure.
- * @param {import('./index.js').Db} db
- * @returns {Promise<number>} entries removed
+ * @returns entries removed
  */
-export async function trimApiCache(db) {
+export async function trimApiCache(db: Db): Promise<number> {
   let removed = 0;
   try {
     for (const [kind, cap] of Object.entries(CAPS)) {
-      const rows = await db.getAllByIndex(STORE, 'kind', kind).catch(() => []);
+      const rows = await db.getAllByIndex<ApiCacheRow>(STORE, 'kind', kind).catch(() => []);
       if (rows.length <= cap) continue;
       const doomed = rows
         .sort((a, b) => (a.fetchedAt ?? 0) - (b.fetchedAt ?? 0))

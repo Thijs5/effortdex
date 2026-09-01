@@ -6,10 +6,10 @@ import { readFileSync } from 'node:fs';
 
 import { Store, projectEntry } from '../lib/store.js';
 import { totalEvs } from '../lib/utils.js';
-import { openDb } from '../lib/db/index.js';
-import { DB_NAME } from '../lib/db/schema.js';
-import { makeRosterMirror } from '../lib/db/roster-import.js';
-import { readRoster, readImportMarker } from '../lib/db/roster-io.js';
+import { openDb } from '../lib/db/index.ts';
+import { DB_NAME } from '../lib/db/schema.ts';
+import { makeRosterMirror } from '../lib/db/roster-import.ts';
+import { readRoster, readImportMarker } from '../lib/db/roster-io.ts';
 
 // docs/adr/0025 §4/§6: the roster moves from the single
 // `localStorage['effortdex:state']` blob into IndexedDB rows

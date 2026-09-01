@@ -3,10 +3,10 @@ import './support/localstorage-polyfill.js';
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { openDb } from '../lib/db/index.js';
-import { DB_NAME } from '../lib/db/schema.js';
-import { IdbCacheBackend } from '../lib/db/idb-cache-backend.js';
-import { dropLegacyLocalStorageCache } from '../lib/db/legacy-cache-cleanup.js';
+import { openDb } from '../lib/db/index.ts';
+import { DB_NAME } from '../lib/db/schema.ts';
+import { IdbCacheBackend } from '../lib/db/idb-cache-backend.ts';
+import { dropLegacyLocalStorageCache } from '../lib/db/legacy-cache-cleanup.ts';
 import { MemoCache } from '../lib/memo-cache.js';
 
 async function freshBackend() {

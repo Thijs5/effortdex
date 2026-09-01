@@ -4,9 +4,9 @@ import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { openDb } from '../lib/db/index.js';
-import { DB_NAME } from '../lib/db/schema.js';
-import { writeRoster, readRoster } from '../lib/db/roster-io.js';
+import { openDb } from '../lib/db/index.ts';
+import { DB_NAME } from '../lib/db/schema.ts';
+import { writeRoster, readRoster } from '../lib/db/roster-io.ts';
 import { Store, projectEntry } from '../lib/store.js';
 
 async function freshDb() {

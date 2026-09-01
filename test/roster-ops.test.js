@@ -3,11 +3,11 @@ import './support/localstorage-polyfill.js';
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { openDb } from '../lib/db/index.js';
-import { DB_NAME } from '../lib/db/schema.js';
-import { makeRosterMirror } from '../lib/db/roster-import.js';
-import { makeRosterOpsApplier } from '../lib/db/roster-ops.js';
-import { readRoster } from '../lib/db/roster-io.js';
+import { openDb } from '../lib/db/index.ts';
+import { DB_NAME } from '../lib/db/schema.ts';
+import { makeRosterMirror } from '../lib/db/roster-import.ts';
+import { makeRosterOpsApplier } from '../lib/db/roster-ops.ts';
+import { readRoster } from '../lib/db/roster-io.ts';
 import { Store } from '../lib/store.js';
 
 async function freshDb() {

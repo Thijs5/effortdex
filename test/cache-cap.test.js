@@ -2,10 +2,10 @@ import 'fake-indexeddb/auto';
 import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 
-import { openDb } from '../lib/db/index.js';
-import { DB_NAME } from '../lib/db/schema.js';
-import { IdbCacheBackend } from '../lib/db/idb-cache-backend.js';
-import { trimApiCache } from '../lib/db/cache-cap.js';
+import { openDb } from '../lib/db/index.ts';
+import { DB_NAME } from '../lib/db/schema.ts';
+import { IdbCacheBackend } from '../lib/db/idb-cache-backend.ts';
+import { trimApiCache } from '../lib/db/cache-cap.ts';
 
 async function freshDb() {
   await new Promise((resolve) => {

@@ -1,4 +1,3 @@
-// @ts-check
 // docs/adr/0025 P4c — targeted roster writes. The event append/delete
 // path (every battle / vitamin / level / stat-reading — the great
 // majority of writes) persists as a single `events.add` / `events.delete`
@@ -9,16 +8,15 @@
 // so this applier only needs `events` + `meta`. Widen the store list
 // here if more op types are added.
 
-/**
- * @typedef {{ type: 'putEvent', entryUid: string, event: any }
- *         | { type: 'deleteEvent', id: string }} RosterOp
- */
+import type { Db } from './index.ts';
 
-/**
- * @param {import('./index.js').Db} db
- * @returns {(ops: RosterOp[], meta: { rev: number, activePartyId: string|null }) => Promise<unknown>}
- */
-export function makeRosterOpsApplier(db) {
+export type RosterOp =
+  | { type: 'putEvent'; entryUid: string; event: any }
+  | { type: 'deleteEvent'; id: string };
+
+export function makeRosterOpsApplier(
+  db: Db,
+): (ops: RosterOp[], meta: { rev: number; activePartyId: string | null }) => Promise<unknown> {
   return (ops, meta) =>
     db.transaction(['events', 'meta'], 'readwrite', (tx) => {
       const events = tx.objectStore('events');
