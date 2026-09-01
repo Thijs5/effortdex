@@ -167,7 +167,7 @@ test('evictLocalCache drops every cached entry (freeing localStorage) and forces
   // Something unrelated in the same origin's storage must be left alone.
   localStorage.setItem('effortdex:state', '{"keep":true}');
 
-  const removed = client.evictLocalCache();
+  const removed = await client.evictLocalCache();
   assert.equal(removed, 2);
   assert.equal(localStorage.getItem('effortdex:mon:pikachu'), null);
   assert.equal(localStorage.getItem('effortdex:generation:1'), null);
@@ -180,17 +180,17 @@ test('evictLocalCache drops every cached entry (freeing localStorage) and forces
 test('localCacheBytes counts the client cache entries and nothing else', async () => {
   routes.push({ match: '/pokemon/pikachu', handler: () => respond(PIKACHU) });
   const client = new PokeApiClient();
-  assert.equal(client.localCacheBytes(), 0);
+  assert.equal(await client.localCacheBytes(), 0);
 
   await client.getPokemon('pikachu');
   localStorage.setItem('effortdex:state', 'x'.repeat(5000)); // not part of the cache
 
   const monKey = 'effortdex:mon:pikachu';
   const expected = monKey.length + localStorage.getItem(monKey).length;
-  assert.equal(client.localCacheBytes(), expected);
+  assert.equal(await client.localCacheBytes(), expected);
 
-  client.evictLocalCache();
-  assert.equal(client.localCacheBytes(), 0);
+  await client.evictLocalCache();
+  assert.equal(await client.localCacheBytes(), 0);
   assert.equal(localStorage.getItem('effortdex:state').length, 5000); // untouched
 });
 

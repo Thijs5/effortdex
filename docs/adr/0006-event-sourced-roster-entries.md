@@ -101,3 +101,34 @@ pattern](https://learn.microsoft.com/en-us/azure/architecture/patterns/event-sou
   counterfactual replay — and matches what a paper journal would show.
 - Old saves lose their battle-by-battle history once (EV totals,
   levels, identity and Pokérus survive via the baseline events).
+
+## Addendum — species facts are snapshotted into events, not referenced (ADR 0025)
+
+The `add` and `evolve` events carry the species' own data —
+`speciesName`, `speciesId`, `sprite`, `baseStats` — copied in, not a
+`speciesId` foreign key into a shared species table. With
+[ADR 0025](0025-persistence-layer-and-indexeddb.md) putting the events
+in their own IndexedDB store this looks like duplication (three
+Bulbasaurs each store Bulbasaur's base stats). It is deliberate:
+
+- **The fold stays a pure, synchronous, offline function of
+  `entry.events`.** A `speciesId` join would make `projectEntry` need a
+  lookup — async, or a preloaded map that must be populated before any
+  render. `apiCache` already holds this data, but it is *disposable*
+  (evictable, trimmed, cleared by "Clear cache"); the roster's
+  correctness must not depend on it (ADR 0001/0024).
+- **History stays immutable.** An `evolve` event's `from.baseStats` is
+  what it was at evolve time. PokéAPI does revise base stats (form
+  splits, generation fixes); a snapshot keeps old projections correct,
+  a join would silently rewrite them.
+- **Transfer needs nothing external.** A shared link
+  ([ADR 0020](0020-transfer-hub-nested-export-import-routes.md)) carries
+  self-contained events, so the receiving device shows the roster with
+  no PokéAPI call.
+
+The cost is a few KB of repeated species facts per roster — negligible
+against IndexedDB's quota, and the price of the pure fold this whole ADR
+is built on. All four fields are used by the fold or its consumers
+(`baseStats` feeds `actualStat`/IV math; both id and name are keyed on
+in different paths; `sprite` is the *resolved* URL, so the fold skips
+re-running the versioned-sprite fallback).
