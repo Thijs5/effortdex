@@ -3,9 +3,10 @@ import { titleCase, escapeHtml } from '../../lib/utils.ts';
 import { api, store } from '../../lib/services.ts';
 import { attachDesignSystem } from '../../lib/design-system.ts';
 import '../atoms/ds-item-button.ts';
+import type { RosterEntry } from '../../lib/store.ts';
+import type { EvolutionNode } from '../../lib/pokeapi-client.ts';
 
-/** @typedef {import('../lib/store.ts').RosterEntry} RosterEntry */
-/** @typedef {import('../lib/pokeapi-client.ts').EvolutionNode} EvolutionNode */
+type Pending = { action: 'evolve'; name: string } | { action: 'undo' };
 
 /**
  * <evolution-chain> — a roster Pokémon's whole evolution family rendered
@@ -27,13 +28,14 @@ import '../atoms/ds-item-button.ts';
  * dialog is closed any other way.
  */
 export class EvolutionChain extends HTMLElement {
+  _entry: RosterEntry | null = null;
+  _pending: Pending | null = null;
+  $note: HTMLElement;
+  $chain: HTMLElement;
+  $status: HTMLElement;
+
   constructor() {
     super();
-    /** @type {RosterEntry|null} */
-    this._entry = null;
-    /** @type {{ action: 'evolve', name: string } | { action: 'undo' } | null} */
-    this._pending = null;
-
     const shadow = this.attachShadow({ mode: 'open' });
     attachDesignSystem(shadow);
     shadow.innerHTML = `
@@ -56,20 +58,20 @@ export class EvolutionChain extends HTMLElement {
       <div class="evo-chain"></div>
       <p class="evolve-status" aria-live="polite"></p>
     `;
-    this.$note = /** @type {HTMLElement} */ (shadow.querySelector('.evo-note'));
-    this.$chain = /** @type {HTMLElement} */ (shadow.querySelector('.evo-chain'));
-    this.$status = /** @type {HTMLElement} */ (shadow.querySelector('.evolve-status'));
+    this.$note = shadow.querySelector<HTMLElement>('.evo-note')!;
+    this.$chain = shadow.querySelector<HTMLElement>('.evo-chain')!;
+    this.$status = shadow.querySelector<HTMLElement>('.evolve-status')!;
 
     this.$chain.addEventListener('pick', (e) => {
-      const btn = /** @type {HTMLElement} */ (e.target).closest('[data-action]');
+      const btn = (e.target as HTMLElement).closest('[data-action]');
       if (!(btn instanceof HTMLElement)) return;
-      if (btn.dataset.action === 'evolve') this._setPending({ action: 'evolve', name: /** @type {string} */ (btn.dataset.name) });
+      if (btn.dataset.action === 'evolve') this._setPending({ action: 'evolve', name: btn.dataset.name ?? '' });
       else if (btn.dataset.action === 'undo' && this._entry?.evolutions.length) this._setPending({ action: 'undo' });
     });
   }
 
-  /** Whether a pick is staged and waiting on the parent's Save. @returns {boolean} */
-  get hasPending() {
+  /** Whether a pick is staged and waiting on the parent's Save. */
+  get hasPending(): boolean {
     return this._pending !== null;
   }
 
@@ -79,10 +81,11 @@ export class EvolutionChain extends HTMLElement {
    * cancels it — the same toggle-to-clear affordance the Items popup's
    * grids use). Picking the other action (or a different Evolve target,
    * for a multi-branch family like Eevee) replaces whatever was pending.
-   * @param {{ action: 'evolve', name: string } | { action: 'undo' }} next
    */
-  _setPending(next) {
-    const same = this._pending?.action === next.action && /** @type {any} */ (this._pending).name === /** @type {any} */ (next).name;
+  _setPending(next: Pending): void {
+    const same =
+      this._pending?.action === next.action &&
+      (this._pending as { name?: string }).name === (next as { name?: string }).name;
     this._pending = same ? null : next;
     this.$status.textContent = '';
     this._syncPendingButtons();
@@ -98,11 +101,11 @@ export class EvolutionChain extends HTMLElement {
    * once (the old form never visibly deselecting) since they share the
    * same look.
    */
-  _syncPendingButtons() {
+  _syncPendingButtons(): void {
     const currentBtn = this.$chain.querySelector('.evo-current-btn');
     if (currentBtn) currentBtn.toggleAttribute('active', this._pending === null);
     for (const el of this.$chain.querySelectorAll('[data-action]')) {
-      const btn = /** @type {HTMLElement} */ (el);
+      const btn = el as HTMLElement;
       const isPending =
         this._pending !== null &&
         btn.dataset.action === this._pending.action &&
@@ -118,11 +121,10 @@ export class EvolutionChain extends HTMLElement {
    * Throws (leaving `_pending` and the status line's error message in
    * place, so Save can be retried) if the lookup fails — the parent
    * should not close its dialog out from under a failed commit.
-   * @returns {Promise<void>}
    */
-  async commit() {
+  async commit(): Promise<void> {
     if (!this._pending) return;
-    const entry = /** @type {RosterEntry} */ (this._entry);
+    const entry = this._entry as RosterEntry;
     try {
       if (this._pending.action === 'evolve') {
         const mon = await api.getPokemon(this._pending.name);
@@ -139,22 +141,21 @@ export class EvolutionChain extends HTMLElement {
   }
 
   /** Clears any pending choice without applying it — called when the dialog closes any other way than Save. */
-  discard() {
+  discard(): void {
     this._pending = null;
     this.$status.textContent = '';
     this._syncPendingButtons();
   }
 
-  /** @param {RosterEntry|null} e */
-  set entry(e) {
+  set entry(e: RosterEntry | null) {
     this._entry = e;
     this._renderNote();
   }
-  get entry() {
+  get entry(): RosterEntry | null {
     return this._entry;
   }
 
-  _renderNote() {
+  _renderNote(): void {
     const e = this._entry;
     if (!e) return;
     if (e.evolutions.length) {
@@ -167,15 +168,15 @@ export class EvolutionChain extends HTMLElement {
   }
 
   /** Loads (or reloads) the whole family and renders it as a chain. */
-  async load() {
+  async load(): Promise<void> {
     this.$chain.innerHTML = '';
     this.$status.textContent = 'Loading evolution chain…';
     try {
-      const nodes = await api.getEvolutionChain(/** @type {RosterEntry} */ (this._entry).speciesName);
+      const nodes = await api.getEvolutionChain((this._entry as RosterEntry).speciesName);
       const mons = await Promise.all(
-        nodes.map((n) => api.getPokemon(n.name).catch(() => ({ name: n.name, sprite: /** @type {string|null} */ (null) })))
+        nodes.map((n) => api.getPokemon(n.name).catch(() => ({ name: n.name, sprite: null as string | null })))
       );
-      const spriteByName = new Map(mons.map((m) => [m.name, m.sprite]));
+      const spriteByName = new Map(mons.map((m) => [m.name, m.sprite] as [string, string | null]));
       this.$status.textContent = '';
       this._renderChain(nodes, spriteByName);
     } catch (err) {
@@ -183,9 +184,8 @@ export class EvolutionChain extends HTMLElement {
     }
   }
 
-  /** @param {EvolutionNode[]} nodes @param {Map<string, string|null>} spriteByName */
-  _renderChain(nodes, spriteByName) {
-    const currentName = /** @type {RosterEntry} */ (this._entry).speciesName.toLowerCase();
+  _renderChain(nodes: EvolutionNode[], spriteByName: Map<string, string | null>): void {
+    const currentName = (this._entry as RosterEntry).speciesName.toLowerCase();
     const currentNode = nodes.find((n) => n.name === currentName);
     const nextNames = new Set(nodes.filter((n) => n.parent === currentName).map((n) => n.name));
     const prevName = currentNode?.parent ?? null;
@@ -210,14 +210,13 @@ export class EvolutionChain extends HTMLElement {
   // training item and vitamin buttons. The lighter line is the level
   // requirement for evolving into that node, when it evolves by
   // level-up — root forms and trade/item/friendship evolutions have none.
-  /**
-   * @param {EvolutionNode} node
-   * @param {string} currentName
-   * @param {string|null} prevName
-   * @param {Set<string>} nextNames
-   * @param {Map<string, string|null>} spriteByName
-   */
-  _nodeHtml(node, currentName, prevName, nextNames, spriteByName) {
+  _nodeHtml(
+    node: EvolutionNode,
+    currentName: string,
+    prevName: string | null,
+    nextNames: Set<string>,
+    spriteByName: Map<string, string | null>
+  ): string {
     const label = titleCase(node.name);
     const sprite = spriteByName.get(node.name) || FALLBACK_SPRITE;
     const boost = node.minLevel ? `Lv. ${node.minLevel}` : '';
@@ -234,6 +233,5 @@ export class EvolutionChain extends HTMLElement {
     }
     return `<ds-item-button ${attrs} disabled title="${label} — not directly reachable from here"></ds-item-button>`;
   }
-
 }
 customElements.define('evolution-chain', EvolutionChain);

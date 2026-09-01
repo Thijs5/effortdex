@@ -36,6 +36,16 @@ const ICON_DOWNLOAD = '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor
  * at. app.js does this on every #/transfer/export render.
  */
 export class TransferPanel extends HTMLElement {
+  $link: HTMLInputElement;
+  $shareBtn: HTMLButtonElement;
+  $copyBtn: HTMLButtonElement;
+  $downloadBtn: HTMLButtonElement;
+  $status: HTMLElement;
+  $longLinkNote: HTMLElement;
+  _url = '';
+  _payload = '';
+  _copyResetTimer: ReturnType<typeof setTimeout> | undefined;
+
   constructor() {
     super();
     const shadow = this.attachShadow({ mode: 'open' });
@@ -75,25 +85,22 @@ export class TransferPanel extends HTMLElement {
         above instead and send that file however you like.
       </p>
     `;
-    this.$link = shadow.querySelector('.link-field');
-    this.$shareBtn = shadow.querySelector('[data-action="share"]');
-    this.$copyBtn = shadow.querySelector('[data-action="copy"]');
-    this.$downloadBtn = shadow.querySelector('[data-action="download"]');
-    this.$status = shadow.querySelector('.status');
-    this.$longLinkNote = shadow.querySelector('.long-link-note');
-    this._url = '';
-    this._payload = '';
-    this._copyResetTimer = null;
+    this.$link = shadow.querySelector<HTMLInputElement>('.link-field')!;
+    this.$shareBtn = shadow.querySelector<HTMLButtonElement>('[data-action="share"]')!;
+    this.$copyBtn = shadow.querySelector<HTMLButtonElement>('[data-action="copy"]')!;
+    this.$downloadBtn = shadow.querySelector<HTMLButtonElement>('[data-action="download"]')!;
+    this.$status = shadow.querySelector<HTMLElement>('.status')!;
+    this.$longLinkNote = shadow.querySelector<HTMLElement>('.long-link-note')!;
   }
 
-  connectedCallback() {
+  connectedCallback(): void {
     this.$shareBtn.hidden = typeof navigator.share !== 'function';
     this.$shareBtn.addEventListener('click', () => this._share());
     this.$copyBtn.addEventListener('click', () => this._copy());
     this.$downloadBtn.addEventListener('click', () => this._download());
   }
 
-  async refresh() {
+  async refresh(): Promise<void> {
     this._url = '';
     this._payload = '';
     this.$link.value = '';
@@ -115,7 +122,7 @@ export class TransferPanel extends HTMLElement {
     this.$longLinkNote.hidden = this._url.length <= LONG_LINK_WARNING_CHARS;
   }
 
-  async _copy() {
+  async _copy(): Promise<void> {
     try {
       await navigator.clipboard.writeText(this._url);
       this._flashCopied();
@@ -125,7 +132,7 @@ export class TransferPanel extends HTMLElement {
     }
   }
 
-  _flashCopied() {
+  _flashCopied(): void {
     clearTimeout(this._copyResetTimer);
     this.$copyBtn.innerHTML = `${ICON_CHECK}<span>Copied</span>`;
     this.$copyBtn.classList.add('is-copied');
@@ -135,7 +142,7 @@ export class TransferPanel extends HTMLElement {
     }, COPY_FEEDBACK_MS);
   }
 
-  _download() {
+  _download(): void {
     const blob = new Blob([this._payload], { type: 'text/plain' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -145,7 +152,7 @@ export class TransferPanel extends HTMLElement {
     URL.revokeObjectURL(url);
   }
 
-  async _share() {
+  async _share(): Promise<void> {
     try {
       await navigator.share({ url: this._url, title: 'Effortdex transfer link' });
     } catch {

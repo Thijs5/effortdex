@@ -18,7 +18,7 @@
 
 import { interceptLinkClick } from '../../../lib/dom.ts';
 import * as router from '../../../lib/router.ts';
-import '../../organisms/transfer-panel.js';
+import '../../organisms/transfer-panel.ts';
 
 export const view = document.getElementById('transfer-view');
 const backFromTransfer = /** @type {HTMLAnchorElement} */ (document.getElementById('back-from-transfer'));

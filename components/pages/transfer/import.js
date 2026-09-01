@@ -10,7 +10,7 @@
 // not export.js's fixed-to-parent destination.
 
 import { wireUtilityBackLink } from '../../../lib/dom.ts';
-import '../../organisms/import-review.js';
+import '../../organisms/import-review.ts';
 
 export const view = document.getElementById('import-view');
 const backFromImport = document.getElementById('back-from-import');
