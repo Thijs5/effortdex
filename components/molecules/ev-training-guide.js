@@ -3,7 +3,7 @@ import { STATS, FALLBACK_SPRITE } from '../../lib/constants.ts';
 import { versionedSpriteUrl, modernSpriteUrl } from '../../lib/pokeapi-client.ts';
 import { titleCase } from '../../lib/utils.ts';
 import { attachDesignSystem } from '../../lib/design-system.ts';
-import '../atoms/item-button-grid.js';
+import '../atoms/item-button-grid.ts';
 
 /**
  * <ev-training-guide> — one section per stat, each an <item-button-grid>
@@ -62,7 +62,7 @@ export class EvTrainingGuide extends HTMLElement {
       const heading = document.createElement('h3');
       heading.className = 'section-title';
       heading.textContent = label;
-      const grid = /** @type {import('./item-button-grid.js').ItemButtonGrid} */ (document.createElement('item-button-grid'));
+      const grid = /** @type {import('./item-button-grid.ts').ItemButtonGrid} */ (document.createElement('item-button-grid'));
       grid.setAttribute('columns', '1');
       grid.items = spots.map((spot) => {
         const sprite = versionedSpriteUrl(this._spriteGame, spot.speciesId) || modernSpriteUrl(spot.speciesId) || FALLBACK_SPRITE;

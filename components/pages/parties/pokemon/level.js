@@ -3,7 +3,7 @@ import { escapeHtml } from '../../../../lib/utils.ts';
 import { store } from '../../../../lib/services.ts';
 import { BaseDialog } from '../../../atoms/base-dialog.ts';
 import '../../../organisms/evolution-chain.js';
-import '../../../atoms/level-input.js';
+import '../../../atoms/level-input.ts';
 
 /** @typedef {import('../../../../lib/store.ts').RosterEntry} RosterEntry */
 /** @typedef {import('../../../../lib/constants.ts').StatKey} StatKey */

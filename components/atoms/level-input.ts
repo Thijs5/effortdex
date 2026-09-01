@@ -20,6 +20,8 @@ import { attachDesignSystem } from '../../lib/design-system.ts';
  * across the shadow boundary the way it would for a native input.
  */
 export class LevelInput extends HTMLElement {
+  $input: HTMLInputElement;
+
   constructor() {
     super();
     const shadow = this.attachShadow({ mode: 'open' });
@@ -31,15 +33,15 @@ export class LevelInput extends HTMLElement {
       </style>
       <input type="text" inputmode="numeric" pattern="[0-9]*" class="ds-field" />
     `;
-    this.$input = shadow.querySelector('input');
+    this.$input = shadow.querySelector('input')!;
   }
 
-  connectedCallback() {
+  connectedCallback(): void {
     // Moved, not copied: leaving aria-label on the host too would give
     // assistive tech (and Playwright's getByLabel) two same-named nodes
     // for what's really one field — the shadow input.
     if (this.hasAttribute('aria-label')) {
-      this.$input.setAttribute('aria-label', this.getAttribute('aria-label'));
+      this.$input.setAttribute('aria-label', this.getAttribute('aria-label') ?? '');
       this.removeAttribute('aria-label');
     }
     this.$input.addEventListener('input', () => {
@@ -49,17 +51,17 @@ export class LevelInput extends HTMLElement {
     this.$input.addEventListener('change', () => this.dispatchEvent(new Event('change', { bubbles: true, composed: true })));
   }
 
-  get value() {
+  get value(): string {
     return this.$input.value;
   }
-  set value(v) {
+  set value(v: string | number | null | undefined) {
     this.$input.value = v == null ? '' : String(v);
   }
 
-  focus() {
+  focus(): void {
     this.$input.focus();
   }
-  select() {
+  select(): void {
     this.$input.select();
   }
 }

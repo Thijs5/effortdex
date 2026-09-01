@@ -1,7 +1,7 @@
 import { STATS, STAT_CAP, TOTAL_CAP } from '../../lib/constants.ts';
 import { emptyEvs } from '../../lib/utils.ts';
 import { attachDesignSystem } from '../../lib/design-system.ts';
-import '../atoms/ev-bar.js';
+import '../atoms/ev-bar.ts';
 
 /**
  * <ev-summary> — six per-stat <ev-bar>s plus a total bar. Set `.evs` to

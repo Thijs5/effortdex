@@ -9,7 +9,7 @@ import { totalEvs, escapeHtml } from '../../../lib/utils.ts';
 import { store } from '../../../lib/services.ts';
 import * as router from '../../../lib/router.ts';
 import { interceptLinkClick } from '../../../lib/dom.ts';
-import '../../atoms/game-ball.js';
+import '../../atoms/game-ball.ts';
 
 export const view = document.getElementById('picker-view');
 const partyList = document.getElementById('party-list');

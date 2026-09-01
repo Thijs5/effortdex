@@ -1,7 +1,17 @@
 import { attachDesignSystem } from '../../lib/design-system.ts';
-import './ds-item-button.js';
+import './ds-item-button.ts';
 
-/** @typedef {{ id: string, label: string, sprite: string, boost: string, title: string, active?: boolean, capped?: boolean, count?: number, disabled?: boolean }} ItemButtonSpec */
+export interface ItemButtonSpec {
+  id: string;
+  label: string;
+  sprite: string;
+  boost: string;
+  title: string;
+  active?: boolean;
+  capped?: boolean;
+  count?: number;
+  disabled?: boolean;
+}
 
 /**
  * <item-button-grid> — a grid of icon+label+boost buttons: training
@@ -25,14 +35,15 @@ import './ds-item-button.js';
  * `columns` (attribute) sets the grid's column count, default 3.
  */
 export class ItemButtonGrid extends HTMLElement {
-  static get observedAttributes() {
+  static get observedAttributes(): string[] {
     return ['columns'];
   }
 
+  _items: ItemButtonSpec[] = [];
+  $grid: HTMLElement;
+
   constructor() {
     super();
-    /** @type {ItemButtonSpec[]} */
-    this._items = [];
     const shadow = this.attachShadow({ mode: 'open' });
     attachDesignSystem(shadow);
     shadow.innerHTML = `
@@ -50,29 +61,27 @@ export class ItemButtonGrid extends HTMLElement {
       </style>
       <div class="grid"></div>
     `;
-    this.$grid = /** @type {HTMLElement} */ (shadow.querySelector('.grid'));
+    this.$grid = shadow.querySelector<HTMLElement>('.grid')!;
     this.$grid.addEventListener('pick', (e) => {
-      const btn = /** @type {HTMLElement} */ (e.target).closest('[data-id]');
+      const btn = (e.target as HTMLElement).closest('[data-id]');
       if (!(btn instanceof HTMLElement)) return;
       this.dispatchEvent(new CustomEvent('item-pick', { detail: { id: btn.dataset.id }, bubbles: true, composed: true }));
     });
   }
 
-  /** @param {string} name @param {string|null} _old @param {string|null} value */
-  attributeChangedCallback(name, _old, value) {
+  attributeChangedCallback(name: string, _old: string | null, value: string | null): void {
     if (name === 'columns') this.style.setProperty('--columns', value || '3');
   }
 
-  /** @param {ItemButtonSpec[]} items */
-  set items(items) {
+  set items(items: ItemButtonSpec[]) {
     this._items = items;
     this._render();
   }
-  get items() {
+  get items(): ItemButtonSpec[] {
     return this._items;
   }
 
-  _render() {
+  _render(): void {
     this.$grid.innerHTML = '';
     for (const item of this._items) {
       const btn = document.createElement('ds-item-button');

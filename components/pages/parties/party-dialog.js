@@ -29,7 +29,7 @@ import { store, prefetchService } from '../../../lib/services.ts';
 import * as router from '../../../lib/router.ts';
 import { isCachingDisabled } from '../../../lib/dev-cache.ts';
 import { focusDialogStart } from '../../../lib/dom.ts';
-import '../../atoms/game-ball.js';
+import '../../atoms/game-ball.ts';
 import '../../molecules/game-version-picker.js';
 
 const partyDialog = document.getElementById('party-dialog');

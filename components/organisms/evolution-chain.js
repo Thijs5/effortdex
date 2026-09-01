@@ -2,7 +2,7 @@ import { FALLBACK_SPRITE } from '../../lib/constants.ts';
 import { titleCase, escapeHtml } from '../../lib/utils.ts';
 import { api, store } from '../../lib/services.ts';
 import { attachDesignSystem } from '../../lib/design-system.ts';
-import '../atoms/ds-item-button.js';
+import '../atoms/ds-item-button.ts';
 
 /** @typedef {import('../lib/store.ts').RosterEntry} RosterEntry */
 /** @typedef {import('../lib/pokeapi-client.ts').EvolutionNode} EvolutionNode */

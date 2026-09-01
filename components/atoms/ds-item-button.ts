@@ -1,4 +1,3 @@
-// @ts-check
 import { attachDesignSystem } from '../../lib/design-system.ts';
 import { FALLBACK_ONERROR } from '../../lib/constants.ts';
 
@@ -21,9 +20,14 @@ import { FALLBACK_ONERROR } from '../../lib/constants.ts';
  * attributes or listeners the caller already put on this element itself.
  */
 export class DsItemButton extends HTMLElement {
-  static get observedAttributes() {
+  static get observedAttributes(): string[] {
     return ['icon', 'label', 'boost', 'active', 'disabled', 'capped', 'count'];
   }
+
+  $button: HTMLButtonElement;
+  $icon: HTMLImageElement | null;
+  $label: HTMLElement;
+  $boost: HTMLElement;
 
   constructor() {
     super();
@@ -54,17 +58,16 @@ export class DsItemButton extends HTMLElement {
         </span>
       </button>
     `;
-    this.$button = /** @type {HTMLButtonElement} */ (shadow.querySelector('button'));
-    this.$icon = /** @type {HTMLImageElement|null} */ (shadow.querySelector('.ds-item-icon'));
-    this.$label = /** @type {HTMLElement} */ (shadow.querySelector('.ds-item-btn-label'));
-    this.$boost = /** @type {HTMLElement} */ (shadow.querySelector('.ds-item-btn-boost'));
+    this.$button = shadow.querySelector('button')!;
+    this.$icon = shadow.querySelector<HTMLImageElement>('.ds-item-icon');
+    this.$label = shadow.querySelector<HTMLElement>('.ds-item-btn-label')!;
+    this.$boost = shadow.querySelector<HTMLElement>('.ds-item-btn-boost')!;
     this.$button.addEventListener('click', () => {
       this.dispatchEvent(new CustomEvent('pick', { bubbles: true, composed: true }));
     });
   }
 
-  /** @param {string} name @param {string|null} _old @param {string|null} value */
-  attributeChangedCallback(name, _old, value) {
+  attributeChangedCallback(name: string, _old: string | null, value: string | null): void {
     switch (name) {
       case 'icon':
         if (this.$icon) this.$icon.src = value || '';

@@ -3,8 +3,8 @@ import { sortByLabel } from '../../../../lib/utils.ts';
 import { store } from '../../../../lib/services.ts';
 import { POKERUS_ICON_SVG } from '../../../../lib/icons.ts';
 import { BaseDialog } from '../../../atoms/base-dialog.ts';
-import '../../../atoms/item-button-grid.js';
-import '../../../atoms/ds-item-button.js';
+import '../../../atoms/item-button-grid.ts';
+import '../../../atoms/ds-item-button.ts';
 
 /** @typedef {import('../lib/store.ts').RosterEntry} RosterEntry */
 /** @typedef {import('../lib/store.ts').EvMap} EvMap */
