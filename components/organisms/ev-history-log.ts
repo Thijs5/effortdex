@@ -3,6 +3,7 @@ import { titleCase, formatEvYield, escapeHtml, dayKey, dayLabel } from '../../li
 import { store } from '../../lib/services.ts';
 import { attachDesignSystem } from '../../lib/design-system.ts';
 import { POKERUS_ICON_SVG } from '../../lib/icons.ts';
+import type { RosterEntry, StatKey } from '../../lib/store.ts';
 
 /**
  * <ev-history-log> — a roster Pokémon's history: every battle, vitamin
@@ -19,21 +20,28 @@ import { POKERUS_ICON_SVG } from '../../lib/icons.ts';
  */
 
 export class EvHistoryLog extends HTMLElement {
+  _entry: RosterEntry | null = null;
+  _open = false;
+  // Which collapsible batch entries are expanded, keyed by
+  // `_batchKey`. Kept here (not in the DOM) so an expanded batch
+  // survives the full innerHTML rebuild every render does — otherwise
+  // deleting one nested entry re-renders and silently collapses the
+  // batch, hiding its remaining siblings (GitHub issue #35). Same
+  // reasoning as `_open` for the outer History disclosure.
+  _openBatches = new Set<string>();
+  _filterKind = 'all';
+  _search = '';
+  $details: HTMLDetailsElement;
+  $histCount: HTMLElement;
+  $histList: HTMLElement;
+  $histSearch: HTMLInputElement;
+  $histKindFilter: HTMLSelectElement;
+  $histKindOptFeather: HTMLOptionElement;
+  $histKindOptBerry: HTMLOptionElement;
+  $histKindOptPokerus: HTMLOptionElement;
+
   constructor() {
     super();
-    this._entry = null;
-    this._open = false;
-    // Which collapsible batch entries are expanded, keyed by
-    // `_batchKey`. Kept here (not in the DOM) so an expanded batch
-    // survives the full innerHTML rebuild every render does — otherwise
-    // deleting one nested entry re-renders and silently collapses the
-    // batch, hiding its remaining siblings (GitHub issue #35). Same
-    // reasoning as `_open` for the outer History disclosure.
-    /** @type {Set<string>} */
-    this._openBatches = new Set();
-    this._filterKind = 'all';
-    this._search = '';
-
     const shadow = this.attachShadow({ mode: 'open' });
     attachDesignSystem(shadow);
     shadow.innerHTML = `
@@ -121,14 +129,14 @@ export class EvHistoryLog extends HTMLElement {
         <ul class="hist-list"></ul>
       </details>
     `;
-    this.$details = shadow.querySelector('details');
-    this.$histCount = shadow.querySelector('.hist-count');
-    this.$histList = shadow.querySelector('.hist-list');
-    this.$histSearch = shadow.querySelector('.hist-search');
-    this.$histKindFilter = shadow.querySelector('.hist-kind-filter');
-    this.$histKindOptFeather = shadow.querySelector('.hist-kind-opt-feather');
-    this.$histKindOptBerry = shadow.querySelector('.hist-kind-opt-berry');
-    this.$histKindOptPokerus = shadow.querySelector('.hist-kind-opt-pokerus');
+    this.$details = shadow.querySelector('details')!;
+    this.$histCount = shadow.querySelector<HTMLElement>('.hist-count')!;
+    this.$histList = shadow.querySelector<HTMLElement>('.hist-list')!;
+    this.$histSearch = shadow.querySelector<HTMLInputElement>('.hist-search')!;
+    this.$histKindFilter = shadow.querySelector<HTMLSelectElement>('.hist-kind-filter')!;
+    this.$histKindOptFeather = shadow.querySelector<HTMLOptionElement>('.hist-kind-opt-feather')!;
+    this.$histKindOptBerry = shadow.querySelector<HTMLOptionElement>('.hist-kind-opt-berry')!;
+    this.$histKindOptPokerus = shadow.querySelector<HTMLOptionElement>('.hist-kind-opt-pokerus')!;
 
     this.$details.addEventListener('toggle', () => {
       this._open = this.$details.open;
@@ -147,8 +155,8 @@ export class EvHistoryLog extends HTMLElement {
     this.$histList.addEventListener(
       'toggle',
       (e) => {
-        const details = e.target;
-        const li = details.closest?.('li.hist-batch');
+        const details = e.target as HTMLDetailsElement;
+        const li = details.closest?.('li.hist-batch') as HTMLElement | null;
         if (!li) return;
         const key = li.dataset.batchKey;
         if (!key) return;
@@ -158,7 +166,7 @@ export class EvHistoryLog extends HTMLElement {
       true
     );
     this.$histList.addEventListener('click', (e) => {
-      const redefeatBtn = e.target.closest('.redefeat-btn');
+      const redefeatBtn = (e.target as HTMLElement).closest<HTMLElement>('.redefeat-btn');
       if (redefeatBtn) {
         this._open = true;
         this.dispatchEvent(
@@ -170,31 +178,31 @@ export class EvHistoryLog extends HTMLElement {
         );
         return;
       }
-      const deleteBtn = e.target.closest('.delete-hist-btn');
+      const deleteBtn = (e.target as HTMLElement).closest<HTMLElement>('.delete-hist-btn');
       if (deleteBtn) {
         // Deleting a log entry can't be undone (some kinds also revert
         // EVs/level/evolution as they go), so gate it behind a native
         // confirm() — same treatment as removing a Pokémon or a party.
         if (!confirm("Delete this log entry? This can't be undone.")) return;
         this._open = true;
-        store.deleteHistoryEntry(this._entry.uid, deleteBtn.dataset.id);
+        if (this._entry && deleteBtn.dataset.id) store.deleteHistoryEntry(this._entry.uid, deleteBtn.dataset.id);
       }
     });
   }
 
-  set entry(e) {
+  set entry(e: RosterEntry | null) {
     this._entry = e;
     this._render();
   }
-  get entry() {
+  get entry(): RosterEntry | null {
     return this._entry;
   }
 
-  _render() {
+  _render(): void {
     const e = this._entry;
     if (!e) return;
     this.$details.open = this._open;
-    this.$histCount.textContent = e.history.length;
+    this.$histCount.textContent = String(e.history.length);
     this._syncKindFilterOptions();
     this._renderList();
   }
@@ -207,7 +215,7 @@ export class EvHistoryLog extends HTMLElement {
   // filter option itself is hidden, and a filter left selected on one
   // that just disappeared falls back to "All types" rather than staying
   // stuck on an invisible option.
-  _syncKindFilterOptions() {
+  _syncKindFilterOptions(): void {
     this.$histKindOptFeather.hidden = !store.wingsAvailable();
     this.$histKindOptBerry.hidden = !store.berriesAvailable();
     this.$histKindOptPokerus.hidden = !store.pokerusAvailable();
@@ -221,7 +229,7 @@ export class EvHistoryLog extends HTMLElement {
   // without touching the toolbar or the total count in the summary
   // (that count is always the unfiltered total, so filtering never
   // makes "History (N)" look like entries went missing).
-  _renderList() {
+  _renderList(): void {
     const e = this._entry;
     if (!e) return;
     const filtered = e.history.filter((h) => this._matchesFilter(h));
@@ -240,15 +248,13 @@ export class EvHistoryLog extends HTMLElement {
   // against a plain-text rendering of the entry, so it stays in sync
   // with whatever _itemHtml/_batchContent actually show without a
   // second, separately-maintained field list.
-  /** @param {any} h @returns {boolean} */
-  _matchesFilter(h) {
+  _matchesFilter(h: any): boolean {
     if (this._filterKind !== 'all' && this._batchGroupKey(h) !== this._filterKind) return false;
     if (!this._search) return true;
     return this._searchText(h).includes(this._search);
   }
 
-  /** @param {any} h @returns {string} */
-  _searchText(h) {
+  _searchText(h: any): string {
     return this._itemHtml(h)
       .replace(/<[^>]*>/g, ' ')
       .replace(/\s+/g, ' ')
@@ -268,9 +274,9 @@ export class EvHistoryLog extends HTMLElement {
   // berries get their own separate group each rather than one mixed blob.
   // Entries with no batchId (most kinds — it's opt-in per call site) are
   // never grouped, each staying its own top-level entry as before.
-  _listHtml(history) {
+  _listHtml(history: any[]): string {
     let html = '';
-    let lastKey = null;
+    let lastKey: string | null = null;
     let i = 0;
     while (i < history.length) {
       const h = history[i];
@@ -295,8 +301,7 @@ export class EvHistoryLog extends HTMLElement {
   // belong with it); every other kind groups only with its own kind, so
   // Vitamins/Wings/berries queued together in one Items-popup Save still
   // get their own separate entry each instead of one mixed "5 things".
-  /** @param {any} h @returns {string} */
-  _batchGroupKey(h) {
+  _batchGroupKey(h: any): string {
     return h.kind === 'level' || h.kind === 'stat-reading' ? 'level' : h.kind;
   }
 
@@ -306,9 +311,8 @@ export class EvHistoryLog extends HTMLElement {
    * a chevron standing in for the usual delete button's column since
    * there's no group-wide delete; expanding it reveals every individual
    * entry nested, each still its own deletable item.
-   * @param {any[]} batch
    */
-  _batchHtml(batch) {
+  _batchHtml(batch: any[]): string {
     const { title, gain } = this._batchContent(batch);
     // Stable across renders (batchId + kind-group is exactly the run
     // `_listHtml` collapses), so `_openBatches` can re-open it after the
@@ -334,8 +338,7 @@ export class EvHistoryLog extends HTMLElement {
   // icon instead of the generic species sprite, since it reads as "here
   // is what was fed/equipped" rather than "here is what happened to this
   // Pokémon" the way the level/evolve groups do.
-  /** @param {any[]} batch @returns {string} */
-  _batchIcon(batch) {
+  _batchIcon(batch: any[]): string {
     const kind = this._batchGroupKey(batch[0]);
     if (kind === 'vitamin') return VITAMINS.find((v) => v.id === batch[0].vitaminId)?.sprite || FALLBACK_SPRITE;
     if (kind === 'feather') return FEATHERS.find((f) => f.id === batch[0].featherId)?.sprite || FALLBACK_SPRITE;
@@ -347,16 +350,15 @@ export class EvHistoryLog extends HTMLElement {
       if (powerItem) return POWER_ITEMS.find((p) => p.id === powerItem)?.sprite || FALLBACK_SPRITE;
       return FALLBACK_SPRITE; // cleared to no item, none known — nothing specific to show
     }
-    return this._entry.sprite || FALLBACK_SPRITE; // level/evolve group
+    return this._entry?.sprite || FALLBACK_SPRITE; // level/evolve group
   }
 
   // Same id (e.g. every "Calcium" in the batch) collapses into one row
   // with its `applied` amounts summed — "10 vitamins" as a title but
   // "Calcium +100 SPA" as the gain, not ten repeated "+10 SPA"s.
-  /** @param {any[]} chronological @param {string} idKey @returns {any[]} */
-  _mergeByItem(chronological, idKey) {
-    const order = [];
-    const totals = new Map();
+  _mergeByItem(chronological: any[], idKey: string): any[] {
+    const order: any[] = [];
+    const totals = new Map<any, any>();
     for (const h of chronological) {
       const id = h[idKey];
       if (!totals.has(id)) {
@@ -368,8 +370,7 @@ export class EvHistoryLog extends HTMLElement {
     return order.map((id) => totals.get(id));
   }
 
-  /** @param {any[]} batch @returns {{ title: string, gain: string }} */
-  _batchContent(batch) {
+  _batchContent(batch: any[]): { title: string; gain: string } {
     const count = batch.length;
     // batch is newest-first (like the rest of history) — reverse to the
     // order they were actually clicked/applied in for the summary line,
@@ -385,14 +386,14 @@ export class EvHistoryLog extends HTMLElement {
         ? readings.length
           ? `${readings.length} stat reading${readings.length === 1 ? '' : 's'} logged`
           : ''
-        : readings.map((r) => `${STAT_LABEL[r.statKey]} ${r.observedStat}`).join(', ');
+        : readings.map((r) => `${STAT_LABEL[r.statKey as StatKey]} ${r.observedStat}`).join(', ');
       return { title, gain };
     }
     if (batch[0].kind === 'vitamin') {
       const gain = this._mergeByItem(chronological, 'vitaminId')
         .map((h) => {
           const vitamin = VITAMINS.find((v) => v.id === h.vitaminId);
-          const label = h.linkedStat ? 'SPC' : STAT_LABEL[h.stat];
+          const label = h.linkedStat ? 'SPC' : STAT_LABEL[h.stat as StatKey];
           return `${vitamin?.label ?? h.vitaminId} ${h.applied ? `+${h.applied} ${label}` : '(no gain)'}`;
         })
         .join(', ');
@@ -402,7 +403,7 @@ export class EvHistoryLog extends HTMLElement {
       const gain = this._mergeByItem(chronological, 'featherId')
         .map((h) => {
           const feather = FEATHERS.find((f) => f.id === h.featherId);
-          return `${feather?.label ?? h.featherId} ${h.applied ? `+${h.applied} ${STAT_LABEL[h.stat]}` : '(no gain)'}`;
+          return `${feather?.label ?? h.featherId} ${h.applied ? `+${h.applied} ${STAT_LABEL[h.stat as StatKey]}` : '(no gain)'}`;
         })
         .join(', ');
       return { title: `${count} Wing${count === 1 ? '' : 's'}`, gain };
@@ -411,7 +412,7 @@ export class EvHistoryLog extends HTMLElement {
       const gain = this._mergeByItem(chronological, 'berryId')
         .map((h) => {
           const berry = EV_BERRIES.find((b) => b.id === h.berryId);
-          return `${berry?.label ?? h.berryId} ${h.applied ? `−${h.applied} ${STAT_LABEL[h.stat]}` : '(no change)'}`;
+          return `${berry?.label ?? h.berryId} ${h.applied ? `−${h.applied} ${STAT_LABEL[h.stat as StatKey]}` : '(no change)'}`;
         })
         .join(', ');
       return { title: `${count} ${count === 1 ? 'berry' : 'berries'}`, gain };
@@ -422,7 +423,7 @@ export class EvHistoryLog extends HTMLElement {
     return { title: `${count} events logged together`, gain: '' };
   }
 
-  _itemHtml(h) {
+  _itemHtml(h: any): string {
     if (h.kind === 'add') {
       // No delete button: this is the origin record (the store refuses to
       // delete it too). The event's own snapshot shows the form it was
@@ -439,7 +440,7 @@ export class EvHistoryLog extends HTMLElement {
       // Label and sprite come from static data by id — events store only
       // the facts (ADR 0006).
       const vitamin = VITAMINS.find((v) => v.id === h.vitaminId);
-      const statLabel = h.linkedStat ? 'SPC' : STAT_LABEL[h.stat];
+      const statLabel = h.linkedStat ? 'SPC' : STAT_LABEL[h.stat as StatKey];
       const noun = store.usesStatExpSystem() ? 'Stat Experience' : 'EVs';
       const gained = h.applied
         ? `+${h.applied} ${statLabel}`
@@ -461,7 +462,7 @@ export class EvHistoryLog extends HTMLElement {
     }
     if (h.kind === 'feather') {
       const feather = FEATHERS.find((f) => f.id === h.featherId);
-      const gained = h.applied ? `+${h.applied} ${STAT_LABEL[h.stat]}` : 'No EVs gained (capped)';
+      const gained = h.applied ? `+${h.applied} ${STAT_LABEL[h.stat as StatKey]}` : 'No EVs gained (capped)';
       return `<li>
         <img src="${feather?.sprite || FALLBACK_SPRITE}" alt="" ${FALLBACK_ONERROR} />
         <div>
@@ -475,7 +476,7 @@ export class EvHistoryLog extends HTMLElement {
     }
     if (h.kind === 'berry') {
       const berry = EV_BERRIES.find((b) => b.id === h.berryId);
-      const gained = h.applied ? `−${h.applied} ${STAT_LABEL[h.stat]}` : `No EVs removed (${STAT_LABEL[h.stat]} already 0)`;
+      const gained = h.applied ? `−${h.applied} ${STAT_LABEL[h.stat as StatKey]}` : `No EVs removed (${STAT_LABEL[h.stat as StatKey]} already 0)`;
       return `<li>
         <img src="${berry?.sprite || FALLBACK_SPRITE}" alt="" ${FALLBACK_ONERROR} />
         <div>
@@ -501,7 +502,7 @@ export class EvHistoryLog extends HTMLElement {
     }
     if (h.kind === 'imported') {
       return `<li>
-        <img src="${this._entry.sprite || FALLBACK_SPRITE}" alt="" ${FALLBACK_ONERROR} />
+        <img src="${this._entry?.sprite || FALLBACK_SPRITE}" alt="" ${FALLBACK_ONERROR} />
         <div>
           <strong>Imported</strong>
           <span class="gain">${formatEvYield(h.evs) || 'No EVs'} — from an old save format</span>
@@ -536,9 +537,9 @@ export class EvHistoryLog extends HTMLElement {
       </li>`;
     }
     if (h.kind === 'held-item') {
-      const nameOf = (macho, powerItem) =>
+      const nameOf = (macho: any, powerItem: any) =>
         macho ? 'Macho Brace' : powerItem ? POWER_ITEMS.find((p) => p.id === powerItem)?.label || null : null;
-      const spriteOf = (macho, powerItem) =>
+      const spriteOf = (macho: any, powerItem: any) =>
         macho ? MACHO_BRACE_SPRITE : powerItem ? POWER_ITEMS.find((p) => p.id === powerItem)?.sprite : null;
       const equipped = nameOf(h.machoBrace, h.powerItem);
       // `prev*` are absent on events logged before this was tracked — fall
@@ -557,9 +558,9 @@ export class EvHistoryLog extends HTMLElement {
       </li>`;
     }
     if (h.kind === 'stat-reading') {
-      const label = store.specialStatMerged() && h.statKey === 'spa' ? 'SPC' : STAT_LABEL[h.statKey];
+      const label = store.specialStatMerged() && h.statKey === 'spa' ? 'SPC' : STAT_LABEL[h.statKey as StatKey];
       return `<li>
-        <img src="${this._entry.sprite || FALLBACK_SPRITE}" alt="" ${FALLBACK_ONERROR} />
+        <img src="${this._entry?.sprite || FALLBACK_SPRITE}" alt="" ${FALLBACK_ONERROR} />
         <div>
           <strong>${label} reading logged</strong>
           <span class="gain">${h.observedStat} at Lv. ${h.level}</span>
@@ -571,7 +572,7 @@ export class EvHistoryLog extends HTMLElement {
     }
     if (h.kind === 'level') {
       return `<li>
-        <img src="${this._entry.sprite || FALLBACK_SPRITE}" alt="" ${FALLBACK_ONERROR} />
+        <img src="${this._entry?.sprite || FALLBACK_SPRITE}" alt="" ${FALLBACK_ONERROR} />
         <div>
           <strong>${h.toLevel > h.fromLevel ? 'Level up' : 'Level correction'}</strong>
           <span class="gain">Lv. ${h.fromLevel} &rarr; Lv. ${h.toLevel}</span>

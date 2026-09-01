@@ -33,7 +33,7 @@ import * as router from '../../../lib/router.ts';
 import { interceptLinkClick, focusDialogStart } from '../../../lib/dom.ts';
 import { wireDragHandle } from '../../../lib/drag-reorder.ts';
 import '../../atoms/game-ball.ts';
-import '../../organisms/pokemon-search.js';
+import '../../organisms/pokemon-search.ts';
 import '../../atoms/ev-bar.ts';
 import '../../atoms/level-input.ts';
 

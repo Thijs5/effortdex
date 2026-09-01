@@ -15,6 +15,11 @@ import type { ItemButtonGrid } from './atoms/item-button-grid.ts';
 import type { EvSummary } from './molecules/ev-summary.ts';
 import type { EvTrainingGuide } from './molecules/ev-training-guide.ts';
 import type { GameVersionPicker } from './molecules/game-version-picker.ts';
+import type { EvolutionChain } from './organisms/evolution-chain.ts';
+import type { TransferPanel } from './organisms/transfer-panel.ts';
+import type { ImportReview } from './organisms/import-review.ts';
+import type { PokemonSearch } from './organisms/pokemon-search.ts';
+import type { EvHistoryLog } from './organisms/ev-history-log.ts';
 
 declare global {
   interface HTMLElementTagNameMap {
@@ -26,5 +31,10 @@ declare global {
     'ev-summary': EvSummary;
     'ev-training-guide': EvTrainingGuide;
     'game-version-picker': GameVersionPicker;
+    'evolution-chain': EvolutionChain;
+    'transfer-panel': TransferPanel;
+    'import-review': ImportReview;
+    'pokemon-search': PokemonSearch;
+    'ev-history-log': EvHistoryLog;
   }
 }

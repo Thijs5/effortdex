@@ -3,6 +3,8 @@ import { titleCase, formatEvYield } from '../../lib/utils.ts';
 import { FALLBACK_SPRITE, FALLBACK_ONERROR } from '../../lib/constants.ts';
 import { attachDesignSystem } from '../../lib/design-system.ts';
 import { attachPointerSelection, syncActiveDescendant } from '../../lib/combobox.ts';
+import type { SpeciesListEntry, DomainPokemon } from '../../lib/pokeapi-client.ts';
+import type { EvMap } from '../../lib/constants.ts';
 
 // Narrow + coarse-pointer only, so a resized desktop window (narrow but
 // mouse-driven) keeps the inline dropdown, and a touch laptop at full
@@ -12,6 +14,8 @@ const MOBILE_QUERY = '(max-width: 640px) and (pointer: coarse)';
 // How many recently-picked species (via the `recent` property) show up
 // when the field is focused with nothing typed yet.
 const RECENT_LIMIT = 5;
+
+type EvModifier = (mon: DomainPokemon) => EvMap;
 
 /**
  * <pokemon-search placeholder="…" show-ev-yield>
@@ -51,18 +55,25 @@ const RECENT_LIMIT = 5;
  * (default) is unrestricted. See `lib/species-availability.js`.
  */
 export class PokemonSearch extends HTMLElement {
+  _species: SpeciesListEntry[] | null = null; // loaded lazily on first focus
+  _loadingSpecies: Promise<SpeciesListEntry[]> | null = null; // in-flight load promise, so a fast typist isn't lost
+  _matches: SpeciesListEntry[] = [];
+  _activeIndex = -1;
+  _sheetOpen = false;
+  _recent: SpeciesListEntry[] = [];
+  _showingRecent = false;
+  _evModifier: EvModifier | null = null;
+  _allowedSpecies: Set<string> | null = null; // null means unrestricted, see `allowedSpecies` setter
+  _prevBodyOverflow = '';
+  _onViewportChange: () => void = () => {};
+  $wrap: HTMLElement;
+  $input: HTMLInputElement;
+  $list: HTMLUListElement;
+  $sheetTitle: HTMLElement;
+  $sheetClose: HTMLButtonElement;
+
   constructor() {
     super();
-    this._species = null; // [{ name, id, sprite }], loaded lazily on first focus
-    this._loadingSpecies = null; // in-flight load promise, so a fast typist isn't lost
-    this._matches = [];
-    this._activeIndex = -1;
-    this._sheetOpen = false;
-    this._recent = [];
-    this._showingRecent = false;
-    this._evModifier = null;
-    this._allowedSpecies = null; // Set<string>|null — null means unrestricted, see `allowedSpecies` setter
-
     const shadow = this.attachShadow({ mode: 'open' });
     attachDesignSystem(shadow);
     shadow.innerHTML = `
@@ -217,14 +228,14 @@ export class PokemonSearch extends HTMLElement {
         <ul id="ps-list" class="suggestions" hidden role="listbox"></ul>
       </div>
     `;
-    this.$wrap = shadow.querySelector('.wrap');
-    this.$input = shadow.querySelector('input');
-    this.$list = shadow.querySelector('.suggestions');
-    this.$sheetTitle = shadow.querySelector('.sheet-title');
-    this.$sheetClose = shadow.querySelector('.sheet-close');
+    this.$wrap = shadow.querySelector<HTMLElement>('.wrap')!;
+    this.$input = shadow.querySelector('input')!;
+    this.$list = shadow.querySelector<HTMLUListElement>('.suggestions')!;
+    this.$sheetTitle = shadow.querySelector<HTMLElement>('.sheet-title')!;
+    this.$sheetClose = shadow.querySelector<HTMLButtonElement>('.sheet-close')!;
   }
 
-  connectedCallback() {
+  connectedCallback(): void {
     this.$input.placeholder = this.getAttribute('placeholder') || 'Search Pokémon…';
     // Some browser/AT combinations don't compute a placeholder as an
     // accessible name at all — every caller here omits a wrapping
@@ -248,7 +259,7 @@ export class PokemonSearch extends HTMLElement {
         // native <dialog> restores focus to whatever was focused when
         // it opened). Without this check, that stale timeout fires
         // after the refocus and wrongly hides the list it just showed.
-        if (this.shadowRoot.activeElement === this.$input) return;
+        if (this.shadowRoot!.activeElement === this.$input) return;
         this._hideList();
         this._closeSheet();
       }, 120)
@@ -257,7 +268,7 @@ export class PokemonSearch extends HTMLElement {
     // Selection on pointerup with a movement threshold (not pointerdown +
     // preventDefault, which breaks touch scrolling on iOS) — shared with
     // <game-version-picker> via lib/combobox.js.
-    attachPointerSelection(this.$list, (li) => this._pick(li.dataset.name));
+    attachPointerSelection(this.$list, (li) => this._pick(li.dataset.name ?? ''));
     // Both the inline dropdown and the full-screen sheet anchor themselves
     // to the input's on-screen position / the visual viewport, so both
     // need repositioning whenever either can change (scroll, resize, or
@@ -269,7 +280,7 @@ export class PokemonSearch extends HTMLElement {
     window.visualViewport?.addEventListener('scroll', this._onViewportChange);
   }
 
-  disconnectedCallback() {
+  disconnectedCallback(): void {
     this._closeSheet();
     window.removeEventListener('scroll', this._onViewportChange, true);
     window.removeEventListener('resize', this._onViewportChange);
@@ -277,19 +288,19 @@ export class PokemonSearch extends HTMLElement {
     window.visualViewport?.removeEventListener('scroll', this._onViewportChange);
   }
 
-  get recent() {
+  get recent(): SpeciesListEntry[] {
     return this._recent;
   }
 
-  get evModifier() {
+  get evModifier(): EvModifier | null {
     return this._evModifier;
   }
 
-  set evModifier(fn) {
+  set evModifier(fn: EvModifier | null) {
     this._evModifier = typeof fn === 'function' ? fn : null;
   }
 
-  get allowedSpecies() {
+  get allowedSpecies(): Set<string> | null {
     return this._allowedSpecies;
   }
 
@@ -301,9 +312,8 @@ export class PokemonSearch extends HTMLElement {
    * restriction (offline, a failed fetch) should pass `null` rather than
    * an empty set, so a lookup failure never hides species that are
    * actually fine to pick.
-   * @param {Set<string>|null} set
    */
-  set allowedSpecies(set) {
+  set allowedSpecies(set: Set<string> | null) {
     this._allowedSpecies = set instanceof Set ? set : null;
     // Live-refresh an already-open list (e.g. the party's game resolves
     // shortly after this field opens) the same way a species-list load
@@ -311,8 +321,8 @@ export class PokemonSearch extends HTMLElement {
     if (this.$input.value.trim()) this._onInput();
   }
 
-  set recent(list) {
-    const seen = new Set();
+  set recent(list: Array<{ name: string; sprite?: string | null; id?: number | null }> | null | undefined) {
+    const seen = new Set<string>();
     this._recent = (list || [])
       .filter((r) => r && r.name && !seen.has(r.name) && seen.add(r.name))
       .slice(0, RECENT_LIMIT)
@@ -327,7 +337,7 @@ export class PokemonSearch extends HTMLElement {
     if (
       this._showingRecent &&
       !this.$input.value.trim() &&
-      this.shadowRoot.activeElement === this.$input
+      this.shadowRoot!.activeElement === this.$input
     ) {
       this._showRecentOrHide();
     }
@@ -343,11 +353,11 @@ export class PokemonSearch extends HTMLElement {
   // sheet is the one layout here that's actually built to hold the whole
   // list (in-flow, not floating), so it's the only fit for "inside
   // another dialog", not just a narrow-viewport nicety.
-  _isMobile() {
+  _isMobile(): boolean {
     return this.hasAttribute('force-sheet') || window.matchMedia(MOBILE_QUERY).matches;
   }
 
-  _openSheet() {
+  _openSheet(): void {
     this._sheetOpen = true;
     this.$wrap.classList.add('sheet');
     this._prevBodyOverflow = document.body.style.overflow;
@@ -355,7 +365,7 @@ export class PokemonSearch extends HTMLElement {
     this._reposition();
   }
 
-  _closeSheet() {
+  _closeSheet(): void {
     if (!this._sheetOpen) return;
     this._sheetOpen = false;
     this.$wrap.classList.remove('sheet');
@@ -370,18 +380,18 @@ export class PokemonSearch extends HTMLElement {
     this.dispatchEvent(new CustomEvent('sheet-close', { bubbles: true, composed: true }));
   }
 
-  _reposition() {
+  _reposition(): void {
     if (this._sheetOpen) this._positionSheet();
     else this._positionDropdown();
   }
 
-  _positionSheet() {
+  _positionSheet(): void {
     const vv = window.visualViewport;
     this.$wrap.style.top = `${vv?.offsetTop ?? 0}px`;
     this.$wrap.style.height = `${vv?.height ?? window.innerHeight}px`;
   }
 
-  _positionDropdown() {
+  _positionDropdown(): void {
     if (this.$list.hidden) return;
     const vv = window.visualViewport;
     const viewportH = vv?.height ?? window.innerHeight;
@@ -405,7 +415,7 @@ export class PokemonSearch extends HTMLElement {
     }
   }
 
-  async _ensureSpecies() {
+  async _ensureSpecies(): Promise<void> {
     if (this._species) return;
     if (!this._loadingSpecies) {
       this._loadingSpecies = api.getAllSpecies().catch(() => []);
@@ -417,7 +427,7 @@ export class PokemonSearch extends HTMLElement {
     if (this.$input.value.trim()) this._onInput();
   }
 
-  _onInput() {
+  _onInput(): void {
     const q = this.$input.value.trim().toLowerCase();
     this._activeIndex = -1;
     this._showingRecent = false;
@@ -441,7 +451,7 @@ export class PokemonSearch extends HTMLElement {
   }
 
   /** With nothing typed, offer recently-picked species instead of an empty field. */
-  _showRecentOrHide() {
+  _showRecentOrHide(): void {
     if (!this._recent.length) {
       this._hideList();
       return;
@@ -451,14 +461,14 @@ export class PokemonSearch extends HTMLElement {
     this._renderList();
   }
 
-  _showLoading() {
+  _showLoading(): void {
     this.$list.innerHTML = '<li class="status" role="presentation">Loading species…</li>';
     this.$list.hidden = false;
     this.$input.setAttribute('aria-expanded', 'true');
     this._reposition();
   }
 
-  _renderList() {
+  _renderList(): void {
     if (!this._matches.length) {
       this.$list.innerHTML = '<li class="status" role="presentation">No matching Pok&eacute;mon.</li>';
       this.$list.hidden = false;
@@ -482,7 +492,7 @@ export class PokemonSearch extends HTMLElement {
         .join('');
     this.$list.hidden = false;
     this.$input.setAttribute('aria-expanded', 'true');
-    syncActiveDescendant(this.$input, [...this.$list.querySelectorAll('li.option')], -1, 'ps-opt');
+    syncActiveDescendant(this.$input, [...this.$list.querySelectorAll<HTMLElement>('li.option')], -1, 'ps-opt');
     this._reposition();
     if (showEv) this._loadEvYields();
   }
@@ -496,9 +506,9 @@ export class PokemonSearch extends HTMLElement {
    * being maxed out, not a data gap, so it's labeled "Capped" instead of
    * left blank.
    */
-  _loadEvYields() {
-    for (const li of this.$list.querySelectorAll('li.option')) {
-      const name = li.dataset.name;
+  _loadEvYields(): void {
+    for (const li of this.$list.querySelectorAll<HTMLElement>('li.option')) {
+      const name = li.dataset.name ?? '';
       api
         .getPokemon(name)
         .then((mon) => {
@@ -513,7 +523,7 @@ export class PokemonSearch extends HTMLElement {
     }
   }
 
-  _hideList() {
+  _hideList(): void {
     this.$list.hidden = true;
     this.$list.innerHTML = '';
     this.$input.setAttribute('aria-expanded', 'false');
@@ -521,13 +531,13 @@ export class PokemonSearch extends HTMLElement {
     this._showingRecent = false;
   }
 
-  _onKeydown(e) {
+  _onKeydown(e: KeyboardEvent): void {
     if (this.$list.hidden) {
       if (e.key === 'Enter') this._tryDirectPick();
       else if (e.key === 'Escape' && this._sheetOpen) this.$input.blur();
       return;
     }
-    const items = [...this.$list.querySelectorAll('li.option')];
+    const items = [...this.$list.querySelectorAll<HTMLElement>('li.option')];
     if (e.key === 'ArrowDown') {
       e.preventDefault();
       this._activeIndex = Math.min(this._activeIndex + 1, items.length - 1);
@@ -558,19 +568,19 @@ export class PokemonSearch extends HTMLElement {
     }
   }
 
-  _highlight(items) {
+  _highlight(items: HTMLElement[]): void {
     items.forEach((li, i) => li.classList.toggle('active', i === this._activeIndex));
     syncActiveDescendant(this.$input, items, this._activeIndex, 'ps-opt');
     items[this._activeIndex]?.scrollIntoView({ block: 'nearest' });
   }
 
-  _tryDirectPick() {
+  _tryDirectPick(): void {
     const q = this.$input.value.trim().toLowerCase();
     if (this._species?.some((s) => s.name === q) && (!this._allowedSpecies || this._allowedSpecies.has(q)))
       this._pick(q);
   }
 
-  _pick(name) {
+  _pick(name: string): void {
     this.$input.value = '';
     this._hideList();
     const wasSheet = this._sheetOpen;
@@ -579,7 +589,7 @@ export class PokemonSearch extends HTMLElement {
     );
     if (wasSheet) {
       this.$input.blur();
-    } else if (this.shadowRoot.activeElement === this.$input) {
+    } else if (this.shadowRoot!.activeElement === this.$input) {
       // The input stays focused after a mouse pick (see the pointerdown
       // handler above) — without this, re-picking another recent option
       // needs a full blur-then-refocus, since clicking an already-focused
@@ -588,7 +598,7 @@ export class PokemonSearch extends HTMLElement {
     }
   }
 
-  clear() {
+  clear(): void {
     this.$input.value = '';
     this._hideList();
   }
@@ -598,7 +608,7 @@ export class PokemonSearch extends HTMLElement {
   // into the field (and, via the 'focus' listener above, its full-screen
   // sheet on mobile with recents already showing) without the user
   // needing an extra tap on the input itself.
-  focus() {
+  focus(): void {
     this.$input.focus();
   }
 
@@ -608,7 +618,7 @@ export class PokemonSearch extends HTMLElement {
   // to whatever was focused when it opened, which re-focuses this input
   // and (via the 'focus' listener above) pops the suggestions/sheet
   // straight back open.
-  blur() {
+  blur(): void {
     this.$input.blur();
   }
 }
