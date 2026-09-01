@@ -1,5 +1,5 @@
-import { attachDesignSystem } from '../../lib/design-system.ts';
 import { openShadowDialog, clearShadowDialogFlag } from '../../lib/dom.ts';
+import { BaseElement } from '../base-element.ts';
 
 /**
  * BaseDialog — the open/close/backdrop-click/Enter-to-confirm wiring and
@@ -13,6 +13,10 @@ import { openShadowDialog, clearShadowDialogFlag } from '../../lib/dom.ts';
  * subclasses it and registers its own tag, e.g.
  * `class IvDialog extends BaseDialog { ... }`,
  * `customElements.define('iv-dialog', IvDialog)`.
+ *
+ * Its skeleton is built per instance from the constructor arguments, so
+ * it assigns `this.shadow.innerHTML` itself rather than using
+ * BaseElement's `static template` (see that class's note).
  *
  * A subclass calls `super(dialogClass, titleId)` — `dialogClass` becomes
  * both the `<dialog>`'s own class (e2e specs match it directly, e.g.
@@ -33,13 +37,15 @@ import { openShadowDialog, clearShadowDialogFlag } from '../../lib/dom.ts';
  * specific rules) into the same shadow root on top of the shared chrome
  * CSS below.
  */
-export class BaseDialog extends HTMLElement {
-  /** @param {string} dialogClass @param {string} titleId */
-  constructor(dialogClass, titleId) {
+export class BaseDialog extends BaseElement {
+  $dialog: HTMLDialogElement;
+  $title: HTMLElement;
+  $body: HTMLElement;
+  $footer: HTMLElement;
+
+  constructor(dialogClass: string, titleId: string) {
     super();
-    const shadow = this.attachShadow({ mode: 'open' });
-    attachDesignSystem(shadow);
-    shadow.innerHTML = `
+    this.shadow.innerHTML = `
       <style>
         :host { display: contents; }
         /* Open/close + the 3-row grid layout come from .ds-dialog /
@@ -64,11 +70,11 @@ export class BaseDialog extends HTMLElement {
         <footer class="ds-dialog-footer" hidden></footer>
       </dialog>
     `;
-    this.$dialog = /** @type {HTMLDialogElement} */ (shadow.querySelector('dialog'));
-    this.$title = /** @type {HTMLElement} */ (shadow.querySelector('h2'));
-    this.$body = /** @type {HTMLElement} */ (shadow.querySelector('.dialog-body'));
-    this.$footer = /** @type {HTMLElement} */ (shadow.querySelector('.ds-dialog-footer'));
-    const $close = shadow.querySelector(`.${dialogClass}-close`);
+    this.$dialog = this.$<HTMLDialogElement>('dialog');
+    this.$title = this.$('h2');
+    this.$body = this.$('.dialog-body');
+    this.$footer = this.$('.ds-dialog-footer');
+    const $close = this.$maybe(`.${dialogClass}-close`);
 
     this.$dialog.addEventListener('close', () => {
       clearShadowDialogFlag();
@@ -90,7 +96,7 @@ export class BaseDialog extends HTMLElement {
     // `_onEnter`.
     this.$dialog.addEventListener('keydown', (e) => {
       if (e.key !== 'Enter') return;
-      const target = /** @type {HTMLElement} */ (e.target);
+      const target = e.target as HTMLElement;
       if (target.tagName === 'TEXTAREA' || target.tagName === 'BUTTON') return;
       e.preventDefault();
       this._onEnter();
@@ -98,18 +104,17 @@ export class BaseDialog extends HTMLElement {
   }
 
   /** Override for cleanup a subclass needs whenever the dialog closes — Cancel, backdrop click, Escape, or Save. No-op by default. */
-  _onClose() {}
+  _onClose(): void {}
   /** Override in a subclass with a Save button (typically `this.$saveBtn.click()`). No-op by default — nothing to submit. */
-  _onEnter() {}
+  _onEnter(): void {}
 
-  open() {
+  open(): void {
     openShadowDialog(this.$dialog);
   }
-  close() {
+  close(): void {
     this.$dialog.close();
   }
-  /** @returns {boolean} */
-  isOpen() {
+  isOpen(): boolean {
     return this.$dialog.open;
   }
 }

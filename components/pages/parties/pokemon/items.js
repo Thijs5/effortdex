@@ -2,7 +2,7 @@ import { POWER_ITEMS, MACHO_BRACE_SPRITE, EXP_SHARE_SPRITE, VITAMINS, FEATHERS, 
 import { sortByLabel } from '../../../../lib/utils.ts';
 import { store } from '../../../../lib/services.ts';
 import { POKERUS_ICON_SVG } from '../../../../lib/icons.ts';
-import { BaseDialog } from '../../../atoms/base-dialog.js';
+import { BaseDialog } from '../../../atoms/base-dialog.ts';
 import '../../../atoms/item-button-grid.js';
 import '../../../atoms/ds-item-button.js';
 

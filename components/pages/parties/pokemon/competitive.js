@@ -4,7 +4,7 @@ import { escapeHtml } from '../../../../lib/utils.ts';
 import { store, smogon } from '../../../../lib/services.ts';
 import { toShowdownId, smogonSetsKey, TIER_DESCRIPTIONS } from '../../../../lib/smogon-client.ts';
 import { matchGameVersion } from '../../../../lib/game-versions.ts';
-import { BaseDialog } from '../../../atoms/base-dialog.js';
+import { BaseDialog } from '../../../atoms/base-dialog.ts';
 
 /** @typedef {import('../lib/store.ts').RosterEntry} RosterEntry */
 

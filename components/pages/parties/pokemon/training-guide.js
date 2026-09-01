@@ -1,6 +1,6 @@
 import { store } from '../../../../lib/services.ts';
 import { evTrainingLocations } from '../../../../lib/ev-training-locations.ts';
-import { BaseDialog } from '../../../atoms/base-dialog.js';
+import { BaseDialog } from '../../../atoms/base-dialog.ts';
 import '../../../molecules/ev-training-guide.js';
 
 /** @typedef {import('../../../../lib/store.ts').RosterEntry} RosterEntry */

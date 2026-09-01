@@ -1,7 +1,7 @@
 import { STATS, MIN_LEVEL, MAX_LEVEL } from '../../../../lib/constants.ts';
 import { escapeHtml } from '../../../../lib/utils.ts';
 import { store } from '../../../../lib/services.ts';
-import { BaseDialog } from '../../../atoms/base-dialog.js';
+import { BaseDialog } from '../../../atoms/base-dialog.ts';
 import '../../../organisms/evolution-chain.js';
 import '../../../atoms/level-input.js';
 

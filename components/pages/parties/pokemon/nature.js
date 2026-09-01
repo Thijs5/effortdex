@@ -1,7 +1,7 @@
 import { NATURES } from '../../../../lib/constants.ts';
 import { natureEffectHint, natureOptionsHtml } from '../../../../lib/utils.ts';
 import { store } from '../../../../lib/services.ts';
-import { BaseDialog } from '../../../atoms/base-dialog.js';
+import { BaseDialog } from '../../../atoms/base-dialog.ts';
 
 /** @typedef {import('../../../../lib/store.ts').RosterEntry} RosterEntry */
 

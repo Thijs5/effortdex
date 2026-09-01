@@ -1,7 +1,7 @@
 import { STATS } from '../../../../lib/constants.ts';
 import { escapeHtml } from '../../../../lib/utils.ts';
 import { store } from '../../../../lib/services.ts';
-import { BaseDialog } from '../../../atoms/base-dialog.js';
+import { BaseDialog } from '../../../atoms/base-dialog.ts';
 
 /** @typedef {import('../lib/store.ts').RosterEntry} RosterEntry */
 /** @typedef {import('../lib/constants.ts').StatKey} StatKey */
@@ -13,7 +13,7 @@ import { BaseDialog } from '../../../atoms/base-dialog.js';
  * still oversized even after item-button-grid.js) — same "own
  * dialog, own pending state, own store calls" shape as
  * items.js/competitive.js, built on the shared dialog
- * chrome in atoms/base-dialog.js.
+ * chrome in atoms/base-dialog.ts.
  *
  * Set `.entry` to a Store roster entry — kept live on every assignment
  * (mirrors pokemon-detail's own "rebuild is cheap" render, ADR
