@@ -42,33 +42,40 @@ magic.
    query — the skeleton is static, so a missing selector is a
    programming error, not a runtime condition. `$maybe<T>` is the
    nullable variant for genuinely optional elements.
-3. `protected requestRender()` coalesces `render()` into a microtask and
-   guards `isConnected`. Subclasses still write explicit setters that
-   call it — no property observation.
+3. `protected render()` is the imperative-repaint hook; setters call it
+   explicitly — no property observation. `protected requestRender()` is
+   available as a microtask-coalesced, `isConnected`-guarded wrapper for
+   components that want it (see Consequences — not adopted in the
+   initial rebase).
 4. Subclasses keep writing plain setters, plain `render()`, plain
    `customElements.define(...)`. An `HTMLElement` subclass stays an
    `HTMLElement` subclass.
 
 `BaseDialog` (already a hand-rolled partial base for the roster-Pokémon
-dialogs) is rebased onto `BaseElement`.
+dialogs) is rebased onto `BaseElement` too.
 
 ## Consequences
 
 - The per-component constructor shrinks to `super()` +
-  `static template`; the ref casts are gone for good.
-- `render()` calls are now microtask-coalesced where they were
-  synchronous. Behaviour-parity in practice — the skeleton `innerHTML`
-  is still set synchronously in the constructor, and Playwright's
-  auto-waiting assertions never observe the one-microtask delay — but it
-  *is* a timing change, noted here so a future regression hunt starts in
-  the right place.
+  `static template` (or, for the two components with a large template
+  that would be awkward as a class field — `pokemon-detail` and
+  `ev-history-log` — `super()` + `this.shadow.innerHTML = …`, the same
+  escape hatch `BaseDialog` uses for its argument-dependent skeleton).
+  The `/** @type */`-style ref casts are gone for good.
+- **`requestRender()` exists but is not yet adopted.** Every component
+  was rebased in the same pass; to keep that pass a faithful,
+  zero-timing-change translation, setters still call a synchronous
+  `this.render()` directly. Switching the ones with a clean
+  `setter → render` shape (`ev-bar`, `game-ball`, `ev-summary`, …) over
+  to the microtask-coalesced `requestRender()` is a separate, opt-in
+  step — behaviour-visible, so it wants its own commits behind the e2e
+  suite.
+- `attachShadow` / `attachDesignSystem` now appear in exactly one file.
 - This is a maintenance surface the project now owns. It's deliberately
   minimal so that staying on top of it is cheap; if it starts growing
   reactive-property features, that's the signal to revisit
   [ADR 0002](0002-solid-module-boundaries.md)'s Lit question, not to
   keep extending this file.
-- Adopting `BaseElement` in a component is one commit, separate from its
-  `.js` → `.ts` rename, so a bad rebase is easy to isolate. Not every
-  component is rebased yet — the rename landed first across the whole
-  tree; `BaseElement` adoption is proceeding component-by-component
-  behind the e2e suite.
+- Each layer's rebase (`atoms` / `molecules` / `organisms`) is its own
+  commit, separate from that layer's `.js` → `.ts` rename, so a bad
+  rebase is easy to isolate.
