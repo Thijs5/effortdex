@@ -1,11 +1,8 @@
-// @ts-nocheck -- transitional; removed when this file is converted to .ts (TS migration PR)
 import { STATS } from '../../../../lib/constants.ts';
 import { escapeHtml } from '../../../../lib/utils.ts';
 import { store } from '../../../../lib/services.ts';
 import { BaseDialog } from '../../../atoms/base-dialog.ts';
-
-/** @typedef {import('../lib/store.ts').RosterEntry} RosterEntry */
-/** @typedef {import('../lib/constants.ts').StatKey} StatKey */
+import type { RosterEntry, StatKey, StatReadingEvent } from '../../../../lib/store.ts';
 
 /**
  * <iv-dialog> — a roster Pokémon's IVs dialog: the six-stat grid plus
@@ -28,28 +25,33 @@ import { BaseDialog } from '../../../atoms/base-dialog.ts';
  * before; the route only decides when `open()`/`close()` get called.
  */
 export class IvDialog extends BaseDialog {
+  _entry: RosterEntry | null = null;
+  // Pending edits for this dialog session (docs/adr/0017) — null means
+  // "no dialog session open", seeded from the entry's real ivs when
+  // `open()` is called, applied to the store only by Save.
+  _pendingIvs: Record<StatKey, number | null> | null = null;
+  $grid: HTMLElement;
+  $summary: HTMLElement;
+  $calc: HTMLElement;
+  $calcStatName: HTMLElement;
+  $calcStat: HTMLSelectElement;
+  $calcObserved: HTMLInputElement;
+  $calcBtn: HTMLButtonElement | null;
+  $calcReadings: HTMLElement;
+  $calcNote: HTMLElement;
+  $calcResults: HTMLElement;
+  $saveBtn: HTMLButtonElement | null;
+  $helpBtn: HTMLButtonElement | null;
+
   constructor() {
     super('iv-dialog', 'iv-dialog-title');
-    /** @type {RosterEntry|null} */
-    this._entry = null;
-    // Pending edits for this dialog session (docs/adr/0017) — null means
-    // "no dialog session open", seeded from the entry's real ivs when
-    // `open()` is called, applied to the store only by Save.
-    /** @type {Record<string, number|null>|null} */
-    this._pendingIvs = null;
 
-    const shadow = /** @type {ShadowRoot} */ (this.shadowRoot);
     const style = document.createElement('style');
     // No width override here — the default 420px from lib/design-system.js's
     // .ds-dialog already matches what this dialog needs.
     style.textContent = `
       .ivs { display: grid; gap: var(--space-2); min-width: 0; }
       .iv-grid { display: grid; gap: var(--space-2); }
-      /* min-width: 0 on the row and its 1fr column's input — a grid/
-         flex item's default min-width: auto otherwise refuses to
-         shrink past its own children's combined intrinsic content
-         width, so on a narrow phone it overflows the dialog's own
-         right edge instead of actually shrinking to fit. */
       .iv-row {
         display: grid; grid-template-columns: 3.5em 1fr; align-items: center; gap: var(--space-2);
         font-size: var(--font-size-xs); color: var(--ink-soft); min-width: 0;
@@ -97,9 +99,6 @@ export class IvDialog extends BaseDialog {
         line-height: 1; padding: 0; flex: 0 0 auto; cursor: pointer;
       }
       .help-btn:hover, .help-btn:focus-visible { border-color: var(--teal); color: var(--teal); }
-      /* Tap-to-toggle explanation under the dialog title — title-attribute
-         tooltips don't exist on touch devices, so the same text must be
-         reachable with a tap. */
       .help-note {
         margin: 0 0 var(--space-3); font-family: var(--font-mono); font-size: var(--font-size-2xs);
         color: var(--ink-soft); background: var(--lcd);
@@ -107,7 +106,7 @@ export class IvDialog extends BaseDialog {
         text-transform: none; letter-spacing: normal;
       }
     `;
-    shadow.appendChild(style);
+    this.shadow.appendChild(style);
 
     this.$title.innerHTML = `IVs
       <button type="button" class="help-btn" aria-expanded="false" aria-label="What are IVs?" title="Individual Values (IVs) are hidden, randomly-rolled bonus stat points fixed the moment this Pokémon was caught or hatched — 0-31 each (0-15 in Gen I/II, called DVs, with HP derived from the other four rather than stored on its own). Unlike EVs, they never change from training or leveling up. Enter them if you already know them (breeding, the in-game IV Judge), or use the calculator below to narrow one down from an observed stat.">?</button>`;
@@ -130,18 +129,18 @@ export class IvDialog extends BaseDialog {
     this.$footer.innerHTML = `<button type="button" class="ds-btn ds-btn--primary iv-dialog-save-btn">Save</button>`;
     this.$footer.hidden = false;
 
-    this.$grid = /** @type {HTMLElement} */ (shadow.querySelector('.iv-grid'));
-    this.$summary = /** @type {HTMLElement} */ (shadow.querySelector('.iv-summary'));
-    this.$calc = /** @type {HTMLElement} */ (shadow.querySelector('.iv-calc'));
-    this.$calcStatName = /** @type {HTMLElement} */ (shadow.querySelector('.iv-calc-stat-name'));
-    this.$calcStat = /** @type {HTMLSelectElement} */ (shadow.querySelector('.iv-calc-stat'));
-    this.$calcObserved = /** @type {HTMLInputElement} */ (shadow.querySelector('.iv-calc-observed'));
-    this.$calcBtn = shadow.querySelector('.iv-calc-btn');
-    this.$calcReadings = /** @type {HTMLElement} */ (shadow.querySelector('.iv-calc-readings'));
-    this.$calcNote = /** @type {HTMLElement} */ (shadow.querySelector('.iv-calc-note'));
-    this.$calcResults = /** @type {HTMLElement} */ (shadow.querySelector('.iv-calc-results'));
-    this.$saveBtn = shadow.querySelector('.iv-dialog-save-btn');
-    this.$helpBtn = shadow.querySelector('.help-btn');
+    this.$grid = this.shadow.querySelector<HTMLElement>('.iv-grid')!;
+    this.$summary = this.shadow.querySelector<HTMLElement>('.iv-summary')!;
+    this.$calc = this.shadow.querySelector<HTMLElement>('.iv-calc')!;
+    this.$calcStatName = this.shadow.querySelector<HTMLElement>('.iv-calc-stat-name')!;
+    this.$calcStat = this.shadow.querySelector<HTMLSelectElement>('.iv-calc-stat')!;
+    this.$calcObserved = this.shadow.querySelector<HTMLInputElement>('.iv-calc-observed')!;
+    this.$calcBtn = this.shadow.querySelector<HTMLButtonElement>('.iv-calc-btn');
+    this.$calcReadings = this.shadow.querySelector<HTMLElement>('.iv-calc-readings')!;
+    this.$calcNote = this.shadow.querySelector<HTMLElement>('.iv-calc-note')!;
+    this.$calcResults = this.shadow.querySelector<HTMLElement>('.iv-calc-results')!;
+    this.$saveBtn = this.shadow.querySelector<HTMLButtonElement>('.iv-dialog-save-btn');
+    this.$helpBtn = this.shadow.querySelector<HTMLButtonElement>('.help-btn');
     this.$calcStat.innerHTML = STATS.map(({ key, label }) => `<option value="${key}">${label}</option>`).join('');
 
     this.$saveBtn?.addEventListener('click', () => this._save());
@@ -149,19 +148,16 @@ export class IvDialog extends BaseDialog {
     // are hover-only, unreachable on touch) — same pattern as every
     // other dialog's own help buttons.
     this.$helpBtn?.addEventListener('click', () => {
-      // Into the scrolling body (top), not after the header — the header
-      // is its own grid row now, so a sibling inserted there would land
-      // in the body's grid track and break the layout.
       const existing = this.$body.querySelector('.help-note');
       if (existing) {
         existing.remove();
-        this.$helpBtn.setAttribute('aria-expanded', 'false');
+        this.$helpBtn!.setAttribute('aria-expanded', 'false');
       } else {
         const note = document.createElement('p');
         note.className = 'help-note';
-        note.textContent = this.$helpBtn.title;
+        note.textContent = this.$helpBtn!.title;
         this.$body.prepend(note);
-        this.$helpBtn.setAttribute('aria-expanded', 'true');
+        this.$helpBtn!.setAttribute('aria-expanded', 'true');
       }
     });
     // Delegated: the grid's number inputs are rebuilt every render (one
@@ -169,73 +165,61 @@ export class IvDialog extends BaseDialog {
     // listener here outlives any individual input the way per-field ones
     // can't.
     this.$grid.addEventListener('change', (e) => {
-      const input = /** @type {HTMLInputElement} */ (e.target);
+      const input = e.target as HTMLInputElement;
       const statKey = input?.dataset?.stat;
       if (!statKey || !this._pendingIvs) return;
-      // Preview only — store.setIv doesn't run until Save (docs/adr/0017).
-      // Updates the "N/6 known" summary and perfect-stat highlight live,
-      // but deliberately *doesn't* call the full _renderGrid rebuild
-      // here: that replaces every <input> in the grid (a fresh DOM node
-      // per stat), and this fires on blur — the exact moment focus is
-      // moving to whichever field the user clicks/tabs into next.
-      // Rebuilding then would destroy that field's own node out from
-      // under the focus-in-progress, discarding it as if it had never
-      // been typed (a value another stat's change event does).
-      this._pendingIvs[statKey] = input.value === '' ? null : Number(input.value);
+      this._pendingIvs[statKey as StatKey] = input.value === '' ? null : Number(input.value);
       this._updateSummary();
     });
     this.$calcStat.addEventListener('change', () => this._updateCalcHint());
     this.$calcBtn?.addEventListener('click', () => this._logReading());
     this.$calcResults.addEventListener('click', (e) => {
-      const chip = /** @type {HTMLElement} */ (e.target).closest('.iv-calc-chip');
+      const chip = (e.target as HTMLElement).closest<HTMLElement>('.iv-calc-chip');
       if (!chip || !this._entry) return;
-      const statKey = /** @type {StatKey} */ (this.$calcStat.value);
-      const iv = Number(/** @type {HTMLElement} */ (chip).dataset.iv);
+      const statKey = this.$calcStat.value as StatKey;
+      const iv = Number(chip.dataset.iv);
       // Set pending *before* store.setIv, not after: store.setIv's save
       // synchronously dispatches the store's 'change' event, which flows
       // back through `.entry =` and re-renders the grid from
-      // `_pendingIvs` immediately — updating pending afterward would be
-      // one render too late, and Save would then overwrite the
-      // calculator's own result with a stale value.
+      // `_pendingIvs` immediately.
       if (this._pendingIvs) this._pendingIvs[statKey] = iv;
       store.setIv(this._entry.uid, statKey, iv);
     });
     this.$calcReadings.addEventListener('click', (e) => {
-      const del = /** @type {HTMLElement} */ (e.target).closest('.iv-calc-reading-delete');
-      if (!del || !this._entry) return;
-      store.deleteHistoryEntry(this._entry.uid, /** @type {HTMLElement} */ (del).dataset.id);
+      const del = (e.target as HTMLElement).closest<HTMLElement>('.iv-calc-reading-delete');
+      if (!del || !this._entry || !del.dataset.id) return;
+      store.deleteHistoryEntry(this._entry.uid, del.dataset.id);
     });
   }
 
-  /** @param {RosterEntry|null} e */
-  set entry(e) {
+  set entry(e: RosterEntry | null) {
     this._entry = e;
     if (!e) return;
     this._renderGrid(e, store.usesStatExpSystem());
   }
-  get entry() {
+  get entry(): RosterEntry | null {
     return this._entry;
   }
 
   /** Seeds pending IVs from the entry (so a discarded previous session never leaks into a fresh one), then opens. */
-  open() {
-    const e = /** @type {RosterEntry} */ (this._entry);
+  open(): void {
+    const e = this._entry as RosterEntry;
     this._pendingIvs = { ...e.ivs };
     this._renderGrid(e, store.usesStatExpSystem());
     super.open();
   }
 
-  _onClose() {
+  _onClose(): void {
     this._pendingIvs = null;
   }
-  _onEnter() {
+  _onEnter(): void {
     this.$saveBtn?.click();
   }
 
   /** Applies every stat whose pending IV actually changed, then closes. */
-  _save() {
-    const e = /** @type {RosterEntry} */ (this._entry);
-    const pending = /** @type {Record<string, number|null>} */ (this._pendingIvs);
+  _save(): void {
+    const e = this._entry as RosterEntry;
+    const pending = this._pendingIvs as Record<StatKey, number | null>;
     for (const { key } of STATS) {
       if (pending[key] !== e.ivs[key]) store.setIv(e.uid, key, pending[key]);
     }
@@ -247,9 +231,8 @@ export class IvDialog extends BaseDialog {
    * modern (Gen III+) IV system so far — Gen I/II's Stat Experience
    * rounding is a distinct, less-documented formula (see store.js's
    * possibleIvsForStat doc comment).
-   * @param {RosterEntry} e @param {boolean} statExp
    */
-  _renderGrid(e, statExp) {
+  _renderGrid(e: RosterEntry, statExp: boolean): void {
     this.$calc.hidden = statExp;
 
     const ivs = this._pendingIvs || e.ivs;
@@ -283,15 +266,15 @@ export class IvDialog extends BaseDialog {
    * matters. Also refreshes the IV calculator hint, same as a full
    * `_renderGrid` would.
    */
-  _updateSummary() {
-    const e = /** @type {RosterEntry} */ (this._entry);
+  _updateSummary(): void {
+    const e = this._entry as RosterEntry;
     const ivs = this._pendingIvs || e.ivs;
     const { max, legacy } = store.ivRange();
     const rows = STATS.filter(({ key }) => !(legacy && key === 'spd'));
     for (const row of this.$grid.children) {
-      const input = /** @type {HTMLElement} */ (row).querySelector('input[data-stat]');
-      const key = /** @type {HTMLInputElement|null} */ (input)?.dataset.stat;
-      if (key) row.classList.toggle('iv-row--perfect', ivs[key] === max);
+      const input = row.querySelector<HTMLInputElement>('input[data-stat]');
+      const key = input?.dataset.stat;
+      if (key) row.classList.toggle('iv-row--perfect', ivs[key as StatKey] === max);
     }
     const knownValues = rows.map(({ key }) => ivs[key]);
     const knownCount = knownValues.filter((v) => v != null).length;
@@ -303,7 +286,7 @@ export class IvDialog extends BaseDialog {
     this._updateCalcHint();
   }
 
-  _updateCalcHint() {
+  _updateCalcHint(): void {
     const stat = STATS.find((s) => s.key === this.$calcStat.value);
     this.$calcStatName.textContent = stat ? stat.label : '';
     this._renderCalcReadings();
@@ -311,10 +294,12 @@ export class IvDialog extends BaseDialog {
   }
 
   /** This stat's logged readings (level + observed value at the time), newest first, each deletable. */
-  _renderCalcReadings() {
-    const e = /** @type {RosterEntry} */ (this._entry);
+  _renderCalcReadings(): void {
+    const e = this._entry as RosterEntry;
     const statKey = this.$calcStat.value;
-    const readings = e.events.filter((ev) => ev.kind === 'stat-reading' && ev.statKey === statKey).reverse();
+    const readings = e.events
+      .filter((ev): ev is StatReadingEvent => ev.kind === 'stat-reading' && ev.statKey === statKey)
+      .reverse();
     this.$calcReadings.innerHTML = readings
       .map(
         (r) =>
@@ -326,15 +311,13 @@ export class IvDialog extends BaseDialog {
   /**
    * Renders store.possibleIvsFromReadings as clickable chips — click one
    * to actually set it as this stat's IV. A low level often can't
-   * distinguish several adjacent IVs at all (the stat formula's floor()
-   * rounds them to the same displayed number), so more than one chip is
-   * the normal case, not a bug — $calcNote spells that out instead of
-   * leaving a bare wall of numbers to interpret. Nothing to show until
-   * at least one reading is logged.
+   * distinguish several adjacent IVs at all, so more than one chip is
+   * the normal case, not a bug — $calcNote spells that out. Nothing to
+   * show until at least one reading is logged.
    */
-  _renderCalcResults() {
-    const e = /** @type {RosterEntry} */ (this._entry);
-    const statKey = /** @type {StatKey} */ (this.$calcStat.value);
+  _renderCalcResults(): void {
+    const e = this._entry as RosterEntry;
+    const statKey = this.$calcStat.value as StatKey;
     this.$calcResults.innerHTML = '';
     this.$calcNote.hidden = true;
     const hasReadings = e.events.some((ev) => ev.kind === 'stat-reading' && ev.statKey === statKey);
@@ -356,9 +339,9 @@ export class IvDialog extends BaseDialog {
   }
 
   /** Logs the typed observed stat (at the entry's current level/EVs) as a new reading, then clears the input. */
-  _logReading() {
-    const e = /** @type {RosterEntry} */ (this._entry);
-    const statKey = /** @type {StatKey} */ (this.$calcStat.value);
+  _logReading(): void {
+    const e = this._entry as RosterEntry;
+    const statKey = this.$calcStat.value as StatKey;
     const observed = Number(this.$calcObserved.value);
     if (!observed || !e.baseStats) return;
     store.logStatReading(e.uid, statKey, observed);

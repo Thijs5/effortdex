@@ -21,6 +21,12 @@ import type { ImportReview } from './organisms/import-review.ts';
 import type { PokemonSearch } from './organisms/pokemon-search.ts';
 import type { EvHistoryLog } from './organisms/ev-history-log.ts';
 import type { PokemonDetail } from './organisms/pokemon-detail.ts';
+import type { NatureDialog } from './pages/parties/pokemon/nature.ts';
+import type { LevelDialog } from './pages/parties/pokemon/level.ts';
+import type { IvDialog } from './pages/parties/pokemon/ivs.ts';
+import type { ItemsDialog } from './pages/parties/pokemon/items.ts';
+import type { CompetitiveDialog } from './pages/parties/pokemon/competitive.ts';
+import type { TrainingGuideDialog } from './pages/parties/pokemon/training-guide.ts';
 
 declare global {
   interface HTMLElementTagNameMap {
@@ -38,5 +44,11 @@ declare global {
     'pokemon-search': PokemonSearch;
     'ev-history-log': EvHistoryLog;
     'pokemon-detail': PokemonDetail;
+    'nature-dialog': NatureDialog;
+    'level-up-dialog': LevelDialog;
+    'iv-dialog': IvDialog;
+    'items-dialog': ItemsDialog;
+    'competitive-dialog': CompetitiveDialog;
+    'training-guide-dialog': TrainingGuideDialog;
   }
 }

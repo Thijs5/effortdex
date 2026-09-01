@@ -1,4 +1,3 @@
-// @ts-nocheck -- transitional; removed when this file is converted to .ts (TS migration PR)
 import { POWER_ITEMS, MACHO_BRACE_SPRITE, EXP_SHARE_SPRITE, VITAMINS, FEATHERS, FEATHER_BONUS, EV_BERRIES, EV_BERRY_REDUCTION, MACHO_BRACE_MULTIPLIER, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, STAT_EXP_VITAMIN_BONUS, STAT_EXP_VITAMIN_CEILING, STAT_LABEL } from '../../../../lib/constants.ts';
 import { sortByLabel } from '../../../../lib/utils.ts';
 import { store } from '../../../../lib/services.ts';
@@ -6,15 +5,19 @@ import { POKERUS_ICON_SVG } from '../../../../lib/icons.ts';
 import { BaseDialog } from '../../../atoms/base-dialog.ts';
 import '../../../atoms/item-button-grid.ts';
 import '../../../atoms/ds-item-button.ts';
-
-/** @typedef {import('../lib/store.ts').RosterEntry} RosterEntry */
-/** @typedef {import('../lib/store.ts').EvMap} EvMap */
+import type { RosterEntry, EvMap, StatKey } from '../../../../lib/store.ts';
+import type { StatItem } from '../../../../lib/constants.ts';
+import type { ItemButtonGrid, ItemButtonSpec } from '../../../atoms/item-button-grid.ts';
+import type { DsItemButton } from '../../../atoms/ds-item-button.ts';
 
 // Sorted once — these tables are static, so re-sorting them on every
 // render (this dialog's entire point while open) would be pure waste.
 const SORTED_VITAMINS = sortByLabel(VITAMINS);
 const SORTED_FEATHERS = sortByLabel(FEATHERS);
 const SORTED_EV_BERRIES = sortByLabel(EV_BERRIES);
+
+type HeldItemPending = { powerItem: string | null; machoBrace: boolean; expShare: boolean };
+type Apply = { kind: 'vitamin' | 'feather' | 'berry'; id: string };
 
 /**
  * <items-dialog> — a roster Pokémon's training-aids dialog: held
@@ -24,48 +27,41 @@ const SORTED_EV_BERRIES = sortByLabel(EV_BERRIES);
  * item-button-grid.js) — same "own dialog, own pending state, own
  * store calls" shape as ivs.js/competitive.js.
  *
- * Set `.entry` to a Store roster entry — kept live on every assignment
- * (mirrors pokemon-detail's own "rebuild is cheap" render, ADR
- * 0002 point 5), so every grid stays correct even while this dialog is
- * open and an unrelated store change (e.g. another party member's
- * Exp. Share-linked battle) fires a re-render. Call `open()` to seed a
- * fresh pending-edit session (docs/adr/0017: nothing commits to the
- * store until this dialog's own Save) and show it.
+ * Set `.entry` to a Store roster entry — kept live on every assignment.
+ * Call `open()` to seed a fresh pending-edit session (docs/adr/0017:
+ * nothing commits to the store until this dialog's own Save) and show it.
  *
  * Routed under "#/parties/<slug>/<uid>/items" (docs/adr/0023) — still
  * instantiated and owned by pokemon-detail.js's own shadow DOM, same as
  * before; the route only decides when `open()`/`close()` get called.
  */
 export class ItemsDialog extends BaseDialog {
+  _entry: RosterEntry | null = null;
+  // Pending edits for this dialog session (docs/adr/0017) — null means
+  // "no dialog session open". Held-item slot (Training item/Macho
+  // Brace/Exp. Share — mutually exclusive), seeded from the entry.
+  _pendingHeldItem: HeldItemPending | null = null;
+  // Every Vitamin/Wing/berry click queued this dialog session, in the
+  // order clicked. Nothing is recorded in the store until Save replays
+  // this list through store.useVitamin/useFeather/useBerry, in order.
+  _pendingApplies: Apply[] = [];
+  // Pokérus's own pending toggle state — null while no dialog session
+  // is open, a real boolean once one is.
+  _pendingPokerus: boolean | null = null;
+  $aidsSection: HTMLElement;
+  $itemGrid: ItemButtonGrid;
+  $pokerusToggle: DsItemButton;
+  $expShareToggle: DsItemButton;
+  $vitaminGrid: ItemButtonGrid;
+  $wingsSection: HTMLElement;
+  $wingGrid: ItemButtonGrid;
+  $berriesSection: HTMLElement;
+  $berryGrid: ItemButtonGrid;
+  $saveBtn: HTMLButtonElement | null;
+
   constructor() {
     super('item-dialog', 'item-dialog-title');
-    /** @type {RosterEntry|null} */
-    this._entry = null;
-    // Pending edits for this dialog session (docs/adr/0017) — null means
-    // "no dialog session open". Held-item slot (Training item/Macho
-    // Brace/Exp. Share — mutually exclusive), seeded from the entry when
-    // `open()` is called, applied to the store only by Save.
-    /** @type {{ powerItem: string|null, machoBrace: boolean, expShare: boolean }|null} */
-    this._pendingHeldItem = null;
-    // Every Vitamin/Wing/berry click queued this dialog session, in the
-    // order clicked: [{ kind: 'vitamin'|'feather'|'berry', id }]. Nothing
-    // is recorded in the store until Save replays this list through the
-    // real store.useVitamin/useFeather/useBerry, in order — an ordered
-    // list rather than a per-id count because whether a *later* click
-    // still adds anything depends on every earlier one already queued
-    // (the same stat's cap gets closer with each), so replay order has
-    // to match click order exactly, for both the live "would this next
-    // click still do anything" preview and the real Save.
-    /** @type {{ kind: 'vitamin'|'feather'|'berry', id: string }[]} */
-    this._pendingApplies = [];
-    // Pokérus's own pending toggle state — null while no dialog session
-    // is open, a real boolean once one is. Not folded into
-    // `_pendingApplies`: it's a plain on/off flag, not a
-    // repeatable/counted action.
-    /** @type {boolean|null} */
-    this._pendingPokerus = null;
 
-    const shadow = /** @type {ShadowRoot} */ (this.shadowRoot);
     const style = document.createElement('style');
     // No width override here — the default 420px from lib/design-system.js's
     // .ds-dialog already matches what this dialog needs.
@@ -90,18 +86,14 @@ export class ItemsDialog extends BaseDialog {
         text-transform: none; letter-spacing: normal;
       }
       .vitamins, .wings, .berries { display: grid; gap: var(--space-2); }
-      /* Between-section breathing, matching the Level dialog's rhythm —
-         .aids is first so it needs no top margin. */
       .toggle-row, .vitamins, .wings, .berries { margin-top: var(--space-4); }
       .aids[hidden] + .toggle-row { margin-top: 0; }
-      /* Pokérus and Exp. Share are each a single toggle — pair them on one
-         row (kept 2-up even on mobile; they stay narrow). */
       .toggle-row { display: grid; grid-template-columns: 1fr 1fr; gap: var(--space-3); align-items: start; }
       .pokerus-section, .exp-share-section { display: grid; gap: var(--space-2); justify-items: stretch; min-width: 0; }
       .pokerus-icon { width: 22px; height: 22px; flex: 0 0 auto; display: inline-flex; color: var(--pokerus-purple); }
       .pokerus-icon svg { width: 100%; height: 100%; }
     `;
-    shadow.appendChild(style);
+    this.shadow.appendChild(style);
 
     this.$title.textContent = 'Items';
     this.$body.innerHTML = `
@@ -148,21 +140,20 @@ export class ItemsDialog extends BaseDialog {
     this.$footer.innerHTML = `<button type="button" class="ds-btn ds-btn--primary item-dialog-save-btn">Save</button>`;
     this.$footer.hidden = false;
 
-    this.$aidsSection = /** @type {HTMLElement} */ (shadow.querySelector('.aids'));
-    this.$itemGrid = shadow.querySelector('.item-grid');
-    this.$pokerusToggle = shadow.querySelector('.pokerus-toggle-btn');
-    this.$expShareToggle = shadow.querySelector('.exp-share-toggle-btn');
-    this.$vitaminGrid = shadow.querySelector('.vitamin-grid');
-    this.$wingsSection = /** @type {HTMLElement} */ (shadow.querySelector('.wings'));
-    this.$wingGrid = shadow.querySelector('.wing-grid');
-    this.$berriesSection = /** @type {HTMLElement} */ (shadow.querySelector('.berries'));
-    this.$berryGrid = shadow.querySelector('.berry-grid');
-    this.$saveBtn = shadow.querySelector('.item-dialog-save-btn');
+    this.$aidsSection = this.shadow.querySelector<HTMLElement>('.aids')!;
+    this.$itemGrid = this.shadow.querySelector<ItemButtonGrid>('.item-grid')!;
+    this.$pokerusToggle = this.shadow.querySelector<DsItemButton>('.pokerus-toggle-btn')!;
+    this.$expShareToggle = this.shadow.querySelector<DsItemButton>('.exp-share-toggle-btn')!;
+    this.$vitaminGrid = this.shadow.querySelector<ItemButtonGrid>('.vitamin-grid')!;
+    this.$wingsSection = this.shadow.querySelector<HTMLElement>('.wings')!;
+    this.$wingGrid = this.shadow.querySelector<ItemButtonGrid>('.wing-grid')!;
+    this.$berriesSection = this.shadow.querySelector<HTMLElement>('.berries')!;
+    this.$berryGrid = this.shadow.querySelector<ItemButtonGrid>('.berry-grid')!;
+    this.$saveBtn = this.shadow.querySelector<HTMLButtonElement>('.item-dialog-save-btn');
 
-    // The "?" help buttons toggle their explanation inline — several
-    // live in this one dialog (Training item, Pokérus, Exp. Share).
-    shadow.addEventListener('click', (e) => {
-      const btn = /** @type {HTMLElement} */ (e.target).closest('.help-btn');
+    // The "?" help buttons toggle their explanation inline.
+    this.shadow.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLElement>('.help-btn');
       if (!btn) return;
       const anchor = btn.closest('.section-title');
       if (!anchor) return;
@@ -173,18 +164,15 @@ export class ItemsDialog extends BaseDialog {
       } else {
         const note = document.createElement('p');
         note.className = 'help-note';
-        note.textContent = /** @type {HTMLElement} */ (btn).title;
+        note.textContent = btn.title;
         anchor.after(note);
         btn.setAttribute('aria-expanded', 'true');
       }
     });
-    // Everything in this dialog only previews here (docs/adr/0017) —
-    // Training item/Exp. Share write into `_pendingHeldItem`, Pokérus
-    // into `_pendingPokerus`, Vitamins/Wings/berries queue into
-    // `_pendingApplies`; all of it applies together only on Save.
+    // Everything in this dialog only previews here (docs/adr/0017).
     this.$itemGrid?.addEventListener('item-pick', (e) => {
-      const val = /** @type {CustomEvent} */ (e).detail.id;
-      const pending = /** @type {{ powerItem: string|null, machoBrace: boolean, expShare: boolean }} */ (this._pendingHeldItem);
+      const val = (e as CustomEvent).detail.id;
+      const pending = this._pendingHeldItem as HeldItemPending;
       const selected = pending.machoBrace ? 'macho-brace' : pending.powerItem || '';
       if (val === selected) {
         pending.powerItem = null; // clicking the active item again clears it
@@ -204,7 +192,7 @@ export class ItemsDialog extends BaseDialog {
       this.$pokerusToggle.toggleAttribute('active', this._pendingPokerus);
     });
     this.$expShareToggle?.addEventListener('pick', () => {
-      const pending = /** @type {{ powerItem: string|null, machoBrace: boolean, expShare: boolean }} */ (this._pendingHeldItem);
+      const pending = this._pendingHeldItem as HeldItemPending;
       pending.expShare = !pending.expShare;
       if (pending.expShare) {
         pending.powerItem = null;
@@ -213,13 +201,12 @@ export class ItemsDialog extends BaseDialog {
       this._updateItemGrid();
     });
     this.$saveBtn?.addEventListener('click', () => this._save());
-    this.$vitaminGrid?.addEventListener('item-pick', (e) => this._queueVitamin(/** @type {CustomEvent} */ (e).detail.id));
-    this.$wingGrid?.addEventListener('item-pick', (e) => this._queueFeather(/** @type {CustomEvent} */ (e).detail.id));
-    this.$berryGrid?.addEventListener('item-pick', (e) => this._queueBerry(/** @type {CustomEvent} */ (e).detail.id));
+    this.$vitaminGrid?.addEventListener('item-pick', (e) => this._queueVitamin((e as CustomEvent).detail.id));
+    this.$wingGrid?.addEventListener('item-pick', (e) => this._queueFeather((e as CustomEvent).detail.id));
+    this.$berryGrid?.addEventListener('item-pick', (e) => this._queueBerry((e as CustomEvent).detail.id));
   }
 
-  /** @param {RosterEntry|null} e */
-  set entry(e) {
+  set entry(e: RosterEntry | null) {
     this._entry = e;
     if (!e) return;
     this._updateItemGrid();
@@ -237,19 +224,18 @@ export class ItemsDialog extends BaseDialog {
     // instead of a separate note underneath it.
     this.$pokerusToggle.setAttribute('boost', pokerusAvailable ? '×2 EVs' : 'Not in this game');
   }
-  get entry() {
+  get entry(): RosterEntry | null {
     return this._entry;
   }
 
   /**
    * Seeds the held-item pending state from the entry (so a previous
-   * session's discarded pick never leaks into a fresh one — same
-   * reasoning as ivs.js's own pending IVs, docs/adr/0017), clears
-   * the queued Vitamin/Wing/berry list, refreshes every grid from that,
-   * then opens.
+   * session's discarded pick never leaks into a fresh one — docs/adr/0017),
+   * clears the queued Vitamin/Wing/berry list, refreshes every grid from
+   * that, then opens.
    */
-  open() {
-    const e = /** @type {RosterEntry} */ (this._entry);
+  open(): void {
+    const e = this._entry as RosterEntry;
     this._pendingHeldItem = { powerItem: e.powerItem, machoBrace: e.machoBrace, expShare: e.expShare };
     this._pendingApplies = [];
     this._pendingPokerus = e.pokerus;
@@ -261,9 +247,7 @@ export class ItemsDialog extends BaseDialog {
     super.open();
   }
 
-  _onClose() {
-    // Discard any uncommitted picks/queue — harmless no-op if Save
-    // already applied and closed.
+  _onClose(): void {
     this._pendingHeldItem = null;
     this._pendingApplies = [];
     this._pendingPokerus = null;
@@ -271,33 +255,24 @@ export class ItemsDialog extends BaseDialog {
 
   /**
    * Applies everything staged in this dialog session, then closes: the
-   * held-item choice (Training item, Macho Brace, or Exp. Share —
-   * whichever ended up set), the Pokérus toggle, then every queued
-   * Vitamin/Wing/berry click in the exact order it was queued
-   * (`_simulatedEvs`'s own comment explains why order matters) —
-   * replayed through the real store.useVitamin/useFeather/useBerry, so
-   * the store's own capping logic is what actually runs, not the
-   * preview math a second time. Everything shares one batchId so
-   * ev-history-log.js collapses this Save into a single summarized
-   * entry, same as the Level popup's.
+   * held-item choice, the Pokérus toggle, then every queued Vitamin/Wing/
+   * berry click in the exact order it was queued — replayed through the
+   * real store.useVitamin/useFeather/useBerry, so the store's own
+   * capping logic is what actually runs. Everything shares one batchId.
    */
-  _save() {
-    const e = /** @type {RosterEntry} */ (this._entry);
-    const p = /** @type {{ powerItem: string|null, machoBrace: boolean, expShare: boolean }} */ (this._pendingHeldItem);
+  _save(): void {
+    const e = this._entry as RosterEntry;
+    const p = this._pendingHeldItem as HeldItemPending;
     const batchId = crypto.randomUUID();
     if (p.expShare) store.setExpShare(e.uid, true, batchId);
     else if (p.machoBrace) store.setMachoBrace(e.uid, true, batchId);
     else {
       // Clear the Exp. Share explicitly rather than leaning on
-      // setPowerItem's tail call: when nothing is picked, powerItem is
-      // already null and setPowerItem bails at its no-op guard before it
-      // gets to vacate the held-item slot, leaving a toggled-off Exp.
-      // Share still equipped (GitHub issue #39). setExpShare(uid, false)
-      // is itself a no-op when it wasn't set.
+      // setPowerItem's tail call (GitHub issue #39).
       store.setPowerItem(e.uid, p.powerItem, batchId);
       store.setExpShare(e.uid, false, batchId);
     }
-    store.setPokerus(e.uid, this._pendingPokerus, batchId);
+    store.setPokerus(e.uid, !!this._pendingPokerus, batchId);
     for (const item of this._pendingApplies) {
       if (item.kind === 'vitamin') store.useVitamin(e.uid, item.id, batchId);
       else if (item.kind === 'feather') store.useFeather(e.uid, item.id, batchId);
@@ -306,29 +281,22 @@ export class ItemsDialog extends BaseDialog {
     this.close();
   }
 
-  // Rebuilt on every render (not just once) because which items are even
-  // offered — and the Power item bonus shown — depends on the entry's
-  // party's game version, and this one component instance is reused
-  // across different parties as the user navigates. Reads through
-  // `_pendingHeldItem` while a dialog session is active (docs/adr/0017)
-  // — falling back to the entry's actual committed values the rest of
-  // the time (no session open, or an unrelated store change re-rendering
-  // everything while it is) — so an in-progress pick survives a
-  // re-render it didn't cause. Also drives the Exp. Share toggle's
-  // `active` state, since it shares this same pending held-item slot.
-  _updateItemGrid() {
-    const e = /** @type {RosterEntry} */ (this._entry);
+  // Rebuilt on every render because which items are offered — and the
+  // Power item bonus shown — depends on the entry's party's game version.
+  // Reads through `_pendingHeldItem` while a dialog session is active
+  // (docs/adr/0017), falling back to the entry's actual committed values
+  // otherwise. Also drives the Exp. Share toggle's `active` state.
+  _updateItemGrid(): void {
+    const e = this._entry as RosterEntry;
     const bonus = store.powerItemBonus();
     const availability = store.trainingItemAvailability();
-    // Gen I/II have no held-item training aids at all (the Macho Brace is
-    // Gen III, Power items Gen IV) — hide the section outright rather than
-    // leave a bare "Training item" heading over an empty grid.
+    // Gen I/II have no held-item training aids at all — hide the section.
     this.$aidsSection.hidden = !availability.machoBrace && !availability.powerItems;
-    const pending = this._pendingHeldItem || e;
+    const pending: HeldItemPending | RosterEntry = this._pendingHeldItem || e;
     const selected = pending.machoBrace ? 'macho-brace' : pending.powerItem || '';
     this.$expShareToggle.toggleAttribute('active', !!pending.expShare);
 
-    const offered = [];
+    const offered: { id: string; label: string; boost: string; sprite: string }[] = [];
     if (availability.machoBrace) {
       offered.push({
         id: 'macho-brace',
@@ -357,13 +325,10 @@ export class ItemsDialog extends BaseDialog {
   /**
    * The entry's actual current EVs, folded forward through every
    * Vitamin/Wing/berry click queued so far this dialog session, in
-   * click order — what Save would produce right now. Used both to
-   * preview one more queued click (would it still add/remove anything)
-   * and to label each button with what it would apply.
-   * @returns {EvMap}
+   * click order — what Save would produce right now.
    */
-  _simulatedEvs() {
-    const e = /** @type {RosterEntry} */ (this._entry);
+  _simulatedEvs(): EvMap {
+    const e = this._entry as RosterEntry;
     const evs = { ...e.evs };
     for (const item of this._pendingApplies) {
       const y = this._previewYield(item.kind, item.id, evs);
@@ -371,28 +336,22 @@ export class ItemsDialog extends BaseDialog {
       if (item.kind === 'berry') evs[y.stat] -= y.applied;
       else {
         evs[y.stat] += y.applied;
-        if (y.linkedStat) evs[y.linkedStat] += y.applied;
+        const linked = (y as { linkedStat?: StatKey | null }).linkedStat;
+        if (linked) evs[linked] += y.applied;
       }
     }
     return evs;
   }
 
-  /** @param {'vitamin'|'feather'|'berry'} kind @param {string} id @param {EvMap} evs */
-  _previewYield(kind, id, evs) {
-    const uid = /** @type {RosterEntry} */ (this._entry).uid;
+  _previewYield(kind: 'vitamin' | 'feather' | 'berry', id: string, evs: EvMap) {
+    const uid = (this._entry as RosterEntry).uid;
     if (kind === 'vitamin') return store.previewVitamin(uid, id, evs);
     if (kind === 'feather') return store.previewFeather(uid, id, evs);
     return store.previewBerry(uid, id, evs);
   }
 
-  /**
-   * Queues one vitamin click (docs/adr/0017) — nothing is recorded until
-   * Save. No status line: the button itself already shows the queued
-   * count (`_updateVitaminGrid`'s boost text) and disables outright once
-   * another click genuinely couldn't add anything, so there's nothing a
-   * separate line would say that isn't already visible on the button.
-   */
-  _queueVitamin(vitaminId) {
+  /** Queues one vitamin click (docs/adr/0017) — nothing is recorded until Save. */
+  _queueVitamin(vitaminId: string): void {
     const y = this._previewYield('vitamin', vitaminId, this._simulatedEvs());
     if (!y?.applied) return;
     this._pendingApplies.push({ kind: 'vitamin', id: vitaminId });
@@ -400,7 +359,7 @@ export class ItemsDialog extends BaseDialog {
   }
 
   /** Queues one Wing click — see `_queueVitamin`'s own comment. */
-  _queueFeather(featherId) {
+  _queueFeather(featherId: string): void {
     const y = this._previewYield('feather', featherId, this._simulatedEvs());
     if (!y?.applied) return;
     this._pendingApplies.push({ kind: 'feather', id: featherId });
@@ -408,7 +367,7 @@ export class ItemsDialog extends BaseDialog {
   }
 
   /** Queues one EV-reducing berry click — see `_queueVitamin`'s own comment. */
-  _queueBerry(berryId) {
+  _queueBerry(berryId: string): void {
     const y = this._previewYield('berry', berryId, this._simulatedEvs());
     if (!y?.applied) return;
     this._pendingApplies.push({ kind: 'berry', id: berryId });
@@ -419,32 +378,16 @@ export class ItemsDialog extends BaseDialog {
    * Refreshes every grid that reads through `_simulatedEvs()` — a click
    * in any one of Vitamins/Wings/berries can change what's still room
    * for in any *other* one too (they all draw from the same running EV
-   * total), so queuing in one must re-check every one of them, not just
-   * the grid the click happened in.
+   * total).
    */
-  _updateQueuedGrids() {
-    const e = /** @type {RosterEntry} */ (this._entry);
+  _updateQueuedGrids(): void {
+    const e = this._entry as RosterEntry;
     this._updateVitaminGrid(e);
     this._updateWingGrid(e);
     this._updateBerryGrid(e);
   }
 
-  // Same template as the training item buttons — sprite, name, and the
-  // stat it feeds in a lighter line underneath — so there's no need to
-  // remember which vitamin maps to which stat. Marks a button dim (and,
-  // unlike a plain "capped" visual, genuinely unclickable — see
-  // item-button-grid.js's own comment) once queuing another click
-  // wouldn't add anything — the Gen III-VII 100-EV vitamin cutoff, the
-  // Gen I-II 25,600-Stat-Experience ceiling, the stat's own cap, or (with
-  // enough already queued this session) the running total from
-  // `_simulatedEvs` hitting one of those first. Also badges each button
-  // with how many times it's already been fed (history, permanent) and,
-  // separately, how many are queued this session (`_pendingApplies`,
-  // discarded if the dialog closes without Save) — the two are deliberately
-  // shown apart so "already happened" and "about to happen on Save" are
-  // never confused for one number. On Gen I, Zinc is dropped entirely —
-  // Special hasn't split into SpA/SpD yet.
-  _updateVitaminGrid(e) {
+  _updateVitaminGrid(e: RosterEntry): void {
     const statExp = store.usesStatExpSystem();
     const mergedSpecial = store.specialStatMerged();
     const cutoffApplies = !statExp && store.vitaminCutoffApplies();
@@ -472,10 +415,7 @@ export class ItemsDialog extends BaseDialog {
     });
   }
 
-  // Same shape as vitamins, minus the 100-EV-cutoff framing — Wings
-  // never have one. See `_updateVitaminGrid`'s own comment for the
-  // simulated-EVs/queued-count/disabled reasoning, shared here.
-  _updateWingGrid(e) {
+  _updateWingGrid(e: RosterEntry): void {
     const statCap = store.statCap();
     const simEvs = this._simulatedEvs();
     this.$wingGrid.items = SORTED_FEATHERS.map((f) => {
@@ -490,11 +430,7 @@ export class ItemsDialog extends BaseDialog {
     });
   }
 
-  // Mirrors _updateWingGrid, but "capped" here means nothing left to
-  // remove (the stat is already at 0) rather than at the ceiling, and
-  // the boost reads as a reduction — these subtract EVs rather than add
-  // them.
-  _updateBerryGrid(e) {
+  _updateBerryGrid(e: RosterEntry): void {
     const simEvs = this._simulatedEvs();
     this.$berryGrid.items = SORTED_EV_BERRIES.map((b) => {
       const stat = simEvs[b.stat];
@@ -509,13 +445,16 @@ export class ItemsDialog extends BaseDialog {
   }
 
   // Shared shape behind _updateVitaminGrid/_updateWingGrid/_updateBerryGrid:
-  // each grid differs only in its cap rule and its wording (computed by the
-  // caller above and passed in), but all three feed the same fed-count
-  // (permanent, from history) / pending-count (queued this session, from
-  // `_pendingApplies`) / disabled-when-capped row shape into <item-button-grid>.
-  // `kind` is the history/pending-apply discriminator ('vitamin'/'feather'/
-  // 'berry'); history entries key the target id as `${kind}Id`.
-  _buildItemGridRow(e, kind, item, { capped, cappedReason, activeText, boostText }) {
+  // each grid differs only in its cap rule and its wording, but all three
+  // feed the same fed-count / pending-count / disabled-when-capped row
+  // shape into <item-button-grid>. `kind` is the history/pending-apply
+  // discriminator; history entries key the target id as `${kind}Id`.
+  _buildItemGridRow(
+    e: RosterEntry,
+    kind: 'vitamin' | 'feather' | 'berry',
+    item: StatItem,
+    { capped, cappedReason, activeText, boostText }: { capped: boolean; cappedReason: string; activeText: string; boostText: string }
+  ): ItemButtonSpec {
     const fedCount = e.history.filter((h) => h.kind === kind && h[`${kind}Id`] === item.id).length;
     const pendingCount = this._pendingApplies.filter((p) => p.kind === kind && p.id === item.id).length;
     const fedNote = fedCount ? ` — fed ${fedCount}×` : '';

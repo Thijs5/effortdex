@@ -1,10 +1,10 @@
-// @ts-nocheck -- transitional; removed when this file is converted to .ts (TS migration PR)
 import { store } from '../../../../lib/services.ts';
 import { evTrainingLocations } from '../../../../lib/ev-training-locations.ts';
 import { BaseDialog } from '../../../atoms/base-dialog.ts';
 import '../../../molecules/ev-training-guide.ts';
-
-/** @typedef {import('../../../../lib/store.ts').RosterEntry} RosterEntry */
+import type { RosterEntry } from '../../../../lib/store.ts';
+import type { GameTrainingSpots } from '../../../../lib/ev-training-locations.ts';
+import type { EvTrainingGuide } from '../../../molecules/ev-training-guide.ts';
 
 /**
  * <training-guide-dialog> — "Where to train": curated per-stat grinding
@@ -28,12 +28,12 @@ import '../../../molecules/ev-training-guide.ts';
  * the route only decides when `open()`/`close()` get called.
  */
 export class TrainingGuideDialog extends BaseDialog {
+  _entry: RosterEntry | null = null;
+  $guide: EvTrainingGuide;
+
   constructor() {
     super('training-guide-dialog', 'training-guide-dialog-title');
-    /** @type {RosterEntry|null} */
-    this._entry = null;
 
-    const shadow = /** @type {ShadowRoot} */ (this.shadowRoot);
     const style = document.createElement('style');
     // No width override here — the default 420px from lib/design-system.js's
     // .ds-dialog already matches what this dialog needs.
@@ -54,7 +54,7 @@ export class TrainingGuideDialog extends BaseDialog {
       }
       .training-guide-attribution { margin: var(--space-3) 0 0; font-size: var(--font-size-2xs); color: var(--ink-soft); }
     `;
-    shadow.appendChild(style);
+    this.shadow.appendChild(style);
 
     this.$title.innerHTML = `Where to train
       <button type="button" class="help-btn" aria-expanded="false" aria-label="About this list" title="A short, hand-picked list of good spots to grind each stat's EVs in this game — not an exhaustive list. Tap a Pokémon to log a battle against it.">?</button>`;
@@ -63,10 +63,10 @@ export class TrainingGuideDialog extends BaseDialog {
       <p class="training-guide-attribution">Locations via Bulbapedia &amp; Marriland's EV training guides</p>
     `;
 
-    this.$guide = shadow.querySelector('ev-training-guide');
+    this.$guide = this.shadow.querySelector('ev-training-guide')!;
 
-    shadow.addEventListener('click', (e) => {
-      const btn = /** @type {HTMLElement} */ (e.target).closest('.help-btn');
+    this.shadow.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLElement>('.help-btn');
       if (!btn) return;
       if (!btn.closest('.ds-dialog-header')) return;
       // Into the scrolling body (top), not after the header — the header
@@ -94,8 +94,7 @@ export class TrainingGuideDialog extends BaseDialog {
     this.$guide.addEventListener('spot-pick', () => this.close());
   }
 
-  /** @param {RosterEntry|null} e */
-  set entry(e) {
+  set entry(e: RosterEntry | null) {
     this._entry = e;
     if (!e) return;
     // Curated per-game data (lib/ev-training-locations.js), not a party
@@ -104,12 +103,12 @@ export class TrainingGuideDialog extends BaseDialog {
     this.$guide.spriteGame = store.spriteBaseGame();
     this.$guide.locations = this.locations();
   }
-  get entry() {
+  get entry(): RosterEntry | null {
     return this._entry;
   }
 
-  /** Whether this game has a curated list at all — pokemon-detail.js uses this to hide its own "Where to train" menu entry. @returns {object|null} */
-  locations() {
+  /** Whether this game has a curated list at all — pokemon-detail.js uses this to hide its own "Where to train" menu entry. */
+  locations(): GameTrainingSpots | null {
     return evTrainingLocations(store.activeParty?.baseGame);
   }
 }

@@ -1,4 +1,3 @@
-// @ts-nocheck -- transitional; removed when this file is converted to .ts (TS migration PR)
 import { STATS, STAT_LABEL } from '../../../../lib/constants.ts';
 import { gen1SpecialStat } from '../../../../lib/gen1-special-stats.ts';
 import { escapeHtml } from '../../../../lib/utils.ts';
@@ -6,8 +5,7 @@ import { store, smogon } from '../../../../lib/services.ts';
 import { toShowdownId, smogonSetsKey, TIER_DESCRIPTIONS } from '../../../../lib/smogon-client.ts';
 import { matchGameVersion } from '../../../../lib/game-versions.ts';
 import { BaseDialog } from '../../../atoms/base-dialog.ts';
-
-/** @typedef {import('../lib/store.ts').RosterEntry} RosterEntry */
+import type { RosterEntry, StatKey } from '../../../../lib/store.ts';
 
 // Tier badge color grouping — see .tier-badge's own CSS comment for why
 // this is three loose groups, not a per-tier rainbow.
@@ -35,13 +33,16 @@ const TIER_SPECIAL = new Set(['LC', 'NFE']);
  * called.
  */
 export class CompetitiveDialog extends BaseDialog {
+  _entry: RosterEntry | null = null;
+  _token = 0; // guards against a stale async response landing after a fast species switch
+  $baseStats: HTMLElement;
+  $tierBadge: HTMLElement;
+  $sets: HTMLElement;
+  $empty: HTMLElement;
+
   constructor() {
     super('competitive-dialog', 'competitive-dialog-title');
-    /** @type {RosterEntry|null} */
-    this._entry = null;
-    this._token = 0; // guards against a stale async response landing after a fast species switch
 
-    const shadow = /** @type {ShadowRoot} */ (this.shadowRoot);
     const style = document.createElement('style');
     // No width override here — the default 420px from lib/design-system.js's
     // .ds-dialog already matches what this dialog needs.
@@ -114,7 +115,7 @@ export class CompetitiveDialog extends BaseDialog {
         .competitive-attribution { margin: 0; font-size: var(--font-size-2xs); color: var(--ink-soft); }
         .competitive-attribution a { color: inherit; }
     `;
-    shadow.appendChild(style);
+    this.shadow.appendChild(style);
 
     this.$title.textContent = 'Competitive';
     this.$body.innerHTML = `
@@ -131,13 +132,13 @@ export class CompetitiveDialog extends BaseDialog {
       </div>
     `;
 
-    this.$baseStats = /** @type {HTMLElement} */ (shadow.querySelector('.competitive-base-stats'));
-    this.$tierBadge = /** @type {HTMLElement} */ (shadow.querySelector('.tier-badge'));
-    this.$sets = /** @type {HTMLElement} */ (shadow.querySelector('.competitive-sets'));
-    this.$empty = /** @type {HTMLElement} */ (shadow.querySelector('.competitive-empty'));
+    this.$baseStats = this.shadow.querySelector<HTMLElement>('.competitive-base-stats')!;
+    this.$tierBadge = this.shadow.querySelector<HTMLElement>('.tier-badge')!;
+    this.$sets = this.shadow.querySelector<HTMLElement>('.competitive-sets')!;
+    this.$empty = this.shadow.querySelector<HTMLElement>('.competitive-empty')!;
 
-    shadow.addEventListener('click', (e) => {
-      const btn = /** @type {HTMLElement} */ (e.target).closest('.help-btn');
+    this.shadow.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLElement>('.help-btn');
       if (!btn) return;
       const anchor = btn.closest('.section-title');
       if (!anchor) return;
@@ -148,22 +149,21 @@ export class CompetitiveDialog extends BaseDialog {
       } else {
         const note = document.createElement('p');
         note.className = 'help-note';
-        note.textContent = /** @type {HTMLElement} */ (btn).title;
+        note.textContent = btn.title;
         anchor.after(note);
         btn.setAttribute('aria-expanded', 'true');
       }
     });
   }
 
-  /** @param {RosterEntry|null} e */
-  set entry(e) {
+  set entry(e: RosterEntry | null) {
     this._entry = e;
     if (!e) return;
     const mergedSpecial = store.specialStatMerged();
     this._renderBaseStats(e, mergedSpecial);
     this._renderCompetitive(e);
   }
-  get entry() {
+  get entry(): RosterEntry | null {
     return this._entry;
   }
 
@@ -171,9 +171,8 @@ export class CompetitiveDialog extends BaseDialog {
    * Species base stats — a fixed number that's the same for every one of
    * this species, the relevant reference when planning which stats to
    * invest EVs into against their own ceiling.
-   * @param {RosterEntry} e @param {boolean} mergedSpecial
    */
-  _renderBaseStats(e, mergedSpecial) {
+  _renderBaseStats(e: RosterEntry, mergedSpecial: boolean): void {
     if (!e.baseStats) {
       this.$baseStats.innerHTML = '';
       return;
@@ -201,9 +200,8 @@ export class CompetitiveDialog extends BaseDialog {
    * offline or a failed fetch just leaves the section showing its empty
    * state, never an error — this is a nice-to-have overlay on top of the
    * app's own offline-first EV tracking, not something it depends on.
-   * @param {RosterEntry} e
    */
-  async _renderCompetitive(e) {
+  async _renderCompetitive(e: RosterEntry): Promise<void> {
     const token = ++this._token;
     this.$tierBadge.hidden = true;
     this.$tierBadge.classList.remove('tier-badge--danger', 'tier-badge--special', 'tier-badge--illegal');
@@ -212,7 +210,7 @@ export class CompetitiveDialog extends BaseDialog {
     // after switching — close it rather than let it linger.
     if (this.$tierBadge.getAttribute('aria-expanded') === 'true') {
       const heading = this.$tierBadge.closest('.section-title');
-      if (heading?.nextElementSibling?.classList.contains('help-note')) heading.nextElementSibling.remove();
+      if (heading?.nextElementSibling?.classList.contains('help-note')) heading.nextElementSibling!.remove();
       this.$tierBadge.setAttribute('aria-expanded', 'false');
     }
     this.$sets.innerHTML = '';
@@ -240,9 +238,9 @@ export class CompetitiveDialog extends BaseDialog {
         this.$empty.hidden = false;
         return;
       }
-      const flat = [];
+      const flat: { format: string; setName: string; set: any }[] = [];
       for (const [format, bySet] of Object.entries(speciesSets)) {
-        for (const [setName, set] of Object.entries(bySet)) flat.push({ format, setName, set });
+        for (const [setName, set] of Object.entries(bySet as Record<string, any>)) flat.push({ format, setName, set });
       }
       // Capped at 3 — this is a quick "is this a competitive spread"
       // glance, not a full strategy-dex mirror; the attribution line
@@ -257,8 +255,7 @@ export class CompetitiveDialog extends BaseDialog {
     }
   }
 
-  /** @param {string} format @param {string} setName @param {any} set @returns {string} */
-  _setHtml(format, setName, set) {
+  _setHtml(format: string, setName: string, set: any): string {
     // Several of a set's own fields — moves (per-slot), item, nature, and
     // evs — can each be either one value or an array of viable
     // alternatives (Smogon publishes "or" options within a single set,
@@ -266,12 +263,12 @@ export class CompetitiveDialog extends BaseDialog {
     // first alternative is shown here — this card is a quick glance, not
     // a full options list; the attribution line points to the real dex
     // entry for anyone who wants the rest.
-    const first = (/** @type {any} */ v) => (Array.isArray(v) ? v[0] : v);
+    const first = (v: any) => (Array.isArray(v) ? v[0] : v);
     const moves = (set.moves || []).map(first).slice(0, 4);
     const evs = first(set.evs);
     const evsText = evs
       ? Object.entries(evs)
-          .map(([key, value]) => `${value} ${STAT_LABEL[/** @type {import('../lib/constants.ts').StatKey} */ (key)] || key.toUpperCase()}`)
+          .map(([key, value]) => `${value} ${STAT_LABEL[key as StatKey] || key.toUpperCase()}`)
           .join(' / ')
       : '';
     return `

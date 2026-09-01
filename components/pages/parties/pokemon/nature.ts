@@ -1,10 +1,8 @@
-// @ts-nocheck -- transitional; removed when this file is converted to .ts (TS migration PR)
 import { NATURES } from '../../../../lib/constants.ts';
 import { natureEffectHint, natureOptionsHtml } from '../../../../lib/utils.ts';
 import { store } from '../../../../lib/services.ts';
 import { BaseDialog } from '../../../atoms/base-dialog.ts';
-
-/** @typedef {import('../../../../lib/store.ts').RosterEntry} RosterEntry */
+import type { RosterEntry } from '../../../../lib/store.ts';
 
 /**
  * <nature-dialog> — a roster Pokémon's Nature popup: one preview-then-
@@ -25,12 +23,15 @@ import { BaseDialog } from '../../../atoms/base-dialog.ts';
  * route only decides when `open()`/`close()` get called.
  */
 export class NatureDialog extends BaseDialog {
+  _entry: RosterEntry | null = null;
+  $field: HTMLElement;
+  $select: HTMLSelectElement;
+  $hint: HTMLElement;
+  $saveBtn: HTMLButtonElement | null;
+
   constructor() {
     super('nature-dialog', 'nature-dialog-title');
-    /** @type {RosterEntry|null} */
-    this._entry = null;
 
-    const shadow = /** @type {ShadowRoot} */ (this.shadowRoot);
     const style = document.createElement('style');
     // No width override here — the default 420px from lib/design-system.js's
     // .ds-dialog already matches what this dialog needs.
@@ -63,7 +64,7 @@ export class NatureDialog extends BaseDialog {
         text-transform: none; letter-spacing: normal;
       }
     `;
-    shadow.appendChild(style);
+    this.shadow.appendChild(style);
 
     this.$title.innerHTML = `Nature
       <button type="button" class="help-btn" aria-expanded="false" aria-label="What is EV training?" title="EVs (Effort Values) are hidden bonus stat points earned mainly from battling — up to 252 per stat, 510 total. Nature is fixed when a Pokémon is caught or hatched: it boosts one stat by 10% and lowers another. Nature doesn't change EVs, but training the stat your nature already boosts gets the most out of your points.">?</button>`;
@@ -76,16 +77,16 @@ export class NatureDialog extends BaseDialog {
     this.$footer.innerHTML = `<button type="button" class="ds-btn ds-btn--primary nature-dialog-save-btn">Save</button>`;
     this.$footer.hidden = false;
 
-    this.$field = /** @type {HTMLElement} */ (shadow.querySelector('.nature-field'));
-    this.$select = /** @type {HTMLSelectElement} */ (shadow.querySelector('.nature-select'));
-    this.$hint = /** @type {HTMLElement} */ (shadow.querySelector('.nature-hint'));
-    this.$saveBtn = shadow.querySelector('.nature-dialog-save-btn');
+    this.$field = this.shadow.querySelector<HTMLElement>('.nature-field')!;
+    this.$select = this.shadow.querySelector<HTMLSelectElement>('.nature-select')!;
+    this.$hint = this.shadow.querySelector<HTMLElement>('.nature-hint')!;
+    this.$saveBtn = this.shadow.querySelector<HTMLButtonElement>('.nature-dialog-save-btn');
     this.$select.innerHTML = natureOptionsHtml();
 
     this.$select.addEventListener('change', () => this._renderHint());
     this.$saveBtn?.addEventListener('click', () => this._save());
-    shadow.addEventListener('click', (e) => {
-      const btn = /** @type {HTMLElement} */ (e.target).closest('.help-btn');
+    this.shadow.addEventListener('click', (e) => {
+      const btn = (e.target as HTMLElement).closest<HTMLElement>('.help-btn');
       if (!btn) return;
       // The note lives at the top of the dialog body (normal block flow,
       // like items.js's help notes) rather than wedged between the grid's
@@ -105,8 +106,7 @@ export class NatureDialog extends BaseDialog {
     });
   }
 
-  /** @param {RosterEntry|null} e */
-  set entry(e) {
+  set entry(e: RosterEntry | null) {
     this._entry = e;
     if (!e) return;
     const available = store.natureAvailable();
@@ -117,7 +117,7 @@ export class NatureDialog extends BaseDialog {
     if (available && !this.isOpen()) this.$select.value = e.nature || '';
     this._renderHint();
   }
-  get entry() {
+  get entry(): RosterEntry | null {
     return this._entry;
   }
 
@@ -125,34 +125,33 @@ export class NatureDialog extends BaseDialog {
    * Overrides the header "?" button's explanation — pokemon-detail.js
    * sets this each render, since whether the active party uses EVs or
    * Stat Experience (Gen I/II) changes what that text should say.
-   * @param {string} text
    */
-  set helpTitle(text) {
-    this.$title.querySelector('.help-btn').title = text;
+  set helpTitle(text: string) {
+    this.$title.querySelector<HTMLButtonElement>('.help-btn')!.title = text;
   }
 
   /** Seeds the select from the entry (so a discarded previous session never leaks into a fresh one), then opens. */
-  open() {
-    const e = /** @type {RosterEntry} */ (this._entry);
+  open(): void {
+    const e = this._entry as RosterEntry;
     this.$select.value = e.nature || '';
     this._renderHint();
     super.open();
   }
 
-  _onEnter() {
+  _onEnter(): void {
     this.$saveBtn?.click();
   }
 
   /** Applies the pending Nature if it actually changed, then closes. */
-  _save() {
-    const e = /** @type {RosterEntry} */ (this._entry);
+  _save(): void {
+    const e = this._entry as RosterEntry;
     if (this.$select.value !== (e.nature || '')) store.setNature(e.uid, this.$select.value || null);
     this.close();
   }
 
   // Shows the selected nature's stat effect right under the picker, so
   // beginners don't have to memorize what e.g. "Adamant" does.
-  _renderHint() {
+  _renderHint(): void {
     const nature = NATURES.find((n) => n.id === this.$select.value);
     this.$hint.textContent = nature ? natureEffectHint(nature) : '';
   }
