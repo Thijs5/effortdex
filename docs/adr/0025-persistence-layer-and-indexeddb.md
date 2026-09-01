@@ -465,3 +465,39 @@ whole-roster re-mirror on every save — a perf change, not correctness)
 and P4d (drop the blob write once P4b has baked; `effortdex:state`
 becomes `state.pre-idb-backup`, then removed a release later). Still
 also open: the per-kind `apiCache` entry cap (P2).
+
+## Addendum — P4c landed (partial), apiCache cap; P4d deferred
+
+**P4c — targeted event writes, scoped to the dominant path.** `_append`
+and `deleteHistoryEntry` (every battle / vitamin / level / stat-reading
+/ evolve / pokerus / exp-share / held-item / feather / berry) persist as
+a single `events.add` / `events.delete` in a small `[events, meta]`
+transaction (`lib/db/roster-ops.js`), instead of `writeRoster` clearing
+and rewriting all three roster stores.
+
+Structural mutations (create/delete/reorder a party or entry, edit an
+entry field) *keep* the whole-roster mirror. They're a handful per
+session versus dozens of events, converting them all is a large surface
+(cascade deletes, `order` shuffles) for little gain at this app's scale,
+and the `rev` counter + blob backup already make a lagging row write
+self-heal on the next `init()`. A `Store` with no `rosterOps` dep falls
+back to the whole-roster mirror.
+
+**apiCache cap** (`lib/db/cache-cap.js`). ADR 0001's "cache forever"
+means "never stale", not "unbounded". `trimApiCache(db)` runs once
+~15 s after startup, trimming each capped `kind` (mon 2000; species /
+evochain / evolutions 1500; generation 30) to its limit, oldest
+`fetchedAt` first — the same idea as `sw.js`'s 4000-entry sprite cap.
+
+**P4d (drop the blob write) is deferred.** It should only happen once
+P4b/P4c have shipped in a release and run clean for real users: the
+localStorage blob is the recovery path if the row read/write has a
+subtle bug, and the `rev` reconciliation depends on it. When it does
+happen: `effortdex:state` becomes read-only (`state.pre-idb-backup`),
+then is removed a release later; and the remaining structural mutations
+likely want targeting first so a killed transaction can't lose a write
+with no blob to fall back on.
+
+Status: 348 unit + 119 e2e, tsc clean. P1–P4c on `persistence-layer`;
+`main` unchanged at v1.9.4. Post-migration queue (unchanged): fine-
+grained subscriptions, then the TypeScript migration (ADR 0026).
