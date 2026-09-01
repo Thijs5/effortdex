@@ -29,7 +29,7 @@
 // the picker actually compares against.
 
 import { matchGameVersion } from './game-versions.ts';
-import type { Party } from './store.js';
+import type { Party } from './store.ts';
 import type { PokeApiClient } from './pokeapi-client.ts';
 
 export async function availableSpeciesFor(

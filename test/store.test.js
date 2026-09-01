@@ -3,7 +3,7 @@ import { test, beforeEach } from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
 
-import { Store, MIGRATIONS } from '../lib/store.js';
+import { Store, MIGRATIONS } from '../lib/store.ts';
 import { SCHEMA_VERSION } from '../lib/schema-version.ts';
 import { STAT_CAP, TOTAL_CAP, VITAMIN_BONUS, MIN_LEVEL, MAX_LEVEL, DEFAULT_LEVEL } from '../lib/constants.ts';
 

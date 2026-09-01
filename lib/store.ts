@@ -12,8 +12,6 @@
 // stay plain mutable state on purpose — event-sourcing those would be
 // property-sourcing, not fact-recording.
 
-// @ts-check
-
 import { STATS, POWER_ITEMS, VITAMINS, FEATHERS, FEATHER_BONUS, FEATHER_MIN_GEN, EV_BERRIES, EV_BERRY_REDUCTION, EV_BERRY_MIN_GEN, EV_BERRY_SNAP_THRESHOLD, EV_BERRY_SNAP_TARGET, NATURES, NATURE_MIN_GEN, STAT_CAP, TOTAL_CAP, POWER_ITEM_BONUS_LEGACY, POWER_ITEM_BONUS_MODERN, POWER_ITEM_MODERN_MIN_GEN, POWER_ITEM_MIN_GEN, MACHO_BRACE_MULTIPLIER, MACHO_BRACE_MIN_GEN, MACHO_BRACE_MAX_GEN, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, VITAMIN_CUTOFF_MIN_GEN, VITAMIN_CUTOFF_MAX_GEN, STAT_EXP_MAX_GEN, STAT_EXP_STAT_CAP, STAT_EXP_VITAMIN_BONUS, STAT_EXP_VITAMIN_CEILING, POKERUS_MIN_GEN, MIN_LEVEL, MAX_LEVEL, DEFAULT_LEVEL, IV_MIN, IV_MAX_MODERN, IV_MAX_LEGACY } from './constants.ts';
 import { emptyEvs, emptyIvs, totalEvs } from './utils.ts';
 import { uniqueSlug } from './slug.ts';
@@ -21,78 +19,89 @@ import { matchGameVersion } from './game-versions.ts';
 import { gen1SpecialStat } from './gen1-special-stats.ts';
 import { uuidv7 } from './vendor/uuidv7.js';
 import { SCHEMA_VERSION } from './schema-version.ts';
+import type { StatKey, EvMap } from './constants.ts';
+import type { DomainPokemon } from './pokeapi-client.ts';
+import type { RosterOp } from './db/roster-ops.ts';
 
-/** @typedef {import('./constants.ts').StatKey} StatKey */
-/** @typedef {import('./constants.ts').EvMap} EvMap */
+export type { StatKey, EvMap };
 
-/** A newly-added/evolved-into species's identity, as snapshotted at add or evolve time.
- * @typedef {{ speciesName: string, speciesId: number, sprite: string|null, baseStats: EvMap|null }} SpeciesSnapshot */
+/** A newly-added/evolved-into species's identity, as snapshotted at add or evolve time. */
+export interface SpeciesSnapshot {
+  speciesName: string;
+  speciesId: number;
+  sprite: string | null;
+  baseStats: EvMap | null;
+}
 
-/**
- * @typedef {object} PartyOverrides
- * @property {4|8|null} powerItemBonus
- * @property {boolean|null} powerItems
- * @property {boolean|null} machoBrace
- * @property {boolean|null} vitaminCutoff
- * @property {boolean|null} pokerus
- * @property {boolean|null} wings
- * @property {boolean|null} evBerries
- * @property {boolean|null} nature
- * @property {boolean|null} statExpSystem
- * @property {string|null} spriteVersion
- * @property {number|null} availableGeneration
- */
+export interface PartyOverrides {
+  powerItemBonus: 4 | 8 | null;
+  powerItems: boolean | null;
+  machoBrace: boolean | null;
+  vitaminCutoff: boolean | null;
+  pokerus: boolean | null;
+  wings: boolean | null;
+  evBerries: boolean | null;
+  nature: boolean | null;
+  statExpSystem: boolean | null;
+  spriteVersion: string | null;
+  availableGeneration: number | null;
+}
 
-/** @typedef {{ id: string, kind: 'add', timestamp: number, speciesName: string, speciesId: number, sprite: string|null, baseStats: EvMap|null, level: number }} AddEvent */
-/** @typedef {{ id: string, kind: 'battle', timestamp: number, opponentName: string, sprite: string|null, applied: EvMap, powerItem: string|null, machoBrace: boolean, pokerus: boolean, viaExpShare?: boolean }} BattleEvent */
-/** @typedef {{ id: string, kind: 'vitamin', timestamp: number, vitaminId: string, stat: StatKey, linkedStat: StatKey|null, applied: number, blockedByCutoff: boolean, blockedByCeiling: boolean }} VitaminEvent */
-/** @typedef {{ id: string, kind: 'feather', timestamp: number, featherId: string, stat: StatKey, applied: number }} FeatherEvent */
-/** @typedef {{ id: string, kind: 'berry', timestamp: number, berryId: string, stat: StatKey, applied: number }} BerryEvent */
-/** @typedef {{ id: string, kind: 'imported', timestamp: number, evs: EvMap }} ImportedEvent */
-/** @typedef {{ id: string, kind: 'pokerus', timestamp: number, active: boolean }} PokerusEvent */
-/** @typedef {{ id: string, kind: 'exp-share', timestamp: number, active: boolean }} ExpShareEvent */
-/** @typedef {{ id: string, kind: 'level', timestamp: number, toLevel: number, batchId?: string }} LevelEvent */
-/** @typedef {{ id: string, kind: 'evolve', timestamp: number, from: SpeciesSnapshot, to: SpeciesSnapshot }} EvolveEvent */
-/** @typedef {{ id: string, kind: 'stat-reading', timestamp: number, statKey: StatKey, level: number, evs: EvMap, observedStat: number, batchId?: string }} StatReadingEvent */
-/** @typedef {{ id: string, kind: 'held-item', timestamp: number, powerItem: string|null, machoBrace: boolean, prevPowerItem?: string|null, prevMachoBrace?: boolean }} HeldItemEvent */
+export interface AddEvent { id: string; kind: 'add'; timestamp: number; speciesName: string; speciesId: number; sprite: string | null; baseStats: EvMap | null; level: number; }
+export interface BattleEvent { id: string; kind: 'battle'; timestamp: number; opponentName: string; sprite: string | null; applied: EvMap; powerItem: string | null; machoBrace: boolean; pokerus: boolean; viaExpShare?: boolean; }
+export interface VitaminEvent { id: string; kind: 'vitamin'; timestamp: number; vitaminId: string; stat: StatKey; linkedStat: StatKey | null; applied: number; blockedByCutoff: boolean; blockedByCeiling: boolean; }
+export interface FeatherEvent { id: string; kind: 'feather'; timestamp: number; featherId: string; stat: StatKey; applied: number; }
+export interface BerryEvent { id: string; kind: 'berry'; timestamp: number; berryId: string; stat: StatKey; applied: number; }
+export interface ImportedEvent { id: string; kind: 'imported'; timestamp: number; evs: EvMap; }
+export interface PokerusEvent { id: string; kind: 'pokerus'; timestamp: number; active: boolean; }
+export interface ExpShareEvent { id: string; kind: 'exp-share'; timestamp: number; active: boolean; }
+export interface LevelEvent { id: string; kind: 'level'; timestamp: number; toLevel: number; batchId?: string; }
+export interface EvolveEvent { id: string; kind: 'evolve'; timestamp: number; from: SpeciesSnapshot; to: SpeciesSnapshot; }
+export interface StatReadingEvent { id: string; kind: 'stat-reading'; timestamp: number; statKey: StatKey; level: number; evs: EvMap; observedStat: number; batchId?: string; }
+export interface HeldItemEvent { id: string; kind: 'held-item'; timestamp: number; powerItem: string | null; machoBrace: boolean; prevPowerItem?: string | null; prevMachoBrace?: boolean; }
 
-/** @typedef {AddEvent|BattleEvent|VitaminEvent|FeatherEvent|BerryEvent|ImportedEvent|PokerusEvent|ExpShareEvent|LevelEvent|EvolveEvent|StatReadingEvent|HeldItemEvent} RosterEvent */
+export type RosterEvent = AddEvent | BattleEvent | VitaminEvent | FeatherEvent | BerryEvent | ImportedEvent | PokerusEvent | ExpShareEvent | LevelEvent | EvolveEvent | StatReadingEvent | HeldItemEvent;
 
-/** The subset of an entry that is source data — see `persistedEntry` below.
- * @typedef {object} PersistedEntry
- * @property {string} uid
- * @property {string} nickname
- * @property {string|null} nature
- * @property {string|null} powerItem
- * @property {boolean} machoBrace
- * @property {Record<StatKey, number|null>} ivs
- * @property {RosterEvent[]} events
- */
+/** The subset of an entry that is source data — see `persistedEntry` below. */
+export interface PersistedEntry {
+  uid: string;
+  nickname: string;
+  nature: string | null;
+  powerItem: string | null;
+  machoBrace: boolean;
+  ivs: Record<StatKey, number | null>;
+  events: RosterEvent[];
+}
 
-/** Fields `projectEntry` derives from `events` — never set directly.
- * @typedef {object} EntryProjection
- * @property {EvMap} evs
- * @property {number} level
- * @property {boolean} pokerus
- * @property {boolean} expShare
- * @property {{ id: string, fromName: string, toName: string, level: number, timestamp: number }[]} evolutions
- * @property {any[]} history
- */
+/** Fields `projectEntry` derives from `events` — never set directly. */
+export interface EntryProjection {
+  evs: EvMap;
+  level: number;
+  pokerus: boolean;
+  expShare: boolean;
+  evolutions: { id: string; fromName: string; toName: string; level: number; timestamp: number }[];
+  history: any[];
+}
 
-/** @typedef {PersistedEntry & SpeciesSnapshot & EntryProjection} RosterEntry */
+export type RosterEntry = PersistedEntry & SpeciesSnapshot & EntryProjection;
 
-/**
- * @typedef {object} Party
- * @property {string} id
- * @property {string} name
- * @property {string} description
- * @property {string} baseGame
- * @property {PartyOverrides} overrides
- * @property {string} slug
- * @property {RosterEntry[]} pokemon
- */
+export interface Party {
+  id: string;
+  name: string;
+  description: string;
+  baseGame: string;
+  overrides: PartyOverrides;
+  slug: string;
+  pokemon: RosterEntry[];
+}
 
-/** @typedef {{ schema: number, rev?: number, statExpBackfillApplied?: boolean, parties: Party[], activePartyId: string|null }} StoreState */
+export interface StoreState {
+  schema: number;
+  rev?: number;
+  statExpBackfillApplied?: boolean;
+  parties: Party[];
+  activePartyId: string | null;
+}
 // `rev` (docs/adr/0025 P4b): a monotonic counter bumped on every
 // persisted mutation, written into both the localStorage blob and
 // `meta.rosterRev`. `init()` adopts whichever copy has the higher `rev`
@@ -100,8 +109,17 @@ import { SCHEMA_VERSION } from './schema-version.ts';
 // reload can't make stale rows win over the blob.
 
 /** The shape `exportPayload`/`_save` persist and `transfer.js` moves between devices —
- * a Party whose roster entries are source data only, with no derived projection fields.
- * @typedef {Omit<Party, 'pokemon'> & { pokemon: PersistedEntry[] }} ExportedParty */
+ * a Party whose roster entries are source data only, with no derived projection fields. */
+export type ExportedParty = Omit<Party, 'pokemon'> & { pokemon: PersistedEntry[] };
+
+/** Optional collaborators for the async persistence tiers (docs/adr/0025). */
+export interface StoreDeps {
+  peekCachedMon?: (name: string) => DomainPokemon | null;
+  hydrateCache?: () => Promise<unknown>;
+  mirrorRoster?: (state: any, opts?: { firstRunOnly?: boolean }) => Promise<unknown>;
+  loadRoster?: () => Promise<{ rev?: number; statExpBackfillApplied: boolean; activePartyId: string | null; parties: any[] }>;
+  rosterOps?: (ops: RosterOp[], meta: { rev: number; activePartyId: string | null }) => Promise<unknown>;
+}
 
 const STATE_KEY = 'effortdex:state';
 // docs/adr/0025 P4d: with IndexedDB as the roster's home, `_save` stops
@@ -126,8 +144,8 @@ const BACKUP_KEY = 'effortdex:state.pre-migration-backup';
  * breaking migration has ever run on this install. Exported so
  * components/pages/settings/settings.js can offer it for copying, and lib/shell.js can
  * report its shape (never its content) alongside a bug report — see
- * docs/adr/0009. @returns {string|null} */
-export function readPreMigrationBackup() {
+ * docs/adr/0009. */
+export function readPreMigrationBackup(): string | null {
   return localStorage.getItem(BACKUP_KEY);
 }
 
@@ -135,15 +153,14 @@ export function readPreMigrationBackup() {
  * version plus party/Pokémon counts, nothing free-text (no names,
  * nicknames, or descriptions). Used for lib/shell.js's bug-report
  * diagnostics field, safe to include automatically since it carries no
- * personal data (docs/adr/0009).
- * @param {string|null} raw @returns {{schema: unknown, parties: number, pokemon: number}|null} */
-export function summarizeState(raw) {
+ * personal data (docs/adr/0009). */
+export function summarizeState(raw: string | null): { schema: unknown; parties: number; pokemon: number } | null {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw);
     if (!Array.isArray(parsed?.parties)) return null;
     const pokemon = parsed.parties.reduce(
-      (/** @type {number} */ n, /** @type {any} */ p) => n + (Array.isArray(p.pokemon) ? p.pokemon.length : 0),
+      (n: number, p: any) => n + (Array.isArray(p.pokemon) ? p.pokemon.length : 0),
       0
     );
     return { schema: parsed.schema ?? 'unknown', parties: parsed.parties.length, pokemon };
@@ -165,10 +182,10 @@ export function summarizeState(raw) {
  * Exported only so test/store.test.js can assert this chain and
  * SCHEMA_VERSION agree (docs/adr/0009's "how do we not forget to add
  * one" guard) — nothing else should import it.
- *
- * @type {{ from: number, to: number, migrate: (old: StoreState) => StoreState }[]}
  */
-export const MIGRATIONS = [{ from: 1, to: 2, migrate: migrateTo2 }];
+export const MIGRATIONS: { from: number; to: number; migrate: (old: StoreState) => StoreState }[] = [
+  { from: 1, to: 2, migrate: migrateTo2 },
+];
 
 /**
  * v1 -> v2: the origin event every roster entry's history starts with
@@ -181,22 +198,21 @@ export const MIGRATIONS = [{ from: 1, to: 2, migrate: migrateTo2 }];
  * `StoreState`, like `_migrateV1` above — it's raw pre-migration JSON
  * (still carrying the 'catch' kind this codebase no longer types), not
  * data already conforming to the current `RosterEvent` shape.
- * @param {any} old @returns {StoreState}
  */
-function migrateTo2(old) {
+function migrateTo2(old: any): StoreState {
   return {
     ...old,
     schema: 2,
-    parties: (old.parties || []).map((/** @type {any} */ party) => ({
+    parties: (old.parties || []).map((party: any) => ({
       ...party,
       // `|| []` on both, same as `_migrateV1`: a migration must never
       // throw on a slightly-malformed party/entry (a hand-edited save, a
       // partial import). `_normalizeEntries` is what repairs those — but
       // it only runs if `_load` gets far enough to return this at all, so
       // a throw here would lose every party instead (see `_load`).
-      pokemon: (party.pokemon || []).map((/** @type {any} */ entry) => ({
+      pokemon: (party.pokemon || []).map((entry: any) => ({
         ...entry,
-        events: (entry.events || []).map((/** @type {any} */ ev) => (ev.kind === 'catch' ? { ...ev, kind: 'add' } : ev)),
+        events: (entry.events || []).map((ev: any) => (ev.kind === 'catch' ? { ...ev, kind: 'add' } : ev)),
       })),
     })),
   };
@@ -211,8 +227,7 @@ function migrateTo2(old) {
 // only which generation's species the battle-log/add-to-roster pickers
 // offer (see lib/species-availability.js) — for a ROM hack/mod whose
 // actual dex generation differs from whatever `baseGame` would derive.
-/** @returns {PartyOverrides} */
-function defaultOverrides() {
+function defaultOverrides(): PartyOverrides {
   return {
     powerItemBonus: null, // null | 4 | 8
     powerItems: null, // null | boolean
@@ -228,15 +243,13 @@ function defaultOverrides() {
   };
 }
 
-/**
- * @param {string} name
- * @param {string} description
- * @param {string} baseGame
- * @param {Partial<PartyOverrides>} overrides
- * @param {Set<string>} existingSlugs
- * @returns {Party}
- */
-function makeParty(name, description, baseGame, overrides, existingSlugs) {
+function makeParty(
+  name: string,
+  description: string,
+  baseGame: string,
+  overrides: Partial<PartyOverrides>,
+  existingSlugs: Set<string>
+): Party {
   return {
     id: uuidv7(),
     name,
@@ -256,19 +269,14 @@ function makeParty(name, description, baseGame, overrides, existingSlugs) {
  * entirely, and only the history log (ev-history-log.js) reads it, to
  * collapse same-batchId entries into one summarized, expandable entry
  * instead of flooding the list with what reads as a single action.
- * @param {RosterEvent['kind']} kind
- * @param {object} payload
- * @param {string} [batchId]
- * @returns {any}
  */
-function makeEvent(kind, payload, batchId) {
-  const ev = /** @type {any} */ ({ id: uuidv7(), kind, timestamp: Date.now(), ...payload });
+function makeEvent(kind: RosterEvent['kind'], payload: object, batchId?: string): any {
+  const ev: any = { id: uuidv7(), kind, timestamp: Date.now(), ...payload };
   if (batchId) ev.batchId = batchId;
   return ev;
 }
 
-/** @param {import('./pokeapi-client.ts').DomainPokemon} mon @returns {SpeciesSnapshot} */
-function monSnapshot(mon) {
+function monSnapshot(mon: DomainPokemon): SpeciesSnapshot {
   return {
     speciesName: mon.name,
     speciesId: mon.id,
@@ -277,8 +285,7 @@ function monSnapshot(mon) {
   };
 }
 
-/** @param {number} level @param {number} fallback @returns {number} */
-function clampLevel(level, fallback) {
+function clampLevel(level: number, fallback: number): number {
   const parsed = Math.round(Number(level));
   return Number.isNaN(parsed) ? fallback : Math.min(MAX_LEVEL, Math.max(MIN_LEVEL, parsed));
 }
@@ -289,38 +296,40 @@ function clampLevel(level, fallback) {
  * -> +2, Special odd -> +1, summed. Returns null (indeterminate) if any
  * of those four is still unknown.
  * Source: https://bulbapedia.bulbagarden.net/wiki/Individual_values#Generation_I_and_II
- * @param {Record<StatKey, number|null>} ivs @returns {number|null}
  */
-function deriveHpDv(ivs) {
+function deriveHpDv(ivs: Record<StatKey, number | null>): number | null {
   const { atk, def, spa, spe } = ivs;
   if (atk == null || def == null || spa == null || spe == null) return null;
   return (atk % 2) * 8 + (def % 2) * 4 + (spe % 2) * 2 + (spa % 2);
 }
 
 /** Gen III+ HP stat formula.
- * Source: https://bulbapedia.bulbagarden.net/wiki/Statistic#Determination_of_stats
- * @param {number} base @param {number} iv @param {number} ev @param {number} level @returns {number} */
-function calcHpModern(base, iv, ev, level) {
+ * Source: https://bulbapedia.bulbagarden.net/wiki/Statistic#Determination_of_stats */
+function calcHpModern(base: number, iv: number, ev: number, level: number): number {
   return Math.floor((2 * base + iv + Math.floor(ev / 4)) * level / 100) + level + 10;
 }
 
 /** Gen III+ non-HP stat formula. `natureTenths` is 11 (boosted), 9
  * (hindered), or 10 (neutral) — nature's ±10% as the integer math the
  * games actually use, not a floating-point ×1.1/×0.9.
- * Source: https://bulbapedia.bulbagarden.net/wiki/Statistic#Determination_of_stats
- * @param {number} base @param {number} iv @param {number} ev @param {number} level @param {number} natureTenths @returns {number} */
-function calcStatModern(base, iv, ev, level, natureTenths) {
+ * Source: https://bulbapedia.bulbagarden.net/wiki/Statistic#Determination_of_stats */
+function calcStatModern(base: number, iv: number, ev: number, level: number, natureTenths: number): number {
   const pre = Math.floor((2 * base + iv + Math.floor(ev / 4)) * level / 100) + 5;
   return Math.floor((pre * natureTenths) / 10);
 }
 
 /** Every IV (0-31) that reproduces `observedStat` for one (level, EV) reading —
  * the brute-force core `possibleIvsForStat` and `possibleIvsFromReadings` both
- * use, against either the entry's current level/EVs or a logged reading's.
- * @param {number} baseStat @param {StatKey} statKey @param {number} level @param {number} ev @param {number} observedStat @param {number} natureTenths
- * @returns {number[]} */
-function ivsMatchingStat(baseStat, statKey, level, ev, observedStat, natureTenths) {
-  const matches = [];
+ * use, against either the entry's current level/EVs or a logged reading's. */
+function ivsMatchingStat(
+  baseStat: number,
+  statKey: StatKey,
+  level: number,
+  ev: number,
+  observedStat: number,
+  natureTenths: number
+): number[] {
+  const matches: number[] = [];
   for (let iv = IV_MIN; iv <= IV_MAX_MODERN; iv++) {
     const computed =
       statKey === 'hp' ? calcHpModern(baseStat, iv, ev, level) : calcStatModern(baseStat, iv, ev, level, natureTenths);
@@ -332,22 +341,23 @@ function ivsMatchingStat(baseStat, statKey, level, ev, observedStat, natureTenth
 /**
  * The mutable accumulator `projectEntry`'s fold threads through every event
  * handler below — the only state a handler is allowed to read or write.
- * @typedef {object} FoldAcc
- * @property {EvMap} evs
- * @property {number} level
- * @property {boolean} pokerus
- * @property {boolean} expShare
- * @property {SpeciesSnapshot} identity
- * @property {EntryProjection['evolutions']} evolutions
  */
+interface FoldAcc {
+  evs: EvMap;
+  level: number;
+  pokerus: boolean;
+  expShare: boolean;
+  identity: SpeciesSnapshot;
+  evolutions: EntryProjection['evolutions'];
+}
 
 /**
  * A handler owns exactly one event kind's effect on the fold: mutate `acc`
  * as needed, then return the display record `history` should show for this
  * event (usually the event itself; `level` and `evolve` enrich it with fold
  * context, e.g. `fromLevel`, that isn't on the stored event).
- * @typedef {(acc: FoldAcc, ev: RosterEvent) => any} EventHandler
  */
+type EventHandler = (acc: FoldAcc, ev: RosterEvent) => any;
 
 /**
  * One handler per `RosterEvent['kind']`, dispatched by `projectEntry` below
@@ -359,80 +369,79 @@ function ivsMatchingStat(baseStat, statKey, level, ev, observedStat, natureTenth
  * split across the file, since there's only one module — if/when event
  * kinds start living in their own feature modules (see the vertical-slice
  * discussion this followed from), each handler moves with its owning kind.
- * @type {Record<RosterEvent['kind'], EventHandler>}
  */
-const EVENT_HANDLERS = {
+const EVENT_HANDLERS: Record<RosterEvent['kind'], EventHandler> = {
   // Store#addPokemon
   add: (acc, ev) => {
-    ev = /** @type {AddEvent} */ (ev);
+    ev = ev as AddEvent;
     acc.identity = { speciesName: ev.speciesName, speciesId: ev.speciesId, sprite: ev.sprite, baseStats: ev.baseStats };
     acc.level = ev.level;
     return ev;
   },
   // Store#logBattle / Store#_applyExpShare
   battle: (acc, ev) => {
-    ev = /** @type {BattleEvent} */ (ev);
+    ev = ev as BattleEvent;
     for (const { key } of STATS) acc.evs[key] += ev.applied[key] || 0;
     return ev;
   },
   // Store#useVitamin
   vitamin: (acc, ev) => {
-    ev = /** @type {VitaminEvent} */ (ev);
+    ev = ev as VitaminEvent;
     acc.evs[ev.stat] += ev.applied;
     if (ev.linkedStat) acc.evs[ev.linkedStat] += ev.applied;
     return ev;
   },
   // Store#useFeather
   feather: (acc, ev) => {
-    ev = /** @type {FeatherEvent} */ (ev);
+    ev = ev as FeatherEvent;
     acc.evs[ev.stat] += ev.applied;
     return ev;
   },
   // Store#useBerry
   berry: (acc, ev) => {
-    ev = /** @type {BerryEvent} */ (ev);
+    ev = ev as BerryEvent;
     acc.evs[ev.stat] -= ev.applied;
     return ev;
   },
   // Store#_migrateV1's synthesized baseline event
   imported: (acc, ev) => {
-    ev = /** @type {ImportedEvent} */ (ev);
+    ev = ev as ImportedEvent;
     for (const { key } of STATS) acc.evs[key] += ev.evs[key] || 0;
     return ev;
   },
   // Store#setPokerus
   pokerus: (acc, ev) => {
-    ev = /** @type {PokerusEvent} */ (ev);
+    ev = ev as PokerusEvent;
     acc.pokerus = ev.active;
     return ev;
   },
   // Store#setExpShare
   'exp-share': (acc, ev) => {
-    ev = /** @type {ExpShareEvent} */ (ev);
+    ev = ev as ExpShareEvent;
     acc.expShare = ev.active;
     return ev;
   },
   // Store#setLevel
   level: (acc, ev) => {
-    ev = /** @type {LevelEvent} */ (ev);
+    ev = ev as LevelEvent;
     const rec = { ...ev, fromLevel: acc.level };
     acc.level = ev.toLevel;
     return rec;
   },
   // Store#evolvePokemon
   evolve: (acc, ev) => {
-    ev = /** @type {EvolveEvent} */ (ev);
+    ev = ev as EvolveEvent;
     const rec = { ...ev, fromName: ev.from.speciesName, toName: ev.to.speciesName, sprite: ev.to.sprite, level: acc.level };
     acc.evolutions.unshift({ id: ev.id, fromName: ev.from.speciesName, toName: ev.to.speciesName, level: acc.level, timestamp: ev.timestamp });
     acc.identity = { ...ev.to };
     return rec;
   },
   // Store#logStatReading — doesn't affect EVs/level/etc., only feeds possibleIvsFromReadings
-  'stat-reading': (acc, ev) => /** @type {StatReadingEvent} */ (ev),
+  'stat-reading': (acc, ev) => ev as StatReadingEvent,
   // Store#setPowerItem / Store#setMachoBrace — display-only, like 'stat-reading'
   // above: powerItem/machoBrace stay plain state (docs/adr/0006 §6), this
   // event just makes an equip/swap/remove visible in the history log.
-  'held-item': (acc, ev) => /** @type {HeldItemEvent} */ (ev),
+  'held-item': (acc, ev) => ev as HeldItemEvent,
 };
 
 /**
@@ -445,10 +454,8 @@ const EVENT_HANDLERS = {
  * deleting an event never counterfactually changes what other events
  * recorded (ADR 0006). Dispatches per event kind via EVENT_HANDLERS.
  */
-/** @param {PersistedEntry} entry @returns {RosterEntry} */
-export function projectEntry(entry) {
-  /** @type {FoldAcc} */
-  const acc = {
+export function projectEntry(entry: PersistedEntry): RosterEntry {
+  const acc: FoldAcc = {
     evs: emptyEvs(),
     level: DEFAULT_LEVEL,
     pokerus: false,
@@ -456,8 +463,7 @@ export function projectEntry(entry) {
     identity: { speciesName: '', speciesId: 0, sprite: null, baseStats: null },
     evolutions: [],
   };
-  /** @type {any[]} */
-  const history = [];
+  const history: any[] = [];
 
   for (const ev of entry.events) {
     const handler = EVENT_HANDLERS[ev.kind];
@@ -479,14 +485,13 @@ export function projectEntry(entry) {
     expShare: acc.expShare,
     evolutions: acc.evolutions,
     history,
-  });
+  }) as RosterEntry;
 }
 
 // The subset of an entry that is source data. Everything else on the
 // in-memory object is a projection, rebuilt by projectEntry at load —
 // persisting it would just be a cache that can drift (ADR 0006).
-/** @param {RosterEntry} entry @returns {PersistedEntry} */
-function persistedEntry(entry) {
+function persistedEntry(entry: RosterEntry): PersistedEntry {
   return {
     uid: entry.uid,
     nickname: entry.nickname,
@@ -499,52 +504,60 @@ function persistedEntry(entry) {
 }
 
 export class Store extends EventTarget {
+  _peekCachedMon: (name: string) => DomainPokemon | null;
+  _hydrateCache: () => Promise<unknown>;
+  _mirrorRoster: ((state: any, opts?: { firstRunOnly?: boolean }) => Promise<unknown>) | null;
+  _loadRoster:
+    | (() => Promise<{ rev?: number; statExpBackfillApplied: boolean; activePartyId: string | null; parties: any[] }>)
+    | null;
+  _rosterOps: ((ops: RosterOp[], meta: { rev: number; activePartyId: string | null }) => Promise<unknown>) | null;
+  _initialized: boolean;
   /**
-   * @param {object} [deps]
-   * @param {(name: string) => import('./pokeapi-client.ts').DomainPokemon|null} [deps.peekCachedMon]
+   * Whether the most recent `_save()` actually reached `localStorage`.
+   * Flips to `false` when a write throws even after evicting the
+   * disposable cache and retrying, and back to `true` once one
+   * succeeds again — each transition fires a `save-error` / `save-ok`
+   * event so app chrome (lib/shell.js) can warn the user that changes
+   * they're making are not being persisted.
+   */
+  saveHealthy: boolean;
+  state: StoreState;
+
+  /**
+   * @param deps.peekCachedMon
    *   Synchronous, local-only species lookup (PokeApiClient#peekCached),
    *   used only by the Gen I/II Stat Experience backfill below (docs/adr/0010)
    *   to recompute historical battle events without a network call. Optional
    *   and defaults to "nothing's cached" so Store stays constructible with no
    *   arguments (every existing test, and any future non-PokeAPI backend).
-   * @param {() => Promise<unknown>} [deps.hydrateCache]
+   * @param deps.hydrateCache
    *   Awaited once by `init()` to bring the persistent caches (now
    *   IndexedDB-backed, docs/adr/0025 P2) into memory before anything
    *   that reads them synchronously via `peekCached`. Wired to
    *   `PokeApiClient#hydrateCache` in `services.js`; a no-op by default.
-   * @param {(state: any, opts?: { firstRunOnly?: boolean }) => Promise<unknown>} [deps.mirrorRoster]
+   * @param deps.mirrorRoster
    *   Writes the current roster state into the IndexedDB
    *   `parties`/`rosterEntries`/`events` stores. Wired in `services.js`;
    *   absent (skipped) by default and when IndexedDB is unavailable.
-   * @param {() => Promise<{ rev?: number, statExpBackfillApplied: boolean, activePartyId: string|null, parties: any[] }>} [deps.loadRoster]
+   * @param deps.loadRoster
    *   Reads the roster back from those stores. When present, `init()`
    *   adopts the rows as `state` if their `rev` is >= the blob's
    *   (docs/adr/0025 P4b — the rows are the read path now, the blob is a
    *   dual-write backup).
-   * @param {(ops: import('./db/roster-ops.ts').RosterOp[], meta: { rev: number, activePartyId: string|null }) => Promise<unknown>} [deps.rosterOps]
+   * @param deps.rosterOps
    *   Applies a few targeted row writes (an event add/delete) in one
    *   small transaction instead of the whole-roster `mirrorRoster`
    *   (docs/adr/0025 P4c). Used by `_append` / `deleteHistoryEntry`.
    */
-  constructor(deps = {}) {
+  constructor(deps: StoreDeps = {}) {
     super();
     this._peekCachedMon = deps.peekCachedMon ?? (() => null);
     this._hydrateCache = deps.hydrateCache ?? (async () => {});
     this._mirrorRoster = deps.mirrorRoster ?? null;
     this._loadRoster = deps.loadRoster ?? null;
     this._rosterOps = deps.rosterOps ?? null;
-    /** @type {boolean} */
     this._initialized = false;
-    /**
-     * Whether the most recent `_save()` actually reached `localStorage`.
-     * Flips to `false` when a write throws even after evicting the
-     * disposable cache and retrying, and back to `true` once one
-     * succeeds again — each transition fires a `save-error` / `save-ok`
-     * event so app chrome (lib/shell.js) can warn the user that changes
-     * they're making are not being persisted.
-     */
     this.saveHealthy = true;
-    /** @type {StoreState} */
     this.state = this._load();
     this._ensureActiveParty();
     this._normalizeEntries();
@@ -558,9 +571,8 @@ export class Store extends EventTarget {
    * can no longer reach them synchronously). `app.js` awaits it before
    * the first `render()`. Idempotent. P4 grows this into "load the
    * roster from IndexedDB rows, running the one-time blob import".
-   * @returns {Promise<this>}
    */
-  async init() {
+  async init(): Promise<this> {
     if (this._initialized) return this;
     this._initialized = true;
 
@@ -620,7 +632,7 @@ export class Store extends EventTarget {
   /** Runs the one-time Gen I/II Stat-Exp backfill (docs/adr/0010) if it
    * hasn't been applied, re-projects, and persists — the caller for this
    * is `init()`, after the mon cache is warm. */
-  _runStatExpBackfill() {
+  _runStatExpBackfill(): void {
     if (this.state.statExpBackfillApplied) return;
     this._backfillGen1StatExp();
     for (const party of this.state.parties) for (const entry of party.pokemon) projectEntry(entry);
@@ -628,8 +640,8 @@ export class Store extends EventTarget {
   }
 
   /** Replaces `state` with the roster read back from the IndexedDB rows
-   * (docs/adr/0025 P4b). @param {any} rows @param {number} rev */
-  _adoptRosterFromRows(rows, rev) {
+   * (docs/adr/0025 P4b). */
+  _adoptRosterFromRows(rows: any, rev: number): void {
     this.state = {
       schema: SCHEMA_VERSION,
       rev,
@@ -651,17 +663,16 @@ export class Store extends EventTarget {
   // P4b it runs in `init()` instead, after the mon cache is warmed
   // (`peekCached` can no longer read the async disk tier synchronously)
   // — `_runStatExpBackfill` re-projects the entries it touches.
-  _normalizeEntries() {
-    /** @type {Set<string>} */
-    const slugs = new Set();
+  _normalizeEntries(): void {
+    const slugs = new Set<string>();
     // Iterated as `any` on purpose: this function's whole job is coercing
     // possibly-malformed persisted data (old schema versions, hand-edited
     // localStorage) into the current Party/RosterEntry shape — the strict
     // types don't hold until after this loop runs.
     // A party with no roster array at all (hand-edited save, a truncated
     // import) is kept as an empty one — never a reason to drop the party.
-    this.state.parties = /** @type {any[]} */ (this.state.parties).filter((p) => p && typeof p === 'object');
-    for (const party of /** @type {any[]} */ (this.state.parties)) {
+    this.state.parties = (this.state.parties as any[]).filter((p) => p && typeof p === 'object');
+    for (const party of this.state.parties as any[]) {
       if (!Array.isArray(party.pokemon)) party.pokemon = [];
       if (typeof party.name !== 'string' || party.name === '') party.name = 'Party';
       if (typeof party.description !== 'string') party.description = '';
@@ -679,7 +690,7 @@ export class Store extends EventTarget {
       slugs.add(party.slug);
     }
 
-    for (const party of /** @type {any[]} */ (this.state.parties)) {
+    for (const party of this.state.parties as any[]) {
       for (const entry of party.pokemon) {
         if (typeof entry.nickname !== 'string') entry.nickname = '';
         if (entry.nature === undefined) entry.nature = null;
@@ -709,14 +720,15 @@ export class Store extends EventTarget {
    * that data already for the battle to have been logged in the first
    * place (ADR 0001), read synchronously with no network call. A battle
    * whose opponent isn't cached (cleared site data) is left untouched.
+   *
+   * @returns whether any event's `applied` changed — the caller
+   * (`_runStatExpBackfill`) re-projects and persists.
    */
-  /** @returns {boolean} whether any event's `applied` changed — the
-   * caller (`_runStatExpBackfill`) re-projects and persists. */
-  _backfillGen1StatExp() {
+  _backfillGen1StatExp(): boolean {
     if (this.state.statExpBackfillApplied) return false;
     this.state.statExpBackfillApplied = true;
     let touched = false;
-    for (const party of /** @type {any[]} */ (this.state.parties)) {
+    for (const party of this.state.parties as any[]) {
       if (!this.usesStatExpSystem(party)) continue;
       const merged = this.specialStatMerged(party);
       for (const entry of party.pokemon) {
@@ -732,8 +744,7 @@ export class Store extends EventTarget {
                 base.spa = special;
                 base.spd = special;
               }
-              /** @type {EvMap} */
-              const applied = emptyEvs();
+              const applied: EvMap = emptyEvs();
               for (const { key } of STATS) {
                 const raw = (base[key] || 0) * (ev.pokerus ? 2 : 1);
                 applied[key] = Math.max(0, Math.min(raw, STAT_EXP_STAT_CAP - evs[key]));
@@ -743,7 +754,7 @@ export class Store extends EventTarget {
             }
             for (const { key } of STATS) evs[key] += ev.applied[key] || 0;
           } else if (ev.kind === 'vitamin') {
-            const vitEv = /** @type {VitaminEvent} */ (ev);
+            const vitEv = ev as VitaminEvent;
             const linkedStat = merged && vitEv.stat === 'spa' ? 'spd' : null;
             const blockedByCeiling = evs[vitEv.stat] >= STAT_EXP_VITAMIN_CEILING;
             const statRoom = blockedByCeiling
@@ -778,11 +789,10 @@ export class Store extends EventTarget {
    * are gone). The only path to `{ parties: [] }` here is genuinely
    * having nothing to load: no key, unparseable JSON, or no `parties`
    * array at all.
-   * @returns {StoreState}
    */
-  _load() {
-    let raw = null;
-    let parsed = null;
+  _load(): StoreState {
+    let raw: string | null = null;
+    let parsed: any = null;
     try {
       raw = localStorage.getItem(STATE_KEY);
       parsed = raw ? JSON.parse(raw) : null;
@@ -841,8 +851,7 @@ export class Store extends EventTarget {
   // number, so from here on the stored number is taken at face value.
   // A missing/non-numeric schema is the pre-event-sourcing shape and
   // falls through to `_migrateV1`.
-  /** @param {any} parsed @returns {number|null} */
-  _readSchemaVersion(parsed) {
+  _readSchemaVersion(parsed: any): number | null {
     if (typeof parsed.schema !== 'number' || !Number.isFinite(parsed.schema)) return null;
     // The lone ambiguous case: a bare `schema: 2` that predates ADR 0009
     // entirely (no `statExpBackfillApplied` marker, which ADR 0010 adds
@@ -861,8 +870,7 @@ export class Store extends EventTarget {
   // Returns null (rather than a partially-migrated state) if `version`
   // isn't reachable to SCHEMA_VERSION through the chain — see the
   // caller's comment in _load() for why that distinction matters.
-  /** @param {StoreState} state @param {number} version @returns {StoreState|null} */
-  _applyMigrations(state, version) {
+  _applyMigrations(state: StoreState, version: number): StoreState | null {
     let current = state;
     let at = version;
     for (const step of MIGRATIONS) {
@@ -881,14 +889,13 @@ export class Store extends EventTarget {
   // MIGRATIONS — so it must already emit whatever kind the *current*
   // schema expects ('add', not 'catch') itself, since nothing downstream
   // will rewrite it.
-  /** @param {any} old @returns {StoreState} */
-  _migrateV1(old) {
+  _migrateV1(old: any): StoreState {
     return {
       schema: SCHEMA_VERSION,
       activePartyId: old.activePartyId ?? null,
-      parties: old.parties.map((/** @type {any} */ party) => ({
+      parties: old.parties.map((party: any) => ({
         ...party,
-        pokemon: (party.pokemon || []).map((/** @type {any} */ e) => {
+        pokemon: (party.pokemon || []).map((e: any) => {
           const events = [
             makeEvent('add', {
               speciesName: e.speciesName,
@@ -918,7 +925,7 @@ export class Store extends EventTarget {
   // Unlike earlier versions, this never conjures a default "Party 1" —
   // with zero parties the app has to force the user through the create
   // dialog. It only repoints activePartyId if it's dangling.
-  _ensureActiveParty() {
+  _ensureActiveParty(): void {
     if (!this.state.parties.some((p) => p.id === this.state.activePartyId)) {
       this.state.activePartyId = this.state.parties[0]?.id ?? null;
     }
@@ -929,13 +936,13 @@ export class Store extends EventTarget {
    * `idbOps` if given — docs/adr/0025 P4c — else a whole-roster rewrite)
    * and bump the `rev` marker; the full snapshot is left to
    * `checkpoint()`. Without IndexedDB: write the full `STATE_KEY` blob.
-   * @param {import('./db/roster-ops.ts').RosterOp[]} [idbOps] - omit for
-   *   structural mutations (create/delete/reorder a party or entry).
+   * @param idbOps - omit for structural mutations (create/delete/reorder
+   *   a party or entry).
    */
-  _save(idbOps) {
+  _save(idbOps?: RosterOp[]): void {
     this.state.rev = (this.state.rev ?? 0) + 1;
 
-    let localOk;
+    let localOk: boolean;
     if (this._mirrorRoster) {
       // IndexedDB is the roster's home (docs/adr/0025 P4d). Mirror the
       // change to the rows — targeted ops (P4c) when the caller gave
@@ -1001,13 +1008,12 @@ export class Store extends EventTarget {
    * `_save` path already writes it per mutation). Wired to
    * pagehide / visibilitychange / an interval in lib/shell.js, and run
    * once at the end of `init()`. */
-  checkpoint() {
+  checkpoint(): void {
     if (!this._mirrorRoster) return;
     this._tryLocalWrite(STATE_KEY, JSON.stringify(this._persistedState()));
   }
 
-  /** @param {string} key @param {string} value @returns {boolean} */
-  _tryLocalWrite(key, value) {
+  _tryLocalWrite(key: string, value: string): boolean {
     try {
       localStorage.setItem(key, value);
       return true;
@@ -1017,16 +1023,15 @@ export class Store extends EventTarget {
   }
 
   /** Appends one event to the entry, re-projects it, and persists — as a
-   * single targeted `events.add` on the IndexedDB side (docs/adr/0025 P4c).
-   * @param {RosterEntry} entry @param {RosterEvent} event @returns {RosterEvent} */
-  _append(entry, event) {
+   * single targeted `events.add` on the IndexedDB side (docs/adr/0025 P4c). */
+  _append(entry: RosterEntry, event: RosterEvent): RosterEvent {
     entry.events.push(event);
     projectEntry(entry);
     this._save([{ type: 'putEvent', entryUid: entry.uid, event }]);
     return event;
   }
 
-  get activeParty() {
+  get activeParty(): Party | undefined {
     return this.state.parties.find((p) => p.id === this.state.activePartyId);
   }
 
@@ -1039,25 +1044,22 @@ export class Store extends EventTarget {
    * with a fallback for titles/species it has no distinct sprite for)
    * is the rendering layer's job, not Store's.
    */
-  spriteBaseGame() {
+  spriteBaseGame(): string {
     return this.activeParty?.overrides?.spriteVersion || this.activeParty?.baseGame || '';
   }
 
-  /** @param {string} uid @returns {RosterEntry|undefined} */
-  _find(uid) {
+  _find(uid: string): RosterEntry | undefined {
     return this.activeParty?.pokemon.find((e) => e.uid === uid);
   }
 
   /* ---------------- parties ---------------- */
 
-  /**
-   * @param {string} name
-   * @param {string} [description]
-   * @param {string} [baseGame]
-   * @param {Partial<PartyOverrides>} [overrides]
-   * @returns {Party}
-   */
-  createParty(name, description = '', baseGame = '', overrides = {}) {
+  createParty(
+    name: string,
+    description = '',
+    baseGame = '',
+    overrides: Partial<PartyOverrides> = {}
+  ): Party {
     const existingSlugs = new Set(this.state.parties.map((p) => p.slug));
     const party = makeParty(
       name || `Party ${this.state.parties.length + 1}`,
@@ -1077,11 +1079,10 @@ export class Store extends EventTarget {
    * slug (and its URL) never changes. `overrides` is merged over the
    * party's existing overrides (per-key), not replaced wholesale.
    */
-  /**
-   * @param {string} id
-   * @param {{ name?: string, description?: string, baseGame?: string, overrides?: Partial<PartyOverrides> }} changes
-   */
-  updateParty(id, { name, description, baseGame, overrides }) {
+  updateParty(
+    id: string,
+    { name, description, baseGame, overrides }: { name?: string; description?: string; baseGame?: string; overrides?: Partial<PartyOverrides> }
+  ): void {
     const party = this.state.parties.find((p) => p.id === id);
     if (!party) return;
     if (name) party.name = name;
@@ -1091,20 +1092,17 @@ export class Store extends EventTarget {
     this._save();
   }
 
-  /** @param {string} slug @returns {Party|null} */
-  getPartyBySlug(slug) {
+  getPartyBySlug(slug: string): Party | null {
     return this.state.parties.find((p) => p.slug === slug) || null;
   }
 
-  /** @param {string} id */
-  deleteParty(id) {
+  deleteParty(id: string): void {
     this.state.parties = this.state.parties.filter((p) => p.id !== id);
     this._ensureActiveParty();
     this._save();
   }
 
-  /** @param {string} id */
-  setActiveParty(id) {
+  setActiveParty(id: string): void {
     if (!this.state.parties.some((p) => p.id === id)) return;
     this.state.activePartyId = id;
     this._save();
@@ -1121,15 +1119,8 @@ export class Store extends EventTarget {
    * Pokémon actually entered the roster — caught, bred, or transferred
    * in — the event itself doesn't distinguish which.
    */
-  /**
-   * @param {import('./pokeapi-client.ts').DomainPokemon} mon
-   * @param {number} [level]
-   * @param {string|null} [natureId]
-   * @returns {RosterEntry}
-   */
-  addPokemon(mon, level = DEFAULT_LEVEL, natureId = null) {
-    /** @type {PersistedEntry} */
-    const entry = {
+  addPokemon(mon: DomainPokemon, level = DEFAULT_LEVEL, natureId: string | null = null): RosterEntry {
+    const entry: PersistedEntry = {
       uid: uuidv7(),
       nickname: '',
       nature: this.natureAvailable() && NATURES.some((n) => n.id === natureId) ? natureId : null,
@@ -1142,14 +1133,13 @@ export class Store extends EventTarget {
     };
     const projected = projectEntry(entry);
     // Invariant: the UI never offers "add" without an active party.
-    /** @type {Party} */ (this.activeParty).pokemon.push(projected);
+    (this.activeParty as Party).pokemon.push(projected);
     this._save();
     return projected;
   }
 
-  /** Sets (or clears, with a falsy/unrecognized natureId) the roster Pokémon's nature.
-   * @param {string} uid @param {string|null} natureId */
-  setNature(uid, natureId) {
+  /** Sets (or clears, with a falsy/unrecognized natureId) the roster Pokémon's nature. */
+  setNature(uid: string, natureId: string | null): void {
     const entry = this._find(uid);
     if (!entry) return;
     entry.nature = this.natureAvailable() && NATURES.some((n) => n.id === natureId) ? natureId : null;
@@ -1165,9 +1155,8 @@ export class Store extends EventTarget {
    * usesStatExpSystem's boundary, not specialStatMerged's — Gen II's
    * base stats did split, but its *stored DV* never did). Gen III+
    * stores all six IVs independently, 0-31.
-   * @returns {{ min: number, max: number, legacy: boolean }}
    */
-  ivRange() {
+  ivRange(): { min: number; max: number; legacy: boolean } {
     return this.usesStatExpSystem()
       ? { min: IV_MIN, max: IV_MAX_LEGACY, legacy: true }
       : { min: IV_MIN, max: IV_MAX_MODERN, legacy: false };
@@ -1180,9 +1169,8 @@ export class Store extends EventTarget {
    * writing `spa` mirrors to `spd` (a single stored Special DV feeds
    * both — see ivRange()'s doc comment) and HP is always recomputed from
    * the other four DVs' parity rather than settable directly.
-   * @param {string} uid @param {StatKey} statKey @param {number|null} value
    */
-  setIv(uid, statKey, value) {
+  setIv(uid: string, statKey: StatKey, value: number | null): void {
     const entry = this._find(uid);
     if (!entry) return;
     const { min, max, legacy } = this.ivRange();
@@ -1213,12 +1201,12 @@ export class Store extends EventTarget {
    * or this generation uses Stat Experience instead of IVs/EVs (Gen I/II's
    * own stat rounding is a distinct, unsourced formula not implemented
    * here — see `possibleIvsForStat`'s own comment).
-   * @param {RosterEntry} entry @param {StatKey} statKey @param {number} baseStat
-   * @returns {number|null}
    */
-  actualStat(entry, statKey, baseStat) {
+  actualStat(entry: RosterEntry, statKey: StatKey, baseStat: number): number | null {
     if (this.usesStatExpSystem()) return null;
-    const readings = /** @type {StatReadingEvent[]} */ (entry.events.filter((ev) => ev.kind === 'stat-reading' && ev.statKey === statKey));
+    const readings = entry.events.filter(
+      (ev) => ev.kind === 'stat-reading' && ev.statKey === statKey
+    ) as StatReadingEvent[];
     const reading = readings.at(-1);
     if (reading && reading.level === entry.level && reading.evs[statKey] === entry.evs[statKey]) {
       return reading.observedStat;
@@ -1244,10 +1232,8 @@ export class Store extends EventTarget {
    * two calls' results. Gen III+ only — see docs/adr for the Gen I/II
    * follow-up (Stat Experience's own rounding is a distinct, unsourced
    * formula not implemented here yet).
-   * @param {RosterEntry} entry @param {StatKey} statKey @param {number} observedStat @param {number} baseStat
-   * @returns {number[]}
    */
-  possibleIvsForStat(entry, statKey, observedStat, baseStat) {
+  possibleIvsForStat(entry: RosterEntry, statKey: StatKey, observedStat: number, baseStat: number): number[] {
     if (this.usesStatExpSystem()) return [];
     const nature = this.natureAvailable() ? NATURES.find((n) => n.id === entry.nature) : null;
     const natureTenths = nature?.boost === statKey ? 11 : nature?.hinder === statKey ? 9 : 10;
@@ -1263,18 +1249,15 @@ export class Store extends EventTarget {
    * per the community-calculator technique possibleIvsForStat's own
    * comment already describes manually. Empty array = no readings logged
    * yet (not "no candidates" — the UI must tell those apart).
-   * @param {RosterEntry} entry @param {StatKey} statKey @param {number} baseStat
-   * @returns {number[]}
    */
-  possibleIvsFromReadings(entry, statKey, baseStat) {
+  possibleIvsFromReadings(entry: RosterEntry, statKey: StatKey, baseStat: number): number[] {
     if (this.usesStatExpSystem()) return [];
-    const readings = /** @type {StatReadingEvent[]} */ (
-      entry.events.filter((ev) => ev.kind === 'stat-reading' && ev.statKey === statKey)
-    );
+    const readings = entry.events.filter(
+      (ev) => ev.kind === 'stat-reading' && ev.statKey === statKey
+    ) as StatReadingEvent[];
     if (readings.length === 0) return [];
     const nature = this.natureAvailable() ? NATURES.find((n) => n.id === entry.nature) : null;
     const natureTenths = nature?.boost === statKey ? 11 : nature?.hinder === statKey ? 9 : 10;
-    /** @type {Set<number>} */
     let candidates = new Set(Array.from({ length: IV_MAX_MODERN - IV_MIN + 1 }, (_, i) => IV_MIN + i));
     for (const r of readings) {
       const matches = new Set(ivsMatchingStat(baseStat, statKey, r.level, r.evs[statKey], r.observedStat, natureTenths));
@@ -1287,9 +1270,8 @@ export class Store extends EventTarget {
    * Logs statKey's observed value at the entry's current level/EVs as a
    * stat-reading event, snapshotting both — leveling up or gaining EVs
    * later must not silently change what an already-logged reading meant.
-   * @param {string} uid @param {StatKey} statKey @param {number} observedStat @param {string} [batchId]
    */
-  logStatReading(uid, statKey, observedStat, batchId) {
+  logStatReading(uid: string, statKey: StatKey, observedStat: number, batchId?: string): void {
     const entry = this._find(uid);
     if (!entry) return;
     // Logged on every generation. Under the modern system it also feeds
@@ -1299,8 +1281,8 @@ export class Store extends EventTarget {
     this._append(entry, makeEvent('stat-reading', { statKey, level: entry.level, evs: { ...entry.evs }, observedStat }, batchId));
   }
 
-  /** Removes uid from the active party's roster — not necessarily a real in-game "release" any more, since this entry might have been added via breeding or transferring rather than catching. @param {string} uid */
-  removePokemon(uid) {
+  /** Removes uid from the active party's roster — not necessarily a real in-game "release" any more, since this entry might have been added via breeding or transferring rather than catching. */
+  removePokemon(uid: string): void {
     const party = this.activeParty;
     if (!party) return;
     party.pokemon = party.pokemon.filter((e) => e.uid !== uid);
@@ -1313,9 +1295,8 @@ export class Store extends EventTarget {
    * roster's default ("Custom order") sort is just this array's order,
    * add-order or manually reordered alike, so nothing else needs to
    * know a reorder happened.
-   * @param {string} uid @param {number} toIndex
    */
-  reorderPokemon(uid, toIndex) {
+  reorderPokemon(uid: string, toIndex: number): void {
     const party = this.activeParty;
     if (!party) return;
     const fromIndex = party.pokemon.findIndex((e) => e.uid === uid);
@@ -1327,8 +1308,7 @@ export class Store extends EventTarget {
     this._save();
   }
 
-  /** @param {string} uid @param {string} nickname */
-  renamePokemon(uid, nickname) {
+  renamePokemon(uid: string, nickname: string): void {
     const entry = this._find(uid);
     if (!entry) return;
     entry.nickname = nickname;
@@ -1345,8 +1325,8 @@ export class Store extends EventTarget {
    * machoBrace stay plain current-valued state — this event doesn't
    * feed the fold, so deleting it removes the log entry but doesn't
    * revert what's actually equipped.
-   * @param {string} uid @param {string|null} itemId @param {string} [batchId] */
-  setPowerItem(uid, itemId, batchId) {
+   */
+  setPowerItem(uid: string, itemId: string | null, batchId?: string): void {
     const entry = this._find(uid);
     if (!entry) return;
     const powerItem = itemId || null;
@@ -1359,8 +1339,7 @@ export class Store extends EventTarget {
     this.setExpShare(uid, false, batchId);
   }
 
-  /** @param {string} uid @param {boolean} val @param {string} [batchId] */
-  setMachoBrace(uid, val, batchId) {
+  setMachoBrace(uid: string, val: boolean, batchId?: string): void {
     const entry = this._find(uid);
     if (!entry) return;
     const machoBrace = !!val;
@@ -1384,8 +1363,7 @@ export class Store extends EventTarget {
    * setPowerItem/setMachoBrace above), the same one-held-item-slot rule
    * the real games enforce.
    */
-  /** @param {string} uid @param {boolean} val @param {string} [batchId] */
-  setExpShare(uid, val, batchId) {
+  setExpShare(uid: string, val: boolean, batchId?: string): void {
     const entry = this._find(uid);
     if (!entry) return;
     const next = !!val;
@@ -1410,8 +1388,7 @@ export class Store extends EventTarget {
    * overridden per-party (party.overrides.machoBrace/powerItems), for
    * ROM hacks and house rules that don't match any official title.
    */
-  /** @returns {{ machoBrace: boolean, powerItems: boolean }} */
-  trainingItemAvailability() {
+  trainingItemAvailability(): { machoBrace: boolean; powerItems: boolean } {
     const gen = matchGameVersion(this.activeParty?.baseGame)?.gen;
     const autoMachoBrace = gen != null && gen >= MACHO_BRACE_MIN_GEN && gen <= MACHO_BRACE_MAX_GEN;
     const autoPowerItems = gen == null || gen >= POWER_ITEM_MIN_GEN;
@@ -1422,9 +1399,8 @@ export class Store extends EventTarget {
     };
   }
 
-  /** Records a pokerus toggle event whenever the status actually changes, so the log shows when the ×2 boost started (or stopped).
-   * @param {string} uid @param {boolean} val @param {string} [batchId] */
-  setPokerus(uid, val, batchId) {
+  /** Records a pokerus toggle event whenever the status actually changes, so the log shows when the ×2 boost started (or stopped). */
+  setPokerus(uid: string, val: boolean, batchId?: string): void {
     const entry = this._find(uid);
     if (!entry) return;
     const next = !!val;
@@ -1433,9 +1409,8 @@ export class Store extends EventTarget {
     }
   }
 
-  /** Records a level event for any actual level change, from either the level-up button or a manual edit.
-   * @param {string} uid @param {number} level @param {string} [batchId] */
-  setLevel(uid, level, batchId) {
+  /** Records a level event for any actual level change, from either the level-up button or a manual edit. */
+  setLevel(uid: string, level: number, batchId?: string): void {
     const entry = this._find(uid);
     if (!entry) return;
     const parsed = Math.round(Number(level));
@@ -1453,8 +1428,7 @@ export class Store extends EventTarget {
    * nickname, training aids and history all carry over — only the
    * folded identity changes, matching how evolution works in the games.
    */
-  /** @param {string} uid @param {import('./pokeapi-client.ts').DomainPokemon} mon */
-  evolvePokemon(uid, mon) {
+  evolvePokemon(uid: string, mon: DomainPokemon): void {
     const entry = this._find(uid);
     if (!entry) return;
     const from = { speciesName: entry.speciesName, speciesId: entry.speciesId, sprite: entry.sprite, baseStats: entry.baseStats };
@@ -1466,8 +1440,7 @@ export class Store extends EventTarget {
    * wrong evolution option. Just deletes the latest evolve event; the
    * fold restores the previous identity from the remaining events.
    */
-  /** @param {string} uid */
-  revertEvolution(uid) {
+  revertEvolution(uid: string): void {
     const entry = this._find(uid);
     const lastEvolve = entry?.events.findLast((ev) => ev.kind === 'evolve');
     if (!lastEvolve) return;
@@ -1480,8 +1453,7 @@ export class Store extends EventTarget {
    * game version falls back to the modern (+8) value. Overridable via
    * party.overrides.powerItemBonus.
    */
-  /** @returns {4|8} */
-  powerItemBonus() {
+  powerItemBonus(): 4 | 8 {
     const override = this.activeParty?.overrides?.powerItemBonus;
     if (override === 4 || override === 8) return override;
     const gen = matchGameVersion(this.activeParty?.baseGame)?.gen;
@@ -1497,8 +1469,7 @@ export class Store extends EventTarget {
    * available, matching every other title. Overridable via
    * party.overrides.pokerus.
    */
-  /** @returns {boolean} */
-  pokerusAvailable() {
+  pokerusAvailable(): boolean {
     const override = this.activeParty?.overrides?.pokerus;
     if (override != null) return override;
     const match = matchGameVersion(this.activeParty?.baseGame);
@@ -1511,8 +1482,7 @@ export class Store extends EventTarget {
    * natures didn't exist yet. An unset/unrecognized game version falls
    * back to available. Overridable via party.overrides.nature.
    */
-  /** @returns {boolean} */
-  natureAvailable() {
+  natureAvailable(): boolean {
     const override = this.activeParty?.overrides?.nature;
     if (override != null) return override;
     const gen = matchGameVersion(this.activeParty?.baseGame)?.gen;
@@ -1528,7 +1498,7 @@ export class Store extends EventTarget {
    * of always reading the active one, so summary views (the party picker)
    * can get an accurate answer for a party that isn't currently open.
    */
-  usesStatExpSystem(party = this.activeParty) {
+  usesStatExpSystem(party: Party | undefined = this.activeParty): boolean {
     const override = party?.overrides?.statExpSystem;
     if (override != null) return override;
     const gen = matchGameVersion(party?.baseGame)?.gen;
@@ -1541,17 +1511,17 @@ export class Store extends EventTarget {
    * yet split into Special Attack/Special Defense, so both keys are kept
    * in lockstep and shown/fed as one merged stat.
    */
-  specialStatMerged(party = this.activeParty) {
+  specialStatMerged(party: Party | undefined = this.activeParty): boolean {
     return matchGameVersion(party?.baseGame)?.gen === 1;
   }
 
   /** The per-stat cap under `party`'s (default: the active party's) current EV/Stat Exp rules. */
-  statCap(party = this.activeParty) {
+  statCap(party: Party | undefined = this.activeParty): number {
     return this.usesStatExpSystem(party) ? STAT_EXP_STAT_CAP : STAT_CAP;
   }
 
   /** The combined-total cap under `party`'s (default: the active party's) current rules, or `null` if uncapped (Stat Exp has none). */
-  totalCap(party = this.activeParty) {
+  totalCap(party: Party | undefined = this.activeParty): number | null {
     return this.usesStatExpSystem(party) ? null : TOTAL_CAP;
   }
 
@@ -1561,9 +1531,8 @@ export class Store extends EventTarget {
    * 510 combined total is reached. Stat Experience (Gen I/II): no
    * combined total exists, so "done" means every tracked stat is at the
    * per-stat cap (Gen I's merged Special counts once, via `spa`).
-   * @param {RosterEntry|null|undefined} entry
    */
-  isFullyTrained(entry) {
+  isFullyTrained(entry: RosterEntry | null | undefined): boolean {
     if (!entry) return false;
     const totalCap = this.totalCap();
     if (totalCap != null) return totalEvs(entry.evs) >= totalCap;
@@ -1580,8 +1549,7 @@ export class Store extends EventTarget {
    * aid must have no effect. Everything that applies or displays
    * training aids reads through here.
    */
-  /** @param {RosterEntry} entry @returns {{ machoBrace: boolean, powerItem: string|null, pokerus: boolean }} */
-  effectiveAids(entry) {
+  effectiveAids(entry: RosterEntry): { machoBrace: boolean; powerItem: string | null; pokerus: boolean } {
     const { machoBrace, powerItems } = this.trainingItemAvailability();
     return {
       machoBrace: !!entry.machoBrace && machoBrace,
@@ -1601,13 +1569,11 @@ export class Store extends EventTarget {
    * its own Pokérus), matching the real games: "the effects of [Power]
    * items do not transfer over to a Pokémon holding an Exp. Share."
    */
-  /**
-   * @param {RosterEntry} entry
-   * @param {import('./pokeapi-client.ts').DomainPokemon} opponent
-   * @param {{ viaExpShare?: boolean }} [opts]
-   * @returns {{ base: EvMap, afterItem: EvMap, afterPokerus: EvMap, applied: EvMap }}
-   */
-  _battleYield(entry, opponent, { viaExpShare = false } = {}) {
+  _battleYield(
+    entry: RosterEntry,
+    opponent: DomainPokemon,
+    { viaExpShare = false }: { viaExpShare?: boolean } = {}
+  ): { base: EvMap; afterItem: EvMap; afterPokerus: EvMap; applied: EvMap } {
     const aids = this.effectiveAids(entry);
     const base = this.usesStatExpSystem() ? { ...opponent.baseStats } : { ...opponent.evYield };
     if (this.usesStatExpSystem() && this.specialStatMerged()) {
@@ -1621,7 +1587,7 @@ export class Store extends EventTarget {
     const afterItem = { ...base };
     if (!viaExpShare) {
       if (aids.machoBrace) {
-        for (const key of /** @type {StatKey[]} */ (Object.keys(afterItem))) afterItem[key] *= MACHO_BRACE_MULTIPLIER;
+        for (const key of Object.keys(afterItem) as StatKey[]) afterItem[key] *= MACHO_BRACE_MULTIPLIER;
       } else {
         const itemDef = POWER_ITEMS.find((p) => p.id === aids.powerItem);
         if (itemDef) afterItem[itemDef.stat] = (afterItem[itemDef.stat] || 0) + this.powerItemBonus();
@@ -1629,7 +1595,7 @@ export class Store extends EventTarget {
     }
     const afterPokerus = { ...afterItem };
     if (aids.pokerus) {
-      for (const key of /** @type {StatKey[]} */ (Object.keys(afterPokerus))) afterPokerus[key] *= 2;
+      for (const key of Object.keys(afterPokerus) as StatKey[]) afterPokerus[key] *= 2;
     }
 
     const statCap = this.statCap();
@@ -1650,8 +1616,7 @@ export class Store extends EventTarget {
    * Previews what defeating `opponent` would earn the roster Pokémon
    * `uid` right now, without recording anything.
    */
-  /** @param {string} uid @param {import('./pokeapi-client.ts').DomainPokemon} opponent */
-  previewDefeat(uid, opponent) {
+  previewDefeat(uid: string, opponent: DomainPokemon) {
     const entry = this._find(uid);
     if (!entry) return null;
     return this._battleYield(entry, opponent);
@@ -1665,8 +1630,7 @@ export class Store extends EventTarget {
    * grant. Also grants every other Exp.-Share-holding Pokémon in the
    * party its own share of this same battle (see `_applyExpShare`).
    */
-  /** @param {string} uid @param {import('./pokeapi-client.ts').DomainPokemon} opponent */
-  logBattle(uid, opponent) {
+  logBattle(uid: string, opponent: DomainPokemon) {
     const entry = this._find(uid);
     if (!entry) return null;
     const { applied } = this._battleYield(entry, opponent);
@@ -1695,8 +1659,7 @@ export class Store extends EventTarget {
    * effort points received is doubled." Clamped to each recipient's own
    * current 252/510 room, same as a normal battle.
    */
-  /** @param {string} battlerUid @param {import('./pokeapi-client.ts').DomainPokemon} opponent */
-  _applyExpShare(battlerUid, opponent) {
+  _applyExpShare(battlerUid: string, opponent: DomainPokemon): void {
     for (const shareEntry of this.activeParty?.pokemon ?? []) {
       if (shareEntry.uid === battlerUid || !shareEntry.expShare) continue;
       const { applied } = this._battleYield(shareEntry, opponent, { viaExpShare: true });
@@ -1723,8 +1686,7 @@ export class Store extends EventTarget {
    * Exposed so UI can show the cutoff before a vitamin is even used.
    * Overridable via party.overrides.vitaminCutoff.
    */
-  /** @returns {boolean} */
-  vitaminCutoffApplies() {
+  vitaminCutoffApplies(): boolean {
     const override = this.activeParty?.overrides?.vitaminCutoff;
     if (override != null) return override;
     const gen = matchGameVersion(this.activeParty?.baseGame)?.gen;
@@ -1746,6 +1708,7 @@ export class Store extends EventTarget {
    * applying to both `spa` and `spd` together (see
    * `specialStatMerged`/`projectEntry`'s `linkedStat` handling).
    */
+
   /**
    * Pure calc behind `useVitamin`/`previewVitamin` — what feeding
    * `vitaminId` would add given `evs` (a real entry's, or a simulated
@@ -1754,10 +1717,11 @@ export class Store extends EventTarget {
    * queued click still add anything" against a running simulated total
    * without duplicating this math, and without it drifting from what
    * `useVitamin` actually applies.
-   * @param {EvMap} evs @param {string} vitaminId
-   * @returns {{ stat: StatKey, linkedStat: StatKey|null, applied: number, blockedByCutoff: boolean, blockedByCeiling: boolean }|null}
    */
-  _vitaminYield(evs, vitaminId) {
+  _vitaminYield(
+    evs: EvMap,
+    vitaminId: string
+  ): { stat: StatKey; linkedStat: StatKey | null; applied: number; blockedByCutoff: boolean; blockedByCeiling: boolean } | null {
     const vitamin = VITAMINS.find((v) => v.id === vitaminId);
     if (!vitamin) return null;
 
@@ -1779,8 +1743,7 @@ export class Store extends EventTarget {
     return { stat: vitamin.stat, linkedStat, applied, blockedByCutoff, blockedByCeiling };
   }
 
-  /** @param {string} uid @param {string} vitaminId @param {string} [batchId] */
-  useVitamin(uid, vitaminId, batchId) {
+  useVitamin(uid: string, vitaminId: string, batchId?: string) {
     const entry = this._find(uid);
     if (!entry) return null;
     const y = this._vitaminYield(entry.evs, vitaminId);
@@ -1798,9 +1761,8 @@ export class Store extends EventTarget {
    * dialog's pending-queue simulation passes a running total that
    * already folds in earlier queued clicks, so a second queued click of
    * the same vitamin correctly sees less room, or none once capped).
-   * @param {string} uid @param {string} vitaminId @param {EvMap} [evsOverride]
    */
-  previewVitamin(uid, vitaminId, evsOverride) {
+  previewVitamin(uid: string, vitaminId: string, evsOverride?: EvMap) {
     const entry = this._find(uid);
     if (!entry) return null;
     return this._vitaminYield(evsOverride || entry.evs, vitaminId);
@@ -1811,8 +1773,7 @@ export class Store extends EventTarget {
    * Wings (Feathers) didn't exist yet. An unset/unrecognized game version
    * falls back to available. Overridable via party.overrides.wings.
    */
-  /** @returns {boolean} */
-  wingsAvailable() {
+  wingsAvailable(): boolean {
     const override = this.activeParty?.overrides?.wings;
     if (override != null) return override;
     const gen = matchGameVersion(this.activeParty?.baseGame)?.gen;
@@ -1825,10 +1786,8 @@ export class Store extends EventTarget {
    * FEATHER_BONUS (1) clamped to the same per-stat (252) and total (510)
    * caps as battle EVs. Unlike vitamins, no 100-EV cutoff ever applies.
    */
-  /** Pure calc behind `useFeather`/`previewFeather` — see `_vitaminYield`'s own comment for why this is split out.
-   * @param {EvMap} evs @param {string} featherId
-   * @returns {{ stat: StatKey, applied: number }|null} */
-  _featherYield(evs, featherId) {
+  /** Pure calc behind `useFeather`/`previewFeather` — see `_vitaminYield`'s own comment for why this is split out. */
+  _featherYield(evs: EvMap, featherId: string): { stat: StatKey; applied: number } | null {
     const feather = FEATHERS.find((f) => f.id === featherId);
     if (!feather) return null;
     const totalCap = this.totalCap();
@@ -1838,8 +1797,7 @@ export class Store extends EventTarget {
     return { stat: feather.stat, applied };
   }
 
-  /** @param {string} uid @param {string} featherId @param {string} [batchId] */
-  useFeather(uid, featherId, batchId) {
+  useFeather(uid: string, featherId: string, batchId?: string) {
     const entry = this._find(uid);
     if (!entry) return null;
     const y = this._featherYield(entry.evs, featherId);
@@ -1847,9 +1805,8 @@ export class Store extends EventTarget {
     return this._append(entry, makeEvent('feather', { featherId, stat: y.stat, applied: y.applied }, batchId));
   }
 
-  /** Read-only preview of what `useFeather(uid, featherId)` would apply right now — see `previewVitamin`'s own comment.
-   * @param {string} uid @param {string} featherId @param {EvMap} [evsOverride] */
-  previewFeather(uid, featherId, evsOverride) {
+  /** Read-only preview of what `useFeather(uid, featherId)` would apply right now — see `previewVitamin`'s own comment. */
+  previewFeather(uid: string, featherId: string, evsOverride?: EvMap) {
     const entry = this._find(uid);
     if (!entry) return null;
     return this._featherYield(evsOverride || entry.evs, featherId);
@@ -1861,8 +1818,7 @@ export class Store extends EventTarget {
    * ingredient only — see game-versions.js's noEvBerries). Overridable via
    * party.overrides.evBerries.
    */
-  /** @returns {boolean} */
-  berriesAvailable() {
+  berriesAvailable(): boolean {
     const override = this.activeParty?.overrides?.evBerries;
     if (override != null) return override;
     const match = matchGameVersion(this.activeParty?.baseGame);
@@ -1873,9 +1829,8 @@ export class Store extends EventTarget {
   /**
    * True only for Diamond/Pearl/Platinum's own EV-reducing berry quirk —
    * see game-versions.js's berrySnapTo100.
-   * @returns {boolean}
    */
-  berrySnapApplies() {
+  berrySnapApplies(): boolean {
     return !!matchGameVersion(this.activeParty?.baseGame)?.berrySnapTo100;
   }
 
@@ -1886,10 +1841,8 @@ export class Store extends EventTarget {
    * Diamond/Pearl/Platinum's snap-to-100 quirk above EV_BERRY_SNAP_THRESHOLD
    * (see berrySnapApplies).
    */
-  /** Pure calc behind `useBerry`/`previewBerry` — see `_vitaminYield`'s own comment for why this is split out. `applied` is the amount to *remove* (positive), matching the 'berry' event's own field.
-   * @param {EvMap} evs @param {string} berryId
-   * @returns {{ stat: StatKey, applied: number }|null} */
-  _berryYield(evs, berryId) {
+  /** Pure calc behind `useBerry`/`previewBerry` — see `_vitaminYield`'s own comment for why this is split out. `applied` is the amount to *remove* (positive), matching the 'berry' event's own field. */
+  _berryYield(evs: EvMap, berryId: string): { stat: StatKey; applied: number } | null {
     const berry = EV_BERRIES.find((b) => b.id === berryId);
     if (!berry) return null;
     const current = evs[berry.stat];
@@ -1900,8 +1853,7 @@ export class Store extends EventTarget {
     return { stat: berry.stat, applied: current - target };
   }
 
-  /** @param {string} uid @param {string} berryId @param {string} [batchId] */
-  useBerry(uid, berryId, batchId) {
+  useBerry(uid: string, berryId: string, batchId?: string) {
     const entry = this._find(uid);
     if (!entry) return null;
     const y = this._berryYield(entry.evs, berryId);
@@ -1909,9 +1861,8 @@ export class Store extends EventTarget {
     return this._append(entry, makeEvent('berry', { berryId, stat: y.stat, applied: y.applied }, batchId));
   }
 
-  /** Read-only preview of what `useBerry(uid, berryId)` would apply right now — see `previewVitamin`'s own comment.
-   * @param {string} uid @param {string} berryId @param {EvMap} [evsOverride] */
-  previewBerry(uid, berryId, evsOverride) {
+  /** Read-only preview of what `useBerry(uid, berryId)` would apply right now — see `previewVitamin`'s own comment. */
+  previewBerry(uid: string, berryId: string, evsOverride?: EvMap) {
     const entry = this._find(uid);
     if (!entry) return null;
     return this._berryYield(evsOverride || entry.evs, berryId);
@@ -1925,8 +1876,7 @@ export class Store extends EventTarget {
    * by construction. The add event is the origin record and is never
    * deletable.
    */
-  /** @param {string} uid @param {string} eventId */
-  deleteHistoryEntry(uid, eventId) {
+  deleteHistoryEntry(uid: string, eventId: string): void {
     const entry = this._find(uid);
     if (!entry) return;
     const ev = entry.events.find((e) => e.id === eventId);
@@ -1943,8 +1893,7 @@ export class Store extends EventTarget {
    * shape `_save()` persists — the payload lib/transfer.js encodes for
    * sharing with another device. No derived fields ever leave the device.
    */
-  /** @returns {ExportedParty[]} */
-  exportPayload() {
+  exportPayload(): ExportedParty[] {
     return this.state.parties.map((p) => ({
       id: p.id,
       name: p.name,
@@ -1965,8 +1914,7 @@ export class Store extends EventTarget {
    * events not already present by id — plus a `preview` projection (EVs,
    * level, species) computed on a throwaway clone.
    */
-  /** @param {ExportedParty[]} importedParties */
-  previewImport(importedParties) {
+  previewImport(importedParties: ExportedParty[]) {
     return importedParties.map((party) => {
       const localParty = this.state.parties.find((p) => p.id === party.id);
       return {
@@ -2001,8 +1949,7 @@ export class Store extends EventTarget {
    * powerItem, machoBrace, ivs) are left untouched — they aren't
    * journaled, so there's nothing principled to merge them by.
    */
-  /** @param {ExportedParty[]} importedParties @param {Set<string>} selectedUids */
-  applyImport(importedParties, selectedUids) {
+  applyImport(importedParties: ExportedParty[], selectedUids: Set<string>): void {
     for (const party of importedParties) {
       const selectedPokemon = party.pokemon.filter((e) => selectedUids.has(e.uid));
       if (!selectedPokemon.length) continue;
@@ -2028,7 +1975,7 @@ export class Store extends EventTarget {
           localParty.pokemon.push(projectEntry(structuredClone(entry)));
           continue;
         }
-        const byId = new Map(localEntry.events.map((e) => [e.id, e]));
+        const byId = new Map(localEntry.events.map((e) => [e.id, e] as [string, RosterEvent]));
         for (const ev of entry.events) if (!byId.has(ev.id)) byId.set(ev.id, ev);
         localEntry.events = [...byId.values()].sort((a, b) => a.timestamp - b.timestamp);
         projectEntry(localEntry);

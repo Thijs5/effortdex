@@ -5,7 +5,7 @@ import { BaseDialog } from '../../../atoms/base-dialog.js';
 import '../../../organisms/evolution-chain.js';
 import '../../../atoms/level-input.js';
 
-/** @typedef {import('../../../../lib/store.js').RosterEntry} RosterEntry */
+/** @typedef {import('../../../../lib/store.ts').RosterEntry} RosterEntry */
 /** @typedef {import('../../../../lib/constants.ts').StatKey} StatKey */
 
 /** The signed form the offset field shows: `+3`, `+0`, `-2`. */

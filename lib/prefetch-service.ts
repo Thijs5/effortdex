@@ -29,7 +29,7 @@ import { withoutNetworkActivity } from './network-activity.ts';
 import { SPRITE_CACHE_NAME } from './sprite-cache.ts';
 import { isCachingDisabled } from './dev-cache.ts';
 import { ITEM_SPRITES } from './constants.ts';
-import type { Store } from './store.js';
+import type { Store } from './store.ts';
 import type { DomainPokemon, PokeApiClient } from './pokeapi-client.ts';
 
 const CONCURRENCY = 2;

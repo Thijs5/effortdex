@@ -4,7 +4,7 @@ import { api, store } from '../../lib/services.js';
 import { attachDesignSystem } from '../../lib/design-system.js';
 import '../atoms/ds-item-button.js';
 
-/** @typedef {import('../lib/store.js').RosterEntry} RosterEntry */
+/** @typedef {import('../lib/store.ts').RosterEntry} RosterEntry */
 /** @typedef {import('../lib/pokeapi-client.ts').EvolutionNode} EvolutionNode */
 
 /**

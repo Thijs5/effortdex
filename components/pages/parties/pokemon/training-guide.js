@@ -3,7 +3,7 @@ import { evTrainingLocations } from '../../../../lib/ev-training-locations.ts';
 import { BaseDialog } from '../../../atoms/base-dialog.js';
 import '../../../molecules/ev-training-guide.js';
 
-/** @typedef {import('../../../../lib/store.js').RosterEntry} RosterEntry */
+/** @typedef {import('../../../../lib/store.ts').RosterEntry} RosterEntry */
 
 /**
  * <training-guide-dialog> — "Where to train": curated per-stat grinding

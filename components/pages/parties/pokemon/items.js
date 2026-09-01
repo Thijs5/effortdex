@@ -6,8 +6,8 @@ import { BaseDialog } from '../../../atoms/base-dialog.js';
 import '../../../atoms/item-button-grid.js';
 import '../../../atoms/ds-item-button.js';
 
-/** @typedef {import('../lib/store.js').RosterEntry} RosterEntry */
-/** @typedef {import('../lib/store.js').EvMap} EvMap */
+/** @typedef {import('../lib/store.ts').RosterEntry} RosterEntry */
+/** @typedef {import('../lib/store.ts').EvMap} EvMap */
 
 // Sorted once — these tables are static, so re-sorting them on every
 // render (this dialog's entire point while open) would be pure waste.

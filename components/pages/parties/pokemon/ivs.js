@@ -3,7 +3,7 @@ import { escapeHtml } from '../../../../lib/utils.ts';
 import { store } from '../../../../lib/services.js';
 import { BaseDialog } from '../../../atoms/base-dialog.js';
 
-/** @typedef {import('../lib/store.js').RosterEntry} RosterEntry */
+/** @typedef {import('../lib/store.ts').RosterEntry} RosterEntry */
 /** @typedef {import('../lib/constants.ts').StatKey} StatKey */
 
 /**

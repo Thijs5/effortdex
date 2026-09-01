@@ -6,7 +6,7 @@ import { toShowdownId, smogonSetsKey, TIER_DESCRIPTIONS } from '../../../../lib/
 import { matchGameVersion } from '../../../../lib/game-versions.ts';
 import { BaseDialog } from '../../../atoms/base-dialog.js';
 
-/** @typedef {import('../lib/store.js').RosterEntry} RosterEntry */
+/** @typedef {import('../lib/store.ts').RosterEntry} RosterEntry */
 
 // Tier badge color grouping — see .tier-badge's own CSS comment for why
 // this is three loose groups, not a per-tier rainbow.

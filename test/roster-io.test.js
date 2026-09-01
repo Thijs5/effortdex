@@ -7,7 +7,7 @@ import { readFileSync } from 'node:fs';
 import { openDb } from '../lib/db/index.ts';
 import { DB_NAME } from '../lib/db/schema.ts';
 import { writeRoster, readRoster } from '../lib/db/roster-io.ts';
-import { Store, projectEntry } from '../lib/store.js';
+import { Store, projectEntry } from '../lib/store.ts';
 
 async function freshDb() {
   await new Promise((resolve) => {

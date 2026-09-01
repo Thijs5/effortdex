@@ -14,7 +14,7 @@
 // not a byte-for-byte copy of anyone's data.
 import '../support/localstorage-polyfill.js';
 import { writeFileSync } from 'node:fs';
-import { Store } from '../../lib/store.js';
+import { Store } from '../../lib/store.ts';
 
 const mon = (id, name, baseStats) => ({ id, name, sprite: `${name}.png`, baseStats });
 const opp = (name, evYield) => ({ name, sprite: `${name}.png`, evYield });

@@ -8,7 +8,7 @@ import { DB_NAME } from '../lib/db/schema.ts';
 import { makeRosterMirror } from '../lib/db/roster-import.ts';
 import { makeRosterOpsApplier } from '../lib/db/roster-ops.ts';
 import { readRoster } from '../lib/db/roster-io.ts';
-import { Store } from '../lib/store.js';
+import { Store } from '../lib/store.ts';
 
 async function freshDb() {
   await new Promise((resolve) => {

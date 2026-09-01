@@ -5,7 +5,7 @@
 // change — that test exists specifically to catch that case (docs/adr/0009).
 import '../support/localstorage-polyfill.js';
 import { writeFileSync } from 'node:fs';
-import { Store } from '../../lib/store.js';
+import { Store } from '../../lib/store.ts';
 
 localStorage.clear();
 const store = new Store();

@@ -506,7 +506,7 @@ export class PokemonDetail extends HTMLElement {
    * components/pages/parties/pokemon/pokemon.js's `render()`.
    * `PokeApiClient`'s own cache (docs/adr/0001) makes recomputing this on
    * every render cheap after the first lookup.
-   * @param {import('../../lib/store.js').Party|null} p
+   * @param {import('../../lib/store.ts').Party|null} p
    */
   set party(p) {
     const token = ++this._allowedSpeciesToken;

@@ -10,7 +10,7 @@
 // base64url alphabet (+/  ->  -_, no padding) needs no extra encoding to
 // live safely inside a URL hash.
 
-import type { ExportedParty } from './store.js';
+import type { ExportedParty } from './store.ts';
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();

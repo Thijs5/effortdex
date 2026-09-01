@@ -18,7 +18,7 @@ view.appendChild(pokemonDetail);
 let backToRosterSlug = null;
 interceptLinkClick(backToRoster, () => router.navigateToParty(backToRosterSlug));
 
-/** @param {import('../../../../lib/store.js').Party} party @param {object} entry @param {import('../../../../lib/router.js').PokemonDialog|null} [dialog] */
+/** @param {import('../../../../lib/store.ts').Party} party @param {object} entry @param {import('../../../../lib/router.js').PokemonDialog|null} [dialog] */
 export function render(party, entry, dialog = null) {
   backToRosterSlug = party.slug;
   backToRoster.href = router.partyPath(party.slug);

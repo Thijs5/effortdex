@@ -12,7 +12,7 @@
 import * as router from '../../../lib/router.js';
 import { wireUtilityBackLink } from '../../../lib/dom.js';
 import { getAppVersion, hasResolvedAppVersion, onAppVersion } from '../../../lib/app-version.js';
-import { readPreMigrationBackup } from '../../../lib/store.js';
+import { readPreMigrationBackup } from '../../../lib/store.ts';
 
 export const view = document.getElementById('settings-view');
 const backFromSettings = document.getElementById('back-from-settings');
