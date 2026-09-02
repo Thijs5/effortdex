@@ -50,6 +50,28 @@ test.describe('Adding a Pokémon', () => {
     await expect(rosterRow(page, 'Charmander')).toBeVisible();
   });
 
+  test('pressing Enter without arrowing to a suggestion still adds a species with no bare-name PokéAPI entry', async ({ page }) => {
+    // Giratina (like Deoxys, Wormadam, Basculin, Minior) has no PokéAPI
+    // entry literally named after the species — only "giratina-altered" —
+    // so typing "Giratina" and hitting Enter used to match nothing. Uses a
+    // Gen IV+ party (Platinum) since Giratina — introduced in gen 4 — is
+    // itself correctly excluded from an earlier-gen party's allowed
+    // species (lib/species-availability.js).
+    await page.goto('/');
+    await createParty(page, { name: 'Platinum Run', baseGame: 'Platinum' });
+    const addPanel = page.locator('section', { has: page.getByRole('heading', { name: 'Add a Pokémon' }) });
+    await addPanel.getByRole('combobox', { name: 'e.g. Bulbasaur', exact: true }).fill('Giratina');
+    await page.getByRole('option').filter({ hasText: /Giratina/i }).first().waitFor();
+    await page.keyboard.press('Enter');
+
+    const dialog = page.locator('dialog#add-pokemon-dialog');
+    await dialog.waitFor({ state: 'visible' });
+    await dialog.getByRole('button', { name: 'Add!' }).click();
+    await dialog.waitFor({ state: 'hidden' });
+
+    await expect(rosterRow(page, 'Giratina Altered')).toBeVisible();
+  });
+
   test('removing a roster Pokémon removes it from the roster', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
