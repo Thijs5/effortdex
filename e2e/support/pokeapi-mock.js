@@ -28,6 +28,7 @@ const TINY_PNG_BASE64 =
  *   of the root's pokemon-species `varieties` payload
  * @property {{hp:number,atk:number,def:number,spa:number,spd:number,spe:number}} baseStats
  * @property {{hp:number,atk:number,def:number,spa:number,spd:number,spe:number}} evYield
+ * @property {string[]} [types] elemental type(s), primary first; defaults to ['normal']
  * @property {string} [evolvesTo] name of the species this evolves into, if any
  * @property {number} [minLevel] level requirement for evolvesTo
  */
@@ -40,6 +41,7 @@ const SPECIES = [
     gen: 1,
     baseStats: { hp: 45, atk: 49, def: 49, spa: 65, spd: 65, spe: 45 },
     evYield: { hp: 0, atk: 0, def: 0, spa: 1, spd: 0, spe: 0 },
+    types: ['grass', 'poison'],
     evolvesTo: 'ivysaur',
     minLevel: 16,
   },
@@ -49,6 +51,7 @@ const SPECIES = [
     gen: 1,
     baseStats: { hp: 60, atk: 62, def: 63, spa: 80, spd: 80, spe: 60 },
     evYield: { hp: 0, atk: 0, def: 0, spa: 2, spd: 0, spe: 0 },
+    types: ['grass', 'poison'],
   },
   {
     id: 4,
@@ -56,6 +59,7 @@ const SPECIES = [
     gen: 1,
     baseStats: { hp: 39, atk: 52, def: 43, spa: 60, spd: 50, spe: 65 },
     evYield: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 1 },
+    types: ['fire'],
   },
   {
     id: 10,
@@ -63,6 +67,7 @@ const SPECIES = [
     gen: 1,
     baseStats: { hp: 45, atk: 30, def: 35, spa: 20, spd: 20, spe: 45 },
     evYield: { hp: 1, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
+    types: ['bug'],
   },
   {
     id: 95,
@@ -70,6 +75,7 @@ const SPECIES = [
     gen: 1,
     baseStats: { hp: 35, atk: 45, def: 160, spa: 30, spd: 45, spe: 70 },
     evYield: { hp: 0, atk: 0, def: 1, spa: 0, spd: 0, spe: 0 },
+    types: ['rock', 'ground'],
   },
   {
     id: 113,
@@ -77,6 +83,7 @@ const SPECIES = [
     gen: 1,
     baseStats: { hp: 250, atk: 5, def: 5, spa: 35, spd: 105, spe: 50 },
     evYield: { hp: 2, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
+    types: ['normal'],
   },
   {
     id: 150,
@@ -84,6 +91,7 @@ const SPECIES = [
     gen: 1,
     baseStats: { hp: 106, atk: 110, def: 90, spa: 154, spd: 90, spe: 130 },
     evYield: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 3 },
+    types: ['psychic'],
   },
   {
     // The Emerald curated set's own HP-training recommendation
@@ -93,6 +101,7 @@ const SPECIES = [
     gen: 3,
     baseStats: { hp: 64, atk: 51, def: 23, spa: 51, spd: 23, spe: 28 },
     evYield: { hp: 1, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
+    types: ['normal'],
   },
   {
     // Real PokéAPI has no species-list entry literally named "giratina" —
@@ -109,6 +118,7 @@ const SPECIES = [
     extraVarieties: ['giratina-origin'],
     baseStats: { hp: 150, atk: 100, def: 120, spa: 100, spd: 120, spe: 90 },
     evYield: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 },
+    types: ['ghost', 'dragon'],
   },
 ];
 
@@ -127,6 +137,7 @@ function pokemonPayload(species) {
     id: species.id,
     name: species.name,
     sprites: { front_default: `${SPRITE_BASE}${species.id}.png` },
+    types: (species.types ?? ['normal']).map((name, i) => ({ slot: i + 1, type: { name } })),
     stats: STAT_ORDER.map(([key, statName]) => ({
       stat: { name: statName },
       effort: species.evYield[key],

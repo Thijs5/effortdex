@@ -220,6 +220,39 @@ export const IV_MIN = 0;
 export const IV_MAX_MODERN = 31;
 export const IV_MAX_LEGACY = 15;
 
+// Elemental type colours — one per PokéAPI type name (lowercase). Tuned
+// to sit legibly on both the light bone ground and the warm-dark ground
+// (docs/adr/0028): a shade cooler and less saturated than the games'
+// own type chips so a roster full of them doesn't shout. The roster
+// shows these as small dots by the name; the detail page uses the
+// primary type as a badge and a whole-page wash. `[]` types (a species
+// cached before types were tracked) render neither.
+export const TYPE_COLORS: Record<string, string> = {
+  normal: '#9a9a86',
+  fire: '#e0793b',
+  water: '#5a9fe6',
+  electric: '#e5c53d',
+  grass: '#63bb5b',
+  ice: '#74cec0',
+  fighting: '#c8443b',
+  poison: '#a568c6',
+  ground: '#d6a86a',
+  flying: '#8aa9e0',
+  psychic: '#e56b8a',
+  bug: '#9aac2f',
+  rock: '#b6a259',
+  ghost: '#7c62a3',
+  dragon: '#7d64e0',
+  dark: '#6d5f52',
+  steel: '#8fa3b3',
+  fairy: '#e08fc0',
+};
+
+/** A type name title-cased for display ("water" -> "Water"). */
+export function typeLabel(type: string): string {
+  return type ? type[0].toUpperCase() + type.slice(1) : '';
+}
+
 // The `#` in each colour is written literally here and left for
 // `encodeURIComponent` to percent-encode exactly once (`#` -> `%23`).
 // Pre-writing `%23` in the string instead double-encodes it (`%23` ->
