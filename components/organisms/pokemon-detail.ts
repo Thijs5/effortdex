@@ -59,7 +59,6 @@ export class PokemonDetail extends BaseElement {
   $sheetExpShareNote: HTMLElement;
   $battleStatus: HTMLElement;
   $histLog: import('./ev-history-log.ts').EvHistoryLog;
-  $battleFab: HTMLButtonElement;
   $trainingGuideBtn: HTMLElement;
   $trainingGuideDialog: any;
 
@@ -264,23 +263,9 @@ export class PokemonDetail extends BaseElement {
         .card-body { display: grid; gap: var(--space-5); }
         .card-col { display: grid; gap: var(--space-4); align-content: start; max-width: 360px; }
 
-        /* Log a battle moved off the page and behind this FAB (issue #17):
-           it's the single most repeated action here, so it stays reachable
-           from anywhere on a page that can now run long (history log fills
-           the rest of the width) instead of scrolling out of view with the
-           rest of card-body. Fixed to the viewport, not the card, on
-           purpose — sticky would still leave it behind once the card's own
-           box ends. */
-        /* Cleared above index.html's own .bezel-footer (~66px tall), which
-           sits at the true viewport bottom on any page shorter than the
-           viewport — the same corner a fixed FAB would otherwise land on
-           top of. */
-        .battle-fab {
-          position: fixed; right: var(--space-4); bottom: calc(66px + var(--space-4)); z-index: 5;
-          display: inline-flex; align-items: center; gap: var(--space-2);
-          box-shadow: 0 3px 0 var(--poke-red-dark), var(--shadow-panel);
-        }
-        .battle-fab svg { width: 18px; height: 18px; flex: 0 0 auto; }
+        /* "Log a battle" now lives in the view's fixed nav bar
+           (index.html #pokemon-view, docs/adr/0028) — it calls this
+           element's openBattleLog(), which shows the sheet below. */
 
         .section-title {
           margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs);
@@ -347,10 +332,6 @@ export class PokemonDetail extends BaseElement {
 
         <ev-history-log></ev-history-log>
 
-        <button type="button" class="battle-fab ds-btn ds-btn--primary" aria-haspopup="true">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg>
-          Log a battle
-        </button>
         <p class="battle-status" aria-live="polite"></p>
 
         <!--
@@ -358,9 +339,10 @@ export class PokemonDetail extends BaseElement {
           wrapper around this search's own full-screen sheet could be left
           open after the sheet closed — two stacked dialogs with only one
           of them actually tracking "closed"). This <pokemon-search>'s own
-          force-sheet mode *is* the whole "Log a battle" UI now; the FAB
-          shows it and focuses it, and pokemon-search's 'sheet-close' event
-          (fired on pick, Escape, or blur-away) re-hides it below.
+          force-sheet mode *is* the whole "Log a battle" UI now; the view's
+          nav-bar button calls openBattleLog() to show and focus it, and
+          pokemon-search's 'sheet-close' event (fired on pick, Escape, or
+          blur-away) re-hides it below.
         -->
         <pokemon-search hidden placeholder="Defeated Pokémon…" show-ev-yield sheet-title="Log a battle" force-sheet>
           <p class="sheet-exp-share-note" slot="sheet-extra" hidden>Holding an Exp. Share — log the defeat here too, whether or not this Pokémon did the fighting. It earns the same EVs either way.</p>
@@ -399,7 +381,6 @@ export class PokemonDetail extends BaseElement {
     this.$search.evModifier = (mon) => (this._entry ? store.previewDefeat(this._entry.uid, mon)?.applied : undefined);
     this.$battleStatus = this.$<HTMLElement>('.battle-status');
     this.$histLog = this.$<import('./ev-history-log.ts').EvHistoryLog>('ev-history-log');
-    this.$battleFab = this.$<HTMLButtonElement>('.battle-fab');
     this.$trainingGuideBtn = this.$<HTMLElement>('.training-guide-menu-item');
     this.$trainingGuideDialog = this.$maybe('training-guide-dialog');
 
@@ -473,15 +454,6 @@ export class PokemonDetail extends BaseElement {
     this.$search.addEventListener('sheet-close', () => {
       this.$search.hidden = true;
     });
-    this.$battleFab.addEventListener('click', () => {
-      this.$battleStatus.textContent = '';
-      this.$search.hidden = false;
-      // Focusing immediately (rather than waiting for a tap on the field)
-      // is what actually triggers pokemon-search's own recent-picks
-      // list/full-screen sheet — the point of the FAB is one tap to a
-      // ready-to-pick list, not one tap to an empty field.
-      this.$search.focus();
-    });
     this.$itemBtn.addEventListener('click', () => this._navigateToDialog('items'));
     this.$search.addEventListener('pokemon-pick', (e) => {
       this._battle((e as CustomEvent).detail.name, 'Looking up battle data…');
@@ -526,6 +498,21 @@ export class PokemonDetail extends BaseElement {
   }
   get entry(): RosterEntry | null {
     return this._entry;
+  }
+
+  /**
+   * Opens the "Log a battle" search sheet — the single entry point for
+   * both a direct fight and Exp. Share's passive gain. Called by the
+   * detail view's fixed nav-bar button (components/pages/parties/pokemon/
+   * pokemon.ts); the sheet itself is <pokemon-search force-sheet> in this
+   * shadow root, which hides itself again on pick / Escape / blur-away.
+   * Focusing immediately is what triggers its recent-picks list rather
+   * than landing on an empty field.
+   */
+  openBattleLog(): void {
+    this.$battleStatus.textContent = '';
+    this.$search.hidden = false;
+    this.$search.focus();
   }
 
   /**

@@ -139,9 +139,34 @@ html[data-modal-open] body {
 }
 .bezel-btn--menu:hover { border-color: var(--ink-soft); color: var(--ink); }
 
-/* ---------- header dropdown menu ---------- */
-.bezel-menu { position: relative; }
+/* ---------- per-view fixed nav bar ---------- */
+/* A solid band pinned directly below the app header (--app-header-h is
+   published by lib/shell.ts), holding the back link on the left and the
+   view's single primary action on the right. Stays put while the view's
+   content scrolls under it. Used by the picker (title + New party), the
+   party view (← All parties + Add a Pokémon) and the Pokémon detail view
+   (← Roster + Log a battle). Full-bleeds to the view's own inline gutter
+   via --view-pad so it reads as a band, not an inset card. */
+.view-nav {
+  position: sticky;
+  top: var(--app-header-h, 52px);
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  margin: 0 calc(-1 * var(--view-pad, 0px)) var(--space-4);
+  padding: var(--space-3) var(--view-pad, 0px);
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+}
+.view-nav > .back-link { margin: 0; align-self: center; }
+.view-nav > .ds-btn { margin-left: auto; white-space: nowrap; }
+.view-nav--title { align-items: baseline; }
+.view-nav--title > h2 { margin: 0; }
+.view-nav--title > .ds-btn { align-self: center; }
 
+/* ---------- header dropdown menu ---------- */
 .header-menu {
   position: absolute;
   top: calc(100% + 10px);
@@ -288,13 +313,17 @@ html[data-modal-open] body {
 
 /* ---------- party picker ("/") ---------- */
 .picker {
-  padding: var(--space-5) clamp(1.2rem, 3vw, 2.2rem);
+  --view-pad: clamp(1.2rem, 3vw, 2.2rem);
+  padding: var(--space-4) var(--view-pad) var(--space-5);
 }
 .picker h2 {
   font-family: var(--font-display);
   font-size: var(--font-size-xl);
   margin: 0 0 var(--space-1);
 }
+/* The nav bar owns the top gutter; the standalone hint under it just
+   needs a little air. */
+.picker .view-nav + .hint { margin-top: 0; }
 
 .party-list {
   display: grid;
@@ -740,10 +769,13 @@ html[data-modal-open] body {
 
 /* ---------- Pokémon detail view ("/<slug>/<uid>") ---------- */
 .pokemon-view {
-  padding: var(--space-4) clamp(1.2rem, 3vw, 2.2rem) var(--space-5);
+  --view-pad: clamp(1.2rem, 3vw, 2.2rem);
+  padding: var(--space-4) var(--view-pad) var(--space-5);
   display: grid;
   gap: var(--space-4);
 }
+/* The grid gap already spaces the nav bar from the card below it. */
+.pokemon-view .view-nav { margin-bottom: 0; }
 .pokemon-view pokemon-detail {
   max-width: 980px;
 }

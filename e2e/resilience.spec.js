@@ -26,6 +26,7 @@ test('a blocked/failed request for the pageview-reporting module does not break 
   await expect(page.getByRole('button', { name: 'Menu' })).toBeVisible();
   await page.getByRole('button', { name: 'Menu' }).click();
   await expect(page.getByRole('menuitemradio', { name: 'Dark' })).toBeVisible();
+  await page.keyboard.press('Escape'); // dismiss the dropdown before clicking elsewhere
 
   await page.getByRole('button', { name: '+ New party' }).click();
   await expect(page.getByPlaceholder('e.g. Emerald Nuzlocke')).toBeVisible();

@@ -77,7 +77,7 @@ test.describe('Dialog polish', () => {
     await addPokemon(page, 'Charmander');
     const card = await openDetail(page, 'Bulbasaur');
 
-    await card.getByRole('button', { name: 'Log a battle' }).click();
+    await page.getByRole('button', { name: 'Log a battle' }).click();
     // The sheet's projected extra content is now just the note, no
     // section-title heading and no "?" help button.
     await expect(card.locator('pokemon-search .section-title')).toHaveCount(0);
@@ -90,7 +90,7 @@ test.describe('Dialog polish', () => {
     await item.locator('.item-dialog-save-btn').click();
     await expect(item).toBeHidden();
 
-    await card.getByRole('button', { name: 'Log a battle' }).click();
+    await page.getByRole('button', { name: 'Log a battle' }).click();
     await expect(card.locator('.sheet-exp-share-note')).toBeVisible();
   });
 });

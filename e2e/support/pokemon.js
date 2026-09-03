@@ -153,17 +153,20 @@ export async function openTrainingGuide(card) {
 }
 
 /**
- * Logs a battle against `opponentSpecies` from the "Log a battle" FAB's
- * search sheet — the one entry point for both a direct fight and Exp.
- * Share's passive gain. Opens the search first if it isn't already
- * visible; it hides itself once the battle is successfully logged, so
- * this waits for that before returning.
+ * Logs a battle against `opponentSpecies` from the "Log a battle" search
+ * sheet — the one entry point for both a direct fight and Exp. Share's
+ * passive gain. The trigger is the detail view's fixed nav-bar button
+ * (#detail-log-battle-btn), not a FAB in the card. Opens the search
+ * first if it isn't already visible; it hides itself once the battle is
+ * successfully logged, so this waits for that before returning.
  * @param {import('@playwright/test').Locator} card
  * @param {string} opponentSpecies
  */
 export async function logBattle(card, opponentSpecies) {
   const search = card.locator('pokemon-search');
-  if (await search.getAttribute('hidden') !== null) await card.locator('.battle-fab').click();
+  if (await search.getAttribute('hidden') !== null) {
+    await card.page().locator('#detail-log-battle-btn').click();
+  }
   const combobox = search.getByRole('combobox', { name: 'Defeated Pokémon…' });
   await combobox.waitFor({ state: 'visible' });
   await combobox.fill(opponentSpecies);

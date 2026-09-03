@@ -96,12 +96,14 @@
 
     <!-- "/parties" — choose which party (save file / playthrough) to open -->
     <main id="picker-view" class="picker">
-      <h2>Choose a party</h2>
+      <div class="view-nav view-nav--title">
+        <h2>Choose a party</h2>
+        <button id="picker-new-party-btn" class="ds-btn ds-btn--primary">+ New party</button>
+      </div>
       <p class="hint">Keep a separate party per save file or playthrough you're running at once.</p>
       <div id="party-list" class="party-list"></div>
       <p id="picker-empty" class="empty-state" hidden>No parties yet &mdash; create one to start tracking EVs.</p>
       <div class="picker-actions">
-        <button id="picker-new-party-btn" class="ds-btn ds-btn--primary">+ New party</button>
         <button id="picker-import-btn" class="ds-btn ds-btn--ghost">Have a transfer file or link? Import it</button>
       </div>
       <p class="hint picker-import-hint">
@@ -163,7 +165,10 @@
 
     <!-- "/parties/<slug>/<uid>" — one roster Pokémon's full detail page -->
     <main id="pokemon-view" class="pokemon-view" hidden>
-      <a id="back-to-roster" class="back-link" href="#/">&larr; Roster</a>
+      <div class="view-nav">
+        <a id="back-to-roster" class="back-link" href="#/">&larr; Roster</a>
+        <button id="detail-log-battle-btn" class="ds-btn ds-btn--primary" type="button">&plus; Log a battle</button>
+      </div>
     </main>
 
     <!-- "/settings" — app-wide settings, reachable from any party -->

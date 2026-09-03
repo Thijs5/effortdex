@@ -13,11 +13,17 @@ import type { PokemonDialog } from '../../../../lib/router.ts';
 
 export const view = document.getElementById('pokemon-view')!;
 const backToRoster = document.getElementById('back-to-roster') as HTMLAnchorElement;
+const logBattleBtn = document.getElementById('detail-log-battle-btn')!;
 const pokemonDetail = document.createElement('pokemon-detail');
 view.appendChild(pokemonDetail);
 
 let backToRosterSlug: string | null = null;
 interceptLinkClick(backToRoster, () => router.navigateToParty(backToRosterSlug));
+
+// "Log a battle" moved out of a floating FAB and up into the view's
+// fixed nav bar (docs/adr/0028) — the search sheet it opens still lives
+// inside <pokemon-detail>'s shadow DOM, reached via this public method.
+logBattleBtn.addEventListener('click', () => pokemonDetail.openBattleLog());
 
 export function render(party: Party, entry: RosterEntry, dialog: PokemonDialog | null = null): void {
   backToRosterSlug = party.slug;

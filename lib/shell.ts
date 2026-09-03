@@ -170,12 +170,26 @@ updatePowerLed();
    at the very top of .device; when it leaves the viewport the header
    shrinks to its minimum usable height. The size change is a CSS
    transition, already neutralised under prefers-reduced-motion by
-   tokens.css. */
-const appHeader = requireQuery('.app-header');
+   tokens.css.
+
+   --app-header-h is published on <html> so the per-view sticky nav bar
+   (.view-nav) can pin directly below the app header in whichever state
+   it's in. */
+const appHeader = requireQuery('.app-header') as HTMLElement;
+function syncHeaderHeight() {
+  document.documentElement.style.setProperty('--app-header-h', `${appHeader.offsetHeight}px`);
+}
+syncHeaderHeight();
+addEventListener('resize', syncHeaderHeight);
+appHeader.addEventListener('transitionend', syncHeaderHeight);
+
 const scrollSentinel = document.getElementById('app-scroll-sentinel');
 if (scrollSentinel && 'IntersectionObserver' in window) {
   new IntersectionObserver(
-    ([entry]) => appHeader.classList.toggle('is-condensed', !entry.isIntersecting),
+    ([entry]) => {
+      appHeader.classList.toggle('is-condensed', !entry.isIntersecting);
+      requestAnimationFrame(syncHeaderHeight);
+    },
     { threshold: 0 },
   ).observe(scrollSentinel);
 }
