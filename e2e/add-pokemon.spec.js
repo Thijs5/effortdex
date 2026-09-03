@@ -1,7 +1,7 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 import { createParty } from './support/party.js';
-import { addPokemon, rosterRow, openDetail, openIvs } from './support/pokemon.js';
+import { addPokemon, pickSpecies, rosterRow, openDetail, openIvs } from './support/pokemon.js';
 import { mockPokeApi } from './support/pokeapi-mock.js';
 
 // Adding a Pokémon puts it in the active party's roster — however it was
@@ -26,17 +26,13 @@ test.describe('Adding a Pokémon', () => {
   test('a Gen III+ party offers a nature at add time; a pre-Gen-III party does not', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    const addPanel = page.locator('section', { has: page.getByRole('heading', { name: 'Add a Pokémon' }) });
-    await addPanel.getByRole('combobox', { name: 'e.g. Bulbasaur', exact: true }).fill('Bulbasaur');
-    await page.getByRole('option').filter({ hasText: /Bulbasaur/i }).first().click();
+    await pickSpecies(page, 'Bulbasaur');
     await expect(page.locator('dialog#add-pokemon-dialog').getByLabel('Nature')).toBeVisible();
     await page.getByRole('button', { name: 'Cancel' }).click();
 
     await page.getByRole('link', { name: '← All parties' }).click();
     await createParty(page, { name: 'Red Solo Run', baseGame: 'Red' });
-    const addPanel2 = page.locator('section', { has: page.getByRole('heading', { name: 'Add a Pokémon' }) });
-    await addPanel2.getByRole('combobox', { name: 'e.g. Bulbasaur', exact: true }).fill('Bulbasaur');
-    await page.getByRole('option').filter({ hasText: /Bulbasaur/i }).first().click();
+    await pickSpecies(page, 'Bulbasaur');
     await expect(page.locator('dialog#add-pokemon-dialog').getByLabel('Nature')).toBeHidden();
   });
 
@@ -77,8 +73,10 @@ test.describe('Adding a Pokémon', () => {
     // species (lib/species-availability.js).
     await page.goto('/');
     await createParty(page, { name: 'Platinum Run', baseGame: 'Platinum' });
-    const addPanel = page.locator('section', { has: page.getByRole('heading', { name: 'Add a Pokémon' }) });
-    await addPanel.getByRole('combobox', { name: 'e.g. Bulbasaur', exact: true }).fill('Giratina');
+    await page.getByRole('button', { name: 'Add a Pokémon' }).click();
+    const combo = page.locator('#add-search').getByRole('combobox');
+    await combo.waitFor({ state: 'visible' });
+    await combo.fill('Giratina');
     await page.getByRole('option').filter({ hasText: /Giratina/i }).first().waitFor();
     await page.keyboard.press('Enter');
 

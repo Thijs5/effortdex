@@ -228,20 +228,9 @@ html[data-modal-open] body {
   gap: 2px;
 }
 
-/* ---------- layout ---------- */
-.layout {
-  display: grid;
-  grid-template-columns: minmax(240px, 300px) 1fr;
-  gap: var(--space-5);
-  padding: var(--space-5) clamp(1.2rem, 3vw, 2.2rem);
-}
-
-@media (max-width: 860px) {
-  .layout { grid-template-columns: 1fr; }
-  .add-panel { position: static; }
-}
-
-.panel h2 {
+/* ---------- shared bits ---------- */
+.panel h2,
+.roster-panel > h2 {
   font-family: var(--font-display);
   font-size: var(--font-size-xl);
   margin: 0 0 var(--space-1);
@@ -254,53 +243,21 @@ html[data-modal-open] body {
   color: var(--ink-soft);
 }
 
-/* The stationary "screen wells" (not the interactive cards, which read
-   as plastic buttons and lift on hover) get the LCD treatment: a faint
-   dot-matrix pixel grid plus an inset under-glass shadow — the texture
-   and depth that make the green read as a display, not a tint. */
-.add-panel,
-.empty-state,
-.add-pokemon-dialog-identity {
-  background-image:
-    repeating-linear-gradient(0deg, var(--lcd-grid) 0 1px, transparent 1px 4px),
-    repeating-linear-gradient(90deg, var(--lcd-grid) 0 1px, transparent 1px 4px);
-  box-shadow: var(--shadow-lcd);
-}
-
-.add-panel {
-  background-color: var(--lcd);
-  border: 1px solid var(--lcd-line);
-  border-radius: var(--radius-md);
-  padding: var(--space-4);
-  align-self: start;
-  position: sticky;
-  top: clamp(1rem, 3vw, 2.5rem);
-}
-
-.add-form {
-  display: flex;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-
-@media (max-width: 420px) {
-  .add-form { flex-direction: column; align-items: stretch; }
-}
-
+/* "Added X!" toast under the party nav bar. */
 .status-line {
   min-height: 1.2rem;
-  margin: var(--space-3) 0 0;
+  margin: 0 0 var(--space-3);
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
-  color: var(--teal);
+  color: var(--good);
 }
+.status-line:empty { display: none; }
 
-/* Collapsed by default — a cheat sheet on demand, not a permanent
-   tenant of the add panel. */
+/* This game's rules — a disclosure tucked under the party identity. */
 .legend {
-  margin-top: var(--space-4);
+  margin-top: var(--space-3);
   padding-top: var(--space-3);
-  border-top: 1px dashed var(--lcd-line);
+  border-top: 1px dashed var(--line);
 }
 .legend ul {
   margin: var(--space-3) 0 0;
@@ -432,18 +389,13 @@ html[data-modal-open] body {
 .game-version-row .ds-field { flex: 1; }
 .game-version-row game-ball { flex: 0 0 auto; --cart-w: 34px; }
 
-/* ---------- party view header ("/<slug>") ---------- */
-.party-view-header {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: start;
-  gap: var(--space-3) var(--space-4);
-  padding: var(--space-4) clamp(1.2rem, 3vw, 2.2rem) 0;
+/* ---------- party view ("/<slug>") ---------- */
+.party-view {
+  --view-pad: clamp(1.2rem, 3vw, 2.2rem);
+  padding: var(--space-4) var(--view-pad) var(--space-5);
 }
 
 .back-link {
-  grid-row: 1;
-  align-self: center;
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
   color: var(--teal);
@@ -451,17 +403,14 @@ html[data-modal-open] body {
 }
 .back-link:hover { text-decoration: underline; }
 
-/* On narrow screens the back link and edit button share row 1 so the
-   header costs two rows, not three; ≥640px pulls the identity up too. */
-#edit-party-btn {
-  grid-column: 3;
-  grid-row: 1;
+/* Party identity + Edit, below the nav bar. */
+.party-identity-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
 }
-
-.party-identity {
-  grid-column: 1 / -1;
-  grid-row: 2;
-}
+.party-identity { flex: 1; min-width: 0; }
 .party-identity-head {
   display: flex;
   align-items: center;
@@ -480,17 +429,13 @@ html[data-modal-open] body {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-
-@media (min-width: 640px) {
-  .back-link { grid-column: 1; grid-row: 1; }
-  .party-identity { grid-column: 2; grid-row: 1; }
-}
+.party-identity-row #edit-party-btn { flex: 0 0 auto; }
 
 .empty-state {
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-md);
   color: var(--ink-soft);
   background-color: var(--lcd);
-  border: 1px dashed var(--lcd-line);
+  border: 1px dashed var(--line);
   border-radius: var(--radius-md);
   padding: var(--space-5);
   text-align: center;
@@ -615,13 +560,17 @@ html[data-modal-open] body {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  background: var(--lcd);
-  border: 1px solid var(--lcd-line);
+  background: var(--surface);
+  border: 1px solid var(--line);
   border-radius: var(--radius-md);
   padding: var(--space-3) var(--space-4);
-  transition: box-shadow var(--transition-med), transform var(--transition-fast);
+  transition: box-shadow var(--transition-med), transform var(--transition-fast), border-color var(--transition-med);
 }
-.roster-card:hover { box-shadow: var(--shadow-panel); transform: translateY(-1px); }
+.roster-card:hover {
+  box-shadow: var(--shadow-panel);
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+}
 .roster-card--dragging { opacity: 0.6; box-shadow: var(--shadow-panel); }
 .roster-card--drop-target { outline: 2px dashed var(--teal); outline-offset: 2px; }
 
@@ -656,22 +605,39 @@ html[data-modal-open] body {
 .roster-card-handle:hover { color: var(--ink); }
 .roster-card--dragging .roster-card-handle { cursor: grabbing; }
 
+/* The sprite rides a soft round disc carrying a faint wash of the
+   Pokémon's primary type (--type, set inline by roster.ts); the disc
+   lifts a few px on row hover. */
 .roster-card-sprite-frame {
   flex: 0 0 auto;
   position: relative;
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 50% 34%,
+      color-mix(in srgb, var(--type, var(--ink-soft)) 22%, var(--surface)) 0%,
+      color-mix(in srgb, var(--type, var(--ink-soft)) 12%, var(--surface)) 82%);
+  box-shadow:
+    inset 0 0 0 1px color-mix(in srgb, var(--type, var(--line)) 32%, var(--line)),
+    0 2px 7px -4px rgba(27, 25, 22, 0.28);
+  transition: transform var(--transition-fast);
+}
+.roster-card:hover .roster-card-sprite-frame { transform: translateY(-3px); }
+@media (prefers-reduced-motion: reduce) {
+  .roster-card:hover .roster-card-sprite-frame { transform: none; }
 }
 .roster-card-sprite {
-  width: 100%;
-  height: 100%;
+  width: 30px;
+  height: 30px;
   image-rendering: pixelated;
   object-fit: contain;
 }
 /* Gen I/II sprites are an opaque white bitmap — round the corners and
-   sit it on the sprite chip so it doesn't read as a hard rectangle.
-   Transparent sprites (every other gen) float on the card. */
+   sit it on a chip so it doesn't read as a hard rectangle. */
 .roster-card-sprite-frame--opaque .roster-card-sprite {
   background: var(--sprite-bg);
   border-radius: var(--radius-sm);
@@ -683,6 +649,27 @@ html[data-modal-open] body {
   display: grid;
   gap: 0.15rem;
 }
+.roster-card-headline {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  min-width: 0;
+}
+/* Type as colour: one dot per type, primary first. A different visual
+   channel from the nature text in .roster-card-meta so the two can't be
+   confused. */
+.roster-card-types {
+  display: inline-flex;
+  gap: 0.22em;
+  flex: 0 0 auto;
+}
+.roster-card-type-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--type, var(--ink-soft));
+  box-shadow: 0 0 0 1px color-mix(in srgb, var(--type, var(--ink-soft)) 45%, transparent);
+}
 .roster-card-name {
   font-family: var(--font-display);
   font-weight: 600;
@@ -690,6 +677,7 @@ html[data-modal-open] body {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
 }
 .roster-card-meta {
   display: inline-flex;
@@ -698,8 +686,8 @@ html[data-modal-open] body {
   font-family: var(--font-mono);
   font-size: var(--font-size-2xs);
   color: var(--ink-soft);
-  text-transform: capitalize;
 }
+.roster-card-nature { text-transform: lowercase; }
 
 .roster-card-evbar {
   flex: 1 1 100px;
@@ -1181,20 +1169,24 @@ textarea.ds-field { resize: vertical; }
     flex-direction: column;
   }
   .bezel-footer { margin-top: auto; }
-  .layout,
   .picker,
+  .party-view,
   .pokemon-view,
-  .party-view-header,
   .settings-view,
   .app-header {
     padding-inline: 1rem;
   }
-  /* Tighter vertical rhythm on phones: the big --space-5 block gaps are
-     a desktop luxury; here every row of chrome delays the content. */
-  .layout,
-  .picker {
+  /* --view-pad feeds the .view-nav full-bleed maths; keep it in step
+     with the reduced inline padding above. */
+  .picker,
+  .party-view,
+  .pokemon-view {
+    --view-pad: 1rem;
+  }
+  /* Tighter vertical rhythm on phones: the big block gaps are a desktop
+     luxury; here every row of chrome delays the content. */
+  .picker,
+  .party-view {
     padding-block: var(--space-4);
   }
-  .layout { gap: var(--space-4); }
-  .party-view-header { padding-top: var(--space-3); }
 }

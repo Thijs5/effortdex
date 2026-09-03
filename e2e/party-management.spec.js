@@ -23,7 +23,7 @@ test.describe('Party management', () => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
 
-    await expect(page.getByRole('heading', { name: 'Add a Pokémon' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Add a Pokémon' })).toBeVisible();
     await expect(page).toHaveURL(/#\/parties\/emerald-nuzlocke/);
   });
 
@@ -101,7 +101,7 @@ test.describe('Party management', () => {
 
     // Creating the party still works fine with the row absent.
     await page.getByRole('button', { name: 'Create party' }).click();
-    await expect(page.getByRole('heading', { name: 'Add a Pokémon' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Add a Pokémon' })).toBeVisible();
   });
 
   test('on a narrow viewport the New-party dialog shrink-wraps to its content, not the full screen height', async ({ page }) => {

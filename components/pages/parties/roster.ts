@@ -20,6 +20,8 @@ import {
   EXP_SHARE_SPRITE,
   versionedSpriteOnError,
   NATURES,
+  TYPE_COLORS,
+  typeLabel,
 } from '../../../lib/constants.ts';
 import { titleCase, totalEvs, natureOptionsHtml, escapeHtml, sortedNatures, natureLabel } from '../../../lib/utils.ts';
 import { POKERUS_ICON_SVG } from '../../../lib/icons.ts';
@@ -113,14 +115,28 @@ editPartyBtn.addEventListener('click', () => {
 });
 
 /* ------------------------------------------------------------------ */
-/* Add panel                                                           */
+/* Add a Pokémon — a species-picker sheet, then the add dialog          */
 /* ------------------------------------------------------------------ */
+
+const partyAddBtn = document.getElementById('party-add-btn')!;
 
 let pendingAddMon: import('../../../lib/pokeapi-client.ts').DomainPokemon | null = null;
 
 // Guards against a stale lookup landing after a cancel/re-open.
 let addDialogToken = 0;
 
+// The add panel is gone (docs/adr/0028): <pokemon-search id="add-search">
+// is now a full-screen sheet the nav-bar button shows, mirroring the
+// detail page's "Log a battle". It hides itself on pick / Escape /
+// blur-away via its own 'sheet-close'.
+partyAddBtn.addEventListener('click', () => {
+  addStatus.textContent = '';
+  addSearch.hidden = false;
+  addSearch.focus();
+});
+addSearch.addEventListener('sheet-close', () => {
+  addSearch.hidden = true;
+});
 addSearch.addEventListener('pokemon-pick', (e) => openAddPokemonDialog((e as CustomEvent).detail.name));
 
 async function openAddPokemonDialog(name: string): Promise<void> {
@@ -360,8 +376,17 @@ function renderRoster(party: Party): void {
     const pokerusActive = store.effectiveAids(entry).pokerus;
     const nature = natureAvailable ? NATURES.find((n) => n.id === entry.nature) : null;
     const displayName = entry.nickname || titleCase(entry.speciesName);
-    const namePrefix = nature ? `${escapeHtml(nature.label)} ` : '';
+    const natureMeta = nature ? ` &middot; <span class="roster-card-nature">${escapeHtml(nature.label.toLowerCase())}</span>` : '';
     const speciesAside = entry.nickname ? ` &middot; ${escapeHtml(titleCase(entry.speciesName))}` : '';
+    // Type shows as colour: a faint wash on the sprite disc plus a dot
+    // per type by the name. Read from the api cache (populated when the
+    // species was looked up to add it); a v1-cached blob has no types, so
+    // the async warm below re-fetches and re-renders.
+    const types = api.peekCached(entry.speciesName)?.types ?? [];
+    const typeDots = types
+      .map((t) => `<i class="roster-card-type-dot" style="--type:${TYPE_COLORS[t] ?? 'var(--ink-soft)'}" title="${escapeHtml(typeLabel(t))}"></i>`)
+      .join('');
+    const primaryType = types[0] ? TYPE_COLORS[types[0]] ?? '' : '';
     const modernSprite = entry.sprite || FALLBACK_SPRITE;
     const versionedSprite = versionedSpriteUrl(spriteGame, entry.speciesId);
     const spriteSrc = versionedSprite || modernSprite;
@@ -374,14 +399,17 @@ function renderRoster(party: Party): void {
     row.innerHTML = `
       ${reorderable ? `<button type="button" class="roster-card-handle" aria-label="Reorder ${escapeHtml(displayName)}">&#9776;</button>` : ''}
       <a class="roster-card-link" href="${router.pokemonPath(party.slug, entry.uid)}">
-        <span class="roster-card-sprite-frame${trained ? ' roster-card-sprite-frame--trained' : ''}${spriteOpaque ? ' roster-card-sprite-frame--opaque' : ''}">
+        <span class="roster-card-sprite-frame${trained ? ' roster-card-sprite-frame--trained' : ''}${spriteOpaque ? ' roster-card-sprite-frame--opaque' : ''}"${primaryType ? ` style="--type:${primaryType}"` : ''}>
           <img class="roster-card-sprite" src="${spriteSrc}" alt="" title="${trained ? 'Fully trained' : pokerusActive ? 'Pokérus — every EV earned from battling is doubled, permanently' : ''}" ${spriteOnError} />
           ${pokerusActive ? `<span class="roster-card-pkrs" aria-hidden="true">${POKERUS_ICON_SVG}</span>` : ''}
         </span>
         <div class="roster-card-body">
-          <span class="roster-card-name">${namePrefix}${escapeHtml(displayName)}</span>
+          <span class="roster-card-headline">
+            ${typeDots ? `<span class="roster-card-types" aria-hidden="true">${typeDots}</span>` : ''}
+            <span class="roster-card-name">${escapeHtml(displayName)}</span>
+          </span>
           <span class="roster-card-meta">
-            Lv. ${entry.level}${speciesAside}
+            Lv. ${entry.level}${natureMeta}${speciesAside}
             ${entry.expShare ? `<img class="roster-card-exp-share" src="${EXP_SHARE_SPRITE}" alt="" title="Exp. Share — earns EVs from other battles" ${FALLBACK_ONERROR} />` : ''}
           </span>
         </div>
@@ -407,7 +435,24 @@ function renderRoster(party: Party): void {
     }
     roster.appendChild(row);
   }
+
+  warmMissingTypes(entries.map((e) => e.speciesName));
   writeRosterStateToQuery();
+}
+
+// Species added before types were tracked have a v1 api-cache blob with
+// no `types`. Fetch those once (fills the cache under the new key) and
+// re-render so their dots/wash appear; offline, they just stay plain.
+const typeWarmAttempted = new Set<string>();
+function warmMissingTypes(speciesNames: string[]): void {
+  const missing = [...new Set(speciesNames)].filter(
+    (n) => !typeWarmAttempted.has(n) && !api.peekCached(n)?.types?.length,
+  );
+  if (!missing.length) return;
+  for (const n of missing) typeWarmAttempted.add(n);
+  Promise.allSettled(missing.map((n) => api.getPokemon(n))).then(() => {
+    if (store.activeParty) renderRoster(store.activeParty);
+  });
 }
 
 /* ------------------------------------------------------------------ */
