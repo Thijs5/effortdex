@@ -3,65 +3,101 @@
    every component (page-level CSS and Web Component shadow roots alike)
    reads from here instead of redefining its own values.
 
+   "Field Guide" skin (docs/adr/0028): a warm-neutral trainer's reference
+   tool. The old olive-LCD grounds are gone — token *names* are kept so
+   every consumer keeps working, but the values now describe bone paper,
+   graphite ink, a single poké-red accent and a graphite EV meter.
+
    Theming: the light palette lives on bare :root. The dark palette (a
-   backlit-handheld night look) is applied two ways so both entry points
+   warm night look, not green) is applied two ways so both entry points
    win correctly: via prefers-color-scheme when the user hasn't chosen
    (guarded by :not([data-theme="light"])), and via [data-theme="dark"]
-   when they picked dark with the header toggle. */
+   when they picked dark with the header menu. */
 
-@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
 
 :root {
   color-scheme: light;
 
-  /* Color */
-  --ink: #1b1f18;
-  --ink-soft: #4a5342;
-  --paper: #d8ddc6;        /* page ground — deeper than the device so it reads as an object */
-  --paper-panel: #f3f5e9;  /* device face */
-  --lcd: #dde4cb;          /* recessed "screen" wells */
-  --lcd-deep: #c0cba2;
-  --lcd-line: #b8c2a2;
-  --line: #c7ccb6;
-  --surface: #fdfdf7;
+  /* Color — ink */
+  --ink: #1b1916;          /* graphite, faintly warm */
+  --ink-soft: #5f5b53;
+
+  /* Color — grounds & surfaces */
+  --paper: #f4f2ee;        /* page ground — bone, deeper than the card */
+  --paper-panel: #fffefb;  /* the main surface / "device face" */
+  --lcd: #fbfaf6;          /* quiet raised panels (cards, menus) — a hair off surface */
+  --lcd-deep: #ece8e0;     /* recessed tracks (the EV meter groove) */
+  --lcd-line: #e6e2da;     /* card / field borders */
+  --line: #e6e2da;         /* general hairline */
+  --surface: #fffefb;
+
+  /* Color — accent (poké-red, but treated as a swappable token) */
   --poke-red: #e3350d;
   --poke-red-dark: #9c2408;
   --on-red: #fff8ef;
-  --gold: #e9ae1e;
-  --gold-soft: #f4dc96;
+  --accent: var(--poke-red);
+  --accent-dark: var(--poke-red-dark);
+  --on-accent: var(--on-red);
+
+  /* Color — EV meter */
+  --meter: #2c2822;        /* graphite fill */
+  --meter-max: #d99a1c;    /* gold once a stat / the 510 total is capped */
+  --meter-track: var(--lcd-deep);
+
+  /* Color — status / semantic */
+  --good: #1f8f52;         /* a real gain (history deltas) — never a ground */
+  --good-soft: #dcefe3;
+  --gold: #d99a1c;
+  --gold-soft: #f3e6c9;
   --led-online: #52c15e;
   --led-ready: #3d7bf5;
   --led-sending: #e9821e;
-  --led-off: rgba(0, 0, 0, 0.3);
+  --led-off: rgba(27, 25, 22, 0.22);
   --badge-ink: #7a5800;
-  --teal: #2b6a5c;
-  --teal-strong: #1f5346;
-  --on-teal: #fff;
-  --teal-soft: #c6ded4;
-  --danger-soft: #f8d9d0;
-  --pokerus-purple: #8e3fb0;   /* the purple the games themselves use for the Pokérus status */
-  --pokerus-purple-soft: #e8d7f0;
+  --danger-soft: #f8ddd3;
+
+  /* Color — teal: this design's secondary/interactive accent (focus
+     rings, hover borders, active toggles, the EV "boost" label). Kept a
+     token named --teal so ~17 component shadow roots need no edit; the
+     value is now a deep, quiet sea-green, not the old olive. */
+  --teal: #2f7d6b;
+  --teal-strong: #23604f;
+  --on-teal: #ffffff;
+  --teal-soft: #d6e7e0;
+
+  /* Color — Pokérus (the purple the games themselves use) */
+  --pokerus-purple: #8e3fb0;
+  --pokerus-purple-soft: #ecdcf3;
   --on-pokerus: #fff;
-  --sprite-bg: rgba(255, 255, 255, 0.55);
-  --sprite-glow: #c9a227;                      /* fully-trained (510 EVs) halo */
+
+  /* Color — sprite treatment */
+  --sprite-bg: rgba(255, 255, 255, 0.55);       /* chip behind opaque Gen I/II bitmaps */
+  --sprite-glow: #c9a227;                        /* fully-trained (510 EVs) halo */
   --sprite-glow-soft: rgba(201, 162, 39, 0.4);
-  --scanline: rgba(27, 31, 24, 0.2);
-  --lcd-grid: rgba(27, 31, 24, 0.055);
-  --shadow-lcd: inset 0 2px 6px rgba(27, 31, 24, 0.18), inset 0 -1px 0 rgba(255, 255, 255, 0.5);
-  --footer-bg: #171a13;
-  --footer-ink: rgba(238, 241, 228, 0.65);
-  --cart-shell: #eef1e4;
-  --cart-edge: rgba(27, 31, 24, 0.3);
+
+  /* Color — retired LCD effects (kept as no-ops so old consumers are inert) */
+  --scanline: transparent;
+  --lcd-grid: transparent;
+  --shadow-lcd: none;
+
+  /* Color — footer (no longer a dark slab; Phase 2 restyles it fully) */
+  --footer-bg: var(--paper);
+  --footer-ink: #7a756a;
+
+  /* Color — game cartridge chip on party cards */
+  --cart-shell: #efece4;
+  --cart-edge: rgba(27, 25, 22, 0.28);
 
   /* Elevation */
-  --shadow-panel: 0 2px 5px rgba(23, 26, 19, 0.1), 0 16px 32px -16px rgba(23, 26, 19, 0.3);
-  --shadow-suggestions: 0 12px 28px -8px rgba(23, 26, 19, 0.35);
-  --shadow-trained: 0 0 0 2px var(--gold), 0 8px 18px rgba(234, 180, 41, 0.35);
+  --shadow-panel: 0 1px 2px rgba(27, 25, 22, 0.05), 0 16px 34px -20px rgba(27, 25, 22, 0.24);
+  --shadow-suggestions: 0 12px 28px -10px rgba(27, 25, 22, 0.28);
+  --shadow-trained: 0 0 0 2px var(--gold), 0 8px 18px rgba(217, 154, 28, 0.3);
 
   /* Type */
-  --font-display: 'Space Grotesk', system-ui, sans-serif;
-  --font-body: 'Inter', system-ui, sans-serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+  --font-body: 'Public Sans', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
   --font-size-2xs: 0.68rem;
   --font-size-xs: 0.72rem;
@@ -78,11 +114,12 @@
   --space-4: 0.9rem;
   --space-5: 1.4rem;
 
-  /* Radius scale */
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 22px;
+  /* Radius scale — friendlier rounded-rectangle */
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 20px;
   --radius-pill: 999px;
+  --radius-btn: 11px;  /* rounded-rect buttons — not a full pill */
 
   /* Motion */
   --transition-fast: 0.12s ease;
@@ -90,100 +127,126 @@
   --transition-bar: 0.35s ease;
 }
 
-/* Dark palette shared by both dark entry points below. Kept in sync by
-   hand — change one, change both. */
+/* Dark palette shared by both dark entry points below — a warm night
+   look. Kept in sync by hand: change one, change both. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
     color-scheme: dark;
 
-    --ink: #e4e8d6;
-    --ink-soft: #a6b096;
-    --paper: #12150c;
-    --paper-panel: #1c2014;
-    --lcd: #242a19;
-    --lcd-deep: #333c22;
-    --lcd-line: #414b2e;
-    --line: #3a4229;
-    --surface: #2a3120;
+    --ink: #e9e5db;
+    --ink-soft: #a39d8f;
+
+    --paper: #17150f;
+    --paper-panel: #211e17;
+    --lcd: #242017;
+    --lcd-deep: #2f2a1f;
+    --lcd-line: #3a3428;
+    --line: #3a3428;
+    --surface: #211e17;
+
     --poke-red: #ef4d26;
     --poke-red-dark: #8f1f06;
     --on-red: #fff4ec;
-    --gold: #f0b731;
-    --gold-soft: #453711;
+
+    --meter: #d8d2c4;        /* light warm grey fill on a dark track */
+    --meter-max: #e8bf55;
+
+    --good: #3fcf8e;
+    --good-soft: #1e3a2c;
+    --gold: #e8bf55;
+    --gold-soft: #4a3c1c;
     --led-online: #63d96f;
     --led-ready: #6a9bff;
     --led-sending: #f5a23d;
     --led-off: rgba(0, 0, 0, 0.35);
-    --badge-ink: #f0cd76;
+    --badge-ink: #e8cf8f;
+    --danger-soft: #4a2418;
+
     --teal: #6fbfa8;
     --teal-strong: #8fd4bf;
     --on-teal: #14201b;
-    --teal-soft: #23372f;
-    --danger-soft: #4a2018;
+    --teal-soft: #24352f;
+
     --pokerus-purple: #c98ee8;
     --pokerus-purple-soft: #3a2748;
     --on-pokerus: #1c1424;
-    --sprite-bg: rgba(255, 255, 255, 0.08);
-  --sprite-glow: #e8c14e;
-  --sprite-glow-soft: rgba(232, 193, 78, 0.32);
-    --scanline: rgba(0, 0, 0, 0.35);
-    --lcd-grid: rgba(0, 0, 0, 0.3);
-    --shadow-lcd: inset 0 2px 8px rgba(0, 0, 0, 0.5), inset 0 -1px 0 rgba(255, 255, 255, 0.06);
-    --footer-bg: #0c0e07;
-    --footer-ink: rgba(228, 232, 214, 0.55);
-    --cart-shell: #333b26;
-    --cart-edge: rgba(228, 232, 214, 0.28);
 
-    --shadow-panel: 0 2px 5px rgba(0, 0, 0, 0.4), 0 16px 32px -16px rgba(0, 0, 0, 0.7);
-    --shadow-suggestions: 0 12px 28px -8px rgba(0, 0, 0, 0.6);
-    --shadow-trained: 0 0 0 2px var(--gold), 0 8px 18px rgba(240, 183, 49, 0.25);
+    --sprite-bg: rgba(255, 255, 255, 0.08);
+    --sprite-glow: #e8c14e;
+    --sprite-glow-soft: rgba(232, 193, 78, 0.32);
+
+    --scanline: transparent;
+    --lcd-grid: transparent;
+    --shadow-lcd: none;
+
+    --footer-bg: var(--paper);
+    --footer-ink: #8b8578;
+    --cart-shell: #332e22;
+    --cart-edge: rgba(233, 229, 219, 0.26);
+
+    --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.45), 0 16px 34px -20px rgba(0, 0, 0, 0.7);
+    --shadow-suggestions: 0 12px 28px -10px rgba(0, 0, 0, 0.62);
+    --shadow-trained: 0 0 0 2px var(--gold), 0 8px 18px rgba(232, 191, 85, 0.25);
   }
 }
 
 :root[data-theme='dark'] {
   color-scheme: dark;
 
-  --ink: #e4e8d6;
-  --ink-soft: #a6b096;
-  --paper: #12150c;
-  --paper-panel: #1c2014;
-  --lcd: #242a19;
-  --lcd-deep: #333c22;
-  --lcd-line: #414b2e;
-  --line: #3a4229;
-  --surface: #2a3120;
+  --ink: #e9e5db;
+  --ink-soft: #a39d8f;
+
+  --paper: #17150f;
+  --paper-panel: #211e17;
+  --lcd: #242017;
+  --lcd-deep: #2f2a1f;
+  --lcd-line: #3a3428;
+  --line: #3a3428;
+  --surface: #211e17;
+
   --poke-red: #ef4d26;
   --poke-red-dark: #8f1f06;
   --on-red: #fff4ec;
-  --gold: #f0b731;
-  --gold-soft: #453711;
+
+  --meter: #d8d2c4;
+  --meter-max: #e8bf55;
+
+  --good: #3fcf8e;
+  --good-soft: #1e3a2c;
+  --gold: #e8bf55;
+  --gold-soft: #4a3c1c;
   --led-online: #63d96f;
   --led-ready: #6a9bff;
   --led-sending: #f5a23d;
   --led-off: rgba(0, 0, 0, 0.35);
-  --badge-ink: #f0cd76;
+  --badge-ink: #e8cf8f;
+  --danger-soft: #4a2418;
+
   --teal: #6fbfa8;
   --teal-strong: #8fd4bf;
   --on-teal: #14201b;
-  --teal-soft: #23372f;
-  --danger-soft: #4a2018;
+  --teal-soft: #24352f;
+
   --pokerus-purple: #c98ee8;
   --pokerus-purple-soft: #3a2748;
   --on-pokerus: #1c1424;
+
   --sprite-bg: rgba(255, 255, 255, 0.08);
   --sprite-glow: #e8c14e;
   --sprite-glow-soft: rgba(232, 193, 78, 0.32);
-  --scanline: rgba(0, 0, 0, 0.35);
-  --lcd-grid: rgba(0, 0, 0, 0.3);
-  --shadow-lcd: inset 0 2px 8px rgba(0, 0, 0, 0.5), inset 0 -1px 0 rgba(255, 255, 255, 0.06);
-  --footer-bg: #0c0e07;
-  --footer-ink: rgba(228, 232, 214, 0.55);
-  --cart-shell: #333b26;
-  --cart-edge: rgba(228, 232, 214, 0.28);
 
-  --shadow-panel: 0 2px 5px rgba(0, 0, 0, 0.4), 0 16px 32px -16px rgba(0, 0, 0, 0.7);
-  --shadow-suggestions: 0 12px 28px -8px rgba(0, 0, 0, 0.6);
-  --shadow-trained: 0 0 0 2px var(--gold), 0 8px 18px rgba(240, 183, 49, 0.25);
+  --scanline: transparent;
+  --lcd-grid: transparent;
+  --shadow-lcd: none;
+
+  --footer-bg: var(--paper);
+  --footer-ink: #8b8578;
+  --cart-shell: #332e22;
+  --cart-edge: rgba(233, 229, 219, 0.26);
+
+  --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.45), 0 16px 34px -20px rgba(0, 0, 0, 0.7);
+  --shadow-suggestions: 0 12px 28px -10px rgba(0, 0, 0, 0.62);
+  --shadow-trained: 0 0 0 2px var(--gold), 0 8px 18px rgba(232, 191, 85, 0.25);
 }
 
 @media (prefers-reduced-motion: reduce) {
