@@ -43,7 +43,7 @@
   /* Color — EV meter */
   --meter: #2c2822;        /* graphite fill */
   --meter-max: #d99a1c;    /* gold once a stat / the 510 total is capped */
-  --meter-track: var(--lcd-deep);
+  --meter-track: #e2dbc9;  /* recessed groove — a touch darker than the card */
 
   /* Color — status / semantic */
   --good: #1f8f52;         /* a real gain (history deltas) — never a ground */
@@ -150,6 +150,7 @@
 
     --meter: #d8d2c4;        /* light warm grey fill on a dark track */
     --meter-max: #e8bf55;
+    --meter-track: #34301f;
 
     --good: #3fcf8e;
     --good-soft: #1e3a2c;
@@ -210,6 +211,7 @@
 
   --meter: #d8d2c4;
   --meter-max: #e8bf55;
+  --meter-track: #34301f;
 
   --good: #3fcf8e;
   --good-soft: #1e3a2c;

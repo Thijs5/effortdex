@@ -1,9 +1,10 @@
 import { BaseElement } from '../base-element.ts';
 
 /**
- * <ev-bar label max> — one LCD-style segmented progress bar. Set `.value`,
- * `.max`, `.label` as JS properties. Reflects a `maxed` attribute (and
- * shows a Poké Ball badge) once value reaches max.
+ * <ev-bar label max> — one EV progress bar: a graphite fill (--meter) on
+ * a recessed track (--meter-track), turning gold (--meter-max) at the
+ * cap. Set `.value`, `.max`, `.label` as JS properties. Reflects a
+ * `maxed` attribute (and shows a Poké Ball badge) once value reaches max.
  */
 export class EvBar extends BaseElement {
   static template = `
@@ -32,7 +33,7 @@ export class EvBar extends BaseElement {
            app's positive/gain color everywhere else — EV gains, maxed
            bars), hindered stat in red. Red is reserved for the hindered
            stat only, so it never reads as "this is the good one". */
-        :host([nature-effect="boost"]) .label { color: var(--teal); }
+        :host([nature-effect="boost"]) .label { color: var(--good); }
         :host([nature-effect="hinder"]) .label { color: var(--poke-red-dark); }
         .actual-stat {
           font-family: var(--font-mono);
@@ -50,30 +51,19 @@ export class EvBar extends BaseElement {
           grid-column: 3;
           grid-row: 1;
           position: relative;
-          height: 9px;
-          background: var(--lcd-deep);
-          border-radius: var(--radius-sm);
+          height: 8px;
+          background: var(--meter-track);
+          border-radius: var(--radius-pill);
           overflow: hidden;
         }
         .fill {
           height: 100%;
           width: 0%;
-          background: var(--teal);
-          border-radius: var(--radius-sm);
+          background: var(--meter);
+          border-radius: var(--radius-pill);
           transition: width var(--transition-bar), background var(--transition-med);
         }
-        :host([maxed]) .fill { background: var(--gold); }
-        .track::after {
-          content: '';
-          position: absolute;
-          inset: 0;
-          pointer-events: none;
-          background-image: repeating-linear-gradient(
-            90deg,
-            transparent 0 5px,
-            var(--scanline) 5px 6px
-          );
-        }
+        :host([maxed]) .fill { background: var(--meter-max); }
         .value {
           font-family: var(--font-mono);
           font-size: var(--font-size-2xs);
