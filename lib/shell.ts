@@ -166,6 +166,20 @@ networkActivity.addEventListener('change', updatePowerLed);
 networkActivity.attach();
 updatePowerLed();
 
+/* Condense the header once the page scrolls off the top: a 1px sentinel
+   at the very top of .device; when it leaves the viewport the header
+   shrinks to its minimum usable height. The size change is a CSS
+   transition, already neutralised under prefers-reduced-motion by
+   tokens.css. */
+const appHeader = requireQuery('.app-header');
+const scrollSentinel = document.getElementById('app-scroll-sentinel');
+if (scrollSentinel && 'IntersectionObserver' in window) {
+  new IntersectionObserver(
+    ([entry]) => appHeader.classList.toggle('is-condensed', !entry.isIntersecting),
+    { threshold: 0 },
+  ).observe(scrollSentinel);
+}
+
 /* ------------------------------------------------------------------ */
 /* Offline app shell                                                   */
 /* ------------------------------------------------------------------ */

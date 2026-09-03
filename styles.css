@@ -39,132 +39,105 @@ html[data-modal-open] body {
 }
 
 .device {
+  position: relative;
   width: 100%;
   max-width: 1180px;
   background: var(--paper-panel);
   border-radius: var(--radius-lg);
   border: 1px solid var(--line);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), var(--shadow-panel);
+  box-shadow: var(--shadow-panel);
   overflow: hidden;
 }
 
-/* ---------- header ---------- */
-/* A slim toolbar-height bezel: the device's top edge, not a billboard.
-   The identity work is done by the power stripe, the LED, and the red
-   band itself — all of it fits in ~52px so content starts immediately. */
-.bezel {
-  position: relative;
+#app-scroll-sentinel {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 1px;
+  height: 1px;
+  pointer-events: none;
+}
+
+/* ---------- top app header ---------- */
+/* A slim wordmark bar — the app's identity and the Menu, nothing else.
+   Sticky; it condenses to its minimum usable height once the page
+   scrolls off the top (lib/shell.ts toggles .is-condensed from an
+   IntersectionObserver on #app-scroll-sentinel). */
+.app-header {
+  position: sticky;
+  top: 0;
+  z-index: 20;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  background: var(--poke-red);
-  color: var(--on-red);
-  padding: var(--space-2) clamp(1.2rem, 3vw, 2.2rem) calc(var(--space-2) + 4px);
+  padding: var(--space-3) clamp(1.1rem, 3vw, 2rem);
+  background: var(--surface);
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
+  transition: padding var(--transition-med), box-shadow var(--transition-med);
+}
+.app-header.is-condensed {
+  padding-top: var(--space-2);
+  padding-bottom: var(--space-2);
+  box-shadow: var(--shadow-panel);
 }
 
-/* Pokéball seam — the red bezel is the ball's top half: a dark seam
-   along its bottom edge with the white center button straddling it.
-   This is the one signature detail the design is remembered by. */
-.bezel::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 4px;
-  background: var(--footer-bg);
-}
-.bezel::before {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: 2px;
-  transform: translate(-50%, 50%);
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: #fff;
-  border: 4px solid var(--footer-bg);
-  z-index: 1;
-}
-
-.bezel h1 {
+.app-header h1 {
   font-family: var(--font-display);
-  font-size: clamp(1.05rem, 2.5vw, 1.25rem);
+  font-size: clamp(1.05rem, 2.5vw, 1.2rem);
   font-weight: 700;
   margin: 0;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
   white-space: nowrap;
+  transition: font-size var(--transition-med);
 }
-.bezel h1 a {
+.app-header.is-condensed h1 { font-size: 1rem; }
+.app-header h1 a {
   color: inherit;
   text-decoration: none;
+  display: inline-flex;
+  align-items: baseline;
 }
-.bezel h1 a:hover { text-decoration: underline; }
-.e-accent { color: var(--gold-soft); }
+.app-header h1 a:hover { text-decoration: underline; }
+.e-accent { color: var(--accent); }
 
-/* Power LED — a router-style network activity indicator
-   (lib/network-activity.js sets data-status via lib/shell.js): dark/
-   unlit while offline (the base rule, and the default before JS has
-   run), blue while online and idle ("ready"), orange while a request is
-   in flight ("sending"), a brief green flash once one completes
-   ("receiving"). */
+/* Network-activity dot, just before the wordmark: dark/unlit while
+   offline (base rule + pre-JS default), blue online-idle, orange while a
+   request is in flight, a brief green flash once one completes.
+   lib/network-activity.ts sets data-status via lib/shell.ts. */
 .power-led {
   display: inline-block;
   width: 7px;
   height: 7px;
   border-radius: 50%;
   background: var(--led-off);
-  box-shadow: none;
-  margin-right: 0.6em;
-  vertical-align: 2px;
+  margin-right: 0.55em;
+  align-self: center;
   transition: background var(--transition-fast), box-shadow var(--transition-fast);
 }
-.power-led[data-status='ready'] {
-  background: var(--led-ready);
-  box-shadow: 0 0 6px var(--led-ready);
-}
-.power-led[data-status='sending'] {
-  background: var(--led-sending);
-  box-shadow: 0 0 6px var(--led-sending);
-}
-.power-led[data-status='receiving'] {
-  background: var(--led-online);
-  box-shadow: 0 0 6px var(--led-online);
-}
+.power-led[data-status='ready']     { background: var(--led-ready);   box-shadow: 0 0 6px var(--led-ready); }
+.power-led[data-status='sending']   { background: var(--led-sending); box-shadow: 0 0 6px var(--led-sending); }
+.power-led[data-status='receiving'] { background: var(--led-online);  box-shadow: 0 0 6px var(--led-online); }
 
-.bezel-btn {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  border: 1px solid rgba(255, 248, 239, 0.45);
-  border-radius: 50%;
-  background: transparent;
-  color: var(--on-red);
-  cursor: pointer;
-  touch-action: manipulation;
-  transition: background var(--transition-fast);
-}
-.bezel-btn:hover { background: rgba(255, 248, 239, 0.15); }
-.bezel-btn svg { width: 17px; height: 17px; }
-
-/* Text instead of an icon — the pokémon detail page already has its
-   own dotted "More" button right under the header, and two dot-icon
-   buttons stacked that close read as one control. */
+/* Menu button — a quiet mono pill, not a chip. */
+.bezel-menu { position: relative; }
 .bezel-btn--menu {
-  width: auto;
-  height: auto;
   padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-btn);
+  background: var(--surface);
+  color: var(--ink-soft);
   font-family: var(--font-mono);
   font-size: var(--font-size-2xs);
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: border-color var(--transition-fast), color var(--transition-fast);
 }
+.bezel-btn--menu:hover { border-color: var(--ink-soft); color: var(--ink); }
 
 /* ---------- header dropdown menu ---------- */
 .bezel-menu { position: relative; }
@@ -1139,10 +1112,11 @@ textarea.ds-field { resize: vertical; }
   background: var(--footer-bg);
   color: var(--footer-ink);
   text-align: center;
-  padding: var(--space-3);
+  padding: var(--space-4) var(--space-3);
+  border-top: 1px solid var(--line);
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
 }
 .footer-link {
   color: inherit;
@@ -1180,7 +1154,7 @@ textarea.ds-field { resize: vertical; }
   .pokemon-view,
   .party-view-header,
   .settings-view,
-  .bezel {
+  .app-header {
     padding-inline: 1rem;
   }
   /* Tighter vertical rhythm on phones: the big --space-5 block gaps are

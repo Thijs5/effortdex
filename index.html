@@ -53,6 +53,10 @@
 </head>
 <body>
   <div class="device">
+    <!-- 1px sentinel at the very top: lib/shell.ts watches it with an
+         IntersectionObserver and condenses .app-header once it scrolls
+         out of view. -->
+    <div id="app-scroll-sentinel" aria-hidden="true"></div>
     <!-- Shown by lib/shell.js only when Store#_save() can no longer
          write to localStorage (quota exhausted — an installed PWA can
          fill its bucket with PokéAPI cache). Warns that edits aren't
@@ -61,7 +65,7 @@
          (with the Clear-cache link) or a one-off "a recent change may
          not have saved" notice (docs/adr/0025 P4d). -->
     <div id="storage-warning" class="storage-warning" role="alert" hidden></div>
-    <header class="bezel">
+    <header class="app-header">
       <h1><a id="header-home-link" href="#/parties"><span class="power-led" aria-hidden="true"></span>Effort<span class="e-accent">dex</span></a></h1>
       <div class="bezel-menu">
         <button id="menu-btn" class="bezel-btn bezel-btn--menu" type="button" aria-haspopup="true" aria-expanded="false">Menu</button>
