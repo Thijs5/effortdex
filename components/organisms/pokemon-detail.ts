@@ -1,4 +1,4 @@
-import { POWER_ITEMS, MACHO_BRACE_SPRITE, EXP_SHARE_SPRITE, NATURES, STATS, STAT_LABEL, MACHO_BRACE_MULTIPLIER, FALLBACK_SPRITE, FALLBACK_ONERROR } from '../../lib/constants.ts';
+import { POWER_ITEMS, MACHO_BRACE_SPRITE, EXP_SHARE_SPRITE, NATURES, STATS, STAT_LABEL, MACHO_BRACE_MULTIPLIER, FALLBACK_SPRITE, FALLBACK_ONERROR, TYPE_COLORS, typeLabel } from '../../lib/constants.ts';
 import { titleCase, natureEffectHint, dayLabel } from '../../lib/utils.ts';
 import { api, store } from '../../lib/services.ts';
 import { versionedSpriteUrl, versionedSpriteIsOpaque } from '../../lib/pokeapi-client.ts';
@@ -31,10 +31,13 @@ import type { Nature } from '../../lib/constants.ts';
 export class PokemonDetail extends BaseElement {
   _entry: RosterEntry | null = null;
   _allowedSpeciesToken = 0;
+  /** Species we've already fired a one-off type-cache warm for. */
+  _typeWarmTried = new Set<string>();
   _openSegment: PokemonDialog | null = null;
   _spriteFallback: ReturnType<typeof wireSpriteFallback>;
   $sprite: HTMLImageElement;
   $spriteFrame: HTMLElement;
+  $typeBadges: HTMLElement;
   $speciesNum: HTMLElement;
   $nickname: HTMLInputElement;
   $species: HTMLElement;
@@ -73,7 +76,16 @@ export class PokemonDetail extends BaseElement {
 
     this.shadow.innerHTML = `
       <style>
-        :host { display: block; }
+        /* The whole detail page is type-themed (docs/adr/0028): render()
+           sets --type from the species' primary type, and --meter so the
+           EV bars on this page lean toward it. Everything derived from
+           --type is heavily mixed toward the neutral so it never shouts;
+           with no type known, --type is unset and this all no-ops. */
+        :host {
+          display: block;
+          background: color-mix(in srgb, var(--type, #0000) 7%, #0000);
+          border-radius: var(--radius-md);
+        }
         .card {
           display: grid;
           gap: var(--space-4);
@@ -86,16 +98,31 @@ export class PokemonDetail extends BaseElement {
            Pokérus status now lives inline in .meta next to the level
            button rather than owning its own row. */
         header {
-          display: grid; grid-template-columns: 64px 1fr auto;
+          display: grid; grid-template-columns: auto 1fr auto;
           grid-template-areas: "sprite titles more";
           align-items: center; column-gap: var(--space-4); row-gap: 0;
           padding-bottom: var(--space-4);
-          border-bottom: 1px dashed var(--lcd-line);
+          border-bottom: 1px dashed color-mix(in srgb, var(--type, var(--lcd-line)) 30%, var(--lcd-line));
+        }
+        .sprite-col {
+          grid-area: sprite; align-self: start;
+          display: flex; flex-direction: column; align-items: center; gap: 6px;
         }
         .sprite-frame {
-          grid-area: sprite; align-self: start;
           position: relative; width: 64px; height: 64px;
           display: inline-flex;
+        }
+        /* Type badges under the sprite — solid type colour, white text in
+           both themes, the shape the games (and PokéAPI's own type
+           name-icons) use. The literal #fff here is the same deliberate
+           ADR 0003 exception as ev-bar's Poké Ball. */
+        .type-badges { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; max-width: 84px; }
+        .type-badge {
+          font-family: var(--font-mono); font-size: 0.5rem; font-weight: 600;
+          letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap;
+          padding: 1px 5px; border-radius: var(--radius-pill);
+          background: var(--type, var(--ink-soft)); color: #fff;
+          box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.18);
         }
         .sprite {
           width: 100%; height: 100%; image-rendering: pixelated; object-fit: contain;
@@ -205,15 +232,21 @@ export class PokemonDetail extends BaseElement {
         .level-up-btn:hover { color: var(--teal); border-color: var(--teal); }
         .level-up-btn svg { width: 11px; height: 11px; color: var(--teal); }
         .more-btn-wrap { grid-area: more; align-self: start; position: relative; }
-        .more-btn { display: inline-flex; align-items: center; gap: 0.3em; white-space: nowrap; }
-        .more-btn svg { width: 14px; height: 14px; }
-        /* The number+nature prefix (added ahead of the editable name)
-           leaves less room for a long nickname on a phone-width card —
-           drop the "More" label and keep just its icon, freeing that
-           width back up. */
-        @media (max-width: 420px) {
-          .more-btn-label { display: none; }
+        /* A quiet kebab, not a labelled button — the header already
+           carries the level / item / nature controls. */
+        .more-btn {
+          width: 32px; height: 32px; padding: 0;
+          display: grid; place-items: center;
+          border: 1px solid var(--line); border-radius: var(--radius-pill);
+          background: var(--surface); color: var(--ink-soft); cursor: pointer;
+          touch-action: manipulation;
+          transition: border-color var(--transition-fast), color var(--transition-fast);
         }
+        .more-btn:hover {
+          color: var(--ink);
+          border-color: color-mix(in srgb, var(--type, var(--ink-soft)) 50%, var(--ink-soft));
+        }
+        .more-btn svg { width: 15px; height: 15px; }
 
         /* Mirrors the app-shell header menu (styles.css's .header-menu)
            — same look, reimplemented locally since shadow DOM can't
@@ -269,7 +302,8 @@ export class PokemonDetail extends BaseElement {
 
         .section-title {
           margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs);
-          letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft);
+          letter-spacing: 0.06em; text-transform: uppercase;
+          color: color-mix(in srgb, var(--type, var(--ink-soft)) 45%, var(--ink-soft));
           display: flex; align-items: center; gap: var(--space-2);
         }
         .sheet-exp-share-note {
@@ -280,9 +314,12 @@ export class PokemonDetail extends BaseElement {
       </style>
       <article class="card">
         <header>
-          <span class="sprite-frame">
-            <img class="sprite" alt="" />
-            <span class="sprite-pkrs" aria-hidden="true">PKRS</span>
+          <span class="sprite-col">
+            <span class="sprite-frame">
+              <img class="sprite" alt="" />
+              <span class="sprite-pkrs" aria-hidden="true">PKRS</span>
+            </span>
+            <span class="type-badges" aria-hidden="true"></span>
           </span>
           <div class="titles">
             <div class="name-row">
@@ -303,9 +340,8 @@ export class PokemonDetail extends BaseElement {
             </div>
           </div>
           <div class="more-btn-wrap">
-            <button class="more-btn ds-btn ds-btn--outline ds-btn--sm" type="button" title="More" aria-label="More" aria-haspopup="menu" aria-expanded="false">
+            <button class="more-btn" type="button" title="More" aria-label="More" aria-haspopup="menu" aria-expanded="false">
               <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="17.5" r="1.7"/></svg>
-              <span class="more-btn-label">More</span>
             </button>
             <div class="more-menu" role="menu" aria-label="More" hidden>
               <button class="more-menu-item" type="button" role="menuitem" data-open="ivs">IVs</button>
@@ -352,6 +388,7 @@ export class PokemonDetail extends BaseElement {
 
     this.$sprite = this.$<HTMLImageElement>('.sprite');
     this.$spriteFrame = this.$<HTMLElement>('.sprite-frame');
+    this.$typeBadges = this.$<HTMLElement>('.type-badges');
     this.$speciesNum = this.$<HTMLElement>('.species-num');
     this.$nickname = this.$<HTMLInputElement>('.nickname');
     this.$species = this.$<HTMLElement>('.species');
@@ -588,6 +625,31 @@ export class PokemonDetail extends BaseElement {
     // Gen I/II sprites carry an opaque white background — the fully-trained
     // halo boxes them instead of hugging a silhouette (see the stylesheet).
     this.$spriteFrame.classList.toggle('sprite-frame--opaque', !!versioned && versionedSpriteIsOpaque(spriteGame));
+
+    // Type badges + whole-page type theming (docs/adr/0028). Types come
+    // from the api cache (populated when this species was looked up to
+    // add it); unknown → no badges, --type/--meter left at their global
+    // defaults.
+    const types = api.peekCached(e.speciesName)?.types ?? [];
+    if (!types.length && !this._typeWarmTried.has(e.speciesName)) {
+      this._typeWarmTried.add(e.speciesName);
+      api.getPokemon(e.speciesName).then(() => this.render()).catch(() => {});
+    }
+    this.$typeBadges.innerHTML = types
+      .map((t) => `<span class="type-badge" style="--type:${TYPE_COLORS[t] ?? 'var(--ink-soft)'}">${typeLabel(t)}</span>`)
+      .join('');
+    const primaryColor = types[0] ? TYPE_COLORS[types[0]] : undefined;
+    if (primaryColor) {
+      this.dataset.type = types[0];
+      this.style.setProperty('--type', primaryColor);
+      // EV bars on this page lean toward the type (they inherit --meter
+      // through the shadow boundary); still readable, still gold at cap.
+      this.style.setProperty('--meter', primaryColor);
+    } else {
+      delete this.dataset.type;
+      this.style.removeProperty('--type');
+      this.style.removeProperty('--meter');
+    }
     // Nickname is instant (not dialog-scoped, see _wireEvents), so this
     // always reflects the real, current value — no pending state to
     // preserve here the way Nature/Pokérus/Exp. Share below need to.
