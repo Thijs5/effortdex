@@ -32,6 +32,7 @@ import { interceptLinkClick, focusDialogStart } from '../../../lib/dom.ts';
 import { wireDragHandle } from '../../../lib/drag-reorder.ts';
 import '../../atoms/game-ball.ts';
 import '../../organisms/pokemon-search.ts';
+import '../../organisms/stat-reading-grid.ts';
 import '../../atoms/ev-bar.ts';
 import '../../atoms/level-input.ts';
 import type { Party, RosterEntry } from '../../../lib/store.ts';
@@ -92,6 +93,9 @@ const addDialogStatus = document.getElementById('add-pokemon-dialog-status')!;
 const addDialogLevel = document.getElementById('add-pokemon-dialog-level') as import('../../atoms/level-input.ts').LevelInput;
 const addDialogNatureField = document.getElementById('add-pokemon-dialog-nature-field')!;
 const addDialogNature = document.getElementById('add-pokemon-dialog-nature') as HTMLSelectElement;
+const addDialogStatsGrid = document.getElementById(
+  'add-pokemon-dialog-stats-grid'
+) as import('../../organisms/stat-reading-grid.ts').StatReadingGrid;
 const addDialogSubmitBtn = document.getElementById('add-pokemon-dialog-submit-btn') as HTMLButtonElement;
 const addDialogCancelBtn = document.getElementById('add-pokemon-dialog-cancel-btn')!;
 
@@ -129,6 +133,7 @@ async function openAddPokemonDialog(name: string): Promise<void> {
   addDialogLevel.value = DEFAULT_LEVEL;
   addDialogNature.value = '';
   addDialogNatureField.hidden = !store.natureAvailable();
+  addDialogStatsGrid.reset();
   addDialogSubmitBtn.disabled = true;
   addDialog.showModal();
   focusDialogStart(addDialog);
@@ -168,7 +173,14 @@ addForm.addEventListener('submit', (e) => {
   e.preventDefault();
   if (!pendingAddMon) return;
   const mon = pendingAddMon;
-  store.addPokemon(mon, Number(addDialogLevel.value), addDialogNature.value || null);
+  const entry = store.addPokemon(mon, Number(addDialogLevel.value), addDialogNature.value || null);
+  // Log whichever summary-screen stats the user filled in — grouped
+  // under one batchId so the history collapses them into one entry.
+  const readings = addDialogStatsGrid.readings;
+  if (readings.length) {
+    const statBatchId = crypto.randomUUID();
+    for (const { statKey, value } of readings) store.logStatReading(entry.uid, statKey, value, statBatchId);
+  }
   addDialog.close();
   addStatus.textContent = `Added ${titleCase(mon.name)}!`;
   // Warm the evolution-chain cache now.

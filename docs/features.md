@@ -42,9 +42,14 @@ From a party's roster page, a `<pokemon-search>` autocomplete (backed by
 `PokeApiClient.getAllSpecies()`, fuzzy-matched client-side) opens an
 add-Pokémon `<dialog>`: sprite preview, a level field, and — only on a
 Gen III+ party — a nature picker, since natures didn't exist before
-Generation III. Submitting calls `store.addPokemon()`, which creates a
-roster entry with empty EVs — the same regardless of how the Pokémon was
-actually obtained in-game (caught, bred, or transferred in). Removing a
+Generation III. A collapsed **"Its stats"** disclosure holds an optional
+`<stat-reading-grid>` (the same six-stat component the Level popup uses,
+Special merged on a Gen I party): any value read off the in-game summary
+screen is logged as a stat reading at the add level via
+`store.logStatReading()`, feeding the IV calculator later. Submitting
+calls `store.addPokemon()`, which creates a roster entry with empty EVs —
+the same regardless of how the Pokémon was actually obtained in-game
+(caught, bred, or transferred in). Removing a
 Pokémon (from its detail page's "More" menu) asks for confirmation via
 the native `<dialog>` and removes it from the roster.
 
@@ -114,10 +119,13 @@ way (✕, Escape, backdrop click) discards the pending edit.
   further; deleting a reading widens it back.
 - **Level dialog** — change level and, in the same batched Save,
   optionally record a "stat reading" (the actual current value of one or
-  more stats, feeding the IV calculator above) and/or evolve via the
-  embedded `<evolution-chain>`. Nothing applies until Save; adjusting the
-  level after typing a stat value keeps the typed value and just
-  relabels which level it belongs to.
+  more stats, feeding the IV calculator above) via the shared
+  `<stat-reading-grid>` and/or evolve via the embedded
+  `<evolution-chain>`. A stat that already has a reading gets an Adjust
+  box with `−1`/`+1` steppers and a `→` preview instead of a plain
+  input. Nothing applies
+  until Save; adjusting the level after typing a stat value keeps the
+  typed value and just relabels which level it belongs to.
 - **Competitive dialog** — Smogon tier badge (tapping it explains the
   tier in plain English) and common competitive sets for the species,
   sourced from Pokémon Showdown/Smogon data (see below).

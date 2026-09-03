@@ -20,6 +20,7 @@ import type { TransferPanel } from './organisms/transfer-panel.ts';
 import type { ImportReview } from './organisms/import-review.ts';
 import type { PokemonSearch } from './organisms/pokemon-search.ts';
 import type { EvHistoryLog } from './organisms/ev-history-log.ts';
+import type { StatReadingGrid } from './organisms/stat-reading-grid.ts';
 import type { PokemonDetail } from './organisms/pokemon-detail.ts';
 import type { NatureDialog } from './pages/parties/pokemon/nature.ts';
 import type { LevelDialog } from './pages/parties/pokemon/level.ts';
@@ -43,6 +44,7 @@ declare global {
     'import-review': ImportReview;
     'pokemon-search': PokemonSearch;
     'ev-history-log': EvHistoryLog;
+    'stat-reading-grid': StatReadingGrid;
     'pokemon-detail': PokemonDetail;
     'nature-dialog': NatureDialog;
     'level-up-dialog': LevelDialog;

@@ -1,7 +1,7 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 import { createParty } from './support/party.js';
-import { addPokemon, rosterRow, openDetail } from './support/pokemon.js';
+import { addPokemon, rosterRow, openDetail, openIvs } from './support/pokemon.js';
 import { mockPokeApi } from './support/pokeapi-mock.js';
 
 // Adding a Pokémon puts it in the active party's roster — however it was
@@ -38,6 +38,24 @@ test.describe('Adding a Pokémon', () => {
     await addPanel2.getByRole('combobox', { name: 'e.g. Bulbasaur', exact: true }).fill('Bulbasaur');
     await page.getByRole('option').filter({ hasText: /Bulbasaur/i }).first().click();
     await expect(page.locator('dialog#add-pokemon-dialog').getByLabel('Nature')).toBeHidden();
+  });
+
+  test('optional "Its stats" inputs are logged as stat readings at the add level', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
+    await addPokemon(page, 'Bulbasaur', { level: 12, stats: { HP: 20, SPE: 14 } });
+
+    const card = await openDetail(page, 'Bulbasaur');
+    const ivDialog = await openIvs(card);
+    await ivDialog.getByText("Don't know an IV?").click();
+
+    await ivDialog.getByLabel('Stat', { exact: true }).selectOption('hp');
+    await expect(ivDialog.getByText('Lv. 12 — 20')).toBeVisible();
+    await ivDialog.getByLabel('Stat', { exact: true }).selectOption('spe');
+    await expect(ivDialog.getByText('Lv. 12 — 14')).toBeVisible();
+    // A stat left blank logs nothing.
+    await ivDialog.getByLabel('Stat', { exact: true }).selectOption('atk');
+    await expect(ivDialog.locator('.iv-calc-readings li')).toHaveCount(0);
   });
 
   test('multiple added Pokémon each get their own roster row', async ({ page }) => {

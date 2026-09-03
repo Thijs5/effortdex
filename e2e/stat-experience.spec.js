@@ -168,7 +168,7 @@ test.describe('Gen I/II Stat Experience', () => {
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openLevelUpDialog(card);
 
-    const rows = dialog.locator('.level-up-stat-label');
+    const rows = dialog.locator('.stat-label');
     await expect(rows).toHaveText(['HP', 'ATK', 'DEF', 'Special', 'SPE']);
   });
 

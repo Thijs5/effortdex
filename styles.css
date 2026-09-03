@@ -963,6 +963,13 @@ html[data-modal-open] body {
   min-height: 1.1em;
 }
 
+.add-pokemon-dialog-stats {
+  margin: 0 0 var(--space-4);
+}
+.add-pokemon-dialog-stats .field-label {
+  margin-bottom: var(--space-3);
+}
+
 .field-label {
   display: block;
   font-size: var(--font-size-sm);

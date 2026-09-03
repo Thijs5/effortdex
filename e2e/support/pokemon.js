@@ -11,13 +11,15 @@
  * From a party's roster page, searches for `species` in the add panel,
  * picks it, and submits the add-Pokémon dialog (level defaults to 5
  * unless `level` is given; `nature` only applies on a Gen III+ party,
- * where the dialog shows the field). Leaves the page on the roster list,
- * not the new Pokémon's detail page.
+ * where the dialog shows the field). `stats` (optional) fills the "Its
+ * stats" <stat-reading-grid> reading inputs, keyed by stat label
+ * (HP/ATK/DEF/SPA/SPD/SPE), each logged as a stat reading. Leaves the
+ * page on the roster list, not the new Pokémon's detail page.
  * @param {import('@playwright/test').Page} page
  * @param {string} species
- * @param {{ level?: number, nature?: string }} [opts]
+ * @param {{ level?: number, nature?: string, stats?: Record<string, number> }} [opts]
  */
-export async function addPokemon(page, species, { level, nature } = {}) {
+export async function addPokemon(page, species, { level, nature, stats } = {}) {
   const addPanel = page.locator('section', { has: page.getByRole('heading', { name: 'Add a Pokémon' }) });
   // getByPlaceholder would also match <pokemon-search>'s own host element,
   // which reflects the attribute but isn't the actual input — role=combobox
@@ -31,6 +33,11 @@ export async function addPokemon(page, species, { level, nature } = {}) {
   // Selecting by value (the NATURES id, e.g. 'adamant') rather than label
   // text, which would need the exact rendered "Adamant (+ATK, -SPA)" string.
   if (nature) await dialog.getByLabel('Nature').selectOption(nature);
+  if (stats) {
+    for (const [label, value] of Object.entries(stats)) {
+      await dialog.getByLabel(`${label} reading`).fill(String(value));
+    }
+  }
   await dialog.getByRole('button', { name: 'Add!' }).click();
   await dialog.waitFor({ state: 'hidden' });
 }
