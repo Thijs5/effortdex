@@ -768,15 +768,29 @@ html[data-modal-open] body {
   max-width: 980px;
 }
 
-/* ---------- Settings view ("/settings") ---------- */
+/* ---------- Settings / transfer / cache / import views ---------- */
 .settings-view {
-  padding: var(--space-4) clamp(1.2rem, 3vw, 2.2rem) var(--space-5);
-  max-width: 640px;
+  --view-pad: clamp(1.2rem, 3vw, 2.2rem);
+  padding: 0 var(--view-pad) var(--space-5);
+  max-width: 680px;
+}
+/* The lone back link pins below the app header on these long, scrollable
+   pages — the fixed-nav pattern the other views use, minus a primary
+   action there's nothing to put in. */
+.settings-view > .back-link {
+  position: sticky;
+  top: var(--app-header-h, 52px);
+  z-index: 10;
+  display: block;
+  margin: 0 calc(-1 * var(--view-pad)) var(--space-4);
+  padding: var(--space-3) var(--view-pad);
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
 }
 .settings-view h2 {
   font-family: var(--font-display);
   font-size: var(--font-size-xl);
-  margin: var(--space-3) 0 var(--space-4);
+  margin: 0 0 var(--space-4);
   letter-spacing: -0.01em;
 }
 .settings-section {
@@ -804,7 +818,8 @@ html[data-modal-open] body {
 .safe-data-note {
   padding: var(--space-3);
   border-left: 3px solid var(--teal);
-  background: var(--paper);
+  border-radius: var(--radius-sm);
+  background: var(--lcd);
 }
 .safe-data-note strong { color: var(--ink); }
 /* Unlike other .status-line uses, this one only shows text for the
@@ -1180,7 +1195,8 @@ textarea.ds-field { resize: vertical; }
      with the reduced inline padding above. */
   .picker,
   .party-view,
-  .pokemon-view {
+  .pokemon-view,
+  .settings-view {
     --view-pad: 1rem;
   }
   /* Tighter vertical rhythm on phones: the big block gaps are a desktop
