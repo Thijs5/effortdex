@@ -45,10 +45,10 @@ export class StatReadingGrid extends BaseElement {
     .fields.has-change { grid-template-columns: 3.25em minmax(4em, 1fr) auto; }
     .head, .row { display: contents; }
     .head span {
-      font-family: var(--font-mono); font-size: var(--font-size-2xs);
+      font-size: var(--font-size-2xs);
       letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft);
     }
-    .stat-label { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--ink-soft); }
+    .stat-label { font-size: var(--font-size-xs); color: var(--ink-soft); }
     .reading {
       display: flex; align-items: baseline; gap: 0.45ch; min-width: 0;
       font-family: var(--font-display); font-weight: 500; font-size: var(--font-size-input); color: var(--ink);

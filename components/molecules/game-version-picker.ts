@@ -57,7 +57,6 @@ export class GameVersionPicker extends BaseElement {
         }
         li.group {
           padding: var(--space-2) var(--space-3) var(--space-1);
-          font-family: var(--font-mono);
           font-size: var(--font-size-2xs);
           letter-spacing: 0.08em;
           text-transform: uppercase;
@@ -65,7 +64,6 @@ export class GameVersionPicker extends BaseElement {
         }
         li.no-match-hint {
           padding: var(--space-2) var(--space-3);
-          font-family: var(--font-mono);
           font-size: var(--font-size-2xs);
           color: var(--ink-soft);
         }

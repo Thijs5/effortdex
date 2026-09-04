@@ -43,7 +43,6 @@ export class EvHistoryLog extends BaseElement {
         :host { display: block; }
         .hist-title {
           margin: 0;
-          font-family: var(--font-mono);
           font-size: var(--font-size-2xs);
           letter-spacing: 0.06em;
           text-transform: uppercase;
@@ -63,7 +62,6 @@ export class EvHistoryLog extends BaseElement {
           display: block;
           grid-column: 1 / -1;
           margin-top: var(--space-2);
-          font-family: var(--font-mono);
           font-size: var(--font-size-2xs);
           text-transform: uppercase;
           letter-spacing: 0.06em;

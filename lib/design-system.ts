@@ -17,7 +17,6 @@ const css = `
     border: 1px solid var(--lcd-line);
     border-radius: var(--radius-sm);
     background: var(--surface);
-    font-family: var(--font-mono);
     font-size: var(--font-size-input);
     color: var(--ink);
   }
@@ -277,7 +276,6 @@ const css = `
     display: inline-flex;
     align-items: center;
     width: fit-content;
-    font-family: var(--font-mono);
     font-size: var(--font-size-2xs);
     font-weight: 600;
     letter-spacing: 0.06em;

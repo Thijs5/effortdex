@@ -37,12 +37,12 @@ export class EvolutionChain extends BaseElement {
            wide too, on a narrow phone overflowing past the dialog's own
            edge instead of actually wrapping to fit. */
         :host { display: grid; gap: var(--space-2); min-width: 0; }
-        .evo-note { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--ink-soft); }
+        .evo-note { margin: 0; font-size: var(--font-size-2xs); color: var(--ink-soft); }
         .evo-chain { display: flex; align-items: center; gap: var(--space-3) var(--space-4); flex-wrap: wrap; row-gap: var(--space-4); min-width: 0; }
         .evo-stage { display: flex; flex-direction: column; gap: var(--space-2); }
         .evo-link { display: flex; align-items: center; gap: var(--space-3); }
         .evo-arrow { color: var(--ink-soft); font-size: var(--font-size-md); }
-        .evolve-status { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--teal); min-height: 1em; }
+        .evolve-status { margin: 0; font-size: var(--font-size-2xs); color: var(--teal); min-height: 1em; }
       </style>
       <p class="evo-note" hidden></p>
       <div class="evo-chain"></div>

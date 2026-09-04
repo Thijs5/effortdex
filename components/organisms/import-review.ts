@@ -57,7 +57,6 @@ export class ImportReview extends BaseElement {
         .party-name { margin: 0; font-family: var(--font-display); font-size: var(--font-size-lg); display: inline-flex; gap: var(--space-2); align-items: center; }
         .party-meta {
           margin: var(--space-1) 0 0;
-          font-family: var(--font-mono);
           font-size: var(--font-size-2xs);
           font-weight: 600;
           letter-spacing: 0.04em;

@@ -129,7 +129,7 @@ export class PokemonDetail extends BaseElement {
         .type-badges { display: flex; flex-wrap: wrap; gap: 4px; }
         .type-badges:empty { display: none; }
         .type-badge {
-          font-family: var(--font-mono); font-size: var(--font-size-2xs); font-weight: 600;
+          font-size: var(--font-size-2xs); font-weight: 600;
           letter-spacing: 0.07em; text-transform: uppercase; white-space: nowrap;
           padding: 2px 8px; border-radius: var(--radius-pill);
           background: var(--type, var(--ink-soft)); color: #fff;
@@ -188,7 +188,7 @@ export class PokemonDetail extends BaseElement {
           position: absolute; left: 50%; bottom: -3px; transform: translateX(-50%);
           display: none; padding: 1px 4px; border-radius: var(--radius-pill);
           background: var(--pokerus-purple); color: var(--on-pokerus);
-          font-family: var(--font-mono); font-size: 0.6rem; font-weight: 700;
+          font-size: 0.6rem; font-weight: 700;
           letter-spacing: 0.08em; line-height: 1.35; white-space: nowrap;
           pointer-events: none;
         }
@@ -311,7 +311,7 @@ export class PokemonDetail extends BaseElement {
            element's openBattleLog(), which shows the sheet below. */
 
         .section-title {
-          margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs);
+          margin: 0; font-size: var(--font-size-2xs);
           letter-spacing: 0.06em; text-transform: uppercase;
           color: color-mix(in srgb, var(--type, var(--ink-soft)) 45%, var(--ink-soft));
           display: flex; align-items: center; gap: var(--space-2);
@@ -320,7 +320,7 @@ export class PokemonDetail extends BaseElement {
           margin: 0; font-size: var(--font-size-xs); color: var(--ink-soft);
         }
 
-        .battle-status { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--poke-red-dark); min-height: 1em; }
+        .battle-status { margin: 0; font-size: var(--font-size-xs); color: var(--poke-red-dark); min-height: 1em; }
       </style>
       <article class="card">
         <header>
