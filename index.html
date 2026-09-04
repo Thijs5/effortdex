@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content" />
   <meta name="description" content="Local-only Pokémon EV training tracker: log battles and vitamins, track effort values per stat across parties, works offline." />
   <title>Effortdex</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><circle cx=%2216%22 cy=%2216%22 r=%2214%22 fill=%22%23e3350d%22/><path d=%22M2 16h28%22 stroke=%22%231b1f1c%22 stroke-width=%223%22/><circle cx=%2216%22 cy=%2216%22 r=%226%22 fill=%22%23fff%22 stroke=%22%231b1f1c%22 stroke-width=%223%22/></svg>" />
@@ -53,10 +53,6 @@
 </head>
 <body>
   <div class="device">
-    <!-- 1px sentinel at the very top: lib/shell.ts watches it with an
-         IntersectionObserver and condenses .app-header once it scrolls
-         out of view. -->
-    <div id="app-scroll-sentinel" aria-hidden="true"></div>
     <!-- Shown by lib/shell.js only when Store#_save() can no longer
          write to localStorage (quota exhausted — an installed PWA can
          fill its bucket with PokéAPI cache). Warns that edits aren't
@@ -66,7 +62,10 @@
          not have saved" notice (docs/adr/0025 P4d). -->
     <div id="storage-warning" class="storage-warning" role="alert" hidden></div>
     <header class="app-header">
-      <h1><a id="header-home-link" href="#/parties"><span class="power-led" aria-hidden="true"></span>Effort<span class="e-accent">dex</span></a></h1>
+      <div class="app-header-identity">
+        <h1><a id="header-home-link" href="#/parties"><span class="power-led" aria-hidden="true"></span>Effort<span class="e-accent">dex</span></a></h1>
+        <span id="header-party-name" class="app-header-context" hidden></span>
+      </div>
       <div class="bezel-menu">
         <button id="menu-btn" class="bezel-btn bezel-btn--menu" type="button" aria-haspopup="true" aria-expanded="false">Menu</button>
         <div id="header-menu" class="header-menu" role="menu" aria-label="App menu" hidden>
@@ -129,10 +128,6 @@
             </div>
           </div>
           <p id="active-party-description" class="hint" hidden></p>
-          <details class="legend ds-disclosure">
-            <summary>This game's rules</summary>
-            <ul id="training-legend"></ul>
-          </details>
         </div>
         <button id="edit-party-btn" class="ds-btn ds-btn--ghost">Edit party</button>
       </div>

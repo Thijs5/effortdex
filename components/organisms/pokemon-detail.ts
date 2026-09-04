@@ -39,8 +39,8 @@ export class PokemonDetail extends BaseElement {
   $spriteFrame: HTMLElement;
   $typeBadges: HTMLElement;
   $speciesNum: HTMLElement;
+
   $nickname: HTMLInputElement;
-  $species: HTMLElement;
   $levelValue: HTMLElement;
   $levelUpBtn: HTMLButtonElement;
   $natureBtn: HTMLButtonElement;
@@ -80,10 +80,13 @@ export class PokemonDetail extends BaseElement {
            sets --type from the species' primary type, and --meter so the
            EV bars on this page lean toward it. Everything derived from
            --type is heavily mixed toward the neutral so it never shouts;
-           with no type known, --type is unset and this all no-ops. */
+           with no type known, --type is unset and this all no-ops. The
+           faint full-page wash lives on .device (styles.css, fed by
+           --page-type — see the 'type-change' event render() dispatches),
+           so the card itself carries no background of its own and floats
+           on that wash edge to edge. */
         :host {
           display: block;
-          background: color-mix(in srgb, var(--type, #0000) 7%, #0000);
           border-radius: var(--radius-md);
         }
         .card {
@@ -106,33 +109,43 @@ export class PokemonDetail extends BaseElement {
         }
         .sprite-col {
           grid-area: sprite; align-self: start;
-          display: flex; flex-direction: column; align-items: center; gap: 6px;
+          display: flex; flex-direction: column; align-items: center;
         }
+        /* The sprite sits on a soft rounded frame washed with its primary
+           type — the same identity cue the roster card's disc carries, at
+           detail-page scale. --type is set on the host by render(). */
         .sprite-frame {
-          position: relative; width: 64px; height: 64px;
-          display: inline-flex;
+          position: relative; width: 84px; height: 84px; padding: 8px;
+          display: inline-flex; align-items: center; justify-content: center;
+          border-radius: var(--radius-md);
+          background: color-mix(in srgb, var(--type, var(--surface)) 12%, var(--surface));
+          box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--type, var(--line)) 38%, var(--line));
         }
-        /* Type badges under the sprite — solid type colour, white text in
-           both themes, the shape the games (and PokéAPI's own type
-           name-icons) use. The literal #fff here is the same deliberate
-           ADR 0003 exception as ev-bar's Poké Ball. */
-        .type-badges { display: flex; flex-wrap: wrap; gap: 3px; justify-content: center; max-width: 84px; }
+        /* Type badges sit under the name now (not under the sprite) —
+           readable size, left-aligned with the name. Solid type colour,
+           white text in both themes, the shape the games (and PokéAPI's
+           own type name-icons) use. The literal #fff here is the same
+           deliberate ADR 0003 exception as ev-bar's Poké Ball. */
+        .type-badges { display: flex; flex-wrap: wrap; gap: 4px; }
+        .type-badges:empty { display: none; }
         .type-badge {
-          font-family: var(--font-mono); font-size: 0.5rem; font-weight: 600;
-          letter-spacing: 0.08em; text-transform: uppercase; white-space: nowrap;
-          padding: 1px 5px; border-radius: var(--radius-pill);
+          font-family: var(--font-mono); font-size: var(--font-size-2xs); font-weight: 600;
+          letter-spacing: 0.07em; text-transform: uppercase; white-space: nowrap;
+          padding: 2px 8px; border-radius: var(--radius-pill);
           background: var(--type, var(--ink-soft)); color: #fff;
           box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.18);
         }
         .sprite {
           width: 100%; height: 100%; image-rendering: pixelated; object-fit: contain;
         }
-        /* Gen I/II sprites are an opaque white bitmap (no alpha) — round
-           its corners and sit it on the sprite chip so it doesn't read as
-           a hard white rectangle. Every other gen is a transparent PNG
-           and gets neither: it floats on the page. */
-        .sprite-frame--opaque .sprite {
-          background: var(--sprite-bg); border-radius: var(--radius-sm);
+        /* Gen I/II sprites are an opaque bitmap that already carries its
+           own background, so they get no frame at all — no type wash, no
+           ring, no padding. The raw tile sits on its own. Every other gen
+           is a transparent PNG that floats on the washed, ringed frame. */
+        .sprite-frame--opaque {
+          padding: 0;
+          background: none;
+          box-shadow: none;
         }
 
         /* Fully trained (at the 510 EV cap): a soft gold halo, subtly
@@ -210,19 +223,16 @@ export class PokemonDetail extends BaseElement {
            edge into the divider/content below it. */
         .titles {
           grid-area: titles; align-self: start; min-width: 0;
-          min-height: 64px; display: flex; flex-direction: column; justify-content: space-between;
+          min-height: 84px; display: flex; flex-direction: column;
+          justify-content: center; gap: var(--space-2);
         }
         .nickname {
           display: block; flex: 1 1 auto; min-width: 0; width: auto; border: none; background: transparent;
-          font-family: var(--font-display); font-weight: 600; font-size: var(--font-size-input);
-          padding: 0; color: var(--ink);
+          font-family: var(--font-display); font-weight: 700; font-size: var(--font-size-lg);
+          letter-spacing: -0.01em; padding: 0; color: var(--ink);
         }
         .nickname:focus-visible { outline: 2px solid var(--teal); border-radius: var(--radius-sm); }
         .meta { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
-        .species {
-          font-family: var(--font-mono); font-size: var(--font-size-xs);
-          color: var(--ink-soft); text-transform: capitalize;
-        }
         .level-up-btn {
           display: inline-flex; align-items: center; gap: 0.3em;
           border: 1px solid var(--lcd-line); background: var(--surface); cursor: pointer;
@@ -319,7 +329,6 @@ export class PokemonDetail extends BaseElement {
               <img class="sprite" alt="" />
               <span class="sprite-pkrs" aria-hidden="true">PKRS</span>
             </span>
-            <span class="type-badges" aria-hidden="true"></span>
           </span>
           <div class="titles">
             <div class="name-row">
@@ -327,8 +336,8 @@ export class PokemonDetail extends BaseElement {
               <button class="nature-btn" type="button" title="Nature" hidden></button>
               <input class="nickname" aria-label="Nickname" />
             </div>
+            <span class="type-badges" aria-hidden="true"></span>
             <div class="meta">
-              <span class="species" hidden></span>
               <button class="level-up-btn" type="button" title="Set level">
                 <span class="level-value"></span>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg>
@@ -391,7 +400,6 @@ export class PokemonDetail extends BaseElement {
     this.$typeBadges = this.$<HTMLElement>('.type-badges');
     this.$speciesNum = this.$<HTMLElement>('.species-num');
     this.$nickname = this.$<HTMLInputElement>('.nickname');
-    this.$species = this.$<HTMLElement>('.species');
     this.$levelValue = this.$<HTMLElement>('.level-value');
     this.$levelUpBtn = this.$<HTMLButtonElement>('.level-up-btn');
     this.$natureBtn = this.$<HTMLButtonElement>('.nature-btn');
@@ -650,16 +658,16 @@ export class PokemonDetail extends BaseElement {
       this.style.removeProperty('--type');
       this.style.removeProperty('--meter');
     }
+    // Let the page shell paint the full-bleed wash: it can't read --type
+    // off this element (custom props inherit down, not up), so hand it the
+    // colour. pokemon.ts sets --page-type on <html> from this, and clears
+    // it when you leave the detail page.
+    this.dispatchEvent(new CustomEvent('type-change', { detail: { color: primaryColor ?? null } }));
     // Nickname is instant (not dialog-scoped, see _wireEvents), so this
     // always reflects the real, current value — no pending state to
     // preserve here the way Nature/Pokérus/Exp. Share below need to.
     this.$nickname.value = e.nickname || titleCase(e.speciesName);
     this.$speciesNum.textContent = `#${String(e.speciesId).padStart(3, '0')}`;
-    // The species name only earns a second mention when a nickname is
-    // hiding it — with no nickname the title already reads e.g. "#169
-    // Crobat", so repeating "Crobat" below it would say nothing new.
-    this.$species.hidden = !e.nickname;
-    this.$species.textContent = e.nickname ? titleCase(e.speciesName) : '';
     this.$levelValue.textContent = `Lv. ${e.level}`;
     const natureAvailable = store.natureAvailable();
     this.$natureDialog.entry = e;

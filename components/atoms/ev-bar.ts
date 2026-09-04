@@ -15,13 +15,24 @@ export class EvBar extends BaseElement {
            width with no dead space reserved on the right. */
         .row { display: grid; grid-template-columns: 34px auto 1fr auto; align-items: center; gap: var(--space-3); }
         /* Bare mode (no label, no actual-stat hint — e.g. the roster's
-           total bar): drop the empty label columns so the bar + value
-           fit narrow hosts instead of overflowing them. */
-        :host([bare]) .row { grid-template-columns: 1fr auto; }
+           total bar): the track fills the row and the count sits just to
+           its right, tight against it rather than in a wide fixed
+           column. */
+        :host([bare]) .row {
+          grid-template-columns: 1fr auto;
+          column-gap: var(--space-3);
+          align-items: center;
+        }
         :host([bare]) .label,
         :host([bare]) .actual-stat { display: none; }
         :host([bare]) .track,
-        :host([bare]) .badge { grid-column: 1; }
+        :host([bare]) .badge { grid-column: 1; grid-row: 1; }
+        :host([bare]) .value {
+          grid-column: 2;
+          grid-row: 1;
+          min-width: 0;
+          text-align: right;
+        }
         .label {
           font-family: var(--font-mono);
           font-size: var(--font-size-xs);

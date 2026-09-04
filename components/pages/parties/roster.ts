@@ -1,16 +1,9 @@
 // Party roster ("/parties/<slug>") — the active party's identity header,
-// the add panel (species search -> add-Pokémon dialog), the per-game
-// rules legend, and the roster itself. Rebuilt from scratch on every
-// render, same pattern as the picker (see docs/adr/0002, point 5).
+// the add panel (species search -> add-Pokémon dialog), and the roster
+// itself. Rebuilt from scratch on every render, same pattern as the
+// picker (see docs/adr/0002, point 5).
 
 import {
-  STAT_CAP,
-  TOTAL_CAP,
-  VITAMIN_BONUS,
-  VITAMIN_STAT_CUTOFF,
-  STAT_EXP_VITAMIN_BONUS,
-  STAT_EXP_VITAMIN_CEILING,
-  MACHO_BRACE_MULTIPLIER,
   MACHO_BRACE_SPRITE,
   DEFAULT_LEVEL,
   MIN_LEVEL,
@@ -21,7 +14,6 @@ import {
   versionedSpriteOnError,
   NATURES,
   TYPE_COLORS,
-  typeLabel,
 } from '../../../lib/constants.ts';
 import { titleCase, totalEvs, natureOptionsHtml, escapeHtml, sortedNatures, natureLabel } from '../../../lib/utils.ts';
 import { POKERUS_ICON_SVG } from '../../../lib/icons.ts';
@@ -163,8 +155,6 @@ async function openAddPokemonDialog(name: string): Promise<void> {
     addDialogSpriteFallback.setVersionedSprite(versioned, modernSprite);
     addDialogName.textContent = `#${String(mon.id).padStart(3, '0')} ${titleCase(mon.name)}`;
     addDialogSubmitBtn.disabled = false;
-    addDialogLevel.focus();
-    addDialogLevel.select();
   } catch (err) {
     if (token !== addDialogToken) return;
     addDialogStatus.textContent = (err instanceof Error && err.message) || 'Could not look up that Pokémon.';
@@ -377,16 +367,18 @@ function renderRoster(party: Party): void {
     const nature = natureAvailable ? NATURES.find((n) => n.id === entry.nature) : null;
     const displayName = entry.nickname || titleCase(entry.speciesName);
     const natureMeta = nature ? ` &middot; <span class="roster-card-nature">${escapeHtml(nature.label.toLowerCase())}</span>` : '';
-    const speciesAside = entry.nickname ? ` &middot; ${escapeHtml(titleCase(entry.speciesName))}` : '';
-    // Type shows as colour: a faint wash on the sprite disc plus a dot
-    // per type by the name. Read from the api cache (populated when the
-    // species was looked up to add it); a v1-cached blob has no types, so
-    // the async warm below re-fetches and re-renders.
+    // Type shows as colour: a faint diagonal wash across the whole card.
+    // Read from the api cache (populated when the species was looked up to
+    // add it); a v1-cached blob has no types, so the async warm below
+    // re-fetches and re-renders.
     const types = api.peekCached(entry.speciesName)?.types ?? [];
-    const typeDots = types
-      .map((t) => `<i class="roster-card-type-dot" style="--type:${TYPE_COLORS[t] ?? 'var(--ink-soft)'}" title="${escapeHtml(typeLabel(t))}"></i>`)
-      .join('');
+    // Card wash: --type is the primary, --type2 the secondary — a faint
+    // diagonal blend of both across the whole card when dual-typed; the
+    // CSS falls --type2 back to --type for single types so it reads as one
+    // even wash. Set on .roster-card so it spans the full card, not just
+    // the sprite disc (which inherits --type for its ring tint).
     const primaryType = types[0] ? TYPE_COLORS[types[0]] ?? '' : '';
+    const secondaryType = types[1] ? TYPE_COLORS[types[1]] ?? '' : '';
     const modernSprite = entry.sprite || FALLBACK_SPRITE;
     const versionedSprite = versionedSpriteUrl(spriteGame, entry.speciesId);
     const spriteSrc = versionedSprite || modernSprite;
@@ -396,24 +388,25 @@ function renderRoster(party: Party): void {
     const row = document.createElement('div');
     row.className = 'roster-card';
     row.dataset.uid = entry.uid;
+    if (primaryType) {
+      row.style.setProperty('--type', primaryType);
+      if (secondaryType) row.style.setProperty('--type2', secondaryType);
+    }
     row.innerHTML = `
       ${reorderable ? `<button type="button" class="roster-card-handle" aria-label="Reorder ${escapeHtml(displayName)}">&#9776;</button>` : ''}
       <a class="roster-card-link" href="${router.pokemonPath(party.slug, entry.uid)}">
-        <span class="roster-card-sprite-frame${trained ? ' roster-card-sprite-frame--trained' : ''}${spriteOpaque ? ' roster-card-sprite-frame--opaque' : ''}"${primaryType ? ` style="--type:${primaryType}"` : ''}>
+        <span class="roster-card-sprite-frame${trained ? ' roster-card-sprite-frame--trained' : ''}${spriteOpaque ? ' roster-card-sprite-frame--opaque' : ''}">
           <img class="roster-card-sprite" src="${spriteSrc}" alt="" title="${trained ? 'Fully trained' : pokerusActive ? 'Pokérus — every EV earned from battling is doubled, permanently' : ''}" ${spriteOnError} />
           ${pokerusActive ? `<span class="roster-card-pkrs" aria-hidden="true">${POKERUS_ICON_SVG}</span>` : ''}
         </span>
         <div class="roster-card-body">
-          <span class="roster-card-headline">
-            ${typeDots ? `<span class="roster-card-types" aria-hidden="true">${typeDots}</span>` : ''}
-            <span class="roster-card-name">${escapeHtml(displayName)}</span>
-          </span>
+          <span class="roster-card-name">${escapeHtml(displayName)}</span>
           <span class="roster-card-meta">
-            Lv. ${entry.level}${natureMeta}${speciesAside}
+            Lv. ${entry.level}${natureMeta}
             ${entry.expShare ? `<img class="roster-card-exp-share" src="${EXP_SHARE_SPRITE}" alt="" title="Exp. Share — earns EVs from other battles" ${FALLBACK_ONERROR} />` : ''}
           </span>
+          <ev-bar class="roster-card-evbar"></ev-bar>
         </div>
-        <ev-bar class="roster-card-evbar"></ev-bar>
       </a>
     `;
     const link = row.querySelector<HTMLElement>('.roster-card-link')!;
@@ -453,52 +446,6 @@ function warmMissingTypes(speciesNames: string[]): void {
   Promise.allSettled(missing.map((n) => api.getPokemon(n))).then(() => {
     if (store.activeParty) renderRoster(store.activeParty);
   });
-}
-
-/* ------------------------------------------------------------------ */
-/* Per-game rules legend                                               */
-/* ------------------------------------------------------------------ */
-
-const trainingLegend = document.getElementById('training-legend')!;
-
-function renderLegend(): void {
-  const items: string[] = [];
-  const { machoBrace, powerItems } = store.trainingItemAvailability();
-  if (powerItems) {
-    items.push(`<strong>Power items</strong> add a flat +${store.powerItemBonus()} EVs to one stat every battle.`);
-  }
-  if (machoBrace) {
-    items.push(`<strong>Macho Brace</strong> doubles (&times;${MACHO_BRACE_MULTIPLIER}) all EVs gained in battle.`);
-  }
-  if (!powerItems && !machoBrace) {
-    items.push('No EV-boosting held items exist in this generation.');
-  }
-  const statExp = store.usesStatExpSystem();
-  items.push(
-    store.pokerusAvailable()
-      ? `<strong>Pok&eacute;rus</strong> doubles all ${statExp ? 'Stat Experience' : 'EVs'} earned in a battle.`
-      : `<strong>Pok&eacute;rus</strong> doesn't boost ${statExp ? 'Stat Experience' : 'EVs'} in this game.`
-  );
-  if (statExp) {
-    items.push(
-      `<strong>Vitamins</strong> add +${STAT_EXP_VITAMIN_BONUS} Stat Experience, but stop working once a stat has ${STAT_EXP_VITAMIN_CEILING}+.`
-    );
-    items.push(`Every stat caps at ${store.statCap()}, with no combined total cap.`);
-  } else {
-    items.push(
-      store.vitaminCutoffApplies()
-        ? `<strong>Vitamins</strong> add +${VITAMIN_BONUS} EVs, but stop once a stat has ${VITAMIN_STAT_CUTOFF}+.`
-        : `<strong>Vitamins</strong> add +${VITAMIN_BONUS} EVs to their stat.`
-    );
-    items.push(`Every stat caps at ${STAT_CAP}; the total caps at ${TOTAL_CAP}.`);
-  }
-  if (store.specialStatMerged()) {
-    items.push("Special hasn't split into Sp. Atk/Sp. Def yet — one stat feeds both.");
-  }
-  if (store.natureAvailable()) {
-    items.push('<strong>Nature</strong> gives one stat +10%, another -10% (shown on the EV bars).');
-  }
-  trainingLegend.innerHTML = items.map((i) => `<li>${i}</li>`).join('');
 }
 
 function resetRosterFilters(): void {
@@ -585,7 +532,6 @@ export function render(party: Party): void {
   activePartyGameLabel.textContent = party.baseGame;
   activePartyDescription.hidden = !party.description;
   activePartyDescription.textContent = party.description;
-  renderLegend();
   renderRoster(party);
   // Most-recently-added species first, deduped.
   addSearch.recent = [...party.pokemon]

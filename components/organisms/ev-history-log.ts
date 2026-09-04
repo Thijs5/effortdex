@@ -9,9 +9,8 @@ import type { RosterEntry, StatKey } from '../../lib/store.ts';
  * <ev-history-log> — a roster Pokémon's history: every battle, vitamin
  * dose, Wing, EV-reducing berry, Pokérus toggle, Exp. Share toggle (and
  * any EVs earned passively through one) and level change, grouped by date
- * with the most recent day first, inside a collapsible <details>.
- * Set `.entry` to a Store roster entry; the log re-renders on assignment
- * and keeps its open/closed state across re-renders.
+ * with the most recent day first. Always expanded — not a disclosure.
+ * Set `.entry` to a Store roster entry; the log re-renders on assignment.
  *
  * Deleting a record is handled internally (store.deleteHistoryEntry
  * reverts whatever it applied). "↻ Again" dispatches a composed
@@ -21,17 +20,14 @@ import type { RosterEntry, StatKey } from '../../lib/store.ts';
 
 export class EvHistoryLog extends BaseElement {
   _entry: RosterEntry | null = null;
-  _open = false;
   // Which collapsible batch entries are expanded, keyed by
   // `_batchKey`. Kept here (not in the DOM) so an expanded batch
   // survives the full innerHTML rebuild every render does — otherwise
   // deleting one nested entry re-renders and silently collapses the
-  // batch, hiding its remaining siblings (GitHub issue #35). Same
-  // reasoning as `_open` for the outer History disclosure.
+  // batch, hiding its remaining siblings (GitHub issue #35).
   _openBatches = new Set<string>();
   _filterKind = 'all';
   _search = '';
-  $details: HTMLDetailsElement;
   $histCount: HTMLElement;
   $histList: HTMLElement;
   $histSearch: HTMLInputElement;
@@ -45,6 +41,14 @@ export class EvHistoryLog extends BaseElement {
     this.shadow.innerHTML = `
       <style>
         :host { display: block; }
+        .hist-title {
+          margin: 0;
+          font-family: var(--font-mono);
+          font-size: var(--font-size-2xs);
+          letter-spacing: 0.06em;
+          text-transform: uppercase;
+          color: var(--ink-soft);
+        }
         .hist-toolbar { display: flex; flex-wrap: wrap; gap: var(--space-2) var(--space-3); margin: var(--space-3) 0 0; }
         .hist-search { flex: 1 1 12em; }
         .hist-kind-filter { flex: 0 1 12em; }
@@ -52,7 +56,6 @@ export class EvHistoryLog extends BaseElement {
           list-style: none; margin: var(--space-3) 0 0; padding: 0;
           display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
           align-items: start; gap: var(--space-3);
-          max-height: 60vh; overflow-y: auto;
         }
         ul.hist-list li { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2) var(--space-3); font-size: var(--font-size-xs); }
         ul.hist-list li.empty { display: block; color: var(--ink-soft); grid-column: 1 / -1; }
@@ -107,8 +110,8 @@ export class EvHistoryLog extends BaseElement {
           border-left: 2px solid var(--lcd-line); display: grid; gap: var(--space-3);
         }
       </style>
-      <details class="history ds-disclosure">
-        <summary>History (<span class="hist-count">0</span>)</summary>
+      <section class="history">
+        <h3 class="hist-title">History (<span class="hist-count">0</span>)</h3>
         <div class="hist-toolbar">
           <input type="search" class="hist-search ds-field" placeholder="Search history…" aria-label="Search history" />
           <select class="hist-kind-filter ds-field" aria-label="Filter by type">
@@ -125,9 +128,8 @@ export class EvHistoryLog extends BaseElement {
           </select>
         </div>
         <ul class="hist-list"></ul>
-      </details>
+      </section>
     `;
-    this.$details = this.$<HTMLDetailsElement>('details');
     this.$histCount = this.$<HTMLElement>('.hist-count');
     this.$histList = this.$<HTMLElement>('.hist-list');
     this.$histSearch = this.$<HTMLInputElement>('.hist-search');
@@ -136,9 +138,6 @@ export class EvHistoryLog extends BaseElement {
     this.$histKindOptBerry = this.$<HTMLOptionElement>('.hist-kind-opt-berry');
     this.$histKindOptPokerus = this.$<HTMLOptionElement>('.hist-kind-opt-pokerus');
 
-    this.$details.addEventListener('toggle', () => {
-      this._open = this.$details.open;
-    });
     this.$histSearch.addEventListener('input', () => {
       this._search = this.$histSearch.value.trim().toLowerCase();
       this._renderList();
@@ -166,7 +165,6 @@ export class EvHistoryLog extends BaseElement {
     this.$histList.addEventListener('click', (e) => {
       const redefeatBtn = (e.target as HTMLElement).closest<HTMLElement>('.redefeat-btn');
       if (redefeatBtn) {
-        this._open = true;
         this.dispatchEvent(
           new CustomEvent('redefeat', {
             detail: { name: redefeatBtn.dataset.name },
@@ -182,7 +180,6 @@ export class EvHistoryLog extends BaseElement {
         // EVs/level/evolution as they go), so gate it behind a native
         // confirm() — same treatment as removing a Pokémon or a party.
         if (!confirm("Delete this log entry? This can't be undone.")) return;
-        this._open = true;
         if (this._entry && deleteBtn.dataset.id) store.deleteHistoryEntry(this._entry.uid, deleteBtn.dataset.id);
       }
     });
@@ -199,7 +196,6 @@ export class EvHistoryLog extends BaseElement {
   protected render(): void {
     const e = this._entry;
     if (!e) return;
-    this.$details.open = this._open;
     this.$histCount.textContent = String(e.history.length);
     this._syncKindFilterOptions();
     this._renderList();

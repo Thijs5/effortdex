@@ -75,6 +75,7 @@
   --sprite-bg: rgba(255, 255, 255, 0.55);       /* chip behind opaque Gen I/II bitmaps */
   --sprite-glow: #c9a227;                        /* fully-trained (510 EVs) halo */
   --sprite-glow-soft: rgba(201, 162, 39, 0.4);
+  --sprite-drop: rgba(20, 18, 15, 0.4);         /* drop-shadow lifting a sprite off a surface — dark in light mode */
 
   /* Color — retired LCD effects (kept as no-ops so old consumers are inert) */
   --scanline: transparent;
@@ -175,6 +176,7 @@
     --sprite-bg: rgba(255, 255, 255, 0.08);
     --sprite-glow: #e8c14e;
     --sprite-glow-soft: rgba(232, 193, 78, 0.32);
+    --sprite-drop: rgba(255, 255, 255, 0.32);   /* light halo lifting a sprite off a dark surface */
 
     --scanline: transparent;
     --lcd-grid: transparent;
@@ -236,6 +238,7 @@
   --sprite-bg: rgba(255, 255, 255, 0.08);
   --sprite-glow: #e8c14e;
   --sprite-glow-soft: rgba(232, 193, 78, 0.32);
+  --sprite-drop: rgba(255, 255, 255, 0.32);   /* light halo lifting a sprite off a dark surface */
 
   --scanline: transparent;
   --lcd-grid: transparent;
