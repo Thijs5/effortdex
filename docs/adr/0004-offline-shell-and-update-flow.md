@@ -47,7 +47,12 @@ localStorage-backed cache with different rules (see ADR 0001).
    `activate` deletes every cache whose name isn't the current
    `CACHE_NAME`. `app.js` listens for `controllerchange` and reloads
    once, so an open tab picks up the new shell instead of running old
-   JS against new assumptions.
+   JS against new assumptions. `install` precaches each shell asset with
+   `fetch(url, { cache: 'reload' })` rather than `cache.addAll()` —
+   `addAll`'s fetches go through the browser HTTP cache, so a returning
+   visitor would otherwise copy the *previous* release's still-fresh
+   (`max-age=600`) `styles.css` / `tokens.css` / `index.html` into the
+   new per-release cache, leaving the site looking half-updated.
 4. **`version.json` is the staleness probe for long-lived tabs.** It is
    served network-first by the worker (a cache-first read would echo
    back the cached version and defeat the check). `lib/app-version.js`

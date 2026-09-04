@@ -76,7 +76,28 @@ const SHELL_URLS = SHELL_PATHS.map((p) => new URL(p, self.location).toString());
 
 self.addEventListener('install', (event) => {
   event.waitUntil(
-    caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL_URLS)).then(() => self.skipWaiting())
+    caches
+      .open(CACHE_NAME)
+      // NOT cache.addAll(): its fetches go through the browser's HTTP
+      // cache, so a returning visitor would precache the *previous*
+      // release's still-fresh styles.css / tokens.css / index.html
+      // (GitHub Pages serves them max-age=600) into this brand-new,
+      // per-release cache — a fresh CACHE_NAME holding stale files, which
+      // reads as "only half the site refreshed" after a deploy. Fetch
+      // every shell asset with `cache: 'reload'` to bypass the HTTP cache
+      // (and refresh its entry) instead. Still all-or-nothing like
+      // addAll: one bad response rejects the whole install.
+      .then((cache) =>
+        Promise.all(
+          SHELL_URLS.map((url) =>
+            fetch(new Request(url, { cache: 'reload' })).then((res) => {
+              if (!res.ok) throw new Error(`shell precache ${res.status} for ${url}`);
+              return cache.put(url, res);
+            })
+          )
+        )
+      )
+      .then(() => self.skipWaiting())
   );
 });
 
