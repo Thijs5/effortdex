@@ -126,17 +126,26 @@ const css = `
   .ds-dialog::backdrop { background: rgba(27, 25, 22, 0.6); }
   @media (max-width: 640px) {
     .ds-dialog {
+      /* Full-screen sheet on a phone, sized and positioned to the
+         *visual* viewport: lib/shell.ts mirrors window.visualViewport
+         onto --dialog-vv-top / --dialog-vv-height. A modal <dialog> is
+         fixed to the *layout*
+         viewport, which iOS Safari doesn't shrink for the on-screen
+         keyboard (and interactive-widget=resizes-content only helps on
+         Chrome), so a plain 100dvh sheet puts its footer — the primary
+         action — behind the keyboard. Tracking the visual viewport keeps
+         the sheet exactly over the visible area, so the three-row grid's
+         footer row lands just above the keyboard. Falls back to 100dvh
+         where visualViewport is unavailable. */
+      position: fixed;
+      inset: auto;
+      top: var(--dialog-vv-top, 0px);
+      left: 0;
       margin: 0;
       width: 100vw;
       max-width: 100vw;
-      /* Full-screen sheet on a phone: fill the viewport, always. The
-         three-row grid ([open] below) keeps the header and footer hugging
-         the top and bottom edges with the body scrolling between them, so
-         the primary action stays above an on-screen keyboard. margin:0
-         pins it to the top so an opening keyboard can't shove a field
-         off. */
-      height: 100dvh;
-      max-height: 100dvh;
+      height: var(--dialog-vv-height, 100dvh);
+      max-height: var(--dialog-vv-height, 100dvh);
       border-radius: 0;
     }
   }

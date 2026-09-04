@@ -192,6 +192,29 @@ function syncNavCondensed(): void {
 addEventListener('scroll', syncNavCondensed, { passive: true });
 syncNavCondensed();
 
+/* Keep a modal dialog's footer (its primary action) above the on-screen
+   keyboard on mobile. A modal <dialog> is fixed to the *layout* viewport,
+   which iOS Safari never shrinks for the keyboard, so a full-height sheet
+   ends with its footer behind the keyboard. Mirror the *visual* viewport
+   onto two custom properties the mobile .ds-dialog rule
+   (lib/design-system.ts) uses for its top/height, so the sheet covers
+   exactly the visible area and the grid footer row lands just above the
+   keyboard. Same technique as <pokemon-search>'s full-screen sheet. */
+const vv = window.visualViewport;
+if (vv) {
+  const rootStyle = document.documentElement.style;
+  const syncDialogViewport = () => {
+    rootStyle.setProperty('--dialog-vv-top', `${vv.offsetTop}px`);
+    rootStyle.setProperty('--dialog-vv-height', `${vv.height}px`);
+  };
+  syncDialogViewport();
+  vv.addEventListener('resize', syncDialogViewport);
+  vv.addEventListener('scroll', syncDialogViewport);
+  // iOS can settle the viewport a frame after focus moves in/out of a field.
+  addEventListener('focusin', () => requestAnimationFrame(syncDialogViewport));
+  addEventListener('focusout', () => requestAnimationFrame(syncDialogViewport));
+}
+
 /* ------------------------------------------------------------------ */
 /* Offline app shell                                                   */
 /* ------------------------------------------------------------------ */
