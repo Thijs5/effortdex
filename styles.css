@@ -9,6 +9,12 @@ html, body {
   background: var(--paper);
   color: var(--ink);
   font-family: var(--font-body);
+  /* The sticky per-view nav bars break out to full viewport width with
+     100vw (styles.css .view-nav) so they can full-bleed past their
+     centered, max-width parent — 100vw counts the scrollbar gutter, so
+     without this a vertical scrollbar would push the page a few px into
+     unwanted horizontal scroll. */
+  overflow-x: hidden;
 }
 
 body { padding: 0; }
@@ -68,7 +74,12 @@ html[data-modal-open] body {
   justify-content: space-between;
   gap: var(--space-3);
   padding-block: var(--space-3);
-  padding-inline: max(clamp(1.1rem, 3vw, 2.2rem), calc((100% - 1180px) / 2));
+  /* The centered 1180px column already carries its own gutter (the
+     view's --view-pad, ~1.1-2.2rem); a full-bleed band needs that SAME
+     gutter added on top of the centering offset, not maxed against it —
+     max() under-indents on wide viewports, landing this band's content
+     to the left of the column's actual edge. */
+  padding-inline: calc(max(0px, (100% - 1180px) / 2) + clamp(1.1rem, 3vw, 2.2rem));
   background: var(--surface);
   color: var(--ink);
   border-bottom: 1px solid var(--line);
@@ -83,7 +94,6 @@ html[data-modal-open] body {
 
 /* The active party's name, beside the wordmark while inside a party. */
 .app-header-context {
-  font-family: var(--font-mono);
   font-size: var(--font-size-2xs);
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -138,7 +148,6 @@ html[data-modal-open] body {
   border-radius: var(--radius-btn);
   background: var(--surface);
   color: var(--ink-soft);
-  font-family: var(--font-mono);
   font-size: var(--font-size-2xs);
   font-weight: 700;
   letter-spacing: 0.06em;
@@ -155,8 +164,12 @@ html[data-modal-open] body {
    on the left and the view's single primary action on the right, so that
    action is always reachable. Used by the picker (title + New party), the
    party view (← All parties + Add a Pokémon) and the Pokémon detail view
-   (← Roster + Log a battle). Full-bleeds to the view's own inline gutter
-   via --view-pad so it reads as a band, not an inset card. */
+   (← Roster + Log a battle). Full-bleeds to the viewport edges like the
+   app header and footer bands — not just to the view's own max-width
+   column — via the same width:100vw break-out those use, with the same
+   (100vw - 1180px)/2 centering offset PLUS the column's own --view-pad
+   gutter — not maxed against it — so its content lines up with the
+   column's actual left/right edge instead of sitting inside it. */
 .view-nav {
   position: sticky;
   top: 0;
@@ -165,8 +178,11 @@ html[data-modal-open] body {
   align-items: center;
   flex-wrap: wrap;
   gap: var(--space-2) var(--space-3);
-  margin: 0 calc(-1 * var(--view-pad, 0px)) var(--space-4);
-  padding: var(--space-3) var(--view-pad, 0px);
+  width: 100vw;
+  margin-inline: calc(50% - 50vw);
+  margin-bottom: var(--space-4);
+  padding-block: var(--space-3);
+  padding-inline: calc(max(0px, (100vw - 1180px) / 2) + var(--view-pad, 0px));
   background: var(--surface);
   border-bottom: 1px solid var(--line);
   transition: padding var(--transition-fast);
@@ -249,7 +265,6 @@ html[data-modal-open] body {
 }
 .header-menu-label {
   margin: 0 var(--space-3) var(--space-1);
-  font-family: var(--font-mono);
   font-size: var(--font-size-2xs);
   letter-spacing: 0.08em;
   text-transform: uppercase;
@@ -279,7 +294,6 @@ html[data-modal-open] body {
 .status-line {
   min-height: 1.2rem;
   margin: 0 0 var(--space-3);
-  font-family: var(--font-mono);
   font-size: var(--font-size-sm);
   color: var(--good);
 }
@@ -366,7 +380,6 @@ html[data-modal-open] body {
 .party-card-name-row .game-name-label { flex: 0 0 auto; }
 
 .game-name-label {
-  font-family: var(--font-mono);
   font-size: var(--font-size-2xs);
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -386,7 +399,6 @@ html[data-modal-open] body {
   display: flex;
   gap: var(--space-3);
   margin-top: var(--space-2);
-  font-family: var(--font-mono);
   font-size: var(--font-size-2xs);
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -417,7 +429,6 @@ html[data-modal-open] body {
 }
 
 .back-link {
-  font-family: var(--font-mono);
   font-size: var(--font-size-sm);
   color: var(--teal);
   text-decoration: none;
@@ -487,7 +498,6 @@ html[data-modal-open] body {
   border: 1px solid var(--lcd-line);
   border-radius: var(--radius-sm);
   background: var(--surface);
-  font-family: var(--font-mono);
   font-size: var(--font-size-input);
   color: var(--ink);
   cursor: pointer;
@@ -524,7 +534,6 @@ html[data-modal-open] body {
 }
 .roster-filter-group legend {
   padding: 0;
-  font-family: var(--font-mono);
   font-size: var(--font-size-2xs);
   text-transform: uppercase;
   letter-spacing: 0.06em;
@@ -679,7 +688,6 @@ html[data-modal-open] body {
   display: inline-flex;
   align-items: center;
   gap: 0.35em;
-  font-family: var(--font-mono);
   font-size: var(--font-size-2xs);
   color: var(--ink-soft);
 }
@@ -762,9 +770,9 @@ html[data-modal-open] body {
 }
 /* The grid gap already spaces the nav bar from the card below it. */
 .pokemon-view .view-nav { margin-bottom: 0; }
-.pokemon-view pokemon-detail {
-  max-width: 980px;
-}
+/* No max-width of its own: a grid item stretches to fill the track by
+   default, so the card's right edge lands under the nav bar's primary
+   button instead of stopping short of it. */
 
 /* ---------- Settings / transfer / cache / import views ---------- */
 .settings-view {
@@ -780,8 +788,11 @@ html[data-modal-open] body {
   top: 0;
   z-index: 10;
   display: block;
-  margin: 0 calc(-1 * var(--view-pad)) var(--space-4);
-  padding: var(--space-3) var(--view-pad);
+  width: 100vw;
+  margin-inline: calc(50% - 50vw);
+  margin-bottom: var(--space-4);
+  padding-block: var(--space-3);
+  padding-inline: calc(max(0px, (100vw - 680px) / 2) + var(--view-pad));
   background: var(--surface);
   border-bottom: 1px solid var(--line);
   transition: padding var(--transition-fast);
@@ -862,7 +873,6 @@ html[data-modal-open] body {
 }
 .sprite-cache-summary-status {
   margin-left: auto;
-  font-family: var(--font-mono);
   font-size: var(--font-size-2xs);
   font-weight: 400;
   color: var(--ink-soft);
@@ -964,7 +974,6 @@ html[data-modal-open] body {
 }
 .add-pokemon-dialog-status {
   margin: 0.15rem 0 0;
-  font-family: var(--font-mono);
   font-size: var(--font-size-sm);
   color: var(--teal);
   min-height: 1.1em;
@@ -1152,9 +1161,8 @@ textarea.ds-field { resize: vertical; }
   color: var(--footer-ink);
   text-align: center;
   padding-block: var(--space-4);
-  padding-inline: max(clamp(1.1rem, 3vw, 2.2rem), calc((100% - 1180px) / 2));
+  padding-inline: calc(max(0px, (100% - 1180px) / 2) + clamp(1.1rem, 3vw, 2.2rem));
   border-top: 1px solid var(--line);
-  font-family: var(--font-mono);
   font-size: var(--font-size-xs);
   letter-spacing: 0.03em;
 }

@@ -67,7 +67,7 @@ export class LevelDialog extends BaseDialog {
       .level-up-evolve, .level-up-stats { display: grid; gap: var(--space-2); min-width: 0; }
       .level-up-stats, .level-up-evolve { margin-top: var(--space-3); }
       .section-title {
-        margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs);
+        margin: 0; font-size: var(--font-size-2xs);
         letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft);
       }
       .level-up-step {

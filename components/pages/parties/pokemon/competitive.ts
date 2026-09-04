@@ -48,20 +48,20 @@ export class CompetitiveDialog extends BaseDialog {
     // .ds-dialog already matches what this dialog needs.
     style.textContent = `
         .section-title {
-          margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs);
+          margin: 0; font-size: var(--font-size-2xs);
           letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft);
           display: flex; align-items: center; gap: var(--space-2);
         }
         .help-btn {
           display: inline-flex; align-items: center; justify-content: center;
           width: 15px; height: 15px; border-radius: 50%; border: 1px solid var(--lcd-line);
-          background: var(--surface); color: var(--ink-soft); font-family: var(--font-mono);
+          background: var(--surface); color: var(--ink-soft);
           font-size: 10px; font-weight: 700; letter-spacing: 0; text-transform: none;
           line-height: 1; padding: 0; flex: 0 0 auto; cursor: pointer;
         }
         .help-btn:hover, .help-btn:focus-visible { border-color: var(--teal); color: var(--teal); }
         .help-note {
-          margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs);
+          margin: 0; font-size: var(--font-size-2xs);
           color: var(--ink-soft); background: var(--lcd);
           border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3);
           text-transform: none; letter-spacing: normal;
@@ -76,7 +76,6 @@ export class CompetitiveDialog extends BaseDialog {
           display: grid; grid-template-columns: 3.5em 1fr; align-items: center; gap: var(--space-2);
           font-size: var(--font-size-xs); color: var(--ink-soft);
         }
-        .base-stat-label { font-family: var(--font-mono); }
         .base-stat-value { font-family: var(--font-mono); color: var(--ink); text-align: right; }
         /* Three loose groups, not a full per-tier rainbow — a 14-color
            gradient would just be a new scale to learn. Default (teal):
@@ -108,10 +107,10 @@ export class CompetitiveDialog extends BaseDialog {
         }
         .competitive-set-title { margin: 0; font-weight: 600; color: var(--ink); }
         .competitive-set-format { font-weight: 400; color: var(--ink-soft); text-transform: uppercase; }
-        .competitive-set-line { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); }
+        .competitive-set-line { margin: 0; font-size: var(--font-size-2xs); }
         .competitive-set-line:empty { display: none; }
         .competitive-set-moves { margin: 0; font-size: var(--font-size-2xs); }
-        .competitive-empty { margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--ink-soft); }
+        .competitive-empty { margin: 0; font-size: var(--font-size-2xs); color: var(--ink-soft); }
         .competitive-attribution { margin: 0; font-size: var(--font-size-2xs); color: var(--ink-soft); }
         .competitive-attribution a { color: inherit; }
     `;

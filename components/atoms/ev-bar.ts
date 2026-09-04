@@ -34,7 +34,6 @@ export class EvBar extends BaseElement {
           text-align: right;
         }
         .label {
-          font-family: var(--font-mono);
           font-size: var(--font-size-xs);
           font-weight: 600;
           color: var(--ink-soft);

@@ -124,7 +124,6 @@ export class PokemonSearch extends BaseElement {
         }
         li.status {
           padding: var(--space-2) var(--space-3);
-          font-family: var(--font-mono);
           font-size: var(--font-size-2xs);
           color: var(--ink-soft);
           cursor: default;
@@ -149,7 +148,6 @@ export class PokemonSearch extends BaseElement {
           flex: 0 0 auto;
           padding: var(--space-3);
           border-bottom: 1px solid var(--lcd-line);
-          font-family: var(--font-mono);
           font-size: var(--font-size-2xs);
           text-transform: uppercase;
           letter-spacing: 0.06em;

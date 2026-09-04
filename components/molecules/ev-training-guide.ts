@@ -22,7 +22,7 @@ export class EvTrainingGuide extends BaseElement {
         :host { display: block; }
         .sections { display: grid; gap: var(--space-4); }
         .section-title {
-          margin: 0 0 var(--space-2); font-family: var(--font-mono); font-size: var(--font-size-2xs);
+          margin: 0 0 var(--space-2); font-size: var(--font-size-2xs);
           letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft);
         }
       </style>

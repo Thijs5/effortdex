@@ -67,20 +67,20 @@ export class ItemsDialog extends BaseDialog {
     // .ds-dialog already matches what this dialog needs.
     style.textContent = `
       .section-title {
-        margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs);
+        margin: 0; font-size: var(--font-size-2xs);
         letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft);
         display: flex; align-items: center; gap: var(--space-2);
       }
       .help-btn {
         display: inline-flex; align-items: center; justify-content: center;
         width: 15px; height: 15px; border-radius: 50%; border: 1px solid var(--lcd-line);
-        background: var(--surface); color: var(--ink-soft); font-family: var(--font-mono);
+        background: var(--surface); color: var(--ink-soft);
         font-size: 10px; font-weight: 700; letter-spacing: 0; text-transform: none;
         line-height: 1; padding: 0; flex: 0 0 auto; cursor: pointer;
       }
       .help-btn:hover, .help-btn:focus-visible { border-color: var(--teal); color: var(--teal); }
       .help-note {
-        margin: 0; font-family: var(--font-mono); font-size: var(--font-size-2xs);
+        margin: 0; font-size: var(--font-size-2xs);
         color: var(--ink-soft); background: var(--lcd);
         border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3);
         text-transform: none; letter-spacing: normal;
