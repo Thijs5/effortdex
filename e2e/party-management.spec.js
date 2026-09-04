@@ -104,7 +104,7 @@ test.describe('Party management', () => {
     await expect(page.getByRole('button', { name: 'Add a Pokémon' })).toBeVisible();
   });
 
-  test('on a narrow viewport the New-party dialog shrink-wraps to its content, not the full screen height', async ({ page }) => {
+  test('on a narrow viewport the New-party dialog is a full-screen sheet', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto('/');
     await page.getByRole('button', { name: '+ New party' }).click();
@@ -115,11 +115,12 @@ test.describe('Party management', () => {
     const viewport = page.viewportSize();
     if (!box || !viewport) throw new Error('expected both a dialog bounding box and a viewport size');
 
-    // Before the fix this light-DOM dialog was pinned to height:100dvh,
-    // so a short form left a big dead band of blank panel below the
-    // action row. It should end just past "Create party" instead —
-    // comfortably under the viewport, and top-anchored (keyboard-safe).
+    // On a phone the dialog fills the viewport edge to edge — top-anchored
+    // (keyboard-safe), full width, full height, with the three-row grid
+    // keeping the action row pinned to the bottom edge.
     expect(box.y).toBeLessThanOrEqual(1);
-    expect(box.height).toBeLessThan(viewport.height * 0.85);
+    expect(box.x).toBeLessThanOrEqual(1);
+    expect(box.width).toBeGreaterThanOrEqual(viewport.width - 1);
+    expect(box.height).toBeGreaterThanOrEqual(viewport.height - 1);
   });
 });

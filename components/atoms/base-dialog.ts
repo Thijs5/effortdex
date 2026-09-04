@@ -5,12 +5,12 @@ import { BaseElement } from '../base-element.ts';
  * BaseDialog — the open/close/backdrop-click/Enter-to-confirm wiring and
  * <dialog>/header/footer markup skeleton every dialog-shaped component in
  * this app duplicated before this existed (iv-dialog.js/items-dialog.js/
- * competitive-dialog.js's own "own dialog... same shape" header comments
- * — including, less obviously, the byte-identical mobile media query
- * every one of them repeated to opt out of design-system.js's default
- * full-screen-on-mobile treatment in favor of a floating, auto-height
- * dialog). Not registered as a custom element itself — a concrete dialog
- * subclasses it and registers its own tag, e.g.
+ * competitive-dialog.js's own "own dialog... same shape" header
+ * comments). Layout — full-screen sheet on mobile, grow-to-content on
+ * desktop — is entirely `.ds-dialog` in design-system.ts, the one shared
+ * contract every dialog in the app follows; this skeleton adds no
+ * layout CSS of its own. Not registered as a custom element itself — a
+ * concrete dialog subclasses it and registers its own tag, e.g.
  * `class IvDialog extends BaseDialog { ... }`,
  * `customElements.define('iv-dialog', IvDialog)`.
  *
@@ -48,16 +48,14 @@ export class BaseDialog extends BaseElement {
     this.shadow.innerHTML = `
       <style>
         :host { display: contents; }
-        /* Open/close + the 3-row grid layout come from .ds-dialog /
-           .ds-dialog[open] in design-system.js — nothing to add here. */
-        @media (max-width: 640px) {
-          dialog.${dialogClass}.ds-dialog {
-            margin: auto;
-            height: fit-content;
-            max-height: calc(100dvh - 2.4rem);
-            border-radius: var(--radius-md);
-          }
-        }
+        /* Open/close, the 3-row grid layout, full-screen-on-mobile and
+           the grow-to-content desktop behaviour all come from .ds-dialog /
+           .ds-dialog[open] in design-system.ts — one shared source of
+           truth for every dialog in the app, light-DOM and shadow-DOM
+           alike. Nothing to add or override here; a subclass only appends
+           its own body-specific rules (and a non-default *desktop* width,
+           gated to min-width: 641px so it can't fight the mobile sheet).
+        */
       </style>
       <dialog class="${dialogClass} ds-dialog" aria-labelledby="${titleId}">
         <header class="ds-dialog-header">

@@ -269,21 +269,13 @@ test.describe('Level popup', () => {
     await expect(dialog.getByLabel('ATK reading')).toHaveValue('20');
   });
 
-  // Regression: on a narrow (mobile) viewport, this dialog and the other
-  // "compact card" dialogs used to render two different ways — flush
-  // against the left edge instead of centered (a <dialog>'s UA box is
-  // position:fixed with inset:0 + margin:auto for centering; the design
-  // system's own mobile breakpoint zeroes that margin for the *other*,
-  // full-screen-sheet dialogs, and the override restoring it here was
-  // missing width but not the also-needed margin), and — separately —
-  // stretched to nearly the full viewport height with a large blank gap
-  // above its fields (restoring margin via height:auto ran into a second
-  // bug: for a fixed-position box with both top and bottom pinned,
-  // height:auto fills the remaining space instead of shrinking to fit —
-  // fit-content was needed instead). Both are CSS mechanics with no
-  // automated coverage elsewhere, so pin them here with real layout
-  // assertions rather than just a manually-checked screenshot.
-  test('on a narrow viewport, the dialog is centered and shrink-wrapped, not flush-left or full-height', async ({ page }) => {
+  // On a narrow (mobile) viewport every dialog in the app — this
+  // shadow-DOM one included — is a full-screen sheet: the shared
+  // .ds-dialog rules in design-system.ts are the single source of truth,
+  // and BaseDialog no longer carries a per-dialog opt-out. Pin the
+  // full-screen layout here with real assertions rather than a
+  // manually-checked screenshot.
+  test('on a narrow viewport, the dialog is a full-screen sheet', async ({ page }) => {
     await page.setViewportSize({ width: 375, height: 812 });
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
@@ -295,17 +287,10 @@ test.describe('Level popup', () => {
     const viewport = page.viewportSize();
     if (!dialogBox || !viewport) throw new Error('expected both a dialog bounding box and a viewport size');
 
-    const leftGap = dialogBox.x;
-    const rightGap = viewport.width - (dialogBox.x + dialogBox.width);
-    expect(Math.abs(leftGap - rightGap)).toBeLessThan(2); // centered, not flush-left
-
-    // Shrink-wrapped to content, not stretched to fill the available
-    // space: compared against the dialog's own max-height (100dvh -
-    // 2.4rem) rather than a fixed fraction of the viewport, since this
-    // dialog's real content height varies with what's shown (evolution
-    // chain, stat rows) — the bug pinned it at the cap regardless of
-    // content, so "meaningfully under the cap" is the actual invariant.
-    const maxHeightPx = await page.evaluate(() => window.innerHeight - 2.4 * 16);
-    expect(dialogBox.height).toBeLessThan(maxHeightPx * 0.95);
+    // Edge to edge, top-anchored (keyboard-safe), full height.
+    expect(dialogBox.x).toBeLessThanOrEqual(1);
+    expect(dialogBox.y).toBeLessThanOrEqual(1);
+    expect(dialogBox.width).toBeGreaterThanOrEqual(viewport.width - 1);
+    expect(dialogBox.height).toBeGreaterThanOrEqual(viewport.height - 1);
   });
 });
