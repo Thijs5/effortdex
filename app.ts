@@ -12,7 +12,7 @@ import { store, prefetchService } from './lib/services.ts';
 import { attachDesignSystem } from './lib/design-system.ts';
 import { wireDialogCloseButtons } from './lib/dom.ts';
 import * as router from './lib/router.ts';
-import './lib/shell.ts';
+import { setHeaderContext } from './lib/shell.ts';
 import './lib/app-version.ts';
 import * as parties from './components/pages/parties/parties.ts';
 import * as roster from './components/pages/parties/roster.ts';
@@ -40,6 +40,8 @@ function showView(view: HTMLElement): void {
 
 function render(): void {
   const { page, partySlug, pokemonUid, payload, dialog, pokemonDialog } = router.currentRoute();
+  // Cleared here, set again below only for the two in-party views.
+  setHeaderContext(null);
 
   if (page === 'settings') {
     partyDialog.closeIfOpen();
@@ -107,12 +109,14 @@ function render(): void {
       return;
     }
     partyDialog.closeIfOpen(); // no dialog route exists this deep — always closed here
+    setHeaderContext(party.name);
     showView(pokemon.view);
     pokemon.render(party, entry, pokemonDialog);
     return;
   }
 
   pokemon.closeDialogsIfOpen();
+  setHeaderContext(party.name);
   showView(roster.view);
   roster.render(party);
   if (dialog === 'edit-party') partyDialog.openEditDialog(party);
@@ -120,6 +124,12 @@ function render(): void {
 }
 
 router.onRouteChange(render);
+// A route change means a new page — start it at the top, the way a real
+// navigation would. Wired to route changes only, not store 'change'
+// (that's data edits — scrolling to the top mid-edit would be jarring);
+// the roster's own search/filter state uses replaceState, which never
+// fires this.
+router.onRouteChange(() => scrollTo({ top: 0 }));
 // The count script (index.html) already counts the initial page load
 // on its own; this only needs to cover subsequent in-app hash
 // navigation, which is why it's wired to route changes specifically —

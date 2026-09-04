@@ -8,24 +8,35 @@
 // navigate into a specific Pokémon's detail page via `openDetail`.
 
 /**
- * From a party's roster page, searches for `species` in the add panel,
- * picks it, and submits the add-Pokémon dialog (level defaults to 5
- * unless `level` is given; `nature` only applies on a Gen III+ party,
- * where the dialog shows the field). `stats` (optional) fills the "Its
- * stats" <stat-reading-grid> reading inputs, keyed by stat label
- * (HP/ATK/DEF/SPA/SPD/SPE), each logged as a stat reading. Leaves the
- * page on the roster list, not the new Pokémon's detail page.
+ * Opens the "Add a Pokémon" species-picker sheet (the add panel is gone —
+ * docs/adr/0028) and picks `species`, leaving #add-pokemon-dialog open on
+ * the result. The <pokemon-search> combobox lives in a shadow root, so
+ * role=combobox is the only reliable handle on the real input.
+ * @param {import('@playwright/test').Page} page
+ * @param {string} species
+ */
+export async function pickSpecies(page, species) {
+  await page.getByRole('button', { name: 'Add a Pokémon' }).click();
+  const combo = page.locator('#add-search').getByRole('combobox');
+  await combo.waitFor({ state: 'visible' });
+  await combo.fill(species);
+  await page.getByRole('option').filter({ hasText: new RegExp(species, 'i') }).first().click();
+}
+
+/**
+ * From a party's roster page, picks `species` via the add sheet and
+ * submits the add-Pokémon dialog (level defaults to 5 unless `level` is
+ * given; `nature` only applies on a Gen III+ party, where the dialog
+ * shows the field). `stats` (optional) fills the "Its stats"
+ * <stat-reading-grid> inputs, keyed by stat label (HP/ATK/DEF/SPA/SPD/
+ * SPE), each logged as a stat reading. Leaves the page on the roster
+ * list, not the new Pokémon's detail page.
  * @param {import('@playwright/test').Page} page
  * @param {string} species
  * @param {{ level?: number, nature?: string, stats?: Record<string, number> }} [opts]
  */
 export async function addPokemon(page, species, { level, nature, stats } = {}) {
-  const addPanel = page.locator('section', { has: page.getByRole('heading', { name: 'Add a Pokémon' }) });
-  // getByPlaceholder would also match <pokemon-search>'s own host element,
-  // which reflects the attribute but isn't the actual input — role=combobox
-  // only exists on the real <input> inside its shadow root.
-  await addPanel.getByRole('combobox', { name: 'e.g. Bulbasaur', exact: true }).fill(species);
-  await page.getByRole('option').filter({ hasText: new RegExp(species, 'i') }).first().click();
+  await pickSpecies(page, species);
 
   const dialog = page.locator('dialog#add-pokemon-dialog');
   await dialog.waitFor({ state: 'visible' });
@@ -153,17 +164,20 @@ export async function openTrainingGuide(card) {
 }
 
 /**
- * Logs a battle against `opponentSpecies` from the "Log a battle" FAB's
- * search sheet — the one entry point for both a direct fight and Exp.
- * Share's passive gain. Opens the search first if it isn't already
- * visible; it hides itself once the battle is successfully logged, so
- * this waits for that before returning.
+ * Logs a battle against `opponentSpecies` from the "Log a battle" search
+ * sheet — the one entry point for both a direct fight and Exp. Share's
+ * passive gain. The trigger is the detail view's fixed nav-bar button
+ * (#detail-log-battle-btn), not a FAB in the card. Opens the search
+ * first if it isn't already visible; it hides itself once the battle is
+ * successfully logged, so this waits for that before returning.
  * @param {import('@playwright/test').Locator} card
  * @param {string} opponentSpecies
  */
 export async function logBattle(card, opponentSpecies) {
   const search = card.locator('pokemon-search');
-  if (await search.getAttribute('hidden') !== null) await card.locator('.battle-fab').click();
+  if (await search.getAttribute('hidden') !== null) {
+    await card.page().locator('#detail-log-battle-btn').click();
+  }
   const combobox = search.getByRole('combobox', { name: 'Defeated Pokémon…' });
   await combobox.waitFor({ state: 'visible' });
   await combobox.fill(opponentSpecies);

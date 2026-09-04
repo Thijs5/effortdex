@@ -11,11 +11,7 @@ html, body {
   font-family: var(--font-body);
 }
 
-body {
-  padding: clamp(1rem, 3vw, 2.5rem);
-  display: flex;
-  justify-content: center;
-}
+body { padding: 0; }
 
 button, input, select {
   font: inherit;
@@ -38,137 +34,171 @@ html[data-modal-open] body {
   overflow: hidden;
 }
 
+/* No "device" frame any more (docs/adr/0028 revision): the app fills the
+   window edge to edge. The header and footer run full-bleed bands; each
+   view keeps its own readable max-width and centres itself. */
 .device {
+  position: relative;
   width: 100%;
-  max-width: 1180px;
-  background: var(--paper-panel);
-  border-radius: var(--radius-lg);
-  border: 1px solid var(--line);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.35), var(--shadow-panel);
-  overflow: hidden;
+  min-height: 100vh;
+  min-height: 100dvh;
+  /* Plain paper everywhere, except the Pokémon detail page: while that
+     view is showing, pokemon.ts sets --page-type on <html> to the
+     species' primary-type colour and this mixes a faint wash of it into
+     the full-bleed background, so the type tint fills the whole page
+     rather than stopping at the card. Unset elsewhere → resolves to
+     plain --paper-panel. */
+  background: color-mix(in srgb, var(--page-type, var(--paper-panel)) 7%, var(--paper-panel));
+  display: flex;
+  flex-direction: column;
+}
+.device > main {
+  width: 100%;
+  margin-inline: auto;
 }
 
-/* ---------- header ---------- */
-/* A slim toolbar-height bezel: the device's top edge, not a billboard.
-   The identity work is done by the power stripe, the LED, and the red
-   band itself — all of it fits in ~52px so content starts immediately. */
-.bezel {
-  position: relative;
+/* ---------- top app header ---------- */
+/* A slim wordmark bar — the app's identity, the active party's name, and
+   the Menu. Full-bleed band; its content aligns to the same 1180px column
+   the views use. Scrolls away with the page — only the per-view action
+   bar (.view-nav) stays pinned. */
+.app-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  background: var(--poke-red);
-  color: var(--on-red);
-  padding: var(--space-2) clamp(1.2rem, 3vw, 2.2rem) calc(var(--space-2) + 4px);
+  padding-block: var(--space-3);
+  padding-inline: max(clamp(1.1rem, 3vw, 2.2rem), calc((100% - 1180px) / 2));
+  background: var(--surface);
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
 }
 
-/* Pokéball seam — the red bezel is the ball's top half: a dark seam
-   along its bottom edge with the white center button straddling it.
-   This is the one signature detail the design is remembered by. */
-.bezel::after {
-  content: '';
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  height: 4px;
-  background: var(--footer-bg);
-}
-.bezel::before {
-  content: '';
-  position: absolute;
-  left: 50%;
-  bottom: 2px;
-  transform: translate(-50%, 50%);
-  width: 18px;
-  height: 18px;
-  border-radius: 50%;
-  background: #fff;
-  border: 4px solid var(--footer-bg);
-  z-index: 1;
+.app-header-identity {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-3);
+  min-width: 0;
 }
 
-.bezel h1 {
+/* The active party's name, beside the wordmark while inside a party. */
+.app-header-context {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-2xs);
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--ink-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+.app-header h1 {
   font-family: var(--font-display);
-  font-size: clamp(1.05rem, 2.5vw, 1.25rem);
+  font-size: clamp(1.05rem, 2.5vw, 1.2rem);
   font-weight: 700;
   margin: 0;
-  letter-spacing: -0.01em;
+  letter-spacing: -0.015em;
   white-space: nowrap;
 }
-.bezel h1 a {
+.app-header h1 a {
   color: inherit;
   text-decoration: none;
+  display: inline-flex;
+  align-items: baseline;
 }
-.bezel h1 a:hover { text-decoration: underline; }
-.e-accent { color: var(--gold-soft); }
+.app-header h1 a:hover { text-decoration: underline; }
+.e-accent { color: var(--accent); }
 
-/* Power LED — a router-style network activity indicator
-   (lib/network-activity.js sets data-status via lib/shell.js): dark/
-   unlit while offline (the base rule, and the default before JS has
-   run), blue while online and idle ("ready"), orange while a request is
-   in flight ("sending"), a brief green flash once one completes
-   ("receiving"). */
+/* Network-activity dot, just before the wordmark: dark/unlit while
+   offline (base rule + pre-JS default), blue online-idle, orange while a
+   request is in flight, a brief green flash once one completes.
+   lib/network-activity.ts sets data-status via lib/shell.ts. */
 .power-led {
   display: inline-block;
   width: 7px;
   height: 7px;
   border-radius: 50%;
   background: var(--led-off);
-  box-shadow: none;
-  margin-right: 0.6em;
-  vertical-align: 2px;
+  margin-right: 0.55em;
+  align-self: center;
   transition: background var(--transition-fast), box-shadow var(--transition-fast);
 }
-.power-led[data-status='ready'] {
-  background: var(--led-ready);
-  box-shadow: 0 0 6px var(--led-ready);
-}
-.power-led[data-status='sending'] {
-  background: var(--led-sending);
-  box-shadow: 0 0 6px var(--led-sending);
-}
-.power-led[data-status='receiving'] {
-  background: var(--led-online);
-  box-shadow: 0 0 6px var(--led-online);
-}
+.power-led[data-status='ready']     { background: var(--led-ready);   box-shadow: 0 0 6px var(--led-ready); }
+.power-led[data-status='sending']   { background: var(--led-sending); box-shadow: 0 0 6px var(--led-sending); }
+.power-led[data-status='receiving'] { background: var(--led-online);  box-shadow: 0 0 6px var(--led-online); }
 
-.bezel-btn {
-  display: grid;
-  place-items: center;
-  width: 34px;
-  height: 34px;
-  padding: 0;
-  border: 1px solid rgba(255, 248, 239, 0.45);
-  border-radius: 50%;
-  background: transparent;
-  color: var(--on-red);
-  cursor: pointer;
-  touch-action: manipulation;
-  transition: background var(--transition-fast);
-}
-.bezel-btn:hover { background: rgba(255, 248, 239, 0.15); }
-.bezel-btn svg { width: 17px; height: 17px; }
-
-/* Text instead of an icon — the pokémon detail page already has its
-   own dotted "More" button right under the header, and two dot-icon
-   buttons stacked that close read as one control. */
+/* Menu button — a quiet mono pill, not a chip. */
+.bezel-menu { position: relative; }
 .bezel-btn--menu {
-  width: auto;
-  height: auto;
   padding: var(--space-2) var(--space-3);
-  border-radius: var(--radius-sm);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-btn);
+  background: var(--surface);
+  color: var(--ink-soft);
   font-family: var(--font-mono);
   font-size: var(--font-size-2xs);
   font-weight: 700;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: border-color var(--transition-fast), color var(--transition-fast);
+}
+.bezel-btn--menu:hover { border-color: var(--ink-soft); color: var(--ink); }
+
+/* ---------- per-view fixed nav bar ---------- */
+/* A solid band that pins to the top of the viewport once the app header
+   scrolls past it — the only chrome that stays put. Holds the back link
+   on the left and the view's single primary action on the right, so that
+   action is always reachable. Used by the picker (title + New party), the
+   party view (← All parties + Add a Pokémon) and the Pokémon detail view
+   (← Roster + Log a battle). Full-bleeds to the view's own inline gutter
+   via --view-pad so it reads as a band, not an inset card. */
+.view-nav {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  margin: 0 calc(-1 * var(--view-pad, 0px)) var(--space-4);
+  padding: var(--space-3) var(--view-pad, 0px);
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  transition: padding var(--transition-fast);
+}
+.view-nav > .back-link { margin: 0; align-self: center; }
+.view-nav > .ds-btn {
+  margin-left: auto;
+  white-space: nowrap;
+  transition: padding var(--transition-fast), font-size var(--transition-fast);
+}
+.view-nav--title { align-items: baseline; }
+.view-nav--title > h2 { margin: 0; }
+.view-nav--title > .ds-btn { align-self: center; }
+
+/* Once the page has scrolled at all (lib/shell.ts flags .device), the
+   pinned action bar and its primary button tighten up a notch so they
+   sit lighter over the content. */
+.device.is-scrolled .view-nav,
+.device.is-scrolled .settings-view > .back-link {
+  padding-block: var(--space-2);
+}
+.device.is-scrolled .view-nav > .ds-btn--primary {
+  padding-block: var(--space-2);
+  font-size: var(--font-size-sm);
+  min-height: 32px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .view-nav,
+  .view-nav > .ds-btn { transition: none; }
 }
 
 /* ---------- header dropdown menu ---------- */
-.bezel-menu { position: relative; }
-
 .header-menu {
   position: absolute;
   top: calc(100% + 10px);
@@ -230,20 +260,9 @@ html[data-modal-open] body {
   gap: 2px;
 }
 
-/* ---------- layout ---------- */
-.layout {
-  display: grid;
-  grid-template-columns: minmax(240px, 300px) 1fr;
-  gap: var(--space-5);
-  padding: var(--space-5) clamp(1.2rem, 3vw, 2.2rem);
-}
-
-@media (max-width: 860px) {
-  .layout { grid-template-columns: 1fr; }
-  .add-panel { position: static; }
-}
-
-.panel h2 {
+/* ---------- shared bits ---------- */
+.panel h2,
+.roster-panel > h2 {
   font-family: var(--font-display);
   font-size: var(--font-size-xl);
   margin: 0 0 var(--space-1);
@@ -256,72 +275,32 @@ html[data-modal-open] body {
   color: var(--ink-soft);
 }
 
-/* The stationary "screen wells" (not the interactive cards, which read
-   as plastic buttons and lift on hover) get the LCD treatment: a faint
-   dot-matrix pixel grid plus an inset under-glass shadow — the texture
-   and depth that make the green read as a display, not a tint. */
-.add-panel,
-.empty-state,
-.add-pokemon-dialog-identity {
-  background-image:
-    repeating-linear-gradient(0deg, var(--lcd-grid) 0 1px, transparent 1px 4px),
-    repeating-linear-gradient(90deg, var(--lcd-grid) 0 1px, transparent 1px 4px);
-  box-shadow: var(--shadow-lcd);
-}
-
-.add-panel {
-  background-color: var(--lcd);
-  border: 1px solid var(--lcd-line);
-  border-radius: var(--radius-md);
-  padding: var(--space-4);
-  align-self: start;
-  position: sticky;
-  top: clamp(1rem, 3vw, 2.5rem);
-}
-
-.add-form {
-  display: flex;
-  gap: var(--space-3);
-  flex-wrap: wrap;
-}
-
-@media (max-width: 420px) {
-  .add-form { flex-direction: column; align-items: stretch; }
-}
-
+/* "Added X!" toast under the party nav bar. */
 .status-line {
   min-height: 1.2rem;
-  margin: var(--space-3) 0 0;
+  margin: 0 0 var(--space-3);
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
-  color: var(--teal);
+  color: var(--good);
 }
-
-/* Collapsed by default — a cheat sheet on demand, not a permanent
-   tenant of the add panel. */
-.legend {
-  margin-top: var(--space-4);
-  padding-top: var(--space-3);
-  border-top: 1px dashed var(--lcd-line);
-}
-.legend ul {
-  margin: var(--space-3) 0 0;
-  padding-left: 1.1rem;
-  font-size: var(--font-size-sm);
-  color: var(--ink-soft);
-  display: grid;
-  gap: var(--space-2);
-}
+.status-line:empty { display: none; }
 
 /* ---------- party picker ("/") ---------- */
 .picker {
-  padding: var(--space-5) clamp(1.2rem, 3vw, 2.2rem);
+  --view-pad: clamp(1.2rem, 3vw, 2.2rem);
+  max-width: 1180px;
+  /* No top padding: the .view-nav action bar sits flush under the app
+     header as a stacked band, then owns the gap to the content below it. */
+  padding: 0 var(--view-pad) var(--space-5);
 }
 .picker h2 {
   font-family: var(--font-display);
   font-size: var(--font-size-xl);
   margin: 0 0 var(--space-1);
 }
+/* The nav bar owns the top gutter; the standalone hint under it just
+   needs a little air. */
+.picker .view-nav + .hint { margin-top: 0; }
 
 .party-list {
   display: grid;
@@ -430,18 +409,14 @@ html[data-modal-open] body {
 .game-version-row .ds-field { flex: 1; }
 .game-version-row game-ball { flex: 0 0 auto; --cart-w: 34px; }
 
-/* ---------- party view header ("/<slug>") ---------- */
-.party-view-header {
-  display: grid;
-  grid-template-columns: auto 1fr auto;
-  align-items: start;
-  gap: var(--space-3) var(--space-4);
-  padding: var(--space-4) clamp(1.2rem, 3vw, 2.2rem) 0;
+/* ---------- party view ("/<slug>") ---------- */
+.party-view {
+  --view-pad: clamp(1.2rem, 3vw, 2.2rem);
+  max-width: 1180px;
+  padding: 0 var(--view-pad) var(--space-5);
 }
 
 .back-link {
-  grid-row: 1;
-  align-self: center;
   font-family: var(--font-mono);
   font-size: var(--font-size-sm);
   color: var(--teal);
@@ -449,17 +424,14 @@ html[data-modal-open] body {
 }
 .back-link:hover { text-decoration: underline; }
 
-/* On narrow screens the back link and edit button share row 1 so the
-   header costs two rows, not three; ≥640px pulls the identity up too. */
-#edit-party-btn {
-  grid-column: 3;
-  grid-row: 1;
+/* Party identity + Edit, below the nav bar. */
+.party-identity-row {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-3) var(--space-4);
+  margin-bottom: var(--space-4);
 }
-
-.party-identity {
-  grid-column: 1 / -1;
-  grid-row: 2;
-}
+.party-identity { flex: 1; min-width: 0; }
 .party-identity-head {
   display: flex;
   align-items: center;
@@ -478,17 +450,13 @@ html[data-modal-open] body {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-
-@media (min-width: 640px) {
-  .back-link { grid-column: 1; grid-row: 1; }
-  .party-identity { grid-column: 2; grid-row: 1; }
-}
+.party-identity-row #edit-party-btn { flex: 0 0 auto; }
 
 .empty-state {
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-md);
   color: var(--ink-soft);
   background-color: var(--lcd);
-  border: 1px dashed var(--lcd-line);
+  border: 1px dashed var(--line);
   border-radius: var(--radius-md);
   padding: var(--space-5);
   text-align: center;
@@ -613,13 +581,30 @@ html[data-modal-open] body {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  background: var(--lcd);
-  border: 1px solid var(--lcd-line);
+  /* A faint diagonal wash of the Pokémon's type(s) across the whole card:
+     --type (primary) and --type2 (secondary) are set inline by roster.ts;
+     single-typed cards leave --type2 unset so it falls back to --type and
+     the wash reads as one even colour. No type set at all → both fall
+     back to --surface and it's a plain surface card. */
+  background:
+    linear-gradient(135deg,
+      color-mix(in srgb, var(--type, var(--surface)) 14%, var(--surface)) 0%,
+      color-mix(in srgb, var(--type, var(--surface)) 6%, var(--surface)) 46%,
+      color-mix(in srgb, var(--type2, var(--type, var(--surface))) 7%, var(--surface)) 60%,
+      color-mix(in srgb, var(--type2, var(--type, var(--surface))) 16%, var(--surface)) 100%);
+  border: 1px solid var(--line);
   border-radius: var(--radius-md);
   padding: var(--space-3) var(--space-4);
-  transition: box-shadow var(--transition-med), transform var(--transition-fast);
+  transition: box-shadow var(--transition-med), transform var(--transition-fast), border-color var(--transition-med);
 }
-.roster-card:hover { box-shadow: var(--shadow-panel); transform: translateY(-1px); }
+.roster-card:hover {
+  box-shadow: var(--shadow-panel);
+  transform: translateY(-2px);
+  border-color: color-mix(in srgb, var(--accent) 45%, var(--line));
+}
+@media (prefers-reduced-motion: reduce) {
+  .roster-card:hover { transform: none; }
+}
 .roster-card--dragging { opacity: 0.6; box-shadow: var(--shadow-panel); }
 .roster-card--drop-target { outline: 2px dashed var(--teal); outline-offset: 2px; }
 
@@ -654,40 +639,41 @@ html[data-modal-open] body {
 .roster-card-handle:hover { color: var(--ink); }
 .roster-card--dragging .roster-card-handle { cursor: grabbing; }
 
+/* No frame around the sprite — it sits straight on the card's type wash
+   and gets a drop-shadow to pop off it (--sprite-drop: dark in light
+   mode, a light halo in dark mode). The wrapper just positions the
+   Pokérus glyph and carries the trained-glow classes. */
 .roster-card-sprite-frame {
   flex: 0 0 auto;
   position: relative;
-  width: 36px;
-  height: 36px;
   display: inline-flex;
 }
 .roster-card-sprite {
-  width: 100%;
-  height: 100%;
+  width: 40px;
+  height: 40px;
   image-rendering: pixelated;
   object-fit: contain;
+  filter: drop-shadow(0 3px 4px var(--sprite-drop)) drop-shadow(0 1px 1px var(--sprite-drop));
 }
-/* Gen I/II sprites are an opaque white bitmap — round the corners and
-   sit it on the sprite chip so it doesn't read as a hard rectangle.
-   Transparent sprites (every other gen) float on the card. */
-.roster-card-sprite-frame--opaque .roster-card-sprite {
-  background: var(--sprite-bg);
-  border-radius: var(--radius-sm);
-}
+/* Gen I/II sprites are already an opaque bitmap with their own light
+   background, so they get no chip or rounded edge of their own — the
+   drop-shadow above lifts the tile off the card as-is. */
 
 .roster-card-body {
   min-width: 0;
   flex: 1 1 auto;
   display: grid;
-  gap: 0.15rem;
+  gap: 0.2rem;
 }
 .roster-card-name {
   font-family: var(--font-display);
-  font-weight: 600;
-  font-size: var(--font-size-md);
+  font-weight: 700;
+  font-size: var(--font-size-lg);
+  letter-spacing: -0.01em;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+  min-width: 0;
 }
 .roster-card-meta {
   display: inline-flex;
@@ -696,13 +682,14 @@ html[data-modal-open] body {
   font-family: var(--font-mono);
   font-size: var(--font-size-2xs);
   color: var(--ink-soft);
-  text-transform: capitalize;
 }
+.roster-card-nature { text-transform: lowercase; }
 
+/* Sits under the name/meta inside .roster-card-body, spanning the full
+   content column; the count rides just to the right of the bar. */
 .roster-card-evbar {
-  flex: 1 1 100px;
-  max-width: 140px;
-  min-width: 84px;
+  width: 100%;
+  margin-top: 0.15rem;
 }
 
 /* Fully trained (at the 510 EV cap): a soft gold halo, subtly pulsing —
@@ -767,23 +754,42 @@ html[data-modal-open] body {
 
 /* ---------- Pokémon detail view ("/<slug>/<uid>") ---------- */
 .pokemon-view {
-  padding: var(--space-4) clamp(1.2rem, 3vw, 2.2rem) var(--space-5);
+  --view-pad: clamp(1.2rem, 3vw, 2.2rem);
+  max-width: 1180px;
+  padding: 0 var(--view-pad) var(--space-5);
   display: grid;
   gap: var(--space-4);
 }
+/* The grid gap already spaces the nav bar from the card below it. */
+.pokemon-view .view-nav { margin-bottom: 0; }
 .pokemon-view pokemon-detail {
   max-width: 980px;
 }
 
-/* ---------- Settings view ("/settings") ---------- */
+/* ---------- Settings / transfer / cache / import views ---------- */
 .settings-view {
-  padding: var(--space-4) clamp(1.2rem, 3vw, 2.2rem) var(--space-5);
-  max-width: 640px;
+  --view-pad: clamp(1.2rem, 3vw, 2.2rem);
+  padding: 0 var(--view-pad) var(--space-5);
+  max-width: 680px;
+}
+/* The lone back link pins to the top of the viewport on these long,
+   scrollable pages — the same pinned-nav pattern the other views use,
+   minus a primary action there's nothing to put in. */
+.settings-view > .back-link {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+  display: block;
+  margin: 0 calc(-1 * var(--view-pad)) var(--space-4);
+  padding: var(--space-3) var(--view-pad);
+  background: var(--surface);
+  border-bottom: 1px solid var(--line);
+  transition: padding var(--transition-fast);
 }
 .settings-view h2 {
   font-family: var(--font-display);
   font-size: var(--font-size-xl);
-  margin: var(--space-3) 0 var(--space-4);
+  margin: 0 0 var(--space-4);
   letter-spacing: -0.01em;
 }
 .settings-section {
@@ -811,7 +817,8 @@ html[data-modal-open] body {
 .safe-data-note {
   padding: var(--space-3);
   border-left: 3px solid var(--teal);
-  background: var(--paper);
+  border-radius: var(--radius-sm);
+  background: var(--lcd);
 }
 .safe-data-note strong { color: var(--ink); }
 /* Unlike other .status-line uses, this one only shows text for the
@@ -1133,16 +1140,23 @@ textarea.ds-field { resize: vertical; }
 .party-dialog-actions .spacer { flex: 1; }
 
 /* ---------- footer ---------- */
+/* Full-bleed band like the header; content aligned to the same 1180px
+   column. Sits at the viewport bottom on a short page (margin-top: auto
+   in the .device flex column), and scrolls away on a long one. */
 .bezel-footer {
+  flex: 0 0 auto;
+  margin-top: auto;
   display: grid;
   gap: 2px;
   background: var(--footer-bg);
   color: var(--footer-ink);
   text-align: center;
-  padding: var(--space-3);
+  padding-block: var(--space-4);
+  padding-inline: max(clamp(1.1rem, 3vw, 2.2rem), calc((100% - 1180px) / 2));
+  border-top: 1px solid var(--line);
   font-family: var(--font-mono);
   font-size: var(--font-size-xs);
-  letter-spacing: 0.04em;
+  letter-spacing: 0.03em;
 }
 .footer-link {
   color: inherit;
@@ -1155,40 +1169,24 @@ textarea.ds-field { resize: vertical; }
 }
 
 /* ---------- small screens ---------- */
-/* Below ~600px the outer body padding + .device border + each section's
-   own inline padding stacked into three separate gutters on top of each
-   other, eating a fifth of the screen on a typical phone before any
-   content started. Go edge-to-edge here: the device *is* the viewport,
-   with just enough inline padding on its inner sections to keep text off
-   the physical screen edge. */
+/* Below ~600px, tighten each view's inline gutter to 1rem so a phone
+   isn't spending a chunk of its width on whitespace before any content.
+   The header and footer manage their own gutters via the max() calc
+   above, which already floors at ~1.1rem on a narrow screen. */
 @media (max-width: 600px) {
-  body { padding: 0; }
-  .device {
-    border-radius: 0;
-    border-left: none;
-    border-right: none;
-    min-height: 100vh;
-    min-height: 100dvh;
-    /* Flex column so the footer sits at the viewport bottom instead of
-       floating mid-screen when a view is shorter than the display. */
-    display: flex;
-    flex-direction: column;
-  }
-  .bezel-footer { margin-top: auto; }
-  .layout,
   .picker,
+  .party-view,
   .pokemon-view,
-  .party-view-header,
-  .settings-view,
-  .bezel {
+  .settings-view {
     padding-inline: 1rem;
+    /* --view-pad feeds the .view-nav full-bleed maths; keep it in step. */
+    --view-pad: 1rem;
   }
-  /* Tighter vertical rhythm on phones: the big --space-5 block gaps are
-     a desktop luxury; here every row of chrome delays the content. */
-  .layout,
-  .picker {
-    padding-block: var(--space-4);
+  /* Tighter vertical rhythm on phones: the big block gaps are a desktop
+     luxury; here every row of chrome delays the content. Top stays 0 —
+     the action bar bands straight onto the app header. */
+  .picker,
+  .party-view {
+    padding-bottom: var(--space-4);
   }
-  .layout { gap: var(--space-4); }
-  .party-view-header { padding-top: var(--space-3); }
 }

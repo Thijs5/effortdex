@@ -38,6 +38,11 @@ const PIKACHU = {
     { stat: { name: 'special-defense' }, effort: 0, base_stat: 50 },
     { stat: { name: 'speed' }, effort: 2, base_stat: 90 },
   ],
+  // Deliberately slot-2 before slot-1 to prove _toDomainPokemon re-sorts.
+  types: [
+    { slot: 2, type: { name: 'flying' } },
+    { slot: 1, type: { name: 'electric' } },
+  ],
   sprites: { front_default: 'https://sprites.example/25.png' },
 };
 
@@ -49,9 +54,16 @@ test('getPokemon maps the PokeAPI shape to the domain shape', async () => {
     id: 25,
     name: 'pikachu',
     sprite: 'https://sprites.example/25.png',
+    types: ['electric', 'flying'], // primary (slot 1) first
     evYield: { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 2 },
     baseStats: { hp: 35, atk: 55, def: 40, spa: 50, spd: 50, spe: 90 },
   });
+});
+
+test('getPokemon tolerates a response with no types array', async () => {
+  routes.push({ match: '/pokemon/pikachu', handler: () => respond({ ...PIKACHU, types: undefined }) });
+  const mon = await new PokeApiClient().getPokemon('pikachu');
+  assert.deepEqual(mon.types, []);
 });
 
 test('getPokemon falls back to official artwork when front_default is missing', async () => {
@@ -185,7 +197,7 @@ test('localCacheBytes counts the client cache entries and nothing else', async (
   await client.getPokemon('pikachu');
   localStorage.setItem('effortdex:state', 'x'.repeat(5000)); // not part of the cache
 
-  const monKey = 'effortdex:mon:pikachu';
+  const monKey = 'effortdex:mon:2:pikachu';
   const expected = monKey.length + localStorage.getItem(monKey).length;
   assert.equal(await client.localCacheBytes(), expected);
 

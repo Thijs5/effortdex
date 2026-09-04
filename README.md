@@ -227,6 +227,8 @@ history linear and resolve conflicts at rebase time, not merge time.
   [`docs/adr/0026`](docs/adr/0026-typescript-migration.md));
   `scripts/build.mjs`: the esbuild production bundle.
 - `tokens.css` / `lib/design-system.ts`: the shared design-token and
-  primitive-style system every component draws from.
+  primitive-style system every component draws from — the "Field Guide"
+  skin (see
+  [`docs/adr/0028`](docs/adr/0028-field-guide-visual-redesign.md)).
 - `docs/adr/`: architecture decision records explaining the *why*
   behind the non-obvious choices above.

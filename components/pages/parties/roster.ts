@@ -1,16 +1,9 @@
 // Party roster ("/parties/<slug>") — the active party's identity header,
-// the add panel (species search -> add-Pokémon dialog), the per-game
-// rules legend, and the roster itself. Rebuilt from scratch on every
-// render, same pattern as the picker (see docs/adr/0002, point 5).
+// the add panel (species search -> add-Pokémon dialog), and the roster
+// itself. Rebuilt from scratch on every render, same pattern as the
+// picker (see docs/adr/0002, point 5).
 
 import {
-  STAT_CAP,
-  TOTAL_CAP,
-  VITAMIN_BONUS,
-  VITAMIN_STAT_CUTOFF,
-  STAT_EXP_VITAMIN_BONUS,
-  STAT_EXP_VITAMIN_CEILING,
-  MACHO_BRACE_MULTIPLIER,
   MACHO_BRACE_SPRITE,
   DEFAULT_LEVEL,
   MIN_LEVEL,
@@ -20,6 +13,7 @@ import {
   EXP_SHARE_SPRITE,
   versionedSpriteOnError,
   NATURES,
+  TYPE_COLORS,
 } from '../../../lib/constants.ts';
 import { titleCase, totalEvs, natureOptionsHtml, escapeHtml, sortedNatures, natureLabel } from '../../../lib/utils.ts';
 import { POKERUS_ICON_SVG } from '../../../lib/icons.ts';
@@ -113,14 +107,28 @@ editPartyBtn.addEventListener('click', () => {
 });
 
 /* ------------------------------------------------------------------ */
-/* Add panel                                                           */
+/* Add a Pokémon — a species-picker sheet, then the add dialog          */
 /* ------------------------------------------------------------------ */
+
+const partyAddBtn = document.getElementById('party-add-btn')!;
 
 let pendingAddMon: import('../../../lib/pokeapi-client.ts').DomainPokemon | null = null;
 
 // Guards against a stale lookup landing after a cancel/re-open.
 let addDialogToken = 0;
 
+// The add panel is gone (docs/adr/0028): <pokemon-search id="add-search">
+// is now a full-screen sheet the nav-bar button shows, mirroring the
+// detail page's "Log a battle". It hides itself on pick / Escape /
+// blur-away via its own 'sheet-close'.
+partyAddBtn.addEventListener('click', () => {
+  addStatus.textContent = '';
+  addSearch.hidden = false;
+  addSearch.focus();
+});
+addSearch.addEventListener('sheet-close', () => {
+  addSearch.hidden = true;
+});
 addSearch.addEventListener('pokemon-pick', (e) => openAddPokemonDialog((e as CustomEvent).detail.name));
 
 async function openAddPokemonDialog(name: string): Promise<void> {
@@ -147,8 +155,6 @@ async function openAddPokemonDialog(name: string): Promise<void> {
     addDialogSpriteFallback.setVersionedSprite(versioned, modernSprite);
     addDialogName.textContent = `#${String(mon.id).padStart(3, '0')} ${titleCase(mon.name)}`;
     addDialogSubmitBtn.disabled = false;
-    addDialogLevel.focus();
-    addDialogLevel.select();
   } catch (err) {
     if (token !== addDialogToken) return;
     addDialogStatus.textContent = (err instanceof Error && err.message) || 'Could not look up that Pokémon.';
@@ -360,8 +366,19 @@ function renderRoster(party: Party): void {
     const pokerusActive = store.effectiveAids(entry).pokerus;
     const nature = natureAvailable ? NATURES.find((n) => n.id === entry.nature) : null;
     const displayName = entry.nickname || titleCase(entry.speciesName);
-    const namePrefix = nature ? `${escapeHtml(nature.label)} ` : '';
-    const speciesAside = entry.nickname ? ` &middot; ${escapeHtml(titleCase(entry.speciesName))}` : '';
+    const natureMeta = nature ? ` &middot; <span class="roster-card-nature">${escapeHtml(nature.label.toLowerCase())}</span>` : '';
+    // Type shows as colour: a faint diagonal wash across the whole card.
+    // Read from the api cache (populated when the species was looked up to
+    // add it); a v1-cached blob has no types, so the async warm below
+    // re-fetches and re-renders.
+    const types = api.peekCached(entry.speciesName)?.types ?? [];
+    // Card wash: --type is the primary, --type2 the secondary — a faint
+    // diagonal blend of both across the whole card when dual-typed; the
+    // CSS falls --type2 back to --type for single types so it reads as one
+    // even wash. Set on .roster-card so it spans the full card, not just
+    // the sprite disc (which inherits --type for its ring tint).
+    const primaryType = types[0] ? TYPE_COLORS[types[0]] ?? '' : '';
+    const secondaryType = types[1] ? TYPE_COLORS[types[1]] ?? '' : '';
     const modernSprite = entry.sprite || FALLBACK_SPRITE;
     const versionedSprite = versionedSpriteUrl(spriteGame, entry.speciesId);
     const spriteSrc = versionedSprite || modernSprite;
@@ -371,6 +388,10 @@ function renderRoster(party: Party): void {
     const row = document.createElement('div');
     row.className = 'roster-card';
     row.dataset.uid = entry.uid;
+    if (primaryType) {
+      row.style.setProperty('--type', primaryType);
+      if (secondaryType) row.style.setProperty('--type2', secondaryType);
+    }
     row.innerHTML = `
       ${reorderable ? `<button type="button" class="roster-card-handle" aria-label="Reorder ${escapeHtml(displayName)}">&#9776;</button>` : ''}
       <a class="roster-card-link" href="${router.pokemonPath(party.slug, entry.uid)}">
@@ -379,13 +400,13 @@ function renderRoster(party: Party): void {
           ${pokerusActive ? `<span class="roster-card-pkrs" aria-hidden="true">${POKERUS_ICON_SVG}</span>` : ''}
         </span>
         <div class="roster-card-body">
-          <span class="roster-card-name">${namePrefix}${escapeHtml(displayName)}</span>
+          <span class="roster-card-name">${escapeHtml(displayName)}</span>
           <span class="roster-card-meta">
-            Lv. ${entry.level}${speciesAside}
+            Lv. ${entry.level}${natureMeta}
             ${entry.expShare ? `<img class="roster-card-exp-share" src="${EXP_SHARE_SPRITE}" alt="" title="Exp. Share — earns EVs from other battles" ${FALLBACK_ONERROR} />` : ''}
           </span>
+          <ev-bar class="roster-card-evbar"></ev-bar>
         </div>
-        <ev-bar class="roster-card-evbar"></ev-bar>
       </a>
     `;
     const link = row.querySelector<HTMLElement>('.roster-card-link')!;
@@ -407,53 +428,24 @@ function renderRoster(party: Party): void {
     }
     roster.appendChild(row);
   }
+
+  warmMissingTypes(entries.map((e) => e.speciesName));
   writeRosterStateToQuery();
 }
 
-/* ------------------------------------------------------------------ */
-/* Per-game rules legend                                               */
-/* ------------------------------------------------------------------ */
-
-const trainingLegend = document.getElementById('training-legend')!;
-
-function renderLegend(): void {
-  const items: string[] = [];
-  const { machoBrace, powerItems } = store.trainingItemAvailability();
-  if (powerItems) {
-    items.push(`<strong>Power items</strong> add a flat +${store.powerItemBonus()} EVs to one stat every battle.`);
-  }
-  if (machoBrace) {
-    items.push(`<strong>Macho Brace</strong> doubles (&times;${MACHO_BRACE_MULTIPLIER}) all EVs gained in battle.`);
-  }
-  if (!powerItems && !machoBrace) {
-    items.push('No EV-boosting held items exist in this generation.');
-  }
-  const statExp = store.usesStatExpSystem();
-  items.push(
-    store.pokerusAvailable()
-      ? `<strong>Pok&eacute;rus</strong> doubles all ${statExp ? 'Stat Experience' : 'EVs'} earned in a battle.`
-      : `<strong>Pok&eacute;rus</strong> doesn't boost ${statExp ? 'Stat Experience' : 'EVs'} in this game.`
+// Species added before types were tracked have a v1 api-cache blob with
+// no `types`. Fetch those once (fills the cache under the new key) and
+// re-render so their dots/wash appear; offline, they just stay plain.
+const typeWarmAttempted = new Set<string>();
+function warmMissingTypes(speciesNames: string[]): void {
+  const missing = [...new Set(speciesNames)].filter(
+    (n) => !typeWarmAttempted.has(n) && !api.peekCached(n)?.types?.length,
   );
-  if (statExp) {
-    items.push(
-      `<strong>Vitamins</strong> add +${STAT_EXP_VITAMIN_BONUS} Stat Experience, but stop working once a stat has ${STAT_EXP_VITAMIN_CEILING}+.`
-    );
-    items.push(`Every stat caps at ${store.statCap()}, with no combined total cap.`);
-  } else {
-    items.push(
-      store.vitaminCutoffApplies()
-        ? `<strong>Vitamins</strong> add +${VITAMIN_BONUS} EVs, but stop once a stat has ${VITAMIN_STAT_CUTOFF}+.`
-        : `<strong>Vitamins</strong> add +${VITAMIN_BONUS} EVs to their stat.`
-    );
-    items.push(`Every stat caps at ${STAT_CAP}; the total caps at ${TOTAL_CAP}.`);
-  }
-  if (store.specialStatMerged()) {
-    items.push("Special hasn't split into Sp. Atk/Sp. Def yet — one stat feeds both.");
-  }
-  if (store.natureAvailable()) {
-    items.push('<strong>Nature</strong> gives one stat +10%, another -10% (shown on the EV bars).');
-  }
-  trainingLegend.innerHTML = items.map((i) => `<li>${i}</li>`).join('');
+  if (!missing.length) return;
+  for (const n of missing) typeWarmAttempted.add(n);
+  Promise.allSettled(missing.map((n) => api.getPokemon(n))).then(() => {
+    if (store.activeParty) renderRoster(store.activeParty);
+  });
 }
 
 function resetRosterFilters(): void {
@@ -540,7 +532,6 @@ export function render(party: Party): void {
   activePartyGameLabel.textContent = party.baseGame;
   activePartyDescription.hidden = !party.description;
   activePartyDescription.textContent = party.description;
-  renderLegend();
   renderRoster(party);
   // Most-recently-added species first, deduped.
   addSearch.recent = [...party.pokemon]

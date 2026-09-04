@@ -25,7 +25,7 @@ const css = `
 
   .ds-btn {
     border: none;
-    border-radius: var(--radius-pill);
+    border-radius: var(--radius-btn);
     padding: var(--space-3) var(--space-4);
     font-weight: 600;
     font-size: var(--font-size-sm);
@@ -50,15 +50,18 @@ const css = `
 
   /* Page-level action buttons (previously a parallel .btn system in
      styles.css — one button system now, per ADR 0003). */
+  /* The one deliberately physical control: a raised face on a hard
+     bottom edge that presses in on :active. The accent colour is a
+     swappable token; the raised feel is the constant. */
   .ds-btn--primary {
-    background: var(--poke-red);
-    color: var(--on-red);
-    box-shadow: 0 3px 0 var(--poke-red-dark);
+    background: var(--accent);
+    color: var(--on-accent);
+    box-shadow: 0 3px 0 var(--accent-dark);
     font-size: var(--font-size-md);
     transition: transform var(--transition-fast), box-shadow var(--transition-fast), opacity var(--transition-fast);
   }
   .ds-btn--primary:not(:disabled):hover { transform: translateY(-1px); }
-  .ds-btn--primary:not(:disabled):active { transform: translateY(1px); box-shadow: 0 1px 0 var(--poke-red-dark); }
+  .ds-btn--primary:not(:disabled):active { transform: translateY(1px); box-shadow: 0 1px 0 var(--accent-dark); }
 
   .ds-btn--ghost {
     background: transparent;
@@ -120,23 +123,45 @@ const css = `
     overscroll-behavior: contain;
     padding: var(--space-3) var(--space-4);
   }
-  .ds-dialog::backdrop { background: rgba(27, 31, 28, 0.75); }
+  .ds-dialog::backdrop { background: rgba(27, 25, 22, 0.6); }
   @media (max-width: 640px) {
     .ds-dialog {
       margin: 0;
       width: 100vw;
       max-width: 100vw;
-      /* No height declaration on purpose: the grid rows already resolve
-         to content height (the minmax(0,1fr) body only grows to its
-         content), so a short dialog stays short and a tall one caps at
-         100dvh with the body scrolling. Forcing height:100dvh instead
-         made every short dialog a full-screen sheet with a dead band of
-         blank panel and its action row stranded mid-screen. margin:0
-         still pins it to the top so an opening keyboard can't shove a
-         field off. */
+      /* Full-screen sheet on a phone: fill the viewport, always. The
+         three-row grid ([open] below) keeps the header and footer hugging
+         the top and bottom edges with the body scrolling between them, so
+         the primary action stays above an on-screen keyboard. margin:0
+         pins it to the top so an opening keyboard can't shove a field
+         off. */
+      height: 100dvh;
       max-height: 100dvh;
       border-radius: 0;
     }
+  }
+
+  /* Desktop (roomy pointer devices): the dialog is one column that grows
+     to its content — no separately-scrolling body, no pinned header or
+     footer. A modal <dialog> is position:fixed so it still can't exceed
+     the viewport; a rare very tall one then scrolls as a whole, but the
+     body itself never gets its own inset scrollbar. Mobile keeps the
+     three-row grid (above) so the primary action stays above the
+     on-screen keyboard. */
+  @media (min-width: 641px) {
+    .ds-dialog {
+      max-height: calc(100dvh - 3rem);
+      margin-block: 1.5rem;
+    }
+    .ds-dialog[open] {
+      display: block;
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+    .ds-dialog .dialog-body { overflow: visible; }
+    .ds-dialog-header,
+    .ds-dialog-footer,
+    .party-dialog-actions { box-shadow: none; }
   }
 
   /* Dialog footer — a grid row of its own (auto height), outside the

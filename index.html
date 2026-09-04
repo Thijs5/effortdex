@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content" />
   <meta name="description" content="Local-only Pokémon EV training tracker: log battles and vitamins, track effort values per stat across parties, works offline." />
   <title>Effortdex</title>
   <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 32 32%22><circle cx=%2216%22 cy=%2216%22 r=%2214%22 fill=%22%23e3350d%22/><path d=%22M2 16h28%22 stroke=%22%231b1f1c%22 stroke-width=%223%22/><circle cx=%2216%22 cy=%2216%22 r=%226%22 fill=%22%23fff%22 stroke=%22%231b1f1c%22 stroke-width=%223%22/></svg>" />
@@ -61,8 +61,11 @@
          (with the Clear-cache link) or a one-off "a recent change may
          not have saved" notice (docs/adr/0025 P4d). -->
     <div id="storage-warning" class="storage-warning" role="alert" hidden></div>
-    <header class="bezel">
-      <h1><a id="header-home-link" href="#/parties"><span class="power-led" aria-hidden="true"></span>Effort<span class="e-accent">dex</span></a></h1>
+    <header class="app-header">
+      <div class="app-header-identity">
+        <h1><a id="header-home-link" href="#/parties"><span class="power-led" aria-hidden="true"></span>Effort<span class="e-accent">dex</span></a></h1>
+        <span id="header-party-name" class="app-header-context" hidden></span>
+      </div>
       <div class="bezel-menu">
         <button id="menu-btn" class="bezel-btn bezel-btn--menu" type="button" aria-haspopup="true" aria-expanded="false">Menu</button>
         <div id="header-menu" class="header-menu" role="menu" aria-label="App menu" hidden>
@@ -92,12 +95,14 @@
 
     <!-- "/parties" — choose which party (save file / playthrough) to open -->
     <main id="picker-view" class="picker">
-      <h2>Choose a party</h2>
+      <div class="view-nav view-nav--title">
+        <h2>Choose a party</h2>
+        <button id="picker-new-party-btn" class="ds-btn ds-btn--primary">+ New party</button>
+      </div>
       <p class="hint">Keep a separate party per save file or playthrough you're running at once.</p>
       <div id="party-list" class="party-list"></div>
       <p id="picker-empty" class="empty-state" hidden>No parties yet &mdash; create one to start tracking EVs.</p>
       <div class="picker-actions">
-        <button id="picker-new-party-btn" class="ds-btn ds-btn--primary">+ New party</button>
         <button id="picker-import-btn" class="ds-btn ds-btn--ghost">Have a transfer file or link? Import it</button>
       </div>
       <p class="hint picker-import-hint">
@@ -106,10 +111,14 @@
       </p>
     </main>
 
-    <!-- "/parties/<slug>" — that party's add panel + roster -->
+    <!-- "/parties/<slug>" — that party's roster -->
     <main id="party-view" class="party-view" hidden>
-      <div class="party-view-header">
+      <div class="view-nav">
         <a id="back-to-parties" class="back-link" href="#/parties">&larr; All parties</a>
+        <button id="party-add-btn" class="ds-btn ds-btn--primary" type="button">&plus; Add a Pok&eacute;mon</button>
+      </div>
+
+      <div class="party-identity-row">
         <div class="party-identity">
           <div class="party-identity-head">
             <h2 id="active-party-name"></h2>
@@ -123,43 +132,37 @@
         <button id="edit-party-btn" class="ds-btn ds-btn--ghost">Edit party</button>
       </div>
 
-      <div class="layout">
-        <section class="panel add-panel" aria-labelledby="add-heading">
-          <h2 id="add-heading">Add a Pok&eacute;mon</h2>
-          <p class="hint">Search a species to add it to your roster and start logging its EVs.</p>
-          <div class="add-form">
-            <pokemon-search id="add-search" placeholder="e.g. Bulbasaur"></pokemon-search>
-          </div>
-          <p id="add-status" class="status-line" aria-live="polite"></p>
+      <p id="add-status" class="status-line" aria-live="polite"></p>
 
-          <details class="legend ds-disclosure">
-            <summary>This game's rules</summary>
-            <ul id="training-legend"></ul>
-          </details>
-        </section>
+      <section class="roster-panel" aria-labelledby="roster-heading">
+        <h2 id="roster-heading">My Pok&eacute;mon</h2>
+        <p id="empty-state" class="empty-state">
+          No Pok&eacute;mon added yet &mdash; tap &ldquo;Add a Pok&eacute;mon&rdquo; above to start tracking EVs.
+        </p>
+        <div id="roster-toolbar" class="roster-toolbar" hidden>
+          <input type="search" id="roster-search" class="ds-field" placeholder="Search by name or species&hellip;" aria-label="Search roster" />
+          <button type="button" id="roster-filter-btn" class="roster-filter-btn" aria-haspopup="dialog">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
+            <span>Filter</span>
+            <span id="roster-filter-count" class="roster-filter-count" hidden></span>
+          </button>
+        </div>
+        <p id="roster-no-results" class="empty-state" hidden></p>
+        <div id="roster" class="roster"></div>
+      </section>
 
-        <section class="panel roster-panel" aria-labelledby="roster-heading">
-          <h2 id="roster-heading">My Pok&eacute;mon</h2>
-          <p id="empty-state" class="empty-state">
-            No Pok&eacute;mon added yet &mdash; add one on the left to start tracking EVs.
-          </p>
-          <div id="roster-toolbar" class="roster-toolbar" hidden>
-            <input type="search" id="roster-search" class="ds-field" placeholder="Search by name or species&hellip;" aria-label="Search roster" />
-            <button type="button" id="roster-filter-btn" class="roster-filter-btn" aria-haspopup="dialog">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="22 3 2 3 10 12.46 10 19 14 21 14 12.46 22 3"/></svg>
-              <span>Filter</span>
-              <span id="roster-filter-count" class="roster-filter-count" hidden></span>
-            </button>
-          </div>
-          <p id="roster-no-results" class="empty-state" hidden></p>
-          <div id="roster" class="roster"></div>
-        </section>
-      </div>
+      <!-- Species picker: a full-screen sheet the "Add a Pokémon" button
+           shows; picking a species opens #add-pokemon-dialog for level /
+           nature / stats (roster.ts). -->
+      <pokemon-search id="add-search" hidden placeholder="Search a species&hellip;" sheet-title="Add a Pok&eacute;mon" force-sheet></pokemon-search>
     </main>
 
     <!-- "/parties/<slug>/<uid>" — one roster Pokémon's full detail page -->
     <main id="pokemon-view" class="pokemon-view" hidden>
-      <a id="back-to-roster" class="back-link" href="#/">&larr; Roster</a>
+      <div class="view-nav">
+        <a id="back-to-roster" class="back-link" href="#/">&larr; Roster</a>
+        <button id="detail-log-battle-btn" class="ds-btn ds-btn--primary" type="button">&plus; Log a battle</button>
+      </div>
     </main>
 
     <!-- "/settings" — app-wide settings, reachable from any party -->

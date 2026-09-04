@@ -19,6 +19,9 @@ export interface DomainPokemon {
   id: number;
   name: string;
   sprite: string | null;
+  /** Elemental type(s), lowercase, primary first (PokéAPI slot order).
+   * `[]` when unknown — a species cached before types were tracked. */
+  types: string[];
   evYield: EvMap;
   baseStats: EvMap;
 }
@@ -37,7 +40,13 @@ export interface EvolutionNode {
 }
 
 const SPECIES_LIST_KEY = 'effortdex:species-list';
-const MON_KEY_PREFIX = 'effortdex:mon:';
+// Bumped to :2: when `types` was added to the cached shape — an old
+// `effortdex:mon:*` blob has no types, so a one-time re-fetch per
+// species under the new prefix is how existing installs pick them up
+// (online). The old prefix stays in CACHE_KEY_PREFIXES so "Clear cache"
+// still sweeps the orphaned v1 entries.
+const MON_KEY_PREFIX = 'effortdex:mon:2:';
+const MON_KEY_PREFIX_V1 = 'effortdex:mon:';
 const SPECIES_KEY_PREFIX = 'effortdex:species:';
 const CHAIN_KEY_PREFIX = 'effortdex:evochain:';
 const EVOLUTIONS_KEY_PREFIX = 'effortdex:evolutions:';
@@ -50,6 +59,7 @@ const GENERATION_KEY_PREFIX = 'effortdex:generation:';
 const CACHE_KEY_PREFIXES = [
   SPECIES_LIST_KEY,
   MON_KEY_PREFIX,
+  MON_KEY_PREFIX_V1,
   SPECIES_KEY_PREFIX,
   CHAIN_KEY_PREFIX,
   EVOLUTIONS_KEY_PREFIX,
@@ -328,7 +338,14 @@ export class PokeApiClient {
       data.sprites?.front_default ||
       data.sprites?.other?.['official-artwork']?.front_default ||
       null;
-    return { id: data.id, name: data.name, sprite, evYield, baseStats };
+    // PokéAPI lists types slot-first (slot 1 = primary); keep that order.
+    const types: string[] = Array.isArray(data.types)
+      ? [...data.types]
+          .sort((a, b) => (a?.slot ?? 0) - (b?.slot ?? 0))
+          .map((t) => t?.type?.name)
+          .filter((n): n is string => typeof n === 'string')
+      : [];
+    return { id: data.id, name: data.name, sprite, types, evYield, baseStats };
   }
 
   /**

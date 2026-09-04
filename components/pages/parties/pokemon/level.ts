@@ -48,8 +48,11 @@ export class LevelDialog extends BaseDialog {
       /* Wider than the other compact dialogs (420px, the shared default)
          — this is the one that embeds <evolution-chain>, and three
          stages (current + two evolutions) plus arrows routinely need
-         more than 420px to fit on one row before wrapping. */
-      dialog.level-up-dialog.ds-dialog { width: min(560px, calc(100vw - 2.4rem)); }
+         more than 420px to fit on one row before wrapping. Desktop only:
+         on mobile it's a full-screen sheet like every other dialog. */
+      @media (min-width: 641px) {
+        dialog.level-up-dialog.ds-dialog { width: min(560px, calc(100vw - 2.4rem)); }
+      }
       .field-inline {
         display: flex; align-items: center; justify-content: space-between; gap: var(--space-3);
         font-size: var(--font-size-xs); color: var(--ink-soft); min-width: 0;

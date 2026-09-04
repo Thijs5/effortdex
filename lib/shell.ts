@@ -166,6 +166,32 @@ networkActivity.addEventListener('change', updatePowerLed);
 networkActivity.attach();
 updatePowerLed();
 
+/* The app header shows the active party's name beside the wordmark while
+   you're inside a party (its roster or one Pokémon's detail page). app.ts
+   sets it on every route change and clears it (null) everywhere else. */
+const headerPartyName = requireElementById('header-party-name');
+export function setHeaderContext(name: string | null): void {
+  headerPartyName.textContent = name ?? '';
+  headerPartyName.hidden = !name;
+}
+
+/* The per-view action bar (.view-nav) is the one piece of chrome that
+   stays pinned while you scroll; once the page has moved at all, tighten
+   it and its primary button a little so it costs less room over the
+   content. Flag lives on .device (a class, toggled only on the
+   crossings) rather than each bar — there's one bar per view and they
+   come and go with navigation; the CSS keys off it. */
+const deviceEl = requireQuery('.device');
+let navCondensed = false;
+function syncNavCondensed(): void {
+  const next = window.scrollY > 4;
+  if (next === navCondensed) return;
+  navCondensed = next;
+  deviceEl.classList.toggle('is-scrolled', next);
+}
+addEventListener('scroll', syncNavCondensed, { passive: true });
+syncNavCondensed();
+
 /* ------------------------------------------------------------------ */
 /* Offline app shell                                                   */
 /* ------------------------------------------------------------------ */
