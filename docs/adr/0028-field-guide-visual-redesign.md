@@ -40,16 +40,12 @@ structure as before. Buttons keep one deliberately physical detail: the
 raised `.ds-btn--primary` face on a hard bottom edge that presses in on
 `:active`.
 
-**Two headers, kept distinct.**
+**Two headers, kept distinct.** (See the Revision section below — the app
+header is no longer sticky.)
 
-- The `.bezel` billboard is replaced by `.app-header` — a slim, sticky,
-  surface-coloured wordmark bar (Effort·dex + network LED + Menu) that
-  **condenses** to its minimum usable height once the page scrolls off
-  the top. `lib/shell.ts` toggles `.is-condensed` from an
-  `IntersectionObserver` on a 1px `#app-scroll-sentinel`, and publishes
-  the live header height as `--app-header-h` on `<html>`.
-- Each content view gets a `.view-nav` band pinned directly below the app
-  header (`top: var(--app-header-h)`) carrying the back link and the
+- The `.bezel` billboard is replaced by `.app-header` — a slim,
+  surface-coloured wordmark bar (Effort·dex + network LED + Menu).
+- Each content view gets a `.view-nav` band carrying the back link and the
   view's **one** primary action: picker `+ New party`, party view
   `+ Add a Pokémon`, detail `+ Log a battle`. The utility views get the
   band with just the back link.
@@ -98,3 +94,90 @@ before the change (roster and detail both).
 - e2e: the add flow goes through the new sheet (`pickSpecies()` helper);
   `.battle-fab` / add-panel-heading selectors were updated to the new
   button locations.
+
+## Revision — review round 2
+
+Feedback on the first cut changed several structural calls; the palette /
+type / component skin is unchanged.
+
+- **No device frame.** The bordered, rounded, max-width `.device` card is
+  gone: the app fills the window. `.app-header` and `.bezel-footer` are
+  full-bleed bands (content aligned to a 1180px column via a
+  `max(gutter, (100% - 1180px) / 2)` inline pad); each view keeps its own
+  readable `max-width` and centres itself. `.device` is a plain
+  `min-height: 100dvh` flex column; the footer sits at the bottom on a
+  short page (`margin-top: auto`) and scrolls away on a long one.
+- **Only the action bar pins.** The condense-on-scroll header is dropped —
+  no `#app-scroll-sentinel`, no `IntersectionObserver`, no
+  `--app-header-h`. `.app-header` scrolls away with the page on every
+  screen size; `.view-nav` / the utility back-link band are the one
+  pinned element (`position: sticky; top: 0`), so the primary action is
+  always reachable. (The earlier sticky header never actually pinned —
+  `.device { overflow: hidden }` was trapping it; removing the frame
+  fixed that too.)
+- **Party name in the header.** `.app-header` shows the active party's
+  name beside the wordmark while inside a party (`lib/shell.ts`
+  `setHeaderContext()`, called by `app.ts` on every route change).
+- **Roster card.** The disc wash is a diagonal `linear-gradient` of both
+  types (`--type` / `--type2`, single-typed falls `--type2` back to
+  `--type`). The whole card lifts on hover, not the sprite alone. The
+  bare `<ev-bar>` total stacks the count *under* the bar instead of
+  beside it.
+- **History is not a disclosure.** `<ev-history-log>` is always expanded —
+  a plain `HISTORY (n)` heading, no `<details>`, and the list has no
+  `max-height` / inner scrollbar of its own. The per-batch `<details>`
+  inside it are unchanged.
+- **Dialogs.** On desktop (`min-width: 641px`) a dialog is a single
+  scroll area — its own — with the header and footer scrolling with the
+  content rather than pinned, so there's never an inner `.dialog-body`
+  scrollbar. Mobile keeps the three-row grid with the footer pinned
+  above the on-screen keyboard, now helped by
+  `interactive-widget=resizes-content` on the viewport meta. Opening a
+  dialog no longer autofocuses a field (the add-Pokémon Level
+  focus/select was removed); focus still lands on the heading
+  (`focusDialogStart`), so nothing shows a ring.
+
+## Revision — review round 3
+
+- **Roster card, take 2.** Detail line trimmed: no type dots (the
+  full-card type wash already carries type), no separate headline row, and
+  the real species name is dropped entirely when a nickname is set (same
+  on the detail page — a nickname fully replaces the species everywhere).
+  The type `linear-gradient` moved off the sprite disc onto the whole
+  `.roster-card` (`--type` / `--type2` set inline on the card element).
+  The disc/ring is gone — the sprite sits straight on the wash with a
+  `drop-shadow` (`--sprite-drop`: dark in light mode, a light halo in
+  dark). Name is `--font-size-lg`/700 on its own line; the bare `<ev-bar>`
+  spans the body with its count just to the right of the track.
+- **Detail header.** Sprite is 84px on a rounded, type-washed frame. Type
+  badges moved out from under the sprite to a row under the name, at
+  `--font-size-2xs` instead of `0.5rem`. Name is `--font-size-lg`/700. The
+  real species name (shown only when a nickname hides it) is its own quiet
+  line right under the name row, not jammed in among the level/item pills.
+- **Full-page type wash.** On the detail page the type tint fills the
+  whole page, not just the card: `<pokemon-detail>` dispatches a
+  `type-change` event with the primary-type colour, `pokemon.ts` sets
+  `--page-type` on `<html>` from it (cleared on leave), and `.device`
+  mixes that into its full-bleed background. The card carries no
+  background of its own any more.
+- **Roster sprite.** No disc/ring — the sprite sits straight on the card
+  wash with a `drop-shadow` (`--sprite-drop`: dark in light mode, a light
+  halo in dark mode) to lift it off.
+- **"This game's rules"** disclosure removed from the roster screen
+  entirely (markup, `renderLegend()`, `.legend` CSS).
+- **One dialog contract.** `BaseDialog` no longer carries a per-dialog
+  `@media (max-width: 640px)` opt-out — every dialog in the app,
+  light-DOM and shadow-DOM alike, now follows the same `.ds-dialog`
+  rules: full-screen sheet on mobile, grow-to-content on desktop (the
+  whole dialog scrolls only if it can't fit, never an inner
+  `.dialog-body` bar). A subclass's non-default width is gated to
+  `min-width: 641px` so it can't fight the mobile sheet.
+- **Pinned action bar condenses.** `.view-nav` and its primary button
+  shrink a notch once the page has scrolled at all (`.device.is-scrolled`,
+  toggled by a passive scroll listener in `lib/shell.ts`). The app header
+  still just scrolls away. Views dropped their top padding so `.view-nav`
+  bands straight onto the app header.
+- **Scroll to top on navigation.** `app.ts` resets scroll on every route
+  change (not on `store` 'change' — that's a data edit, not navigation).
+- The detail page's back link is just `← Roster` now (the party name is
+  in the app header).
