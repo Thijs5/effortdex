@@ -91,21 +91,30 @@ actually be battling at once, matching the games' own party limit. An
 cells in a responsive layout (more columns on a wide screen, not a fixed
 count leaving whitespace around still-tiny buttons): a card per active
 member (sprite, name, level or a "Fainted" tag) with its own drag
-handle, **swap** (⇆), and **faint/"KO"** buttons, plus a dashed "bring
-someone in" card per open slot. This grid is the *only* place
-active-party membership is managed — the roster card has no control of
-its own. **Swap** (on a filled card, or an empty one) opens a picker of
-the bench to fill that slot; a filled card's picker also offers a plain
-**"Bench — leave this slot open"** option. Dragging a card's handle
-reorders `Party.activeUids` itself (`store.reorderActive`) — the first
-uid is the "lead," which matters beyond cosmetics (see below). A
-contextual **"Heal at Pokécenter"** button appears whenever anyone's
-down and clears every faint at once. Benching a fainted Pokémon (via the
-bench option or a swap) heals it — `fainted` only matters for the
-*current* active party, so there's nothing worth carrying across a
-bench. "+ Log a battle" (multi-participant, in this section's own
-header) and "+ Add a Pokémon" (the page's top-nav-bar action) are equal-
-weight, fully labeled primary buttons.
+handle and a **"⋯" menu** — **Level up**, **Swap out**, and **Mark
+fainted**/**Heal** — plus a dashed "bring someone in" card per open
+slot. This grid is the *only* place active-party membership is
+managed — the roster card has no control of its own. The three actions
+share one menu rather than one always-visible icon button each, so a
+card's limited width only ever has to fit a single trigger; **Level
+up** opens that Pokémon's own Level dialog (the same one the detail
+page's own Level control uses, not a separate quick-increment control).
+**Swap out** (on a filled card, or an empty one's own tap) opens a
+picker of the bench to fill that slot; a filled card's picker also
+offers a plain **"Bench — leave this slot open"** option. Dragging a
+card's handle reorders `Party.activeUids` itself (`store.reorderActive`)
+— the first uid is the "lead," which matters beyond cosmetics (see
+below). A contextual **"Heal at Pokécenter"** button appears whenever
+anyone's down and clears every faint at once. Benching a fainted
+Pokémon (via the bench option or a swap) heals it — `fainted` only
+matters for the *current* active party, so there's nothing worth
+carrying across a bench. "+ Log a battle" (multi-participant, in this
+section's own header) is the page's one accent-colored primary button;
+"+ Add a Pokémon" (the page's top-nav-bar action) is a quieter,
+ghost-styled button — the two used to be equal-weight primaries
+competing for attention, but Log a battle is the page's actual
+repeated, core action once a party exists, while adding a Pokémon is
+comparatively occasional.
 
 None of this — who's active, who's fainted, a Pokécenter visit — is
 logged as a roster event: it never changes a recorded EV, so

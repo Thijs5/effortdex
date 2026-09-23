@@ -10,6 +10,8 @@ import {
   battlePartyFaintBtn,
   battlePartySwapBtn,
   battlePartyEmptySlots,
+  battlePartyMenuItem,
+  levelUpFromParty,
   pickSwapOption,
   benchFromParty,
   logPartyBattle,
@@ -63,18 +65,18 @@ test.describe('Active party and faint tracking', () => {
 
     await expect(page.getByRole('button', { name: 'Heal at Pokécenter' })).toBeHidden();
 
-    await battlePartyFaintBtn(page, 'Bulbasaur').click();
+    await battlePartyFaintBtn(page, 'Bulbasaur');
     await expect(battlePartySlot(page, 'Bulbasaur').locator('.battle-slot-faint-tag')).toBeVisible();
     await expect(battlePartySlot(page, 'Charmander').locator('.battle-slot-faint-tag')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Heal at Pokécenter' })).toBeVisible();
 
     // Tapping heal on the same card heals it directly, no Center needed.
-    await battlePartyFaintBtn(page, 'Bulbasaur').click();
+    await battlePartyFaintBtn(page, 'Bulbasaur');
     await expect(battlePartySlot(page, 'Bulbasaur').locator('.battle-slot-faint-tag')).toHaveCount(0);
     await expect(page.getByRole('button', { name: 'Heal at Pokécenter' })).toBeHidden();
 
-    await battlePartyFaintBtn(page, 'Bulbasaur').click();
-    await battlePartyFaintBtn(page, 'Charmander').click();
+    await battlePartyFaintBtn(page, 'Bulbasaur');
+    await battlePartyFaintBtn(page, 'Charmander');
     await page.getByRole('button', { name: 'Heal at Pokécenter' }).click();
     await expect(battlePartySlot(page, 'Bulbasaur').locator('.battle-slot-faint-tag')).toHaveCount(0);
     await expect(battlePartySlot(page, 'Charmander').locator('.battle-slot-faint-tag')).toHaveCount(0);
@@ -84,7 +86,7 @@ test.describe('Active party and faint tracking', () => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
     await addPokemon(page, 'Bulbasaur');
-    await battlePartyFaintBtn(page, 'Bulbasaur').click();
+    await battlePartyFaintBtn(page, 'Bulbasaur');
     await expect(battlePartySlot(page, 'Bulbasaur').locator('.battle-slot-faint-tag')).toBeVisible();
     await expect(rosterCard(page, 'Bulbasaur').locator('.roster-card-fainted-tag')).toHaveCount(0);
     await expect(rosterCard(page, 'Bulbasaur').getByText('In party')).toHaveCount(0);
@@ -95,7 +97,7 @@ test.describe('Active party and faint tracking', () => {
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
     await addPokemon(page, 'Bulbasaur');
     await addPokemon(page, 'Charmander');
-    await battlePartyFaintBtn(page, 'Charmander').click();
+    await battlePartyFaintBtn(page, 'Charmander');
     await expect(battlePartySlot(page, 'Charmander').locator('.battle-slot-faint-tag')).toBeVisible();
 
     await benchFromParty(page, 'Charmander'); // bench it while fainted
@@ -111,7 +113,7 @@ test.describe('Active party and faint tracking', () => {
     await addPokemon(page, 'Charmander');
     await benchFromParty(page, 'Charmander'); // bench it, leaving Bulbasaur + an open slot
 
-    await battlePartySwapBtn(page, 'Bulbasaur').click();
+    await battlePartySwapBtn(page, 'Bulbasaur');
     await pickSwapOption(page, 'Charmander');
     await expect(battlePartySlot(page, 'Charmander')).toBeVisible();
     await expect(battlePartySlot(page, 'Bulbasaur')).toHaveCount(0);
@@ -141,6 +143,54 @@ test.describe('Active party and faint tracking', () => {
     await expect(battlePartySlot(page, 'Charmander').getByRole('button', { name: /Reorder Charmander/i })).toBeVisible();
     // An open slot has nothing to reorder.
     await expect(battlePartyEmptySlots(page).first().getByRole('button')).toHaveCount(0);
+  });
+
+  test('a battle party card\'s "⋯" menu opens Level up, Swap out, and Mark fainted/Heal, and closes on an outside click', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
+    await addPokemon(page, 'Bulbasaur', { level: 10 });
+    await addPokemon(page, 'Charmander');
+
+    const menu = battlePartySlot(page, 'Bulbasaur').locator('.battle-slot-menu');
+    await battlePartySlot(page, 'Bulbasaur').locator('.battle-slot-menu-btn').click();
+    await expect(menu).toBeVisible();
+    await expect(menu.getByRole('menuitem')).toHaveText(['Level up', 'Swap out', 'Mark fainted']);
+
+    // An outside click closes it without triggering anything inside it.
+    await page.locator('body').click({ position: { x: 5, y: 5 } });
+    await expect(menu).toBeHidden();
+
+    // Only one card's menu is open at a time — opening Charmander's own
+    // menu doesn't leave Bulbasaur's around too (module-level open-menu
+    // state, not per-card).
+    await battlePartySlot(page, 'Bulbasaur').locator('.battle-slot-menu-btn').click();
+    await battlePartySlot(page, 'Charmander').locator('.battle-slot-menu-btn').click();
+    await expect(menu).toBeHidden();
+    await expect(battlePartySlot(page, 'Charmander').locator('.battle-slot-menu')).toBeVisible();
+  });
+
+  test('"Level up" in the "⋯" menu opens that Pokémon\'s own Level dialog, prefilled to its current level', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
+    await addPokemon(page, 'Bulbasaur', { level: 10 });
+
+    await levelUpFromParty(page, 'Bulbasaur');
+
+    const detail = page.locator('pokemon-detail');
+    const dialog = detail.locator('dialog.level-up-dialog');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.locator('.level-up-from')).toHaveText('Lv. 10 →');
+    await expect(page).toHaveURL(/\/level$/);
+  });
+
+  test('"Mark fainted" in the "⋯" menu reads "Heal" once fainted', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
+    await addPokemon(page, 'Bulbasaur');
+
+    await battlePartyFaintBtn(page, 'Bulbasaur'); // opens the menu and clicks "Mark fainted" in one step
+    await expect(battlePartySlot(page, 'Bulbasaur').locator('.battle-slot-faint-tag')).toBeVisible();
+    await expect(await battlePartyMenuItem(page, 'Bulbasaur', 'Heal')).toBeVisible();
   });
 
   test('the opponent dropdown shows every selected participant\'s EV gain before picking anything', async ({ page }) => {
@@ -175,7 +225,7 @@ test.describe('Active party and faint tracking', () => {
     await addPokemon(page, 'Bulbasaur');
     await addPokemon(page, 'Charmander');
     await addPokemon(page, 'Chansey');
-    await battlePartyFaintBtn(page, 'Chansey').click(); // faints — excluded from the default selection
+    await battlePartyFaintBtn(page, 'Chansey'); // faints — excluded from the default selection
 
     // Caterpie yields +1 HP (e2e/ev-training.spec.js). Bulbasaur (the
     // lead) is pre-selected; Charmander has to be picked explicitly.
@@ -262,7 +312,7 @@ test.describe('Active party and faint tracking', () => {
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
     await addPokemon(page, 'Bulbasaur');
     await addPokemon(page, 'Charmander');
-    await battlePartyFaintBtn(page, 'Charmander').click(); // faints
+    await battlePartyFaintBtn(page, 'Charmander'); // faints
 
     await page.locator('#party-log-battle-btn').click();
     const fainted = page.locator('#battle-participants').getByRole('button', { name: /Charmander/i });

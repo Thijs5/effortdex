@@ -284,8 +284,34 @@ function activePokemon(party: Party): RosterEntry[] {
   return party.activeUids.map((uid) => party.pokemon.find((e) => e.uid === uid)).filter((e): e is RosterEntry => !!e);
 }
 
+// Which active-party card's "⋯" menu is currently open, module state
+// rather than per-card closures: renderBattleSlotCard runs fresh on
+// every render (this whole grid is rebuilt from scratch on every store
+// change, same as the rest of this page), so wiring a full
+// wireDisclosureMenu (lib/dom.ts) — which adds its own document-level
+// click listener with no teardown — on every one of those renders would
+// leak a listener per render. One listener, wired once at module load,
+// closes whichever card's menu is open on an outside click instead.
+let openBattleSlotMenuUid: string | null = null;
+function closeBattleSlotMenu(): void {
+  if (openBattleSlotMenuUid === null) return;
+  const card = battlePartySlots.querySelector<HTMLElement>(`.battle-slot[data-uid="${openBattleSlotMenuUid}"]`);
+  card?.querySelector<HTMLElement>('.battle-slot-menu')?.setAttribute('hidden', '');
+  card?.querySelector<HTMLElement>('.battle-slot-menu-btn')?.setAttribute('aria-expanded', 'false');
+  openBattleSlotMenuUid = null;
+}
+document.addEventListener('click', (e) => {
+  if (openBattleSlotMenuUid === null) return;
+  const openWrap = battlePartySlots.querySelector(`.battle-slot[data-uid="${openBattleSlotMenuUid}"] .battle-slot-menu-wrap`);
+  if (openWrap && !e.composedPath().includes(openWrap)) closeBattleSlotMenu();
+});
+
 /** One filled active-party card — sprite/name/level (or a fainted tag in
- * place of the level), plus its own swap and faint/heal action buttons. */
+ * place of the level), plus a "⋯" menu (Level up / Swap out / Mark
+ * fainted-Heal) — consolidated into one menu, rather than one icon
+ * button apiece, so a fourth action (Level up) didn't mean a fourth
+ * always-visible button competing with sprite/name for the card's
+ * limited width. */
 function renderBattleSlotCard(entry: RosterEntry): HTMLDivElement {
   const sprite = spriteFor(entry);
   const displayName = entry.nickname || titleCase(entry.speciesName);
@@ -302,14 +328,37 @@ function renderBattleSlotCard(entry: RosterEntry): HTMLDivElement {
       <span class="battle-slot-name">${escapeHtml(displayName)}</span>
       ${entry.fainted ? '<span class="battle-slot-faint-tag">Fainted</span>' : `<span class="battle-slot-lvl">Lv${entry.level}</span>`}
     </span>
-    <span class="battle-slot-actions">
-      <button type="button" class="battle-slot-action-btn battle-slot-swap-btn" aria-label="Swap out ${escapeHtml(displayName)}" title="Swap out">&#8646;</button>
-      <button type="button" class="battle-slot-action-btn ${entry.fainted ? 'battle-slot-heal-btn' : 'battle-slot-faint-btn'}" aria-label="${entry.fainted ? 'Heal' : 'Mark fainted'} ${escapeHtml(displayName)}" title="${entry.fainted ? 'Heal' : 'Faint'}">${entry.fainted ? '&#10003;' : 'KO'}</button>
+    <span class="battle-slot-menu-wrap">
+      <button type="button" class="battle-slot-menu-btn" aria-label="More actions for ${escapeHtml(displayName)}" aria-haspopup="menu" aria-expanded="false" title="More">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="17.5" r="1.7"/></svg>
+      </button>
+      <div class="battle-slot-menu" role="menu" aria-label="More actions for ${escapeHtml(displayName)}" hidden>
+        <button class="battle-slot-menu-item" type="button" role="menuitem" data-action="level">Level up</button>
+        <button class="battle-slot-menu-item" type="button" role="menuitem" data-action="swap">Swap out</button>
+        <button class="battle-slot-menu-item" type="button" role="menuitem" data-action="faint">${entry.fainted ? 'Heal' : 'Mark fainted'}</button>
+      </div>
     </span>
   `;
-  card.querySelector('.battle-slot-swap-btn')!.addEventListener('click', () => openSwapDialog(entry.uid));
-  const faintBtn = card.querySelector('.battle-slot-faint-btn, .battle-slot-heal-btn')!;
-  faintBtn.addEventListener('click', () => store.setFainted(entry.uid, !entry.fainted));
+  const menuBtn = card.querySelector<HTMLButtonElement>('.battle-slot-menu-btn')!;
+  const menu = card.querySelector<HTMLElement>('.battle-slot-menu')!;
+  menuBtn.addEventListener('click', (e) => {
+    e.stopPropagation(); // else the outside-click listener above sees this same click and immediately re-closes it
+    const wasOpen = openBattleSlotMenuUid === entry.uid;
+    closeBattleSlotMenu();
+    if (wasOpen) return;
+    menu.hidden = false;
+    menuBtn.setAttribute('aria-expanded', 'true');
+    openBattleSlotMenuUid = entry.uid;
+  });
+  menu.addEventListener('click', (e) => {
+    const item = (e.target as HTMLElement).closest<HTMLElement>('.battle-slot-menu-item');
+    if (!item) return;
+    closeBattleSlotMenu();
+    const party = store.activeParty;
+    if (item.dataset.action === 'level') { if (party) router.navigateToPokemonDialog(party.slug, entry.uid, 'level'); }
+    else if (item.dataset.action === 'swap') openSwapDialog(entry.uid);
+    else if (item.dataset.action === 'faint') store.setFainted(entry.uid, !entry.fainted);
+  });
   wireDragHandle({
     handle: card.querySelector<HTMLElement>('.battle-slot-handle')!,
     item: card,
@@ -337,7 +386,8 @@ function renderBattleParty(party: Party): void {
   if (!party.pokemon.length) return;
 
   const active = activePokemon(party);
-  battlePartySlots.innerHTML = '';
+  battlePartySlots.innerHTML = ''; // wipes any open "⋯" menu's DOM too — its own state must follow
+  openBattleSlotMenuUid = null;
   for (const entry of active) battlePartySlots.appendChild(renderBattleSlotCard(entry));
   for (let i = active.length; i < MAX_ACTIVE_PARTY; i++) battlePartySlots.appendChild(renderBattleSlotEmpty());
 
