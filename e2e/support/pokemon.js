@@ -268,7 +268,9 @@ export async function benchFromParty(page, species) {
  * `logBattle` above. Every open starts fresh with only the lead (first
  * able active member) pre-selected — nothing carries over from a
  * previous open; pass `select`/`deselect` to check/uncheck others
- * first. Picking an opponent applies immediately, same as `logBattle`.
+ * first. Picking an opponent only stages it — `#battle-log-btn` is the
+ * actual commit, so this clicks that too rather than assuming the pick
+ * alone applied anything.
  * @param {import('@playwright/test').Page} page
  * @param {string} opponentSpecies
  * @param {{ deselect?: string[], select?: string[] }} [opts]
@@ -285,5 +287,7 @@ export async function logPartyBattle(page, opponentSpecies, { deselect, select }
   await combobox.waitFor({ state: 'visible' });
   await combobox.fill(opponentSpecies);
   await page.getByRole('option').filter({ hasText: new RegExp(opponentSpecies, 'i') }).first().click();
-  await search.waitFor({ state: 'hidden' });
+  // .click() waits for the button to actually be enabled first — it
+  // only arms once stageBattlePick's lookup of `opponentSpecies` resolves.
+  await page.locator('#battle-log-btn').click();
 }

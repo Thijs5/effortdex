@@ -282,7 +282,19 @@ export class PokemonSearch extends BaseElement {
         this._closeSheet();
       }, 120)
     );
-    this.$sheetClose.addEventListener('click', () => this.$input.blur());
+    // Closes directly rather than relying on the blur-driven path above:
+    // `.blur()` only fires a 'blur' event (and so only reaches
+    // `_closeSheet()`) when the input actually has focus, which isn't
+    // true once a slot="sheet-extra" caller's own content has taken it
+    // (the battle sheet's participant chips re-focus themselves after
+    // every click) — this button must close the sheet regardless of
+    // where focus currently is. Still blurs first, best-effort, to drop
+    // the on-screen keyboard.
+    this.$sheetClose.addEventListener('click', () => {
+      this.$input.blur();
+      this._hideList();
+      this._closeSheet();
+    });
     // Selection on pointerup with a movement threshold (not pointerdown +
     // preventDefault, which breaks touch scrolling on iOS) — shared with
     // <game-version-picker> via lib/combobox.js.
@@ -533,7 +545,16 @@ export class PokemonSearch extends BaseElement {
           const span = li.querySelector('.option-ev-yield');
           if (!span) return;
           const evs = this._evModifier ? this._evModifier(mon) : mon.evYield;
-          const formatted = typeof evs === 'string' ? evs : evs ? formatEvYield(evs) : '';
+          if (typeof evs === 'string') {
+            // A string-returning evModifier (the roster's multi-
+            // participant battle sheet) already fully owns its own
+            // wording, "(no EVs — maxed)" per participant included — an
+            // empty string here means there's nothing to show yet (e.g.
+            // no participant selected), never "capped".
+            span.textContent = evs;
+            return;
+          }
+          const formatted = evs ? formatEvYield(evs) : '';
           const baseHadYield = formatEvYield(mon.evYield) !== '';
           span.textContent = formatted || (this._evModifier && baseHadYield ? 'Capped' : '');
         })

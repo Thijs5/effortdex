@@ -124,14 +124,22 @@ picked: each suggestion row shows every selected participant's own,
 already-clamped EV yield for that specific opponent (e.g. "Bulbasaur +1
 HP · Charmander (no EVs — maxed)") — the same breakdown a single-mon
 search shows as one number, just spelled out by name once several
-participants are selected, so a maxed-out one never reads as
-ambiguous. Picking still applies immediately (no separate confirm
-step — tried and reverted, it felt like a second popup for what's
-normally one fast action); the result status line (`#add-status`)
-repeats the same per-participant breakdown afterward. The participant
-selection itself never carries over: opening the sheet always starts
-from just the lead, and closing it clears the selection outright — a
-fresh battle starts fresh, not from whoever was left checked last time.
+participants are selected, so a maxed-out one never reads as ambiguous.
+Picking an opponent only *stages* it — nothing is applied to the roster
+until "+ Log this battle" (`#battle-log-btn`) is actually pressed, shown
+in the same sheet just above the opponent search, disabled until an
+opponent's been picked. This isn't the earlier confirm-then-apply
+attempt that was tried and reverted (that added a whole second popup on
+top of the sheet, and Cancel meant re-searching from scratch) — there's
+no extra popup here, just one more control inside the sheet that's
+already open, and changing participants or the picked opponent simply
+re-stages rather than requiring a cancel. `#battle-result-summary`
+shows "Ready to log vs …" while staged and "Logged vs …" once the button
+commits it — the same per-participant breakdown either side. The
+participant selection itself never carries over: opening the sheet
+always starts from just the lead, and closing it clears the selection
+outright — a fresh battle starts fresh, not from whoever was left
+checked last time.
 
 Covered by `e2e/active-party.spec.js`.
 

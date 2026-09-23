@@ -742,20 +742,28 @@ html[data-modal-open] body {
   font-weight: 700;
 }
 .battle-sheet-extra .party-slots-status { margin-top: var(--space-2); color: var(--ink-soft); }
+#battle-log-btn { width: 100%; margin-top: var(--space-2); }
 
-/* The last logged battle's per-participant breakdown, shown in place —
-   the sheet stays open after picking (roster.ts) so this and the
-   dropdown's own live preview use the same wording either side of the
-   pick, instead of a result that only shows up as a toast after the
-   sheet's already gone. */
+/* The staged (picked, not yet logged) or last-logged battle's
+   per-participant breakdown, shown in place — the sheet stays open
+   after picking (roster.ts) so this and the dropdown's own live preview
+   use the same wording either side of the pick, instead of a result
+   that only shows up as a toast after the sheet's already gone.
+   Defaults to the "logged" (confirmed) styling; roster.ts adds
+   `--pending` while a picked opponent is only staged, waiting on
+   #battle-log-btn. */
 .battle-result-summary {
-  margin: 0 0 var(--space-3);
+  margin: 0 0 var(--space-2);
   padding: var(--space-3);
   border-radius: var(--radius-md);
   background: var(--good-soft);
   color: var(--good);
   font-size: var(--font-size-sm);
   font-weight: 600;
+}
+.battle-result-summary--pending {
+  background: var(--lcd);
+  color: var(--ink);
 }
 
 .empty-state {

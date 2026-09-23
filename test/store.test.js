@@ -1515,6 +1515,25 @@ test('setActive adds/removes a Pokémon from the active party, refusing past the
   assert.ok(!store.activeParty.activeUids.includes(seventh.uid));
 });
 
+// Regression: _normalizeEntries() used to refill Party.activeUids back
+// up to MAX_ACTIVE_PARTY from roster order on every load, unable to
+// tell "never set" (needs backfilling) apart from "deliberately below
+// the cap" (someone benched via setActive) once both are just a short
+// array — so a fresh Store reading the same localStorage un-benched
+// anyone who wasn't at a full six.
+test('a deliberate bench (setActive) survives reloading the store, instead of being refilled back to six', () => {
+  const kept = [store.addPokemon(mon())];
+  for (let i = 0; i < 5; i++) kept.push(store.addPokemon(mon({ id: 2 + i, name: `mon${i}` })));
+  store.setActive(kept[4].uid, false);
+  store.setActive(kept[5].uid, false);
+  assert.equal(store.activeParty.activeUids.length, 4);
+
+  const reloaded = new Store();
+  assert.equal(reloaded.activeParty.activeUids.length, 4);
+  assert.ok(!reloaded.activeParty.activeUids.includes(kept[4].uid));
+  assert.ok(!reloaded.activeParty.activeUids.includes(kept[5].uid));
+});
+
 test('benching a fainted Pokémon heals it — fainted status doesn\'t outlive its time in the active party', () => {
   const entry = store.addPokemon(mon());
   store.setFainted(entry.uid, true);
@@ -1572,6 +1591,25 @@ test('logBattleForParticipants grants Exp. Share only to holders not already cre
   assert.equal(b.history.filter((h) => h.kind === 'battle').length, 1);
   assert.equal(benchedHolder.evs.atk, 1); // Exp. Share, not a direct participant
   assert.equal(faintedHolder.evs.atk, 0); // fainted — gets nothing even though it holds Exp. Share
+});
+
+// Regression: _applyExpShare used to loop over the whole roster instead
+// of just Party.activeUids, so an Exp. Share holder removed from the
+// active party (setActive(uid, false)) — as opposed to merely not
+// picked as a participant this fight — still earned EVs from a battle
+// it wasn't on the field for.
+test('_applyExpShare never credits a holder that has actually been removed from the active party', () => {
+  const a = store.addPokemon(mon());
+  const benched = store.addPokemon(mon({ id: 2, name: 'squirtle' }));
+  store.setExpShare(benched.uid, true);
+  store.setActive(benched.uid, false);
+  assert.ok(!store.activeParty.activeUids.includes(benched.uid));
+
+  const opp = opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 });
+  store.logBattleForParticipants([a.uid], opp);
+
+  assert.equal(a.evs.atk, 1);
+  assert.equal(benched.evs.atk, 0); // off the field — no share of the battle
 });
 
 test('isFullyTrained: 510 total under the modern system, every stat maxed under Stat Experience', () => {
@@ -1751,6 +1789,11 @@ test('applyImport adds a brand-new party and Pokémon wholesale', () => {
   assert.equal(party.pokemon[0].nickname, 'Sparky');
   assert.equal(party.pokemon[0].speciesName, 'pikachu');
   assert.equal(party.pokemon[0].level, 10);
+  // Regression: a brand-new local party from import must still get its
+  // activeUids backfilled — not left empty by _normalizeEntries's "already
+  // an array, must be a deliberate bench" guard, which only applies to a
+  // party that existed before this import.
+  assert.deepEqual(party.activeUids, ['remote-mon-1']);
 });
 
 test('applyImport skips Pokémon not in the selected set entirely', () => {

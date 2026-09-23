@@ -162,10 +162,14 @@ test.describe('Active party and faint tracking', () => {
     await expect(rosterCard(page, 'Bulbasaur').locator('.roster-card-evbar .value')).toHaveText('0/510');
 
     await option.click();
+    // Picking only stages it — still nothing applied until #battle-log-btn.
+    await expect(rosterCard(page, 'Bulbasaur').locator('.roster-card-evbar .value')).toHaveText('0/510');
+    await expect(page.locator('#battle-result-summary')).toContainText('Ready to log');
+    await page.locator('#battle-log-btn').click();
     await expect(rosterCard(page, 'Bulbasaur').locator('.roster-card-evbar .value')).toHaveText('1/510');
   });
 
-  test('"Log a battle" applies immediately and reports every participant\'s own actual EV gain', async ({ page }) => {
+  test('"Log a battle" only applies once #battle-log-btn is pressed, and reports every participant\'s own actual EV gain', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
     await addPokemon(page, 'Bulbasaur');
@@ -180,11 +184,12 @@ test.describe('Active party and faint tracking', () => {
     await expect(rosterCard(page, 'Bulbasaur').locator('.roster-card-evbar .value')).toHaveText('1/510');
     await expect(rosterCard(page, 'Charmander').locator('.roster-card-evbar .value')).toHaveText('1/510');
     await expect(rosterCard(page, 'Chansey').locator('.roster-card-evbar .value')).toHaveText('0/510');
-    // The status line spells out each participant's own gain by name —
+    // The result line spells out each participant's own gain by name —
     // no single ambiguous count.
-    await expect(page.locator('#add-status')).toContainText('Bulbasaur');
-    await expect(page.locator('#add-status')).toContainText('Charmander');
-    await expect(page.locator('#add-status')).toContainText('+1 HP');
+    await expect(page.locator('#battle-result-summary')).toContainText('Logged');
+    await expect(page.locator('#battle-result-summary')).toContainText('Bulbasaur');
+    await expect(page.locator('#battle-result-summary')).toContainText('Charmander');
+    await expect(page.locator('#battle-result-summary')).toContainText('+1 HP');
   });
 
   test('a maxed-out participant\'s result reads "no EVs", not a silent omission', async ({ page }) => {
@@ -201,7 +206,7 @@ test.describe('Active party and faint tracking', () => {
     await page.locator('#back-to-roster').click();
 
     await logPartyBattle(page, 'Caterpie');
-    await expect(page.locator('#add-status')).toContainText('no EVs');
+    await expect(page.locator('#battle-result-summary')).toContainText('no EVs');
   });
 
   test('the participant selection resets every time the sheet is opened, not carried from last time', async ({ page }) => {
@@ -237,6 +242,14 @@ test.describe('Active party and faint tracking', () => {
     await expect(search).not.toHaveAttribute('hidden');
     await expect(combobox).toBeVisible();
     await expect(page.locator('#battle-participants-status')).toBeVisible();
+
+    // With nobody selected, the dropdown's own EV-yield preview has
+    // nothing to show — it must read blank, never "Capped" (there's
+    // nothing capped; there's just no one selected).
+    await combobox.fill('Caterpie');
+    const option = page.getByRole('option').filter({ hasText: /Caterpie/i }).first();
+    await expect(option.locator('.option-ev-yield')).toBeEmpty();
+    await combobox.clear();
 
     // The sheet's own Close (✕) button must still actually close it —
     // a broader fix for the above regressed this the other way.

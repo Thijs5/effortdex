@@ -32,6 +32,7 @@ import '../../atoms/ev-bar.ts';
 import '../../atoms/level-input.ts';
 import type { Party, RosterEntry } from '../../../lib/store.ts';
 import type { EvMap } from '../../../lib/constants.ts';
+import type { DomainPokemon } from '../../../lib/pokeapi-client.ts';
 
 export const view = document.getElementById('party-view')!;
 const backToParties = document.getElementById('back-to-parties') as HTMLAnchorElement;
@@ -58,6 +59,7 @@ const battleSearch = document.getElementById('battle-search') as import('../../o
 const battleParticipants = document.getElementById('battle-participants')!;
 const battleParticipantsStatus = document.getElementById('battle-participants-status')!;
 const battleResultSummary = document.getElementById('battle-result-summary')!;
+const battleLogBtn = document.getElementById('battle-log-btn') as HTMLButtonElement;
 
 // The swap picker (docs/adr/0029): opened from a filled slot's swap
 // button (pre-scoped to that uid) or an empty slot (nothing to swap
@@ -409,6 +411,19 @@ swapDialog.addEventListener('click', (e) => {
 // the games' own "who's fighting" screen never survives a restart.
 let battleSelected = new Set<string>();
 
+// An opponent picked from the search but not yet logged — set by
+// stageBattlePick, cleared by the actual #battle-log-btn press (or by
+// anything that invalidates it: closing the sheet, or changing who's
+// selected once a pick is already staged).
+let pendingBattle: { mon: DomainPokemon; uids: string[] } | null = null;
+
+function clearPendingBattle(): void {
+  pendingBattle = null;
+  battleLogBtn.disabled = true;
+  battleResultSummary.hidden = true;
+  battleResultSummary.classList.remove('battle-result-summary--pending');
+}
+
 function renderBattleParticipants(): void {
   const party = store.activeParty;
   // A full rebuild replaces whichever chip was just clicked, dropping
@@ -426,6 +441,10 @@ function renderBattleParticipants(): void {
       slot.addEventListener('click', () => {
         if (battleSelected.has(entry.uid)) battleSelected.delete(entry.uid);
         else battleSelected.add(entry.uid);
+        // Who's selected no longer matches whatever was staged for the
+        // pending pick (if any) — force a fresh pick rather than logging
+        // a breakdown for the old roster of participants.
+        clearPendingBattle();
         renderBattleParticipants();
       });
     }
@@ -446,17 +465,18 @@ partyLogBattleBtn.addEventListener('click', () => {
   // Pokémon, so the rest of the strip stays opt-in.
   battleSelected = able.length ? new Set([able[0].uid]) : new Set();
   renderBattleParticipants();
-  battleResultSummary.hidden = true;
+  clearPendingBattle();
   battleSearch.hidden = false;
   battleSearch.focus();
 });
 // <pokemon-search> always closes itself after a pick (pokemon-search.ts's
 // own blur-on-pick) — right for a one-shot search like the add-Pokémon
-// flow, but here it fired before the user could see what they just
-// logged. logPartyBattle sets this flag right before the pick's own
-// close reaches this handler, so that one close is overridden into a
-// reopen instead — the sheet stays up, showing the result, ready for
-// the next battle without the user reopening it.
+// flow, but here it fired before the user could even see what picking
+// staged, let alone press #battle-log-btn. The 'pokemon-pick' handler
+// below sets this flag synchronously, before that pick's own close
+// reaches this handler, so that one close is overridden into a reopen
+// instead — the sheet stays up, showing the staged breakdown and the
+// log button, ready to log without the user reopening it.
 let keepSheetOpenForResult = false;
 battleSearch.addEventListener('sheet-close', () => {
   if (keepSheetOpenForResult) {
@@ -467,36 +487,57 @@ battleSearch.addEventListener('sheet-close', () => {
   }
   battleSearch.hidden = true;
   battleSelected = new Set(); // closed sheet carries no selection into the next open
-  battleResultSummary.hidden = true;
+  clearPendingBattle();
 });
 // Mirrors <pokemon-detail>'s own `evModifier`, but returns a
 // pre-formatted string (every selected participant's own name and
 // yield) rather than one EvMap — with several participants, "would
 // Bulbasaur alone gain X" is the wrong question; this is the same
-// breakdown #battle-result-summary shows after logging, just computed
+// breakdown #battle-result-summary shows once staged, just computed
 // from `previewDefeat` before anything is applied, so it's visible in
-// the dropdown while still picking an opponent, not only afterward.
+// the dropdown while still picking an opponent, not only after.
 battleSearch.evModifier = (mon) =>
   participantEvSummary([...battleSelected], (uid) => store.previewDefeat(uid, mon)?.applied);
 
 battleSearch.addEventListener('pokemon-pick', (e) => {
-  logPartyBattle((e as CustomEvent).detail.name);
+  if (battleSelected.size === 0) return; // the sheet already shows the "select someone" hint
+  // Set synchronously, before this pick's own blur-driven close reaches
+  // battleSearch's 'sheet-close' handler — staging (below) awaits a
+  // network/cache call, and that handler's 120ms close-on-blur timeout
+  // doesn't wait for it.
+  keepSheetOpenForResult = true;
+  stageBattlePick((e as CustomEvent).detail.name);
 });
 
-async function logPartyBattle(name: string): Promise<void> {
-  if (battleSelected.size === 0) return; // the sheet already shows the "select someone" hint
-  const uids = [...battleSelected]; // snapshot — battleSelected resets once the sheet actually closes
+/** Looks up the picked opponent and stages it as `pendingBattle` — shows
+ * the same participant breakdown the dropdown already previewed, and
+ * arms #battle-log-btn. Nothing is applied to the roster until that
+ * button is actually pressed (see its own click handler below). */
+async function stageBattlePick(name: string): Promise<void> {
+  const uids = [...battleSelected]; // snapshot — battleSelected can change before the button's pressed
   try {
     const mon = await api.getPokemon(name);
-    const applied = store.logBattleForParticipants(uids, mon);
-    const summary = participantEvSummary(uids, (uid) => applied.find((r) => r.uid === uid)?.applied);
-    battleResultSummary.textContent = `vs ${titleCase(mon.name)} — ${summary}`;
+    pendingBattle = { mon, uids };
+    const summary = participantEvSummary(uids, (uid) => store.previewDefeat(uid, mon)?.applied);
+    battleResultSummary.textContent = `Ready to log vs ${titleCase(mon.name)} — ${summary}`;
+    battleResultSummary.classList.add('battle-result-summary--pending');
     battleResultSummary.hidden = false;
-    keepSheetOpenForResult = true;
+    battleLogBtn.disabled = false;
   } catch (err) {
-    showAddStatus((err instanceof Error && err.message) || 'Could not log that battle.');
+    showAddStatus((err instanceof Error && err.message) || 'Could not look up that Pokémon.');
   }
 }
+
+battleLogBtn.addEventListener('click', () => {
+  if (!pendingBattle) return;
+  const { mon, uids } = pendingBattle;
+  const applied = store.logBattleForParticipants(uids, mon);
+  const summary = participantEvSummary(uids, (uid) => applied.find((r) => r.uid === uid)?.applied);
+  battleResultSummary.textContent = `Logged vs ${titleCase(mon.name)} — ${summary}`;
+  battleResultSummary.classList.remove('battle-result-summary--pending');
+  pendingBattle = null;
+  battleLogBtn.disabled = true;
+});
 
 /** "Bulbasaur +1 HP · Charmander (no EVs — maxed)" — `uids`' own names
  * and yields (`applyForUid` supplies the EvMap, already-clamped whether

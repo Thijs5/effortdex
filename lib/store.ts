@@ -716,19 +716,24 @@ export class Store extends EventTarget {
         if (typeof entry.fainted !== 'boolean') entry.fainted = false;
         projectEntry(entry);
       }
-      // Backfills `activeUids` for parties saved before it existed, and
-      // drops any uid whose Pokémon was since removed. A party with
-      // fewer than MAX_ACTIVE_PARTY active members otherwise (a fresh
-      // party, or one saved pre-backfill) fills up to the cap from its
-      // existing roster in add order — the same "just is in the party"
-      // default `addPokemon` uses for a single new member.
+      // Backfills `activeUids` for parties saved before it existed
+      // (fills up to the cap from the existing roster in add order —
+      // the same "just is in the party" default `addPokemon` uses for a
+      // single new member), and drops any uid whose Pokémon was since
+      // removed. Only backfills when `activeUids` didn't exist at all —
+      // a party that already has one, even below the cap, has that
+      // shortfall on purpose (someone benched via setActive) and must
+      // not be silently refilled back up to six on every load.
       const existingUids = new Set(party.pokemon.map((e: any) => e.uid));
-      const active: string[] = Array.isArray(party.activeUids)
+      const hadActiveUids = Array.isArray(party.activeUids);
+      const active: string[] = hadActiveUids
         ? party.activeUids.filter((uid: string) => existingUids.has(uid))
         : [];
-      for (const entry of party.pokemon) {
-        if (active.length >= MAX_ACTIVE_PARTY) break;
-        if (!active.includes(entry.uid)) active.push(entry.uid);
+      if (!hadActiveUids) {
+        for (const entry of party.pokemon) {
+          if (active.length >= MAX_ACTIVE_PARTY) break;
+          if (!active.includes(entry.uid)) active.push(entry.uid);
+        }
       }
       party.activeUids = active;
     }
@@ -1027,6 +1032,7 @@ export class Store extends EventTarget {
         baseGame: p.baseGame,
         overrides: p.overrides,
         slug: p.slug,
+        activeUids: p.activeUids,
         pokemon: p.pokemon.map(persistedEntry),
       })),
     };
@@ -1815,8 +1821,12 @@ export class Store extends EventTarget {
    * would in-game.
    */
   _applyExpShare(creditedUids: Set<string>, opponent: DomainPokemon): void {
-    for (const shareEntry of this.activeParty?.pokemon ?? []) {
-      if (creditedUids.has(shareEntry.uid) || !shareEntry.expShare || shareEntry.fainted) continue;
+    const party = this.activeParty;
+    if (!party) return;
+    for (const uid of party.activeUids) {
+      if (creditedUids.has(uid)) continue;
+      const shareEntry = this._find(uid);
+      if (!shareEntry || !shareEntry.expShare || shareEntry.fainted) continue;
       const { applied } = this._battleYield(shareEntry, opponent, { viaExpShare: true });
       const aids = this.effectiveAids(shareEntry);
       this._append(
@@ -2106,6 +2116,13 @@ export class Store extends EventTarget {
    * journaled, so there's nothing principled to merge them by.
    */
   applyImport(importedParties: ExportedParty[], selectedUids: Set<string>): void {
+    // Tracks parties created fresh by this import (as opposed to an
+    // existing local party an import is merging into) — `_normalizeEntries`
+    // below can't tell "just created, activeUids not filled in yet" apart
+    // from "existing party, deliberately benched down to this count" once
+    // both look like a plain array, so those two get backfilled to the
+    // cap explicitly here instead of relying on it.
+    const newLocalPartyIds = new Set<string>();
     for (const party of importedParties) {
       const selectedPokemon = party.pokemon.filter((e) => selectedUids.has(e.uid));
       if (!selectedPokemon.length) continue;
@@ -2121,13 +2138,10 @@ export class Store extends EventTarget {
           overrides: { ...defaultOverrides(), ...party.overrides },
           slug: uniqueSlug(party.name, existingSlugs),
           pokemon: [],
-          // Backfilled below by `_normalizeEntries()` once this party's
-          // Pokémon are in — same "fill up to MAX_ACTIVE_PARTY in add
-          // order" default a brand-new local party gets, since an older
-          // export (pre-dating `activeUids`) may not carry one at all.
-          activeUids: [],
+          activeUids: [], // filled to the cap below, once its Pokémon are in
         };
         this.state.parties.push(localParty);
+        newLocalPartyIds.add(localParty.id);
       }
 
       for (const entry of selectedPokemon) {
@@ -2141,6 +2155,15 @@ export class Store extends EventTarget {
         localEntry.events = [...byId.values()].sort((a, b) => a.timestamp - b.timestamp);
         projectEntry(localEntry);
       }
+    }
+    // Same "fill up to MAX_ACTIVE_PARTY in add order" default a brand-new
+    // local party gets anywhere else (`addPokemon`, `_normalizeEntries`'s
+    // own legacy-data backfill) — done explicitly rather than left to
+    // `_normalizeEntries` below, which can no longer distinguish this
+    // from a real party deliberately benched down to the same count.
+    for (const id of newLocalPartyIds) {
+      const party = this.state.parties.find((p) => p.id === id);
+      if (party) party.activeUids = party.pokemon.slice(0, MAX_ACTIVE_PARTY).map((e) => e.uid);
     }
     // Backfills `activeUids` (and `fainted` on any entry an older export
     // didn't carry it for) now that every imported party/Pokémon is in —

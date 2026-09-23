@@ -98,6 +98,7 @@ export interface PartyRow {
   baseGame: string;
   overrides: unknown;
   slug: string;
+  activeUids: string[];
   order: number;
 }
 

@@ -184,16 +184,20 @@
            opponent search input. show-ev-yield + evModifier (roster.ts)
            show each suggestion's own multi-participant EV breakdown right
            in the dropdown, before anything is picked (docs/adr/0029).
-           Picking still applies immediately, but the sheet itself stays
-           open afterward (roster.ts overrides the usual pick-closes-it
-           behavior) and #battle-result-summary shows the same breakdown
-           in place — ready to log the next battle without reopening. -->
+           Picking an opponent only stages it — #battle-log-btn is the
+           actual log action, so there's always an explicit button press
+           between "who did we fight" and the EVs actually being applied.
+           The sheet itself stays open afterward (roster.ts overrides the
+           usual pick-closes-it behavior) and #battle-result-summary shows
+           the logged breakdown in place — ready to stage the next battle
+           without reopening. -->
       <pokemon-search id="battle-search" hidden placeholder="Defeated Pok&eacute;mon&hellip;" show-ev-yield sheet-title="Log a battle" force-sheet>
         <div slot="sheet-extra" class="battle-sheet-extra">
-          <p id="battle-result-summary" class="battle-result-summary" hidden aria-live="polite"></p>
           <p class="battle-sheet-eyebrow">Who's in this battle?</p>
           <div id="battle-participants" class="party-slots party-slots--select"></div>
           <p id="battle-participants-status" class="party-slots-status" hidden></p>
+          <p id="battle-result-summary" class="battle-result-summary" hidden aria-live="polite"></p>
+          <button id="battle-log-btn" class="ds-btn ds-btn--primary" type="button" disabled>&plus; Log this battle</button>
         </div>
       </pokemon-search>
     </main>
