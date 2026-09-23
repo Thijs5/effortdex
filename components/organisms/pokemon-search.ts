@@ -189,6 +189,26 @@ export class PokemonSearch extends BaseElement {
           width: auto;
           margin: var(--space-2) var(--space-3);
         }
+        /* A second slot, kept apart from sheet-extra, for a caller's
+           primary action (e.g. the battle sheet's "Log this battle") —
+           ordered after the suggestions list so it's a true sheet
+           footer, pinned to the bottom of .wrap.sheet's own
+           visualViewport-tracked height (_positionSheet) rather than
+           sitting up near the header where an opening keyboard could
+           cover it. margin-top: auto (not just flex order) because
+           ul.suggestions has the "hidden" attribute — out of flow
+           entirely, so its own flex: 1 1 auto contributes nothing to
+           push this down — until there's a query with matches;
+           margin-top: auto keeps the footer pinned to the bottom of the
+           sheet either way. */
+        slot[name="sheet-footer"] { display: none; }
+        .wrap.sheet slot[name="sheet-footer"] {
+          display: block;
+          order: 4;
+          flex: 0 0 auto;
+          margin-top: auto;
+          padding: var(--space-2) var(--space-3) var(--space-3);
+        }
         .wrap.sheet ul.suggestions {
           order: 3;
           position: static;
@@ -213,6 +233,7 @@ export class PokemonSearch extends BaseElement {
                autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false"
                inputmode="search" enterkeyhint="go" />
         <ul id="ps-list" class="suggestions" hidden role="listbox"></ul>
+        <slot name="sheet-footer"></slot>
       </div>
     `;
 

@@ -187,6 +187,12 @@
            Picking an opponent only stages it — #battle-log-btn is the
            actual log action, so there's always an explicit button press
            between "who did we fight" and the EVs actually being applied.
+           It lives in its own slot="sheet-footer" (pokemon-search.ts),
+           not slot="sheet-extra" with the participant strip — a
+           sheet-footer slot renders after the suggestions list, pinned
+           to the bottom of the sheet's own visualViewport-tracked
+           height, so it stays above an opening on-screen keyboard
+           instead of sitting up near the top with the participant strip.
            The sheet itself stays open afterward (roster.ts overrides the
            usual pick-closes-it behavior) and #battle-result-summary shows
            the logged breakdown in place — ready to stage the next battle
@@ -197,8 +203,8 @@
           <div id="battle-participants" class="party-slots party-slots--select"></div>
           <p id="battle-participants-status" class="party-slots-status" hidden></p>
           <p id="battle-result-summary" class="battle-result-summary" hidden aria-live="polite"></p>
-          <button id="battle-log-btn" class="ds-btn ds-btn--primary" type="button" disabled>&plus; Log this battle</button>
         </div>
+        <button id="battle-log-btn" slot="sheet-footer" class="ds-btn ds-btn--primary" type="button" disabled>&plus; Log this battle</button>
       </pokemon-search>
     </main>
 

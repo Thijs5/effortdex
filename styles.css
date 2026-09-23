@@ -742,7 +742,7 @@ html[data-modal-open] body {
   font-weight: 700;
 }
 .battle-sheet-extra .party-slots-status { margin-top: var(--space-2); color: var(--ink-soft); }
-#battle-log-btn { width: 100%; margin-top: var(--space-2); }
+#battle-log-btn { width: 100%; }
 
 /* The staged (picked, not yet logged) or last-logged battle's
    per-participant breakdown, shown in place — the sheet stays open
