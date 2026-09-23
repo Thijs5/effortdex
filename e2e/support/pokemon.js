@@ -184,3 +184,106 @@ export async function logBattle(card, opponentSpecies) {
   await card.page().getByRole('option').filter({ hasText: new RegExp(opponentSpecies, 'i') }).first().click();
   await search.waitFor({ state: 'hidden' });
 }
+
+/**
+ * The roster card (the whole `.roster-card`, not just its link) for
+ * `species` — needed for the "In party"/fainted controls that live
+ * alongside, not inside, the link row (docs/adr/0029).
+ * @param {import('@playwright/test').Page} page
+ * @param {string} species
+ */
+export function rosterCard(page, species) {
+  return page.locator('.roster-card').filter({ has: rosterRow(page, species) });
+}
+
+/** The battle party grid's filled card for `species` (docs/adr/0029) —
+ * not itself a button; its faint/heal and swap actions are its own
+ * sub-buttons, see `battlePartyFaintBtn`/`battlePartySwapBtn`.
+ * @param {import('@playwright/test').Page} page
+ * @param {string} species
+ */
+export function battlePartySlot(page, species) {
+  return page.locator('#battle-party-slots .battle-slot').filter({ hasText: new RegExp(species, 'i') });
+}
+
+/** The faint/heal toggle button on `species`' battle party card.
+ * @param {import('@playwright/test').Page} page
+ * @param {string} species
+ */
+export function battlePartyFaintBtn(page, species) {
+  return battlePartySlot(page, species).locator('.battle-slot-faint-btn, .battle-slot-heal-btn');
+}
+
+/** The swap-out button on `species`' battle party card — opens the swap
+ * picker (`#swap-dialog`) pre-scoped to that slot.
+ * @param {import('@playwright/test').Page} page
+ * @param {string} species
+ */
+export function battlePartySwapBtn(page, species) {
+  return battlePartySlot(page, species).locator('.battle-slot-swap-btn');
+}
+
+/** One of the battle party grid's open "bring someone in" cells — there
+ * are `MAX_ACTIVE_PARTY - activeUids.length` of these at any time.
+ * @param {import('@playwright/test').Page} page
+ */
+export function battlePartyEmptySlots(page) {
+  return page.locator('#battle-party-slots .battle-slot--empty');
+}
+
+/**
+ * Picks `species` from the open swap dialog's bench list — brings it
+ * into whichever slot the dialog was opened for (a specific one being
+ * replaced, or any open slot).
+ * @param {import('@playwright/test').Page} page
+ * @param {string} species
+ */
+export async function pickSwapOption(page, species) {
+  const dialog = page.locator('dialog#swap-dialog');
+  await dialog.waitFor({ state: 'visible' });
+  await dialog.locator('.swap-dialog-option').filter({ hasText: new RegExp(species, 'i') }).click();
+  await dialog.waitFor({ state: 'hidden' });
+}
+
+/**
+ * Benches `species` from the active party with no replacement, via its
+ * battle-party card's swap button and the dialog's own "Bench — leave
+ * this slot open" option (the roster card has no active-party control
+ * of its own — docs/adr/0029).
+ * @param {import('@playwright/test').Page} page
+ * @param {string} species
+ */
+export async function benchFromParty(page, species) {
+  await battlePartySwapBtn(page, species).click();
+  const dialog = page.locator('dialog#swap-dialog');
+  await dialog.waitFor({ state: 'visible' });
+  await dialog.getByRole('button', { name: /Bench/i }).click();
+  await dialog.waitFor({ state: 'hidden' });
+}
+
+/**
+ * Logs a battle against `opponentSpecies` for the roster's own active
+ * party (docs/adr/0029) — the multi-participant entry point
+ * (`#party-log-battle-btn`), distinct from a single Pokémon's own
+ * `logBattle` above. Every open starts fresh with only the lead (first
+ * able active member) pre-selected — nothing carries over from a
+ * previous open; pass `select`/`deselect` to check/uncheck others
+ * first. Picking an opponent applies immediately, same as `logBattle`.
+ * @param {import('@playwright/test').Page} page
+ * @param {string} opponentSpecies
+ * @param {{ deselect?: string[], select?: string[] }} [opts]
+ */
+export async function logPartyBattle(page, opponentSpecies, { deselect, select } = {}) {
+  const search = page.locator('#battle-search');
+  if (await search.getAttribute('hidden') !== null) {
+    await page.locator('#party-log-battle-btn').click();
+  }
+  for (const species of [...(deselect ?? []), ...(select ?? [])]) {
+    await page.locator('#battle-participants').getByRole('button', { name: new RegExp(species, 'i') }).click();
+  }
+  const combobox = search.getByRole('combobox', { name: 'Defeated Pokémon…' });
+  await combobox.waitFor({ state: 'visible' });
+  await combobox.fill(opponentSpecies);
+  await page.getByRole('option').filter({ hasText: new RegExp(opponentSpecies, 'i') }).first().click();
+  await search.waitFor({ state: 'hidden' });
+}

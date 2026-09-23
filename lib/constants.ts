@@ -208,6 +208,12 @@ export const MIN_LEVEL = 1;
 export const MAX_LEVEL = 100;
 export const DEFAULT_LEVEL = 5;
 
+// The in-game party limit — how many of a Store party's Pokémon
+// (its whole box) can be active/battling at once. Tracked as
+// `Party.activeUids`; membership beyond this is silently refused rather
+// than bumping an existing member out (the UI decides who to bench).
+export const MAX_ACTIVE_PARTY = 6;
+
 // IVs, per generation. Gen I/II ("DVs") are 0-15, and only 4 are actually
 // stored (Attack/Defense/Speed/Special) — HP is derived from the other
 // four's parity (odd/even), not an independent value, and Special feeds

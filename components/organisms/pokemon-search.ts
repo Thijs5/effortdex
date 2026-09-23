@@ -15,7 +15,12 @@ const MOBILE_QUERY = '(max-width: 640px) and (pointer: coarse)';
 // when the field is focused with nothing typed yet.
 const RECENT_LIMIT = 5;
 
-type EvModifier = (mon: DomainPokemon) => EvMap | undefined;
+// A caller with a single applicable Pokémon (the detail page's own
+// battle search) returns an EvMap, formatted the normal way. One with
+// several — the roster's multi-participant battle search — returns a
+// pre-formatted string instead (one row's worth of space can't lay out
+// a per-participant breakdown as stat/number pairs), used as-is.
+type EvModifier = (mon: DomainPokemon) => EvMap | string | undefined;
 
 /**
  * <pokemon-search placeholder="…" show-ev-yield>
@@ -108,10 +113,15 @@ export class PokemonSearch extends BaseElement {
         }
         .option-ev-yield {
           flex: 0 0 auto;
+          max-width: 45%;
           font-family: var(--font-mono);
           font-size: var(--font-size-2xs);
           color: var(--teal);
-          white-space: nowrap;
+          text-align: right;
+          /* A single Pokémon's own yield ("+1 HP") never wraps in
+             practice; a multi-participant breakdown (roster.ts's battle
+             search) can run long enough to need it. */
+          white-space: normal;
         }
         .thumb {
           flex: 0 0 auto;
@@ -256,7 +266,18 @@ export class PokemonSearch extends BaseElement {
         // native <dialog> restores focus to whatever was focused when
         // it opened). Without this check, that stale timeout fires
         // after the refocus and wrongly hides the list it just showed.
-        if (this.shadow.activeElement === this.$input) return;
+        // A slot="sheet-extra" caller (the battle sheet's participant
+        // strip) renders its buttons as light-DOM children of this
+        // element, not into the shadow root — focus landing there
+        // shouldn't read as "focus left the sheet" and close it.
+        // this.contains(document.activeElement) is NOT that check: once
+        // focus is anywhere inside an attached shadow root (including
+        // this component's own sheet-close button), document.activeElement
+        // retargets to the *host* itself, so `this.contains(this)` is
+        // trivially true — that broke the close button. Scope the check
+        // to this element's actual light-DOM children instead.
+        const focusInSlottedContent = [...this.children].some((child) => child.contains(document.activeElement));
+        if (this.shadow.activeElement === this.$input || focusInSlottedContent) return;
         this._hideList();
         this._closeSheet();
       }, 120)
@@ -512,7 +533,7 @@ export class PokemonSearch extends BaseElement {
           const span = li.querySelector('.option-ev-yield');
           if (!span) return;
           const evs = this._evModifier ? this._evModifier(mon) : mon.evYield;
-          const formatted = evs ? formatEvYield(evs) : '';
+          const formatted = typeof evs === 'string' ? evs : evs ? formatEvYield(evs) : '';
           const baseHadYield = formatEvYield(mon.evYield) !== '';
           span.textContent = formatted || (this._evModifier && baseHadYield ? 'Capped' : '');
         })

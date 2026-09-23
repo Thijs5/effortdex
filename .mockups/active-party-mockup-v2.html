@@ -1,0 +1,495 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Active Party Revision</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+/* ---- Real app tokens (tokens.css), light palette on :root, dark under prefers-color-scheme ---- */
+:root{
+  color-scheme: light;
+  --ink:#1b1916; --ink-soft:#5f5b53;
+  --paper:#f4f2ee; --paper-panel:#fffefb;
+  --lcd:#fbfaf6; --lcd-deep:#ece8e0; --lcd-line:#e6e2da; --line:#e6e2da;
+  --surface:#fffefb;
+  --poke-red:#e3350d; --poke-red-dark:#9c2408; --on-red:#fff8ef;
+  --accent:var(--poke-red); --accent-dark:var(--poke-red-dark); --on-accent:var(--on-red);
+  --good:#1f8f52; --good-soft:#dcefe3;
+  --gold:#d99a1c; --gold-soft:#f3e6c9;
+  --danger-soft:#f8ddd3;
+  --teal:#2f7d6b; --teal-strong:#23604f; --on-teal:#fff; --teal-soft:#d6e7e0;
+  --sprite-drop: rgba(20,18,15,.4);
+  --shadow-panel: 0 1px 2px rgba(27,25,22,.05), 0 16px 34px -20px rgba(27,25,22,.24);
+  --font-display:"Bricolage Grotesque",system-ui,sans-serif;
+  --font-body:"Public Sans",system-ui,sans-serif;
+  --font-mono:"JetBrains Mono",ui-monospace,monospace;
+  --font-size-2xs:.68rem; --font-size-xs:.72rem; --font-size-sm:.8rem; --font-size-md:.88rem; --font-size-lg:1rem; --font-size-xl:1.15rem;
+  --space-1:.25rem; --space-2:.4rem; --space-3:.55rem; --space-4:.9rem; --space-5:1.4rem;
+  --radius-sm:8px; --radius-md:12px; --radius-lg:20px; --radius-pill:999px; --radius-btn:11px;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --ink:#e9e5db; --ink-soft:#a39d8f;
+    --paper:#17150f; --paper-panel:#211e17;
+    --lcd:#242017; --lcd-deep:#2f2a1f; --lcd-line:#3a3428; --line:#3a3428;
+    --surface:#211e17;
+    --poke-red:#ef4d26; --poke-red-dark:#8f1f06; --on-red:#fff4ec;
+    --good:#3fcf8e; --good-soft:#1e3a2c;
+    --gold:#e8bf55; --gold-soft:#4a3c1c;
+    --danger-soft:#4a2418;
+    --teal:#6fbfa8; --teal-strong:#8fd4bf; --on-teal:#14201b; --teal-soft:#24352f;
+    --sprite-drop: rgba(255,255,255,.32);
+    --shadow-panel: 0 1px 2px rgba(0,0,0,.45), 0 16px 34px -20px rgba(0,0,0,.7);
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --ink:#e9e5db; --ink-soft:#a39d8f;
+  --paper:#17150f; --paper-panel:#211e17;
+  --lcd:#242017; --lcd-deep:#2f2a1f; --lcd-line:#3a3428; --line:#3a3428;
+  --surface:#211e17;
+  --poke-red:#ef4d26; --poke-red-dark:#8f1f06; --on-red:#fff4ec;
+  --good:#3fcf8e; --good-soft:#1e3a2c;
+  --gold:#e8bf55; --gold-soft:#4a3c1c;
+  --danger-soft:#4a2418;
+  --teal:#6fbfa8; --teal-strong:#8fd4bf; --on-teal:#14201b; --teal-soft:#24352f;
+  --sprite-drop: rgba(255,255,255,.32);
+  --shadow-panel: 0 1px 2px rgba(0,0,0,.45), 0 16px 34px -20px rgba(0,0,0,.7);
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: var(--font-size-md);
+  padding: var(--space-5) var(--space-4) 4rem;
+}
+h1.page-title {
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+  margin: 0 0 var(--space-1);
+  text-wrap: balance;
+}
+p.page-sub { color: var(--ink-soft); margin: 0 0 var(--space-5); max-width: 62ch; }
+
+.frames { display: grid; gap: var(--space-5); max-width: 900px; margin: 0 auto; }
+.frame {
+  background: var(--paper-panel);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-panel);
+  overflow: hidden;
+}
+.frame-label {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-xs);
+  color: var(--ink-soft);
+  padding: var(--space-2) var(--space-4);
+  background: var(--lcd);
+  border-bottom: 1px solid var(--line);
+  display: flex; align-items: center; justify-content: space-between;
+}
+.frame-body { padding: var(--space-4); }
+
+/* ---- ds-btn ---- */
+.ds-btn {
+  appearance: none; border: none; cursor: pointer;
+  font-family: var(--font-body); font-weight: 700; font-size: var(--font-size-sm);
+  border-radius: var(--radius-btn);
+  padding: 0.6em 1.1em;
+  display: inline-flex; align-items: center; gap: 0.4em;
+  transition: filter .12s ease;
+}
+.ds-btn--primary { background: var(--accent); color: var(--on-accent); }
+.ds-btn--primary:hover { filter: brightness(1.06); }
+.ds-btn--ghost { background: transparent; color: var(--ink-soft); border: 1px solid var(--lcd-line); }
+.ds-btn--sm { padding: 0.42em 0.8em; font-size: var(--font-size-xs); }
+
+/* ---- view-nav ---- */
+.view-nav { display: flex; align-items: baseline; gap: var(--space-3); margin-bottom: var(--space-4); }
+.back-link { color: var(--ink-soft); text-decoration: none; font-size: var(--font-size-sm); font-weight: 600; }
+.view-nav > .ds-btn { margin-left: auto; }
+
+/* ---- identity row ---- */
+.party-identity-row { display: flex; align-items: flex-start; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-4); }
+.party-identity h2 { font-family: var(--font-display); margin: 0; font-size: 1.3rem; }
+.party-identity .hint { color: var(--ink-soft); font-size: var(--font-size-sm); margin: .2rem 0 0; }
+
+/* ---- roster panel head (issue 1: add button promoted to primary) ---- */
+.roster-panel-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-2); }
+.roster-panel-head > h2 { font-family: var(--font-display); margin: 0; font-size: 1.05rem; }
+.icon-btn-primary {
+  flex: 0 0 auto;
+  width: 34px; height: 34px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: var(--radius-pill);
+  border: none;
+  background: var(--accent);
+  color: var(--on-accent);
+  cursor: pointer;
+  box-shadow: 0 1px 0 rgba(0,0,0,.08);
+}
+.icon-btn-primary:hover { filter: brightness(1.06); }
+.icon-btn-primary svg { width: 18px; height: 18px; }
+
+/* ---- battle party section (issue 2: log-a-battle moved here; issue 7: 3-col slots with actions) ---- */
+.battle-party {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--lcd);
+  padding: var(--space-4);
+  margin-bottom: var(--space-4);
+}
+.battle-party-head { display: flex; align-items: center; justify-content: space-between; gap: var(--space-3); margin-bottom: var(--space-3); }
+.battle-party-title { font-family: var(--font-display); font-weight: 700; font-size: var(--font-size-lg); }
+.battle-party-head-actions { display: flex; align-items: center; gap: var(--space-2); }
+.heal-btn {
+  border: 1px solid var(--danger-soft);
+  background: var(--danger-soft);
+  color: var(--poke-red-dark);
+  border-radius: var(--radius-pill);
+  font-weight: 700;
+  font-size: var(--font-size-xs);
+  padding: 0.4em 0.85em;
+  cursor: pointer;
+}
+
+.party-grid3 {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+}
+@media (max-width: 420px) {
+  .party-grid3 { grid-template-columns: repeat(2, 1fr); }
+}
+.slot-card {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-2);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+.slot-card--fainted { background: var(--lcd-deep); border-style: dashed; opacity: .82; }
+.slot-card--empty {
+  border-style: dashed;
+  color: var(--ink-soft);
+  justify-content: center;
+  cursor: pointer;
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  min-height: 56px;
+}
+.slot-card--empty:hover { border-color: var(--teal); color: var(--teal-strong); }
+.slot-sprite-wrap { position: relative; width: 34px; height: 34px; flex: 0 0 auto; }
+.slot-sprite { width: 100%; height: 100%; object-fit: contain; image-rendering: pixelated; filter: drop-shadow(0 2px 2px var(--sprite-drop)); }
+.slot-card--fainted .slot-sprite { filter: grayscale(1) opacity(.55); }
+.slot-body { min-width: 0; flex: 1 1 auto; display: grid; gap: 1px; }
+.slot-name { font-size: var(--font-size-2xs); font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.slot-lvl { font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--ink-soft); }
+.slot-actions { flex: 0 0 auto; display: flex; gap: 3px; }
+.slot-action-btn {
+  width: 22px; height: 22px;
+  display: inline-flex; align-items: center; justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--lcd-line);
+  background: var(--surface);
+  color: var(--ink-soft);
+  cursor: pointer;
+  font-size: .68rem;
+  line-height: 1;
+}
+.slot-action-btn:hover { border-color: var(--teal); color: var(--teal-strong); }
+.slot-action-btn--danger:hover { border-color: var(--poke-red); color: var(--poke-red-dark); }
+.slot-faint-tag {
+  font-size: var(--font-size-2xs);
+  font-weight: 800;
+  color: var(--poke-red-dark);
+}
+.party-slots-status { margin: var(--space-2) 0 0; font-size: var(--font-size-xs); color: var(--poke-red-dark); }
+
+/* ---- roster card (issue 5: no fainted tag here anymore) ---- */
+.roster { display: grid; gap: var(--space-2); }
+.roster-card {
+  display: flex; align-items: center; gap: var(--space-2);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: var(--space-3) var(--space-4);
+}
+.roster-card-link { display: flex; align-items: center; gap: var(--space-3); min-width: 0; flex: 1 1 auto; text-decoration: none; color: inherit; }
+.roster-card-sprite { width: 40px; height: 40px; image-rendering: pixelated; object-fit: contain; filter: drop-shadow(0 3px 4px var(--sprite-drop)); }
+.roster-card-body { min-width: 0; flex: 1 1 auto; display: grid; gap: .2rem; }
+.roster-card-name { font-family: var(--font-display); font-weight: 700; font-size: var(--font-size-lg); }
+.roster-card-meta { font-size: var(--font-size-2xs); color: var(--ink-soft); }
+.roster-card-evbar { display: block; height: 6px; border-radius: 3px; background: var(--lcd-line); margin-top: .2rem; overflow: hidden; width: 100%; }
+.roster-card-evbar > span { display: block; height: 100%; background: var(--good); }
+.roster-card-active-btn {
+  flex: 0 0 auto;
+  border: 1px solid var(--lcd-line);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--ink-soft);
+  font-size: var(--font-size-2xs);
+  font-weight: 700;
+  padding: 0.3em 0.7em;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.roster-card-active-btn--active { background: var(--teal-soft); border-color: transparent; color: var(--teal-strong); }
+
+/* ---- battle sheet frame ---- */
+.sheet-mock {
+  border: 1px solid var(--line);
+  border-radius: var(--radius-lg);
+  background: var(--paper-panel);
+  padding: var(--space-4);
+}
+.sheet-title { font-family: var(--font-display); font-weight: 700; font-size: var(--font-size-lg); margin: 0 0 var(--space-3); }
+.sheet-eyebrow { font-size: var(--font-size-xs); color: var(--ink-soft); font-weight: 600; margin: 0 0 var(--space-2); }
+.select-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+.select-slot {
+  display: flex; flex-direction: column; align-items: center; gap: .2rem;
+  padding: var(--space-2);
+  border: 2px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  cursor: pointer;
+  position: relative;
+}
+.select-slot--selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+.select-slot--locked { cursor: not-allowed; opacity: .45; }
+.select-slot--locked .slot-sprite { filter: grayscale(1); }
+.select-slot .slot-check {
+  position: absolute; top: -6px; right: -6px;
+  width: 15px; height: 15px; border-radius: 50%;
+  background: var(--accent); color: var(--on-red);
+  font-size: .6rem; display: flex; align-items: center; justify-content: center;
+}
+.search-input-mock {
+  width: 100%;
+  padding: 0.65em 0.9em;
+  border-radius: var(--radius-btn);
+  border: 1px solid var(--lcd-line);
+  background: var(--lcd);
+  color: var(--ink);
+  font-size: var(--font-size-input, 16px);
+  font-family: inherit;
+}
+
+.legend {
+  max-width: 900px;
+  margin: var(--space-5) auto 0;
+  background: var(--lcd);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  padding: var(--space-4);
+}
+.legend h3 { font-family: var(--font-display); font-size: var(--font-size-md); margin: 0 0 var(--space-2); }
+.legend ol { margin: 0; padding-left: 1.2em; display: grid; gap: .35em; font-size: var(--font-size-sm); color: var(--ink-soft); }
+.legend b { color: var(--ink); }
+
+.tag-num {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 16px; height: 16px; border-radius: 50%;
+  background: var(--poke-red); color: var(--on-red);
+  font-size: .6rem; font-weight: 800;
+  position: absolute; top: -6px; left: -6px;
+  border: 2px solid var(--paper-panel);
+}
+.pos-rel { position: relative; }
+</style>
+</head>
+<body>
+
+<h1 class="page-title">Active party — revision pass</h1>
+<p class="page-sub">Addresses the 7 review notes on the first mockup: button weight/placement, the sheet-close focus bug, default selection, where "fainted" shows, and a real add/remove/swap mechanism inside a 3-column battle-party grid.</p>
+
+<div class="frames">
+
+  <!-- FRAME A: Roster page -->
+  <div class="frame">
+    <div class="frame-label"><span>Frame A — Roster page</span><span>#/parties/emerald-nuzlocke</span></div>
+    <div class="frame-body">
+
+      <div class="view-nav">
+        <a class="back-link" href="#">&larr; All parties</a>
+        <button class="ds-btn ds-btn--primary pos-rel">&plus; Add a Pok&eacute;mon</button>
+      </div>
+
+      <div class="party-identity-row">
+        <div class="party-identity">
+          <h2>Emerald Nuzlocke</h2>
+          <p class="hint">Pok&eacute;mon Emerald</p>
+        </div>
+      </div>
+
+      <section class="battle-party pos-rel">
+        <span class="tag-num">2</span>
+        <div class="battle-party-head">
+          <span class="battle-party-title">Active party</span>
+          <div class="battle-party-head-actions">
+            <button class="heal-btn">&#10021; Heal at Pok&eacute;center</button>
+            <button class="ds-btn ds-btn--primary ds-btn--sm pos-rel">&plus; Log a battle<span class="tag-num" style="top:-8px;left:auto;right:-8px;">2</span></button>
+          </div>
+        </div>
+
+        <div class="party-grid3 pos-rel">
+          <span class="tag-num" style="top:-10px;left:-10px;">7</span>
+
+          <div class="slot-card">
+            <div class="slot-sprite-wrap">
+              <img class="slot-sprite" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Ccircle cx='20' cy='20' r='16' fill='%2378c850'/%3E%3C/svg%3E">
+            </div>
+            <div class="slot-body">
+              <span class="slot-name">Bulbasaur</span>
+              <span class="slot-lvl">Lv12</span>
+            </div>
+            <div class="slot-actions">
+              <button class="slot-action-btn" title="Swap out">&#8646;</button>
+              <button class="slot-action-btn" title="Faint">&times;</button>
+            </div>
+          </div>
+
+          <div class="slot-card slot-card--fainted">
+            <div class="slot-sprite-wrap">
+              <img class="slot-sprite" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Ccircle cx='20' cy='20' r='16' fill='%23f08030'/%3E%3C/svg%3E">
+            </div>
+            <div class="slot-body">
+              <span class="slot-name">Charmander</span>
+              <span class="slot-faint-tag">Fainted &mdash; tap to heal</span>
+            </div>
+            <div class="slot-actions">
+              <button class="slot-action-btn" title="Swap out">&#8646;</button>
+            </div>
+          </div>
+
+          <div class="slot-card">
+            <div class="slot-sprite-wrap">
+              <img class="slot-sprite" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Ccircle cx='20' cy='20' r='16' fill='%23f8d030'/%3E%3C/svg%3E">
+            </div>
+            <div class="slot-body">
+              <span class="slot-name">Chansey</span>
+              <span class="slot-lvl">Lv9</span>
+            </div>
+            <div class="slot-actions">
+              <button class="slot-action-btn" title="Swap out">&#8646;</button>
+              <button class="slot-action-btn" title="Faint">&times;</button>
+            </div>
+          </div>
+
+          <div class="slot-card--empty">+ Bring in a benched Pok&eacute;mon</div>
+          <div class="slot-card--empty">+ Bring in a benched Pok&eacute;mon</div>
+          <div class="slot-card--empty">+ Bring in a benched Pok&eacute;mon</div>
+        </div>
+        <p class="party-slots-status">Charmander is down &mdash; tap it, or Heal, before it can battle.</p>
+      </section>
+
+      <section class="pos-rel">
+        <div class="roster-panel-head">
+          <span class="tag-num" style="top:2px;left:-6px;">1</span>
+          <h2>My Pok&eacute;mon</h2>
+          <button class="icon-btn-primary" title="Add a Pok&eacute;mon" aria-label="Add a Pok&eacute;mon">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5v14M5 12h14"/></svg>
+          </button>
+        </div>
+
+        <div class="roster pos-rel">
+          <span class="tag-num" style="top:6px;left:-10px;">5</span>
+
+          <div class="roster-card">
+            <a class="roster-card-link" href="#">
+              <img class="roster-card-sprite" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Ccircle cx='20' cy='20' r='16' fill='%2378c850'/%3E%3C/svg%3E">
+              <div class="roster-card-body">
+                <span class="roster-card-name">Bulbasaur</span>
+                <span class="roster-card-meta">Lv12 &middot; Bold</span>
+                <span class="roster-card-evbar"><span style="width:22%"></span></span>
+              </div>
+            </a>
+            <button class="roster-card-active-btn roster-card-active-btn--active" aria-pressed="true">In party</button>
+          </div>
+
+          <div class="roster-card">
+            <a class="roster-card-link" href="#">
+              <img class="roster-card-sprite" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Ccircle cx='20' cy='20' r='16' fill='%23f08030'/%3E%3C/svg%3E">
+              <div class="roster-card-body">
+                <span class="roster-card-name">Charmander</span>
+                <span class="roster-card-meta">Lv10 &middot; Adamant</span>
+                <span class="roster-card-evbar"><span style="width:8%"></span></span>
+              </div>
+            </a>
+            <!-- note: no fainted tag here anymore — that lives on the battle-party slot above (issue 5) -->
+            <button class="roster-card-active-btn roster-card-active-btn--active" aria-pressed="true">In party</button>
+          </div>
+
+          <div class="roster-card">
+            <a class="roster-card-link" href="#">
+              <img class="roster-card-sprite" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Ccircle cx='20' cy='20' r='16' fill='%23a8a878'/%3E%3C/svg%3E">
+              <div class="roster-card-body">
+                <span class="roster-card-name">Onix</span>
+                <span class="roster-card-meta">Lv7</span>
+                <span class="roster-card-evbar"><span style="width:4%"></span></span>
+              </div>
+            </a>
+            <button class="roster-card-active-btn" aria-pressed="false">In party</button>
+          </div>
+        </div>
+      </section>
+    </div>
+  </div>
+
+  <!-- FRAME B: Log a battle sheet -->
+  <div class="frame">
+    <div class="frame-label"><span>Frame B — "Log a battle" sheet</span><span>opened from the battle-party bar</span></div>
+    <div class="frame-body">
+      <div class="sheet-mock pos-rel">
+        <span class="tag-num" style="top:-8px;left:-8px;">3</span><span class="tag-num" style="top:-8px;left:14px;">4</span>
+        <h3 class="sheet-title">Log a battle</h3>
+        <p class="sheet-eyebrow">Who's in this battle?</p>
+        <div class="select-grid">
+          <div class="select-slot select-slot--selected">
+            <span class="slot-check">&#10003;</span>
+            <img class="slot-sprite" style="width:32px;height:32px" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Ccircle cx='20' cy='20' r='16' fill='%2378c850'/%3E%3C/svg%3E">
+            <span class="slot-lvl">Lv12</span>
+          </div>
+          <div class="select-slot select-slot--locked">
+            <img class="slot-sprite" style="width:32px;height:32px" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Ccircle cx='20' cy='20' r='16' fill='%23f08030'/%3E%3C/svg%3E">
+            <span class="slot-lvl">Fainted</span>
+          </div>
+          <div class="select-slot">
+            <img class="slot-sprite" style="width:32px;height:32px" alt="" src="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='40' height='40'%3E%3Ccircle cx='20' cy='20' r='16' fill='%23f8d030'/%3E%3C/svg%3E">
+            <span class="slot-lvl">Lv9</span>
+          </div>
+        </div>
+        <input class="search-input-mock" placeholder="Defeated Pok&eacute;mon&hellip;" disabled>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<div class="legend">
+  <h3>What changed vs. the first pass</h3>
+  <ol>
+    <li><b>1 — Add a Pok&eacute;mon</b> is now a filled primary icon button in the roster header, same visual weight as "Log a battle".</li>
+    <li><b>2 — Log a battle</b> moved off the top nav bar into the "Active party" section header, next to Heal, right where it acts.</li>
+    <li><b>3 — Deselecting a chip no longer closes the sheet</b> (the underlying bug was a focus check in the search component that didn't know about slotted content — fixed at the component level, nothing to see visually here besides "it still works after you tap").</li>
+    <li><b>4 — Only Bulbasaur (the lead) is pre-selected</b> by default; Chansey has to be tapped in.</li>
+    <li><b>5 — "Fainted" only appears on the battle-party slot</b> now (Charmander, top). The roster card below no longer repeats it — it already shows "In party".</li>
+    <li><b>6 — Swap (&#8646;) on each filled slot</b> opens a quick picker of the bench to replace that member in one tap; an empty slot is itself a "bring someone in" tap target. Faint (&times;) stays a one-tap toggle.</li>
+    <li><b>7 — Battle-party grid is a fixed 3 columns</b> (2 rows of 3), each card now wide enough for a name, level, and its two action buttons — no more tiny 56px icons.</li>
+  </ol>
+</div>
+
+</body>
+</html>

@@ -132,10 +132,32 @@
         <button id="edit-party-btn" class="ds-btn ds-btn--ghost">Edit party</button>
       </div>
 
+      <!-- The current in-game six (Party.activeUids — not to be confused
+           with store.activeParty, the whole selected playthrough), tap a
+           slot to faint/heal it (roster.ts) — plain state, not logged. A
+           benched Pokémon joins/leaves via the "In party" toggle on its
+           own roster card below. -->
+      <section id="battle-party" class="battle-party" aria-labelledby="battle-party-heading" hidden>
+        <div class="battle-party-head">
+          <span id="battle-party-heading" class="battle-party-title">Active party</span>
+          <div class="battle-party-head-actions">
+            <button type="button" id="heal-party-btn" class="heal-btn" hidden>&#10021; Heal at Pok&eacute;center</button>
+            <button id="party-log-battle-btn" class="ds-btn ds-btn--primary ds-btn--sm" type="button">&plus; Log a battle</button>
+          </div>
+        </div>
+        <!-- Always exactly MAX_ACTIVE_PARTY cells (roster.ts): a filled
+             card per active member plus a dashed "bring someone in" card
+             per open slot, so add/remove/swap all live in one grid. -->
+        <div id="battle-party-slots" class="battle-party-grid"></div>
+        <p id="battle-party-status" class="party-slots-status" hidden></p>
+      </section>
+
       <p id="add-status" class="status-line" aria-live="polite"></p>
 
       <section class="roster-panel" aria-labelledby="roster-heading">
-        <h2 id="roster-heading">My Pok&eacute;mon</h2>
+        <div class="roster-panel-head">
+          <h2 id="roster-heading">My Pok&eacute;mon</h2>
+        </div>
         <p id="empty-state" class="empty-state">
           No Pok&eacute;mon added yet &mdash; tap &ldquo;Add a Pok&eacute;mon&rdquo; above to start tracking EVs.
         </p>
@@ -155,6 +177,25 @@
            shows; picking a species opens #add-pokemon-dialog for level /
            nature / stats (roster.ts). -->
       <pokemon-search id="add-search" hidden placeholder="Search a species&hellip;" sheet-title="Add a Pok&eacute;mon" force-sheet></pokemon-search>
+
+      <!-- "Log a battle" for the roster's own active party (as opposed to
+           the detail page's single-mon version): slot="sheet-extra" carries
+           the participant strip, pre-checked per roster.ts, above the
+           opponent search input. show-ev-yield + evModifier (roster.ts)
+           show each suggestion's own multi-participant EV breakdown right
+           in the dropdown, before anything is picked (docs/adr/0029).
+           Picking still applies immediately, but the sheet itself stays
+           open afterward (roster.ts overrides the usual pick-closes-it
+           behavior) and #battle-result-summary shows the same breakdown
+           in place — ready to log the next battle without reopening. -->
+      <pokemon-search id="battle-search" hidden placeholder="Defeated Pok&eacute;mon&hellip;" show-ev-yield sheet-title="Log a battle" force-sheet>
+        <div slot="sheet-extra" class="battle-sheet-extra">
+          <p id="battle-result-summary" class="battle-result-summary" hidden aria-live="polite"></p>
+          <p class="battle-sheet-eyebrow">Who's in this battle?</p>
+          <div id="battle-participants" class="party-slots party-slots--select"></div>
+          <p id="battle-participants-status" class="party-slots-status" hidden></p>
+        </div>
+      </pokemon-search>
     </main>
 
     <!-- "/parties/<slug>/<uid>" — one roster Pokémon's full detail page -->
@@ -496,6 +537,27 @@
         <button type="submit" id="add-pokemon-dialog-submit-btn" class="ds-btn ds-btn--primary" disabled>Add!</button>
       </div>
     </form>
+  </dialog>
+
+  <!-- Swap picker (docs/adr/0029): the active-party grid's swap (&#8646;)
+       button opens this pre-scoped to the slot being replaced; an empty
+       slot opens it with nothing to swap out, just add. Bench list is
+       rebuilt fresh each open (roster.ts). -->
+  <dialog id="swap-dialog" class="party-dialog swap-dialog ds-dialog" aria-labelledby="swap-dialog-title">
+    <header class="ds-dialog-header">
+      <h2 id="swap-dialog-title">Bring in a Pok&eacute;mon</h2>
+      <button type="button" id="swap-dialog-close" class="ds-dialog-close" aria-label="Close">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg>
+      </button>
+    </header>
+    <div class="dialog-body">
+      <!-- Only shown when opened from a filled slot's swap button — the
+           roster card has no active-party control of its own, so this is
+           also how a Pokémon leaves the party without a replacement. -->
+      <button type="button" id="swap-dialog-bench-btn" class="swap-dialog-bench-btn" hidden>Bench &mdash; leave this slot open</button>
+      <div id="swap-dialog-list" class="swap-dialog-list"></div>
+      <p id="swap-dialog-empty" class="empty-state" hidden>Nobody on the bench to bring in.</p>
+    </div>
   </dialog>
 
   <dialog id="roster-filter-dialog" class="roster-filter-dialog ds-dialog" aria-labelledby="roster-filter-dialog-title">
