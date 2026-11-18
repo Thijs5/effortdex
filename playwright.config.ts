@@ -14,6 +14,7 @@ export default defineConfig({
   use: {
     baseURL: 'http://localhost:5173',
     trace: 'on-first-retry',
+    screenshot: 'on',
     storageState: {
       cookies: [],
       origins: [{ origin: 'http://localhost:5173', localStorage: [{ name: 'effortdex:dev-no-cache', value: '1' }] }],

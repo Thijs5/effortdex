@@ -64,6 +64,7 @@ export class StatReadingGrid extends BaseElement {
       color: var(--ink-soft); opacity: 0.55;
       font-family: var(--font-mono); font-size: var(--font-size-xs);
     }
+    .value, .delta { min-height: 44px; }
     .value:hover { color: var(--teal); }
     .value:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: var(--radius-sm); }
     .change { display: flex; align-items: center; gap: var(--space-2); }
@@ -74,8 +75,8 @@ export class StatReadingGrid extends BaseElement {
     .delta:hover { color: var(--teal); }
     .delta:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: var(--radius-sm); }
     .step {
-      flex: 0 0 auto; min-width: 2.4em; min-height: 30px; padding: 0.2em 0.5em;
-      font-family: var(--font-mono); font-size: var(--font-size-2xs); line-height: 1;
+      flex: 0 0 auto; min-width: 44px; min-height: 44px; padding: 0.2em 0.5em;
+      font-family: var(--font-mono); font-size: var(--font-size-sm); line-height: 1;
       border: 1px solid var(--lcd-line); border-radius: var(--radius-sm);
       background: var(--surface); color: var(--ink-soft); cursor: pointer; touch-action: manipulation;
     }
