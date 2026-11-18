@@ -385,3 +385,37 @@ test.describe('Active party and faint tracking', () => {
     await expect(page.locator('#battle-search')).toBeHidden();
   });
 });
+
+test.describe('Touch battle confirmation', () => {
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 700 } });
+
+  test('picking a recent opponent on a phone preserves the battle through keyboard dismissal and confirmation', async ({ page }) => {
+    await mockPokeApi(page);
+    await page.goto('/');
+    await createParty(page, { name: 'Phone run', baseGame: 'Emerald' });
+    await addPokemon(page, 'Bulbasaur');
+    await logPartyBattle(page, 'Caterpie');
+    await page.locator('#battle-search .sheet-close').tap();
+    await page.locator('#party-log-battle-btn').tap();
+    const search = page.locator('#battle-search');
+    const input = search.getByRole('combobox');
+    await page.getByRole('option').filter({ hasText: /Caterpie/i }).first().tap();
+    await expect(page.locator('#battle-result-summary')).toContainText('Ready to log');
+    // Phones can blur the input when dismissing the keyboard without
+    // focusing another control (Safari also does not focus tapped buttons).
+    await page.clock.install();
+    await input.evaluate((element) => element.blur());
+    await page.clock.runFor(250);
+    await expect(page.locator('#battle-log-btn')).toBeVisible();
+    await page.locator('#battle-log-btn').tap();
+    await expect(rosterCard(page, 'Bulbasaur').locator('.roster-card-evbar .value')).toHaveText('2/510');
+    await search.locator('.sheet-close').tap();
+    await page.locator('#party-log-battle-btn').tap();
+    await page.getByRole('option').filter({ hasText: /Caterpie/i }).first().tap();
+    await expect(page.locator('#battle-result-summary')).toContainText('Ready to log');
+    await input.press('Escape');
+    await expect(search).toBeHidden();
+    await page.reload();
+    await expect(rosterCard(page, 'Bulbasaur').locator('.roster-card-evbar .value')).toHaveText('2/510');
+  });
+});

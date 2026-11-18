@@ -283,6 +283,12 @@ export class PokemonSearch extends BaseElement {
     // mouse wins the race against the hide.
     this.$input.addEventListener('blur', () =>
       setTimeout(() => {
+        // A confirmation sheet must survive keyboard dismissal. On
+        // phones (notably Safari), a tap can blur the input without
+        // focusing the tapped control; closing here discards the staged
+        // opponent before the footer can confirm it. Close/Escape remain
+        // explicit cancellation actions for sheets with a footer.
+        if (this._sheetOpen && this.querySelector('[slot="sheet-footer"]')) return;
         // A blur can be immediately followed by a refocus — e.g. the
         // add dialog opening (blurs this input) then closing (a
         // native <dialog> restores focus to whatever was focused when
@@ -595,7 +601,11 @@ export class PokemonSearch extends BaseElement {
   _onKeydown(e: KeyboardEvent): void {
     if (this.$list.hidden) {
       if (e.key === 'Enter') this._tryDirectPick();
-      else if (e.key === 'Escape' && this._sheetOpen) this.$input.blur();
+      else if (e.key === 'Escape' && this._sheetOpen) {
+        e.preventDefault();
+        this.$input.blur();
+        this._closeSheet();
+      }
       return;
     }
     const items = [...this.$list.querySelectorAll<HTMLElement>('li.option')];
@@ -625,7 +635,10 @@ export class PokemonSearch extends BaseElement {
       // card's More dialog) in the same press.
       e.preventDefault();
       this._hideList();
-      if (this._sheetOpen) this.$input.blur();
+      if (this._sheetOpen) {
+        this.$input.blur();
+        this._closeSheet();
+      }
     }
   }
 
