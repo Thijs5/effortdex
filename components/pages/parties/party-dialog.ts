@@ -155,9 +155,12 @@ partyForm.addEventListener('submit', (e) => {
   const overrides = readOverridesFromDialog();
 
   if (dialogEditingId === null) {
+    // Creating the party emits a synchronous change event and re-renders
+    // this form. Capture the choice before that render resets it.
+    const cacheOffline = partyCacheOfflineInput.checked && !isCachingDisabled();
     const party = store.createParty(name, description, baseGame, overrides);
     // Deliberately not awaited: this runs in the background.
-    if (partyCacheOfflineInput.checked) prefetchService.prefetchGame(baseGame);
+    if (cacheOffline) void prefetchService.prefetchGame(baseGame).catch(() => {});
     // Navigate first, then close: by the time the `close` listener
     // above fires, the route's `dialog` is already null.
     router.navigateToParty(party.slug);

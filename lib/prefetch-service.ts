@@ -26,7 +26,7 @@
 import { matchGameVersion } from './game-versions.ts';
 import { versionedSpriteUrl, modernSpriteUrl } from './pokeapi-client.ts';
 import { withoutNetworkActivity } from './network-activity.ts';
-import { SPRITE_CACHE_NAME } from './sprite-cache.ts';
+import { SPRITE_CACHE_NAME, SPRITE_CACHE_MAX_ENTRIES } from './sprite-cache.ts';
 import { isCachingDisabled } from './dev-cache.ts';
 import { ITEM_SPRITES } from './constants.ts';
 import type { Store } from './store.ts';
@@ -671,7 +671,19 @@ export class PrefetchService extends EventTarget {
           // (see lib/constants.ts's FALLBACK_ONERROR comment) — otherwise
           // the prefetch would cache a cors entry the <img> can't reuse
           // from cache offline on WebKit/iOS.
-          await run(() => fetch(fetchUrl, { mode: 'no-cors' }));
+          await run(async () => {
+            const response = await fetch(fetchUrl, { mode: 'no-cors' });
+            if (!response.ok && response.type !== 'opaque') throw new Error('Sprite fetch failed');
+            // On a first visit no service worker may control the page yet.
+            // Store the same opaque response images need on WebKit/iOS
+            // ourselves, before reporting this task as complete.
+            if (typeof caches !== 'undefined') {
+              const cache = await caches.open(SPRITE_CACHE_NAME);
+              await cache.put(new Request(fetchUrl, { mode: 'no-cors' }), response.clone());
+              const keys = await cache.keys();
+              await Promise.all(keys.slice(0, Math.max(0, keys.length - SPRITE_CACHE_MAX_ENTRIES)).map((key) => cache.delete(key)));
+            }
+          });
         }
       }
     } catch {

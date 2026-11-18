@@ -293,7 +293,7 @@ export class PokemonSearch extends BaseElement {
         const visible = controls.filter((node) => !node.hasAttribute('disabled') && node.getClientRects().length);
         const active = document.activeElement === this ? this.shadow.activeElement : document.activeElement;
         const first = visible[0], last = visible[visible.length - 1];
-        if ((e.shiftKey && active === first) || (!e.shiftKey && active === last)) {
+        if ((e.shiftKey && (active === first || active === this.$sheetTitle)) || (!e.shiftKey && active === last)) {
           e.preventDefault();
           (e.shiftKey ? last : first)?.focus();
         }

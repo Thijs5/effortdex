@@ -441,6 +441,11 @@ test.describe('Keyboard-free defeat review', () => {
     await expect(input).toBeHidden();
     await expect(page.locator('#battle-confirm-state')).toHaveText('Not logged yet');
     await expect(page.locator('#battle-log-btn')).toBeDisabled();
+    await expect(search.getByRole('heading', { name: 'Record a defeat' })).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(page.locator('#battle-done-btn')).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(search.locator('.sheet-close')).toBeFocused();
     await page.locator('#battle-choose-opponent-btn').tap();
     await expect(input).toBeFocused();
     await page.setViewportSize({ width: 390, height: 320 });
@@ -454,6 +459,8 @@ test.describe('Keyboard-free defeat review', () => {
     await expect(input).toBeHidden();
     await expect(page.locator('#battle-opponent-name')).toHaveText('Caterpie');
     await expect(page.locator('#battle-confirm-state')).toHaveText('Not logged yet');
+    await page.keyboard.press('Shift+Tab');
+    await expect(page.locator('#battle-log-btn')).toBeFocused();
     await expect(page.locator('#battle-log-btn')).toBeInViewport({ ratio: 1 });
     await page.setViewportSize({ width: 390, height: 844 });
     await expect(rosterCard(page, 'Bulbasaur').locator('.roster-card-evbar .value')).toHaveText('0/510');
@@ -472,7 +479,9 @@ test.describe('Keyboard-free defeat review', () => {
     await search.getByRole('button', { name: 'Back to defeat review' }).tap();
     await expect(input).toBeHidden();
     await expect(page.locator('#battle-opponent-name')).toHaveText('Caterpie');
-    await page.locator('#battle-log-btn').focus();
+    await expect(search.getByRole('heading', { name: 'Record a defeat' })).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(page.locator('#battle-log-btn')).toBeFocused();
     await page.keyboard.press('Tab');
     await expect(search.locator('.sheet-close')).toBeFocused();
     await page.locator('#battle-done-btn').tap();

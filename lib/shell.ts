@@ -133,6 +133,17 @@ settingsBtn.addEventListener('click', () => router.navigateToSettings());
 
 const THEME_KEY = 'effortdex:theme';
 const themeChoices = [...headerMenu.querySelectorAll('[data-theme-choice]')].map((el) => el as HTMLElement);
+const systemTheme = window.matchMedia('(prefers-color-scheme: dark)');
+
+function updateBrowserTheme(): void {
+  const colour = getComputedStyle(document.documentElement).getPropertyValue('--surface').trim();
+  // A manual theme must also update browser chrome, independently of
+  // the operating system's preference used by the initial media tags.
+  for (const meta of document.querySelectorAll<HTMLMetaElement>('meta[name="theme-color"]')) {
+    meta.removeAttribute('media');
+    meta.content = colour;
+  }
+}
 
 function applyTheme(theme: string): void {
   if (theme === 'auto') {
@@ -145,9 +156,11 @@ function applyTheme(theme: string): void {
   for (const choice of themeChoices) {
     choice.setAttribute('aria-checked', String(choice.dataset.themeChoice === theme));
   }
+  updateBrowserTheme();
 }
 
 applyTheme(localStorage.getItem(THEME_KEY) || 'auto');
+systemTheme.addEventListener('change', updateBrowserTheme);
 for (const choice of themeChoices) {
   choice.addEventListener('click', () => applyTheme(choice.dataset.themeChoice as string));
 }

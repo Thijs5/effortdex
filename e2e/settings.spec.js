@@ -53,3 +53,35 @@ test.describe('Settings', () => {
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
   });
 });
+
+test('dark surfaces are neutral and browser chrome follows manual and automatic theme choices', async ({ page }) => {
+  await page.emulateMedia({ colorScheme: 'light' });
+  await page.goto('/');
+  await page.getByRole('button', { name: 'Menu' }).click();
+  await page.getByRole('menuitemradio', { name: 'Dark' }).click();
+  const read = () => page.evaluate(() => ({
+    surface: getComputedStyle(document.documentElement).getPropertyValue('--surface').trim(),
+    tint: getComputedStyle(document.documentElement).getPropertyValue('--page-type-tint').trim(),
+    chrome: [...document.querySelectorAll('meta[name="theme-color"]')].map((m) => m.getAttribute('content')),
+  }));
+  for (const mode of ['manual', 'automatic']) {
+    if (mode === 'automatic') {
+      await page.emulateMedia({ colorScheme: 'dark' });
+      await page.getByRole('button', { name: 'Menu' }).click();
+      await page.getByRole('menuitemradio', { name: 'Auto' }).click();
+    }
+    const palette = await read();
+    const channels = palette.surface.slice(1).match(/../g)?.map((v) => parseInt(v, 16)) ?? [];
+    expect(channels).toHaveLength(3);
+    expect(Math.max(...channels) - Math.min(...channels)).toBeLessThanOrEqual(12);
+    expect(channels[2]).toBeGreaterThanOrEqual(channels[0]);
+    expect(palette.tint).toBe('0%');
+    expect(palette.chrome.every((colour) => colour === palette.surface)).toBe(true);
+  }
+  await page.getByRole('button', { name: 'Menu' }).click();
+  await page.getByRole('menuitemradio', { name: 'Light' }).click();
+  const light = await read();
+  expect(light.chrome.every((colour) => colour === light.surface)).toBe(true);
+  await expect(page.locator('.brand-mark img')).toBeVisible();
+  expect(await page.locator('.brand-mark img').evaluate((img) => (/** @type {HTMLImageElement} */ (img)).naturalWidth)).toBeGreaterThan(0);
+});

@@ -13,3 +13,5 @@
 // service worker can reach, so reading/deleting entries here talks to
 // the exact same cache sw.js's fetch handler serves out of.
 export const SPRITE_CACHE_NAME = 'effortdex-sprites';
+// Keep equal to sw.js's cap: prefetch also writes before a worker controls the page.
+export const SPRITE_CACHE_MAX_ENTRIES = 4000;
