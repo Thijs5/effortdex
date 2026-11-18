@@ -276,7 +276,6 @@ html[data-modal-open] body {
 }
 
 /* ---------- shared bits ---------- */
-.panel h2,
 .roster-panel-head {
   display: flex;
   align-items: center;
@@ -284,12 +283,14 @@ html[data-modal-open] body {
   gap: var(--space-3);
   margin-bottom: var(--space-1);
 }
+.panel h2,
 .roster-panel-head > h2 {
   font-family: var(--font-display);
   font-size: var(--font-size-xl);
   margin: 0;
   letter-spacing: -0.01em;
 }
+.panel h2 { margin-bottom: var(--space-1); }
 
 .hint {
   margin: 0 0 var(--space-4);
@@ -483,6 +484,7 @@ html[data-modal-open] body {
 }
 .battle-party-head {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
@@ -495,7 +497,7 @@ html[data-modal-open] body {
   font-weight: 700;
   color: var(--ink-soft);
 }
-.battle-party-head-actions { display: flex; align-items: center; gap: var(--space-2); }
+.battle-party-head-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .heal-btn {
   display: inline-flex;
   align-items: center;

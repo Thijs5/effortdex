@@ -87,6 +87,22 @@ test('writeRoster -> readRoster round-trips a deliberately-below-cap Party.activ
   assert.ok(!rebuilt.parties[0].activeUids.includes(a.uid));
 });
 
+test('fainted status survives IndexedDB writes and a full store reload', async () => {
+  const db = await freshDb();
+  const original = new Store();
+  original.createParty('Emerald run', '', 'Emerald');
+  const entry = original.addPokemon({ id: 1, name: 'bulbasaur', sprite: null });
+  original.setFainted(entry.uid, true);
+  await writeRoster(db, original.state);
+
+  const reloaded = new Store({
+    mirrorRoster: async () => {},
+    loadRoster: () => readRoster(db),
+  });
+  await reloaded.init();
+  assert.equal(reloaded.activeParty.pokemon[0].fainted, true);
+});
+
 test('pre-event-sourcing blob (_migrateV1) round-trips through the rows', async () => {
   const db = await freshDb();
   localStorage.setItem(

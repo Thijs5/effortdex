@@ -92,6 +92,56 @@ test.describe('Active party and faint tracking', () => {
     await expect(rosterCard(page, 'Bulbasaur').getByText('In party')).toHaveCount(0);
   });
 
+  test('fainted status and a deliberately benched member survive a reload', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Emerald run', baseGame: 'Emerald' });
+    await addPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Charmander');
+    await battlePartyFaintBtn(page, 'Bulbasaur');
+    await benchFromParty(page, 'Charmander');
+    await page.reload();
+    await expect(battlePartySlot(page, 'Bulbasaur').locator('.battle-slot-faint-tag')).toBeVisible();
+    await expect(battlePartySlot(page, 'Charmander')).toHaveCount(0);
+  });
+
+  for (const invalidate of ['close', 'participants']) {
+    test(`a delayed opponent lookup cannot restore a battle invalidated by ${invalidate}`, async ({ page }) => {
+      await page.goto('/');
+      await createParty(page, { name: 'Emerald run', baseGame: 'Emerald' });
+      await addPokemon(page, 'Bulbasaur');
+      await page.locator('#party-log-battle-btn').click();
+      const search = page.locator('#battle-search');
+      await search.getByRole('combobox').fill('Caterpie');
+      const option = page.getByRole('option').filter({ hasText: /Caterpie/i }).first();
+      await expect(option.locator('.option-ev-yield')).toContainText('+1 HP');
+      await page.evaluate(async () => {
+        const moduleUrl = '/lib/services.ts';
+        const { api } = await import(moduleUrl);
+        const original = api.getPokemon.bind(api);
+        api.getPokemon = async (/** @type {string} */ name) => {
+          document.documentElement.dataset.battleLookup = 'pending';
+          await new Promise((resolve) => document.addEventListener('release-battle-lookup', () => resolve(undefined), { once: true }));
+          const mon = await original(name);
+          document.documentElement.dataset.battleLookup = 'resolved';
+          return mon;
+        };
+      });
+      await option.click();
+      await expect(page.locator('html')).toHaveAttribute('data-battle-lookup', 'pending');
+      if (invalidate === 'close') {
+        await search.locator('.sheet-close').click();
+        await page.locator('#party-log-battle-btn').click();
+      } else {
+        await page.locator('#battle-participants').getByRole('button', { name: /Bulbasaur/i }).click();
+      }
+      await page.evaluate(() => document.dispatchEvent(new Event('release-battle-lookup')));
+      await expect(page.locator('html')).toHaveAttribute('data-battle-lookup', 'resolved');
+      await expect(page.locator('#battle-log-btn')).toBeDisabled();
+      await expect(page.locator('#battle-result-summary')).toBeHidden();
+      await expect(rosterCard(page, 'Bulbasaur').locator('.roster-card-evbar .value')).toHaveText('0/510');
+    });
+  }
+
   test('benching a fainted Pokémon heals it — bringing it back later is healed', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
@@ -318,5 +368,20 @@ test.describe('Active party and faint tracking', () => {
     const fainted = page.locator('#battle-participants').getByRole('button', { name: /Charmander/i });
     await expect(fainted).toBeDisabled();
     await expect(page.locator('#battle-participants .party-slot--selected')).toHaveCount(1); // just Bulbasaur, the lead
+  });
+
+  test('active-party actions fit a phone screen and the battle confirmation stays visible', async ({ page }) => {
+    await page.setViewportSize({ width: 360, height: 640 });
+    await page.goto('/');
+    await createParty(page, { name: 'Emerald run', baseGame: 'Emerald' });
+    await addPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Charmander');
+    await battlePartyFaintBtn(page, 'Charmander');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
+    await logPartyBattle(page, 'Caterpie');
+    await expect(page.locator('#battle-log-btn')).toBeInViewport();
+    await expect(page.locator('#battle-result-summary')).toContainText('Logged');
+    await page.locator('#battle-search .sheet-close').click();
+    await expect(page.locator('#battle-search')).toBeHidden();
   });
 });

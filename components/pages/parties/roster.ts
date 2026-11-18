@@ -262,6 +262,7 @@ function renderPartySlot(entry: RosterEntry, selectable: boolean, selected: bool
   btn.dataset.uid = entry.uid;
   if (entry.fainted) btn.classList.add('party-slot--fainted');
   if (selectable) {
+    btn.setAttribute('aria-pressed', String(selected));
     if (selected) btn.classList.add('party-slot--selected');
     if (locked) btn.classList.add('party-slot--locked');
   }
@@ -398,7 +399,7 @@ function renderBattleParty(party: Party): void {
     const names = fainted.map((e) => e.nickname || titleCase(e.speciesName));
     const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0];
     const verb = fainted.length > 1 ? 'are' : 'is';
-    battlePartyStatus.textContent = `${list} ${verb} down — tap it, or Heal, before it can battle.`;
+    battlePartyStatus.textContent = `${list} ${verb} down — choose Heal in the card menu, or heal at the Pokémon Center.`;
   }
 }
 
@@ -455,11 +456,9 @@ swapDialog.addEventListener('click', (e) => {
 /* ---- "Log a battle" sheet: participant strip + opponent search ---- */
 
 // Which active, non-fainted uids are checked for the next battle —
-// module state, not persisted: it just carries a sensible default (the
-// last selection, minus anyone who's since fainted) from one battle to
-// the next within this page load, the same way `battleSelected` from
-// the games' own "who's fighting" screen never survives a restart.
+// module state, not persisted; each fresh sheet starts with the lead.
 let battleSelected = new Set<string>();
+let battlePickToken = 0;
 
 // An opponent picked from the search but not yet logged — set by
 // stageBattlePick, cleared by the actual #battle-log-btn press (or by
@@ -468,6 +467,7 @@ let battleSelected = new Set<string>();
 let pendingBattle: { mon: DomainPokemon; uids: string[] } | null = null;
 
 function clearPendingBattle(): void {
+  ++battlePickToken;
   pendingBattle = null;
   battleLogBtn.disabled = true;
   battleResultSummary.hidden = true;
@@ -519,22 +519,7 @@ partyLogBattleBtn.addEventListener('click', () => {
   battleSearch.hidden = false;
   battleSearch.focus();
 });
-// <pokemon-search> always closes itself after a pick (pokemon-search.ts's
-// own blur-on-pick) — right for a one-shot search like the add-Pokémon
-// flow, but here it fired before the user could even see what picking
-// staged, let alone press #battle-log-btn. The 'pokemon-pick' handler
-// below sets this flag synchronously, before that pick's own close
-// reaches this handler, so that one close is overridden into a reopen
-// instead — the sheet stays up, showing the staged breakdown and the
-// log button, ready to log without the user reopening it.
-let keepSheetOpenForResult = false;
 battleSearch.addEventListener('sheet-close', () => {
-  if (keepSheetOpenForResult) {
-    keepSheetOpenForResult = false;
-    battleSearch.hidden = false;
-    battleSearch.focus();
-    return;
-  }
   battleSearch.hidden = true;
   battleSelected = new Set(); // closed sheet carries no selection into the next open
   clearPendingBattle();
@@ -550,12 +535,10 @@ battleSearch.evModifier = (mon) =>
   participantEvSummary([...battleSelected], (uid) => store.previewDefeat(uid, mon)?.applied);
 
 battleSearch.addEventListener('pokemon-pick', (e) => {
+  // Keep the sheet open to confirm the staged battle. Cancelling the
+  // pick's default avoids a timed close/reopen race with the Close button.
+  e.preventDefault();
   if (battleSelected.size === 0) return; // the sheet already shows the "select someone" hint
-  // Set synchronously, before this pick's own blur-driven close reaches
-  // battleSearch's 'sheet-close' handler — staging (below) awaits a
-  // network/cache call, and that handler's 120ms close-on-blur timeout
-  // doesn't wait for it.
-  keepSheetOpenForResult = true;
   stageBattlePick((e as CustomEvent).detail.name);
 });
 
@@ -564,9 +547,13 @@ battleSearch.addEventListener('pokemon-pick', (e) => {
  * arms #battle-log-btn. Nothing is applied to the roster until that
  * button is actually pressed (see its own click handler below). */
 async function stageBattlePick(name: string): Promise<void> {
+  clearPendingBattle();
+  const token = battlePickToken;
+  const partyId = store.activeParty?.id;
   const uids = [...battleSelected]; // snapshot — battleSelected can change before the button's pressed
   try {
     const mon = await api.getPokemon(name);
+    if (token !== battlePickToken || partyId !== store.activeParty?.id || battleSearch.hidden) return;
     pendingBattle = { mon, uids };
     const summary = participantEvSummary(uids, (uid) => store.previewDefeat(uid, mon)?.applied);
     battleResultSummary.textContent = `Ready to log vs ${titleCase(mon.name)} — ${summary}`;
@@ -574,6 +561,7 @@ async function stageBattlePick(name: string): Promise<void> {
     battleResultSummary.hidden = false;
     battleLogBtn.disabled = false;
   } catch (err) {
+    if (token !== battlePickToken || partyId !== store.activeParty?.id || battleSearch.hidden) return;
     showAddStatus((err instanceof Error && err.message) || 'Could not look up that Pokémon.');
   }
 }

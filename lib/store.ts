@@ -727,7 +727,7 @@ export class Store extends EventTarget {
       const existingUids = new Set(party.pokemon.map((e: any) => e.uid));
       const hadActiveUids = Array.isArray(party.activeUids);
       const active: string[] = hadActiveUids
-        ? party.activeUids.filter((uid: string) => existingUids.has(uid))
+        ? [...new Set<string>(party.activeUids.filter((uid: string) => existingUids.has(uid)))].slice(0, MAX_ACTIVE_PARTY)
         : [];
       if (!hadActiveUids) {
         for (const entry of party.pokemon) {
@@ -1793,16 +1793,18 @@ export class Store extends EventTarget {
    * participant's own `applied` is correctly empty, even mid-battle).
    */
   logBattleForParticipants(uids: string[], opponent: DomainPokemon): { uid: string; applied: EvMap }[] {
+    const active = new Set(this.activeParty?.activeUids ?? []);
     const credited = new Set<string>();
     const results: { uid: string; applied: EvMap }[] = [];
     for (const uid of uids) {
+      if (!active.has(uid) || credited.has(uid)) continue;
       const entry = this._find(uid);
       if (!entry || entry.fainted) continue;
       const event = this._logBattleFor(entry, opponent);
       results.push({ uid, applied: event.applied });
       credited.add(uid);
     }
-    this._applyExpShare(credited, opponent);
+    if (credited.size) this._applyExpShare(credited, opponent);
     return results;
   }
 
@@ -2122,7 +2124,7 @@ export class Store extends EventTarget {
     // from "existing party, deliberately benched down to this count" once
     // both look like a plain array, so those two get backfilled to the
     // cap explicitly here instead of relying on it.
-    const newLocalPartyIds = new Set<string>();
+    const newLocalParties = new Map<string, string[] | undefined>();
     for (const party of importedParties) {
       const selectedPokemon = party.pokemon.filter((e) => selectedUids.has(e.uid));
       if (!selectedPokemon.length) continue;
@@ -2141,7 +2143,7 @@ export class Store extends EventTarget {
           activeUids: [], // filled to the cap below, once its Pokémon are in
         };
         this.state.parties.push(localParty);
-        newLocalPartyIds.add(localParty.id);
+        newLocalParties.set(localParty.id, Array.isArray(party.activeUids) ? party.activeUids : undefined);
       }
 
       for (const entry of selectedPokemon) {
@@ -2156,14 +2158,11 @@ export class Store extends EventTarget {
         projectEntry(localEntry);
       }
     }
-    // Same "fill up to MAX_ACTIVE_PARTY in add order" default a brand-new
-    // local party gets anywhere else (`addPokemon`, `_normalizeEntries`'s
-    // own legacy-data backfill) — done explicitly rather than left to
-    // `_normalizeEntries` below, which can no longer distinguish this
-    // from a real party deliberately benched down to the same count.
-    for (const id of newLocalPartyIds) {
+    // Preserve a transferred active party's order and deliberate benching.
+    // Older exports without activeUids use the usual first-six default.
+    for (const [id, importedActive] of newLocalParties) {
       const party = this.state.parties.find((p) => p.id === id);
-      if (party) party.activeUids = party.pokemon.slice(0, MAX_ACTIVE_PARTY).map((e) => e.uid);
+      if (party) party.activeUids = importedActive ?? party.pokemon.slice(0, MAX_ACTIVE_PARTY).map((e) => e.uid);
     }
     // Backfills `activeUids` (and `fainted` on any entry an older export
     // didn't carry it for) now that every imported party/Pokémon is in —

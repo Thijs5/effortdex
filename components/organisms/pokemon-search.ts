@@ -27,7 +27,8 @@ type EvModifier = (mon: DomainPokemon) => EvMap | string | undefined;
  * Autocomplete text input over the full PokeAPI species list, styled to
  * match <game-version-picker> (sprite/swatch + label rows, same tap
  * targets and dropdown chrome). Dispatches a `pokemon-pick` CustomEvent
- * (detail: { name }) when a species is chosen.
+ * (detail: { name }) when a species is chosen. Preventing that event's
+ * default keeps the sheet open for an explicit confirmation action.
  *
  * On narrow touch viewports, focusing the input opens a full-screen
  * sheet instead of an inline dropdown: a header, then the input, then
@@ -644,11 +645,12 @@ export class PokemonSearch extends BaseElement {
     this.$input.value = '';
     this._hideList();
     const wasSheet = this._sheetOpen;
-    this.dispatchEvent(
-      new CustomEvent('pokemon-pick', { detail: { name }, bubbles: true, composed: true })
+    const closeOnPick = this.dispatchEvent(
+      new CustomEvent('pokemon-pick', { detail: { name }, bubbles: true, composed: true, cancelable: true })
     );
     if (wasSheet) {
-      this.$input.blur();
+      if (closeOnPick) this.$input.blur();
+      else this.$input.focus();
     } else if (this.shadow.activeElement === this.$input) {
       // The input stays focused after a mouse pick (see the pointerdown
       // handler above) — without this, re-picking another recent option

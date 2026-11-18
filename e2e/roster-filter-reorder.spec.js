@@ -85,6 +85,9 @@ test.describe('Roster filters, manual reorder, and URL state', () => {
   });
 
   test('dragging a card by its handle reorders the roster', async ({ page }) => {
+    // Keep all three cards within the viewport while sending mouse
+    // coordinates; the active-party grid adds height above the roster.
+    await page.setViewportSize({ width: 1280, height: 1200 });
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
     await addPokemon(page, 'Bulbasaur');
@@ -95,20 +98,24 @@ test.describe('Roster filters, manual reorder, and URL state', () => {
     const namesBefore = await page.locator('.roster-card-name').allTextContents();
     expect(namesBefore.join(',')).toContain('Bulbasaur,Charmander,Caterpie');
 
-    const caterpieHandle = page.locator('.roster-card', { hasText: 'Caterpie' }).locator('.roster-card-handle');
+    const caterpieCard = page.locator('.roster-card', { hasText: 'Caterpie' });
+    const caterpieHandle = caterpieCard.locator('.roster-card-handle');
     const bulbaCard = page.locator('.roster-card', { hasText: 'Bulbasaur' });
-    const from = await caterpieHandle.boundingBox();
+    await caterpieHandle.scrollIntoViewIfNeeded();
+    // Locator hover waits for the dialog's focus/scroll restoration and
+    // layout to settle before starting a pointer-captured drag.
+    await caterpieHandle.hover();
     const to = await bulbaCard.boundingBox();
-    if (!from || !to) throw new Error('missing bounding box');
-    await page.mouse.move(from.x + from.width / 2, from.y + from.height / 2);
+    if (!to) throw new Error('missing bounding box');
     await page.mouse.down();
+    await expect(caterpieCard).toHaveClass(/roster-card--dragging/);
     // Well above the first card's vertical center, so the drop target is
     // unambiguous regardless of how the grid reflows mid-drag.
     await page.mouse.move(to.x + to.width / 2, Math.max(0, to.y - 100), { steps: 10 });
+    await expect(bulbaCard).toHaveClass(/roster-card--drop-target/);
     await page.mouse.up();
 
-    const namesAfter = await page.locator('.roster-card-name').allTextContents();
-    expect(namesAfter[0]).toContain('Caterpie');
+    await expect(page.locator('.roster-card-name').first()).toContainText('Caterpie');
   });
 
   test('the drag handle is hidden once a non-default sort is applied', async ({ page }) => {
