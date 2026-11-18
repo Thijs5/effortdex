@@ -171,6 +171,14 @@ export class PokemonSearch extends BaseElement {
           color: var(--ink-soft); padding: var(--space-1);
         }
         .sheet-close:hover { color: var(--ink); }
+        .sheet-back { min-width: 44px; min-height: 44px; border: none; background: none; color: var(--teal); cursor: pointer; }
+        .wrap.sheet.reviewing .sheet-header { font-family: var(--font-display); font-size: var(--font-size-lg); text-transform: none; letter-spacing: normal; }
+        .wrap.sheet.reviewing slot[name="sheet-extra"] { flex: 1 1 auto; max-height: none; padding: var(--space-3); width: 100%; max-width: 560px; align-self: center; }
+        .wrap.sheet.reviewing slot[name="sheet-footer"] { width: 100%; max-width: 560px; align-self: center; }
+        .wrap.sheet.reviewing input.ds-field,
+        .wrap.sheet.reviewing ul.suggestions { display: none; }
+        .wrap.sheet.choosing slot[name="sheet-extra"],
+        .wrap.sheet.choosing slot[name="sheet-footer"] { display: none; }
         /* A caller can project extra sheet-only content (e.g. a help
            note) via slot="sheet-extra" — hidden outside the sheet, since
            it has nowhere sensible to render in the inline-dropdown mode. */
@@ -229,6 +237,7 @@ export class PokemonSearch extends BaseElement {
       </style>
       <div class="wrap">
         <div class="sheet-header">
+          <button type="button" class="sheet-back" aria-label="Back to defeat review" hidden>←</button>
           <span class="sheet-title"></span>
           <button type="button" class="sheet-close" aria-label="Close search">&#10005;</button>
         </div>
@@ -269,6 +278,32 @@ export class PokemonSearch extends BaseElement {
   }
 
   connectedCallback(): void {
+    this.shadow.querySelector<HTMLButtonElement>('.sheet-back')!.addEventListener('click', () => this.showReview());
+    this.addEventListener('keydown', (e) => {
+      if (e.key === 'Tab' && this._sheetOpen && this.hasAttribute('review-flow')) {
+        const controls: HTMLElement[] = [];
+        for (const node of this.$wrap.querySelectorAll<HTMLElement>('button, input, slot')) {
+          if (node instanceof HTMLSlotElement) {
+            for (const assigned of node.assignedElements()) {
+              if (assigned.matches('button, input, [tabindex]')) controls.push(assigned as HTMLElement);
+              controls.push(...assigned.querySelectorAll<HTMLElement>('button, input, [tabindex]'));
+            }
+          } else controls.push(node);
+        }
+        const visible = controls.filter((node) => !node.hasAttribute('disabled') && node.getClientRects().length);
+        const active = document.activeElement === this ? this.shadow.activeElement : document.activeElement;
+        const first = visible[0], last = visible[visible.length - 1];
+        if ((e.shiftKey && active === first) || (!e.shiftKey && active === last)) {
+          e.preventDefault();
+          (e.shiftKey ? last : first)?.focus();
+        }
+      }
+      if (e.key === 'Escape' && this.hasAttribute('review-flow')) {
+        e.preventDefault();
+        if (this.$wrap.classList.contains('choosing')) this.showReview();
+        else this._closeSheet();
+      }
+    });
     this.$input.placeholder = this.getAttribute('placeholder') || 'Search Pokémon…';
     // Some browser/AT combinations don't compute a placeholder as an
     // accessible name at all — every caller here omits a wrapping
@@ -330,7 +365,7 @@ export class PokemonSearch extends BaseElement {
     // Selection on pointerup with a movement threshold (not pointerdown +
     // preventDefault, which breaks touch scrolling on iOS) — shared with
     // <game-version-picker> via lib/combobox.js.
-    attachPointerSelection(this.$list, (li) => this._pick(li.dataset.name ?? ''));
+    attachPointerSelection(this.$list, (li) => this._pick(li.dataset.name ?? ''), this.hasAttribute('review-flow'));
     // Both the inline dropdown and the full-screen sheet anchor themselves
     // to the input's on-screen position / the visual viewport, so both
     // need repositioning whenever either can change (scroll, resize, or
@@ -420,6 +455,10 @@ export class PokemonSearch extends BaseElement {
   }
 
   _openSheet(): void {
+    if (this.hasAttribute('review-flow')) {
+      this.$wrap.setAttribute('role', 'dialog');
+      this.$wrap.setAttribute('aria-modal', 'true');
+    }
     this._sheetOpen = true;
     this.$wrap.classList.add('sheet');
     this._prevBodyOverflow = document.body.style.overflow;
@@ -603,6 +642,12 @@ export class PokemonSearch extends BaseElement {
   }
 
   _onKeydown(e: KeyboardEvent): void {
+    if (e.key === 'Escape' && this.hasAttribute('review-flow')) {
+      e.preventDefault();
+      e.stopPropagation();
+      this.showReview();
+      return;
+    }
     if (this.$list.hidden) {
       if (e.key === 'Enter') this._tryDirectPick();
       else if (e.key === 'Escape' && this._sheetOpen) {
@@ -667,7 +712,7 @@ export class PokemonSearch extends BaseElement {
     );
     if (wasSheet) {
       if (closeOnPick) this.$input.blur();
-      else this.$input.focus();
+      else if (!this.$wrap.classList.contains('reviewing')) this.$input.focus();
     } else if (this.shadow.activeElement === this.$input) {
       // The input stays focused after a mouse pick (see the pointerdown
       // handler above) — without this, re-picking another recent option
@@ -688,7 +733,32 @@ export class PokemonSearch extends BaseElement {
   // sheet on mobile with recents already showing) without the user
   // needing an extra tap on the input itself.
   focus(): void {
+    if (this.hasAttribute('review-flow')) {
+      this.$wrap.classList.remove('reviewing');
+      this.$wrap.classList.add('choosing');
+      this.shadow.querySelector<HTMLButtonElement>('.sheet-back')!.hidden = false;
+      this.$sheetTitle.textContent = this.getAttribute('sheet-title') || 'Choose opponent';
+      this.$wrap.setAttribute('aria-label', this.$sheetTitle.textContent);
+    }
     this.$input.focus();
+  }
+
+  /** Keyboard-free review view for a caller with an explicit confirm action. */
+  showReview(): void {
+    if (!this.hasAttribute('review-flow')) return;
+    if (!this._sheetOpen) this._openSheet();
+    this.clear();
+    this.$wrap.classList.remove('choosing');
+    this.$wrap.classList.add('reviewing');
+    this.$sheetTitle.textContent = this.getAttribute('review-title') || 'Review selection';
+    this.$wrap.setAttribute('aria-label', this.$sheetTitle.textContent);
+    this.shadow.querySelector<HTMLButtonElement>('.sheet-back')!.hidden = true;
+    this.$input.blur();
+    this.$sheetTitle.setAttribute('tabindex', '-1');
+    this.$sheetTitle.setAttribute('role', 'heading');
+    this.$sheetTitle.setAttribute('aria-level', '2');
+    this.$sheetTitle.style.outline = 'none';
+    this.$sheetTitle.focus({ preventScroll: true });
   }
 
   // Overrides HTMLElement's no-op blur() — the host itself is never the

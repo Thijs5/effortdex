@@ -111,6 +111,7 @@ test.describe('Active party and faint tracking', () => {
       await addPokemon(page, 'Bulbasaur');
       await page.locator('#party-log-battle-btn').click();
       const search = page.locator('#battle-search');
+      await page.locator('#battle-choose-opponent-btn').click();
       await search.getByRole('combobox').fill('Caterpie');
       const option = page.getByRole('option').filter({ hasText: /Caterpie/i }).first();
       await expect(option.locator('.option-ev-yield')).toContainText('+1 HP');
@@ -252,6 +253,7 @@ test.describe('Active party and faint tracking', () => {
     await page.locator('#party-log-battle-btn').click();
     await page.locator('#battle-participants').getByRole('button', { name: /Charmander/i }).click();
     const combobox = page.locator('#battle-search').getByRole('combobox', { name: 'Defeated Pokémon…' });
+    await page.locator('#battle-choose-opponent-btn').click();
     await combobox.fill('Caterpie');
     const option = page.getByRole('option').filter({ hasText: /Caterpie/i }).first();
     const preview = option.locator('.option-ev-yield');
@@ -335,17 +337,18 @@ test.describe('Active party and faint tracking', () => {
     await page.locator('#party-log-battle-btn').click();
     const search = page.locator('#battle-search');
     const combobox = search.getByRole('combobox', { name: 'Defeated Pokémon…' });
-    await expect(combobox).toBeVisible();
+    await expect(combobox).toBeHidden();
     // Bulbasaur (the lead) starts selected — tapping it off must not
     // close the sheet (the underlying bug was a focus-blur race).
     await page.locator('#battle-participants').getByRole('button', { name: /Bulbasaur/i }).click();
     await expect(search).not.toHaveAttribute('hidden');
-    await expect(combobox).toBeVisible();
+    await expect(combobox).toBeHidden();
     await expect(page.locator('#battle-participants-status')).toBeVisible();
 
     // With nobody selected, the dropdown's own EV-yield preview has
     // nothing to show — it must read blank, never "Capped" (there's
     // nothing capped; there's just no one selected).
+    await page.locator('#battle-choose-opponent-btn').click();
     await combobox.fill('Caterpie');
     const option = page.getByRole('option').filter({ hasText: /Caterpie/i }).first();
     await expect(option.locator('.option-ev-yield')).toBeEmpty();
@@ -399,23 +402,83 @@ test.describe('Touch battle confirmation', () => {
     await page.locator('#party-log-battle-btn').tap();
     const search = page.locator('#battle-search');
     const input = search.getByRole('combobox');
+    await page.locator('#battle-choose-opponent-btn').tap();
     await page.getByRole('option').filter({ hasText: /Caterpie/i }).first().tap();
     await expect(page.locator('#battle-result-summary')).toContainText('Ready to log');
     // Phones can blur the input when dismissing the keyboard without
     // focusing another control (Safari also does not focus tapped buttons).
     await page.clock.install();
-    await input.evaluate((element) => element.blur());
+    await expect(input).toBeHidden();
+    await search.locator('input.ds-field').evaluate((element) => element.blur());
     await page.clock.runFor(250);
     await expect(page.locator('#battle-log-btn')).toBeVisible();
     await page.locator('#battle-log-btn').tap();
     await expect(rosterCard(page, 'Bulbasaur').locator('.roster-card-evbar .value')).toHaveText('2/510');
     await search.locator('.sheet-close').tap();
     await page.locator('#party-log-battle-btn').tap();
+    await page.locator('#battle-choose-opponent-btn').tap();
     await page.getByRole('option').filter({ hasText: /Caterpie/i }).first().tap();
     await expect(page.locator('#battle-result-summary')).toContainText('Ready to log');
-    await input.press('Escape');
+    await page.locator('#battle-choose-opponent-btn').press('Escape');
     await expect(search).toBeHidden();
     await page.reload();
     await expect(rosterCard(page, 'Bulbasaur').locator('.roster-card-evbar .value')).toHaveText('2/510');
+  });
+});
+
+test.describe('Keyboard-free defeat review', () => {
+  test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
+
+  test('searching and recording are separate, with stable actions and clear success', async ({ page }, info) => {
+    await mockPokeApi(page);
+    await page.goto('/');
+    await createParty(page, { name: 'Phone review', baseGame: 'Emerald' });
+    await addPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Charmander');
+    await page.locator('#party-log-battle-btn').tap();
+    const search = page.locator('#battle-search');
+    const input = search.getByRole('combobox');
+    await expect(input).toBeHidden();
+    await expect(page.locator('#battle-confirm-state')).toHaveText('Not logged yet');
+    await expect(page.locator('#battle-log-btn')).toBeDisabled();
+    await page.locator('#battle-choose-opponent-btn').tap();
+    await expect(input).toBeFocused();
+    await page.setViewportSize({ width: 390, height: 320 });
+    await input.fill('Caterpie');
+    await expect(page.locator('#battle-log-btn')).toBeHidden();
+    await expect(page.locator('#battle-participants')).toBeHidden();
+    const option = page.getByRole('option').filter({ hasText: /Caterpie/i }).first();
+    await expect(option).toBeInViewport();
+    await page.screenshot({ path: info.outputPath('iphone13-keyboard-search.png') });
+    await option.tap();
+    await expect(input).toBeHidden();
+    await expect(page.locator('#battle-opponent-name')).toHaveText('Caterpie');
+    await expect(page.locator('#battle-confirm-state')).toHaveText('Not logged yet');
+    await expect(page.locator('#battle-log-btn')).toBeInViewport({ ratio: 1 });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await expect(rosterCard(page, 'Bulbasaur').locator('.roster-card-evbar .value')).toHaveText('0/510');
+    const before = await page.locator('#battle-log-btn').boundingBox();
+    await page.locator('#battle-log-btn').tap();
+    await expect(page.locator('#battle-confirm-state')).toHaveText('✓ Defeat logged');
+    await expect(page.locator('#battle-done-btn')).toHaveText('Done');
+    const after = await page.locator('#battle-log-btn').boundingBox();
+    // The raised button's press/hover animation may translate it 1px.
+    expect(Math.abs((after?.y ?? -100) - (before?.y ?? 100))).toBeLessThanOrEqual(2);
+    expect(after?.height).toBe(before?.height);
+    await page.locator('#battle-log-btn').tap();
+    await expect(page.locator('#battle-confirm-state')).toContainText('2 times');
+    await page.locator('#battle-choose-opponent-btn').tap();
+    await input.fill('Onix');
+    await search.getByRole('button', { name: 'Back to defeat review' }).tap();
+    await expect(input).toBeHidden();
+    await expect(page.locator('#battle-opponent-name')).toHaveText('Caterpie');
+    await page.locator('#battle-log-btn').focus();
+    await page.keyboard.press('Tab');
+    await expect(search.locator('.sheet-close')).toBeFocused();
+    await page.locator('#battle-done-btn').tap();
+    await expect(search).toBeHidden();
+    await page.reload();
+    await expect(rosterCard(page, 'Bulbasaur').locator('.roster-card-evbar .value')).toHaveText('2/510');
+    await expect(rosterCard(page, 'Charmander').locator('.roster-card-evbar .value')).toHaveText('0/510');
   });
 });

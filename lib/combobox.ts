@@ -14,11 +14,13 @@
  * scrolling. A small movement threshold tells a tap from the start of a
  * scroll drag. Calls `pick(li)` with the chosen row.
  */
-export function attachPointerSelection($list: HTMLElement, pick: (li: HTMLElement) => void): void {
+export function attachPointerSelection($list: HTMLElement, pick: (li: HTMLElement) => void, pickOnClick = false): void {
   let downLi: HTMLElement | null = null;
+  let clickedLi: HTMLElement | null = null;
   let downX = 0;
   let downY = 0;
   $list.addEventListener('pointerdown', (e) => {
+    clickedLi = null;
     const li = (e.target as HTMLElement).closest<HTMLElement>('li.option');
     if (!li) return;
     downLi = li;
@@ -32,7 +34,15 @@ export function attachPointerSelection($list: HTMLElement, pick: (li: HTMLElemen
     if (!li) return;
     const movedTooFar = Math.hypot(e.clientX - downX, e.clientY - downY) > 10;
     if (movedTooFar || (e.target as HTMLElement).closest('li.option') !== li) return;
-    pick(li);
+    // View-changing callers wait for click, so a touch's synthetic click
+    // cannot activate a control revealed underneath the old option.
+    if (pickOnClick) clickedLi = li;
+    else pick(li);
+  });
+  $list.addEventListener('click', (e) => {
+    const li = clickedLi;
+    clickedLi = null;
+    if (li && (e.target as HTMLElement).closest('li.option') === li) pick(li);
   });
 }
 

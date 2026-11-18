@@ -60,6 +60,14 @@ const battleParticipants = document.getElementById('battle-participants')!;
 const battleParticipantsStatus = document.getElementById('battle-participants-status')!;
 const battleResultSummary = document.getElementById('battle-result-summary')!;
 const battleLogBtn = document.getElementById('battle-log-btn') as HTMLButtonElement;
+const battleChooseBtn = document.getElementById('battle-choose-opponent-btn') as HTMLButtonElement;
+const battleDoneBtn = document.getElementById('battle-done-btn')!;
+const battleOpponentName = document.getElementById('battle-opponent-name')!;
+const battleOpponentSprite = document.getElementById('battle-opponent-sprite') as HTMLImageElement;
+const battleOpponentHint = document.getElementById('battle-opponent-hint')!;
+const battleConfirmState = document.getElementById('battle-confirm-state')!;
+const battleComposer = document.querySelector<HTMLElement>('.battle-sheet-extra')!;
+const battleOpponentFallback = wireSpriteFallback(battleOpponentSprite);
 
 // The swap picker (docs/adr/0029): opened from a filled slot's swap
 // button (pre-scoped to that uid) or an empty slot (nothing to swap
@@ -498,7 +506,14 @@ function clearPendingBattle(): void {
   pendingBattle = null;
   battleLogCount = 0;
   battleLogBtn.disabled = true;
-  battleLogBtn.textContent = '+ Log this battle';
+  battleLogBtn.textContent = 'Log defeat';
+  battleDoneBtn.textContent = 'Cancel';
+  battleComposer.dataset.state = 'empty';
+  battleConfirmState.textContent = 'Not logged yet';
+  battleOpponentName.textContent = 'Choose a Pokémon';
+  battleOpponentHint.textContent = 'Search or choose a recent opponent →';
+  battleOpponentSprite.hidden = true;
+  document.getElementById('battle-opponent-placeholder')!.hidden = false;
   battleResultSummary.hidden = true;
   battleResultSummary.classList.remove('battle-result-summary--pending');
 }
@@ -531,6 +546,7 @@ function renderBattleParticipants(): void {
   }
   battleParticipantsStatus.hidden = battleSelected.size > 0;
   battleParticipantsStatus.textContent = 'Select at least one Pokémon first.';
+  document.getElementById('battle-selected-count')!.textContent = `${battleSelected.size} selected`;
 }
 
 partyLogBattleBtn.addEventListener('click', () => {
@@ -545,12 +561,22 @@ partyLogBattleBtn.addEventListener('click', () => {
   renderBattleParticipants();
   clearPendingBattle();
   battleSearch.hidden = false;
+  battleSearch.showReview();
+});
+battleChooseBtn.addEventListener('click', () => {
+  ++battlePickToken;
+  if (battleComposer.dataset.state === 'loading') clearPendingBattle();
   battleSearch.focus();
+});
+battleDoneBtn.addEventListener('click', () => battleSearch.shadowRoot?.querySelector<HTMLButtonElement>('.sheet-close')?.click());
+window.addEventListener('hashchange', () => {
+  if (!battleSearch.hidden) battleSearch.shadowRoot?.querySelector<HTMLButtonElement>('.sheet-close')?.click();
 });
 battleSearch.addEventListener('sheet-close', () => {
   battleSearch.hidden = true;
   battleSelected = new Set(); // closed sheet carries no selection into the next open
   clearPendingBattle();
+  partyLogBattleBtn.focus({ preventScroll: true });
 });
 // Mirrors <pokemon-detail>'s own `evModifier`, but returns a
 // pre-formatted string (every selected participant's own name and
@@ -566,7 +592,7 @@ battleSearch.addEventListener('pokemon-pick', (e) => {
   // Keep the sheet open to confirm the staged battle. Cancelling the
   // pick's default avoids a timed close/reopen race with the Close button.
   e.preventDefault();
-  if (battleSelected.size === 0) return; // the sheet already shows the "select someone" hint
+  battleSearch.showReview();
   stageBattlePick((e as CustomEvent).detail.name);
 });
 
@@ -578,19 +604,33 @@ async function stageBattlePick(name: string): Promise<void> {
   clearPendingBattle();
   const token = battlePickToken;
   const partyId = store.activeParty?.id;
+  battleComposer.dataset.state = 'loading';
+  battleOpponentName.textContent = titleCase(name);
+  battleOpponentHint.textContent = 'Loading opponent…';
+  battleConfirmState.textContent = 'Looking up opponent…';
   try {
     const mon = await api.getPokemon(name);
     if (token !== battlePickToken || partyId !== store.activeParty?.id || battleSearch.hidden) return;
     stageKnownBattle(mon);
   } catch (err) {
     if (token !== battlePickToken || partyId !== store.activeParty?.id || battleSearch.hidden) return;
-    showAddStatus((err instanceof Error && err.message) || 'Could not look up that Pokémon.');
+    battleConfirmState.textContent = 'Could not load opponent';
+    battleOpponentHint.textContent = 'Tap to try again';
+    battleResultSummary.textContent = (err instanceof Error && err.message) || 'Could not look up that Pokémon.';
+    battleResultSummary.hidden = false;
   }
 }
 
 function stageKnownBattle(mon: DomainPokemon): void {
   const uids = [...battleSelected];
   pendingBattle = { mon, uids };
+  battleComposer.dataset.state = 'ready';
+  battleOpponentName.textContent = titleCase(mon.name);
+  battleOpponentHint.textContent = 'Tap to change opponent';
+  battleOpponentSprite.hidden = false;
+  document.getElementById('battle-opponent-placeholder')!.hidden = true;
+  battleOpponentFallback.setVersionedSprite(versionedSpriteUrl(store.spriteBaseGame(), mon.id), mon.sprite || FALLBACK_SPRITE);
+  battleConfirmState.textContent = 'Not logged yet';
   const summary = participantEvSummary(uids, (uid) => store.previewDefeat(uid, mon)?.applied);
   battleResultSummary.textContent = `Ready to log vs ${titleCase(mon.name)} — ${summary || 'Select at least one Pokémon.'}`;
   battleResultSummary.classList.add('battle-result-summary--pending');
@@ -604,9 +644,12 @@ battleLogBtn.addEventListener('click', () => {
   const applied = store.logBattleForParticipants(uids, mon);
   const summary = participantEvSummary(uids, (uid) => applied.find((r) => r.uid === uid)?.applied);
   ++battleLogCount;
+  battleComposer.dataset.state = 'logged';
+  battleConfirmState.textContent = `✓ Defeat logged${battleLogCount > 1 ? ` · ${battleLogCount} times` : ''}`;
+  battleDoneBtn.textContent = 'Done';
   battleResultSummary.textContent = `Logged ${battleLogCount > 1 ? `battle ${battleLogCount} ` : ''}vs ${titleCase(mon.name)} — ${summary}`;
   battleResultSummary.classList.remove('battle-result-summary--pending');
-  battleLogBtn.textContent = `+ Log another vs ${titleCase(mon.name)}`;
+  battleLogBtn.textContent = 'Log again';
 });
 
 /** "Bulbasaur +1 HP · Charmander (no EVs — maxed)" — `uids`' own names
