@@ -7,6 +7,11 @@ import { pickBaseGame } from './support/party.js';
 // service worker. This exercises the first-visit gap directly instead
 // of inheriting the normal suite's forced caching-off localhost mode.
 test.use({ serviceWorkers: 'block' });
+test.afterEach(async ({ page }) => {
+  // Finish secure-origin proxy handlers before the test context closes;
+  // a reload can still have a version check in flight after the assertions.
+  await page.unrouteAll({ behavior: 'wait' });
+});
 for (const cacheSprites of [true, false]) {
   test(`party creation ${cacheSprites ? 'caches sprites without a worker' : 'honours an unchecked sprite checkbox'}`, async ({ page }, info) => {
     test.setTimeout(60000);
