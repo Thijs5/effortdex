@@ -165,6 +165,7 @@ export class PokemonSearch extends BaseElement {
           color: var(--ink-soft);
         }
         .sheet-close {
+          min-width: 44px; min-height: 44px;
           border: none; background: transparent; cursor: pointer;
           font-size: var(--font-size-lg); line-height: 1;
           color: var(--ink-soft); padding: var(--space-1);
@@ -177,8 +178,11 @@ export class PokemonSearch extends BaseElement {
         .wrap.sheet slot[name="sheet-extra"] {
           display: block;
           order: 1;
-          flex: 0 0 auto;
+          flex: 0 1 auto;
+          min-height: 0;
           padding: 0 var(--space-3);
+          max-height: 45%;
+          overflow-y: auto;
         }
         .wrap.sheet input.ds-field {
           order: 2;

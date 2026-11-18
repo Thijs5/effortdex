@@ -62,7 +62,7 @@ export class LevelDialog extends BaseDialog {
         flex: 1 1 auto; min-width: 0; max-width: 14em;
       }
       .level-up-input-wrap level-input { flex: 1 1 auto; min-width: 0; }
-      .level-up-input-step { min-height: 0; }
+      .level-up-input-step { min-height: 44px; }
       .level-up-from { font-family: var(--font-mono); white-space: nowrap; }
       .level-up-evolve, .level-up-stats { display: grid; gap: var(--space-2); min-width: 0; }
       .level-up-stats, .level-up-evolve { margin-top: var(--space-3); }
@@ -71,8 +71,8 @@ export class LevelDialog extends BaseDialog {
         letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft);
       }
       .level-up-step {
-        flex: 0 0 auto; min-width: 2.4em; min-height: 30px; padding: 0.2em 0.5em;
-        font-family: var(--font-mono); font-size: var(--font-size-2xs); line-height: 1;
+        flex: 0 0 auto; min-width: 44px; min-height: 44px; padding: 0.2em 0.5em;
+        font-family: var(--font-mono); font-size: var(--font-size-sm); line-height: 1;
         border: 1px solid var(--lcd-line); border-radius: var(--radius-sm);
         background: var(--surface); color: var(--ink-soft); cursor: pointer; touch-action: manipulation;
       }

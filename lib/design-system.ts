@@ -72,6 +72,10 @@ const css = `
   .ds-btn--ghost:hover:not(:disabled) { background: var(--lcd); color: var(--ink); }
   .ds-btn--danger:hover:not(:disabled) { background: var(--danger-soft); color: var(--poke-red); border-color: var(--poke-red); }
 
+  @media (max-width: 640px) {
+    .ds-btn, .ds-field { min-height: 44px; }
+  }
+
   /* Modal dialog chrome, shared by the light-DOM party/add-Pokémon dialogs and
      the detail card's shadow-DOM More dialog. Below ~640px it goes
      full-page instead of a centered card: a native <dialog>'s UA-default
@@ -219,8 +223,8 @@ const css = `
     flex: 0 0 auto;
     display: grid;
     place-items: center;
-    width: 32px;
-    height: 32px;
+    width: 44px;
+    height: 44px;
     padding: 0;
     border: none;
     border-radius: 50%;

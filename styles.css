@@ -477,7 +477,7 @@ html[data-modal-open] body {
    state, not history: nothing here writes to <ev-history-log>. */
 .battle-party {
   margin-bottom: var(--space-4);
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-3);
   background: var(--lcd);
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
@@ -499,6 +499,7 @@ html[data-modal-open] body {
 }
 .battle-party-head-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .heal-btn {
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
   gap: 0.4em;
@@ -522,14 +523,14 @@ html[data-modal-open] body {
    around still-tiny buttons. */
 .battle-party-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
   gap: var(--space-2);
 }
 .battle-slot {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-2) var(--space-3);
+  padding: var(--space-1) var(--space-2);
   border: 1.5px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--surface);
@@ -590,8 +591,8 @@ html[data-modal-open] body {
    one is positioned relative to its own card. */
 .battle-slot-menu-wrap { position: relative; flex: 0 0 auto; }
 .battle-slot-menu-btn {
-  width: 28px;
-  height: 28px;
+  width: 44px;
+  height: 44px;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -621,6 +622,7 @@ html[data-modal-open] body {
 }
 .battle-slot-menu[hidden] { display: none; }
 .battle-slot-menu-item {
+  min-height: 44px;
   display: flex;
   align-items: center;
   width: 100%;
@@ -638,20 +640,21 @@ html[data-modal-open] body {
 /* Swap picker dialog — a plain list of the bench, reusing the same
    sprite/name/level look as the roster card without its full weight. */
 .swap-dialog-bench-btn {
+  min-height: 44px;
   display: block;
   width: 100%;
   margin-bottom: var(--space-3);
   padding: var(--space-2) var(--space-3);
-  border: 1px dashed var(--poke-red-dark);
+  border: 1px dashed var(--line);
   border-radius: var(--radius-md);
-  background: var(--danger-soft);
-  color: var(--poke-red-dark);
+  background: var(--lcd);
+  color: var(--ink-soft);
   font-weight: 700;
   font-size: var(--font-size-sm);
   cursor: pointer;
   text-align: center;
 }
-.swap-dialog-bench-btn:hover { background: color-mix(in srgb, var(--danger-soft) 70%, var(--poke-red-dark)); }
+.swap-dialog-bench-btn:hover { background: var(--teal-soft); }
 .swap-dialog-list { display: grid; gap: var(--space-2); }
 .swap-dialog-option {
   display: flex;
@@ -741,7 +744,8 @@ html[data-modal-open] body {
 /* The battle sheet's participant strip: same slot, plus a selectable
    ring for "will battle" and a locked/dashed look for a fainted mon
    that can't be picked. */
-.party-slots--select .party-slot { border-width: 2px; }
+.party-slots--select { display: flex; overflow-x: auto; padding: var(--space-2) 0; }
+.party-slots--select .party-slot { border-width: 2px; flex: 0 0 56px; }
 .party-slots--select .party-slot--selected {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 8%, var(--surface));

@@ -350,6 +350,34 @@ function renderBattleSlotCard(entry: RosterEntry): HTMLDivElement {
     menu.hidden = false;
     menuBtn.setAttribute('aria-expanded', 'true');
     openBattleSlotMenuUid = entry.uid;
+    if (e.detail === 0) menu.querySelector<HTMLButtonElement>('button')?.focus();
+  });
+  menuBtn.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeBattleSlotMenu();
+      return;
+    }
+    if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
+    e.preventDefault();
+    if (menu.hidden) menuBtn.click();
+    const items = menu.querySelectorAll<HTMLButtonElement>('button');
+    items[e.key === 'ArrowUp' ? items.length - 1 : 0]?.focus();
+  });
+  menu.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeBattleSlotMenu();
+      menuBtn.focus();
+      return;
+    }
+    if (!['ArrowDown', 'ArrowUp', 'Home', 'End'].includes(e.key)) return;
+    e.preventDefault();
+    const items = [...menu.querySelectorAll<HTMLButtonElement>('button')];
+    const current = items.indexOf(document.activeElement as HTMLButtonElement);
+    const index = e.key === 'Home' ? 0 : e.key === 'End' ? items.length - 1
+      : (current + (e.key === 'ArrowDown' ? 1 : -1) + items.length) % items.length;
+    items[index]?.focus();
   });
   menu.addEventListener('click', (e) => {
     const item = (e.target as HTMLElement).closest<HTMLElement>('.battle-slot-menu-item');
@@ -460,16 +488,17 @@ swapDialog.addEventListener('click', (e) => {
 let battleSelected = new Set<string>();
 let battlePickToken = 0;
 
-// An opponent picked from the search but not yet logged — set by
-// stageBattlePick, cleared by the actual #battle-log-btn press (or by
-// anything that invalidates it: closing the sheet, or changing who's
-// selected once a pick is already staged).
+// The chosen opponent and current participants. Retained after a log
+// for the explicit "Log another" action; cleared on close/party change.
 let pendingBattle: { mon: DomainPokemon; uids: string[] } | null = null;
+let battleLogCount = 0;
 
 function clearPendingBattle(): void {
   ++battlePickToken;
   pendingBattle = null;
+  battleLogCount = 0;
   battleLogBtn.disabled = true;
+  battleLogBtn.textContent = '+ Log this battle';
   battleResultSummary.hidden = true;
   battleResultSummary.classList.remove('battle-result-summary--pending');
 }
@@ -491,10 +520,9 @@ function renderBattleParticipants(): void {
       slot.addEventListener('click', () => {
         if (battleSelected.has(entry.uid)) battleSelected.delete(entry.uid);
         else battleSelected.add(entry.uid);
-        // Who's selected no longer matches whatever was staged for the
-        // pending pick (if any) — force a fresh pick rather than logging
-        // a breakdown for the old roster of participants.
+        const opponent = pendingBattle?.mon;
         clearPendingBattle();
+        if (opponent) stageKnownBattle(opponent);
         renderBattleParticipants();
       });
     }
@@ -550,31 +578,35 @@ async function stageBattlePick(name: string): Promise<void> {
   clearPendingBattle();
   const token = battlePickToken;
   const partyId = store.activeParty?.id;
-  const uids = [...battleSelected]; // snapshot — battleSelected can change before the button's pressed
   try {
     const mon = await api.getPokemon(name);
     if (token !== battlePickToken || partyId !== store.activeParty?.id || battleSearch.hidden) return;
-    pendingBattle = { mon, uids };
-    const summary = participantEvSummary(uids, (uid) => store.previewDefeat(uid, mon)?.applied);
-    battleResultSummary.textContent = `Ready to log vs ${titleCase(mon.name)} — ${summary}`;
-    battleResultSummary.classList.add('battle-result-summary--pending');
-    battleResultSummary.hidden = false;
-    battleLogBtn.disabled = false;
+    stageKnownBattle(mon);
   } catch (err) {
     if (token !== battlePickToken || partyId !== store.activeParty?.id || battleSearch.hidden) return;
     showAddStatus((err instanceof Error && err.message) || 'Could not look up that Pokémon.');
   }
 }
 
+function stageKnownBattle(mon: DomainPokemon): void {
+  const uids = [...battleSelected];
+  pendingBattle = { mon, uids };
+  const summary = participantEvSummary(uids, (uid) => store.previewDefeat(uid, mon)?.applied);
+  battleResultSummary.textContent = `Ready to log vs ${titleCase(mon.name)} — ${summary || 'Select at least one Pokémon.'}`;
+  battleResultSummary.classList.add('battle-result-summary--pending');
+  battleResultSummary.hidden = false;
+  battleLogBtn.disabled = uids.length === 0;
+}
+
 battleLogBtn.addEventListener('click', () => {
-  if (!pendingBattle) return;
+  if (!pendingBattle || !pendingBattle.uids.length) return;
   const { mon, uids } = pendingBattle;
   const applied = store.logBattleForParticipants(uids, mon);
   const summary = participantEvSummary(uids, (uid) => applied.find((r) => r.uid === uid)?.applied);
-  battleResultSummary.textContent = `Logged vs ${titleCase(mon.name)} — ${summary}`;
+  ++battleLogCount;
+  battleResultSummary.textContent = `Logged ${battleLogCount > 1 ? `battle ${battleLogCount} ` : ''}vs ${titleCase(mon.name)} — ${summary}`;
   battleResultSummary.classList.remove('battle-result-summary--pending');
-  pendingBattle = null;
-  battleLogBtn.disabled = true;
+  battleLogBtn.textContent = `+ Log another vs ${titleCase(mon.name)}`;
 });
 
 /** "Bulbasaur +1 HP · Charmander (no EVs — maxed)" — `uids`' own names
@@ -905,6 +937,7 @@ rosterFilterDialog.addEventListener('close', () => writeRosterStateToQuery());
 
 export function render(party: Party): void {
   if (party.slug !== currentPartySlug) {
+    clearPendingBattle();
     // The very first render since this page loaded doubles as "did the
     // user land here with a URL that already encodes a view" (ADR 0013).
     const isFreshLoad = currentPartySlug === null;

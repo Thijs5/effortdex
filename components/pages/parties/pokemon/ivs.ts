@@ -92,9 +92,9 @@ export class IvDialog extends BaseDialog {
       .iv-calc-reading-delete:hover { color: var(--poke-red); }
       .help-btn {
         display: inline-flex; align-items: center; justify-content: center;
-        width: 15px; height: 15px; border-radius: 50%; border: 1px solid var(--lcd-line);
+        width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--lcd-line);
         background: var(--surface); color: var(--ink-soft);
-        font-size: 10px; font-weight: 700; letter-spacing: 0; text-transform: none;
+        font-size: 14px; font-weight: 700; letter-spacing: 0; text-transform: none;
         line-height: 1; padding: 0; flex: 0 0 auto; cursor: pointer;
       }
       .help-btn:hover, .help-btn:focus-visible { border-color: var(--teal); color: var(--teal); }
