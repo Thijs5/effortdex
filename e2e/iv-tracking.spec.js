@@ -1,7 +1,7 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 import { createParty } from './support/party.js';
-import { addPokemon, openDetail, openIvs, openLevelUpDialog } from './support/pokemon.js';
+import { addPokemon, openDetail, openIvs, openLevelUpDialog, openItemDialog } from './support/pokemon.js';
 import { mockPokeApi } from './support/pokeapi-mock.js';
 
 // IV tracking (issue #4): its own "More" menu item, not gated by any
@@ -22,6 +22,68 @@ test.describe('IV tracking', () => {
 
     await expect(dialog.getByLabel('HP IV')).toBeVisible();
     await expect(dialog.getByLabel('ATK IV')).toBeVisible();
+    await expect(dialog.getByText('IVs are optional', { exact: true })).toBeVisible();
+    await expect(dialog.getByText(/All IVs unknown/)).toBeVisible();
+    await dialog.locator('summary').focus();
+    await page.keyboard.press('Enter');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByText(/No stat readings saved yet/)).toBeVisible();
+    await expect(dialog.getByRole('button', { name: 'Log reading', exact: true })).toBeDisabled();
+  });
+
+  test('prefills saved stats, reuses Level readings, and keeps older observations out of the current field', async ({ page }, info) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.goto('/');
+    await createParty(page, { name: 'IV review', baseGame: 'Emerald' });
+    await addPokemon(page, 'Bulbasaur', { level: 50, stats: { ATK: 66, DEF: 65 } });
+    const card = await openDetail(page, 'Bulbasaur');
+    let dialog = await openIvs(card);
+    await expect(dialog.getByLabel('Stat', { exact: true })).toHaveValue('atk');
+    await expect(dialog.getByText(/Using 2 saved stat readings/)).toBeVisible();
+    await expect(dialog.getByLabel('Observed stat value')).toHaveValue('66');
+    await expect(dialog.getByRole('button', { name: 'Already saved' })).toBeDisabled();
+    await expect(dialog.locator('.iv-calc-chip')).toHaveText(['24', '25']);
+    await dialog.getByLabel('Stat', { exact: true }).selectOption('def');
+    await expect(dialog.getByLabel('Observed stat value')).toHaveValue('65');
+    await dialog.locator('.iv-dialog-close').click();
+
+    const level = await openLevelUpDialog(card);
+    await level.getByLabel('New level').fill('90');
+    await level.getByLabel('New level').blur();
+    await level.getByRole('button', { name: 'ATK plus 1', exact: true }).click();
+    await level.getByLabel(/ATK adjustment/).fill('+49');
+    await level.getByRole('button', { name: 'Save', exact: true }).click();
+    dialog = await openIvs(card);
+    await expect(dialog.getByText(/Using 3 saved stat readings/)).toBeVisible();
+    await expect(dialog.getByLabel('Observed stat value')).toHaveValue('115');
+    await expect(dialog.locator('.iv-calc-readings li')).toHaveCount(2);
+    await expect(dialog.locator('.iv-calc-chip')).toHaveText(['25']);
+    await page.screenshot({ path: info.outputPath('iphone13-ivs-saved-readings.png') });
+    await dialog.getByLabel('Stat', { exact: true }).selectOption('def');
+    await expect(dialog.getByText('Lv. 50 — 65')).toBeVisible();
+    await expect(dialog.getByLabel('Observed stat value')).toHaveValue('');
+    await expect(dialog.getByText(/New reading at Lv. 90/)).toBeVisible();
+    await dialog.getByLabel('Observed stat value').fill('115');
+    await dialog.getByLabel('Observed stat value').press('Enter');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByLabel('Observed stat value')).toHaveValue('115');
+    await expect(dialog.getByRole('button', { name: 'Already saved' })).toBeDisabled();
+    await expect(dialog.locator('.iv-calc-readings li')).toHaveCount(2);
+  });
+
+  test('keeps a saved reading as evidence after EVs change without prefilling it as current', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'EV change', baseGame: 'Emerald' });
+    await addPokemon(page, 'Bulbasaur', { level: 50, stats: { ATK: 66 } });
+    const card = await openDetail(page, 'Bulbasaur');
+    const items = await openItemDialog(card);
+    await items.getByRole('button', { name: /Protein/ }).click();
+    await items.getByRole('button', { name: 'Save', exact: true }).click();
+    const dialog = await openIvs(card);
+    await expect(dialog.getByLabel('Observed stat value')).toHaveValue('');
+    await expect(dialog.getByText('Lv. 50 — 66')).toBeVisible();
+    await expect(dialog.getByText(/10 EVs in this stat/)).toBeVisible();
+    await expect(dialog.locator('.iv-calc-chip')).toHaveText(['24', '25']);
   });
 
   test('entering an IV persists it and marks a perfect (31) stat', async ({ page }) => {
@@ -124,7 +186,7 @@ test.describe('IV tracking', () => {
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openIvs(card);
 
-    await dialog.getByText("Don't know an IV?").click(); // open the <details> disclosure
+    await dialog.getByText('Estimate from game stats').click(); // open the <details> disclosure
     await dialog.getByLabel('Stat', { exact: true }).selectOption('atk');
     // Bulbasaur's base Attack is 49; level 50, 0 EV, neutral nature, IV 25:
     // floor((2*49+25+0)*50/100)+5 = floor(123*0.5)+5 = 61+5 = 66
@@ -132,10 +194,25 @@ test.describe('IV tracking', () => {
     await dialog.getByRole('button', { name: 'Log reading' }).click();
 
     await expect(dialog.getByText('Lv. 50 — 66')).toBeVisible(); // the logged reading itself
+    await expect(dialog.getByLabel('Observed stat value')).toHaveValue('66');
+    await expect(dialog.getByRole('button', { name: 'Already saved' })).toBeDisabled();
     const chip = dialog.locator('.iv-calc-chip', { hasText: '25' });
     await expect(chip).toBeVisible();
     await chip.click();
     await expect(dialog.getByLabel('ATK IV')).toHaveValue('25');
+    await dialog.locator('.iv-dialog-close').click();
+    const discarded = await openIvs(card);
+    await expect(discarded.getByLabel('ATK IV')).toHaveValue('');
+    await expect(discarded.getByLabel('Observed stat value')).toHaveValue('66');
+    await expect(discarded.locator('.iv-calc-readings li')).toHaveCount(1);
+    await discarded.locator('.iv-calc-chip', { hasText: '25' }).click();
+    await discarded.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(discarded).toBeHidden();
+    await expect(page).not.toHaveURL(/\/ivs$/);
+    await page.reload();
+    const saved = await openIvs(page.locator('pokemon-detail'));
+    await expect(saved.getByLabel('ATK IV')).toHaveValue('25');
+    await expect(saved.getByLabel('Observed stat value')).toHaveValue('66');
   });
 
   test('a calculator result with multiple candidate IVs explains why, instead of just listing numbers', async ({ page }) => {
@@ -145,7 +222,7 @@ test.describe('IV tracking', () => {
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openIvs(card);
 
-    await dialog.getByText("Don't know an IV?").click();
+    await dialog.getByText('Estimate from game stats').click();
     await dialog.getByLabel('Stat', { exact: true }).selectOption('hp');
     await dialog.getByLabel('Observed stat value').fill('20');
     await dialog.getByRole('button', { name: 'Log reading' }).click();
@@ -161,7 +238,7 @@ test.describe('IV tracking', () => {
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openIvs(card);
 
-    await dialog.getByText("Don't know an IV?").click();
+    await dialog.getByText('Estimate from game stats').click();
     await dialog.getByLabel('Stat', { exact: true }).selectOption('atk');
     // Base ATK 49, 0 EV, neutral nature. At level 50, IVs 24 and 25 both read 66:
     // floor((98+24)*0.5)+5 = 61+5 = 66; floor((98+25)*0.5)+5 = 61+5 = 66 -> two candidates.

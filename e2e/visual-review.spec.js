@@ -25,7 +25,7 @@ for (const layout of [
     await page.goto('/');
     await createParty(page, { name: 'Emerald Review', baseGame: 'Emerald' });
     for (const name of ['Bulbasaur', 'Charmander', 'Ivysaur', 'Caterpie', 'Onix', 'Chansey']) {
-      await addPokemon(page, name, { level: 10, stats: { ATK: 20 } });
+      await addPokemon(page, name, { level: 10, stats: { ATK: 15 } });
     }
     const partyUrl = page.url();
     await openDetail(page, 'Bulbasaur');
@@ -50,6 +50,10 @@ for (const layout of [
         await expect(page.locator('.tier-badge')).toHaveText('LC');
       }
       await capture(dialog);
+      if (dialog === 'ivs') {
+        await page.locator('iv-dialog summary').click();
+        await capture('ivs-known-values');
+      }
       if (dialog === 'level') {
         for (const name of ['Level plus 1', 'ATK plus 1', 'ATK minus 1']) {
           const box = await page.getByRole('button', { name, exact: true }).boundingBox();

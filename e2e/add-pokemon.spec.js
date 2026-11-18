@@ -43,7 +43,7 @@ test.describe('Adding a Pokémon', () => {
 
     const card = await openDetail(page, 'Bulbasaur');
     const ivDialog = await openIvs(card);
-    await ivDialog.getByText("Don't know an IV?").click();
+    await expect(ivDialog.getByText(/Using 2 saved stat readings/)).toBeVisible();
 
     await ivDialog.getByLabel('Stat', { exact: true }).selectOption('hp');
     await expect(ivDialog.getByText('Lv. 12 — 20')).toBeVisible();
