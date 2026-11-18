@@ -178,7 +178,8 @@ export class PokemonSearch extends BaseElement {
         .wrap.sheet slot[name="sheet-extra"] {
           display: block;
           order: 1;
-          flex: 0 0 auto;
+          flex: 0 1 auto;
+          min-height: 0;
           padding: 0 var(--space-3);
           max-height: 45%;
           overflow-y: auto;

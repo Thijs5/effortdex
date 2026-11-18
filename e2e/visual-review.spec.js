@@ -2,8 +2,9 @@
 import { test, expect } from '@playwright/test';
 import { readFileSync } from 'node:fs';
 import { mockPokeApi } from './support/pokeapi-mock.js';
+import { mockSmogon } from './support/smogon-mock.js';
 import { createParty } from './support/party.js';
-import { addPokemon, openDetail, openLevelUpDialog, rosterCard } from './support/pokemon.js';
+import { addPokemon, openDetail, rosterCard } from './support/pokemon.js';
 
 for (const layout of [
   { name: 'iphone13', viewport: { width: 390, height: 844 }, dark: false },
@@ -14,6 +15,7 @@ for (const layout of [
     await page.setViewportSize(layout.viewport);
     await page.emulateMedia({ colorScheme: layout.dark ? 'dark' : 'light' });
     await mockPokeApi(page);
+    await mockSmogon(page);
     await page.route('**/raw.githubusercontent.com/**/sprites/pokemon/**', async (route) => {
       const id = route.request().url().match(/\/(\d+)\.png$/)?.[1];
       if (id && ['1', '2', '3', '4', '10', '72', '95', '113', '263', '293', '309', '322', '341', '366'].includes(id)) {
@@ -42,6 +44,11 @@ for (const layout of [
     for (const dialog of ['level', 'ivs', 'items', 'nature', 'competitive', 'training-guide']) {
       await page.goto(`${detailUrl}/${dialog}`);
       await expect(page.locator('pokemon-detail').locator('dialog[open]')).toBeVisible();
+      if (dialog === 'competitive') {
+        await expect(page.locator('.competitive-set')).toHaveCount(1);
+        await expect(page.locator('.competitive-set')).toContainText('Support');
+        await expect(page.locator('.tier-badge')).toHaveText('LC');
+      }
       await capture(dialog);
       if (dialog === 'level') {
         for (const name of ['Level plus 1', 'ATK plus 1', 'ATK minus 1']) {
@@ -69,6 +76,10 @@ for (const layout of [
     await capture('add-search');
     await page.locator('#add-search .sheet-close').click();
     const menu = page.locator('#battle-party-slots .battle-slot-menu-btn').first();
+    await menu.click();
+    await menu.press('Escape');
+    await expect(menu).toHaveAttribute('aria-expanded', 'false');
+    await expect(menu).toBeFocused();
     await menu.press('ArrowDown');
     await expect(page.getByRole('menuitem', { name: 'Level up' })).toBeFocused();
     await page.keyboard.press('End');
@@ -98,3 +109,35 @@ for (const layout of [
     await expect(rosterCard(page, 'Charmander').locator('.roster-card-evbar .value')).toHaveText('2/510');
   });
 }
+
+test('six long participant names keep search and confirmation visible above a phone keyboard', async ({ page }, info) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await mockPokeApi(page);
+  await page.goto('/');
+  await createParty(page, { name: 'Long names', baseGame: 'Emerald' });
+  const partyUrl = page.url();
+  for (const name of ['Bulbasaur', 'Charmander', 'Ivysaur', 'Caterpie', 'Onix', 'Chansey']) {
+    await addPokemon(page, name);
+    await openDetail(page, name);
+    const nickname = page.getByLabel('Nickname', { exact: true });
+    await nickname.fill(`${name} the extraordinarily determined training companion`);
+    await nickname.blur();
+    await page.goto(partyUrl);
+  }
+  await page.locator('#party-log-battle-btn').click();
+  for (let i = 1; i < 6; ++i) await page.locator('#battle-participants button').nth(i).click();
+  const input = page.locator('#battle-search').getByRole('combobox');
+  await input.fill('Caterpie');
+  await page.getByRole('option').filter({ hasText: /Caterpie/i }).first().click();
+  await expect(page.locator('#battle-result-summary')).toContainText('Ready to log');
+  await page.setViewportSize({ width: 390, height: 260 });
+  await expect(input).toBeInViewport({ ratio: 1 });
+  await expect(page.locator('#battle-log-btn')).toBeInViewport({ ratio: 1 });
+  const screenshot = info.outputPath('iphone13-long-summary-keyboard.png');
+  await page.screenshot({ path: screenshot });
+  await info.attach('long-summary-keyboard', { path: screenshot, contentType: 'image/png' });
+  await page.locator('#battle-log-btn').click();
+  await page.locator('#battle-search .sheet-close').click();
+  await page.reload();
+  await expect(page.locator('.roster-card-evbar .value')).toHaveText(Array(6).fill('1/510'));
+});

@@ -51,4 +51,12 @@ export async function mockSmogon(page) {
   await page.route('**/pkmn.github.io/smogon/data/sets/gen9.json', (route) =>
     route.fulfill({ contentType: 'application/json', body: JSON.stringify(SETS_GEN9) })
   );
+  await page.route('**/pkmn.github.io/smogon/data/sets/gen3.json', (route) =>
+    route.fulfill({ contentType: 'application/json', body: JSON.stringify({
+      Bulbasaur: { lc: { Support: {
+        moves: ['Giga Drain', 'Sleep Powder', 'Synthesis', 'Sludge Bomb'],
+        item: 'Leftovers', nature: 'Modest', evs: { hp: 4, spa: 252, spe: 252 },
+      } } },
+    }) })
+  );
 }

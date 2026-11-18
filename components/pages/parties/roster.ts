@@ -353,6 +353,11 @@ function renderBattleSlotCard(entry: RosterEntry): HTMLDivElement {
     if (e.detail === 0) menu.querySelector<HTMLButtonElement>('button')?.focus();
   });
   menuBtn.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      e.preventDefault();
+      closeBattleSlotMenu();
+      return;
+    }
     if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
     e.preventDefault();
     if (menu.hidden) menuBtn.click();
