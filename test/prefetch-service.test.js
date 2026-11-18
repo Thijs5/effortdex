@@ -826,3 +826,34 @@ test('pauses cleanly if the connection drops mid-queue, and resumes on reconnect
   assert.deepEqual(api.calls, ['a', 'b', 'c', 'd']);
   assert.equal(svc.pendingCount, 0);
 });
+
+test('prefetch persists image responses directly before any worker controls the page and caps its cache', async (t) => {
+  const previous = globalThis.caches;
+  t.after(() => { if (previous === undefined) delete globalThis.caches; else globalThis.caches = previous; });
+  const writes = [], deleted = [];
+  const keys = Array.from({ length: 4002 }, (_, i) => new Request(`https://sprites.example/old-${i}.png`));
+  globalThis.caches = { open: async () => ({
+    match: async () => undefined,
+    put: async (request, response) => writes.push({ request, body: await response.text() }),
+    keys: async () => keys,
+    delete: async (request) => { deleted.push(request.url); return true; },
+  }) };
+  globalThis.fetch = async () => new Response('sprite bytes');
+  const svc = service({ api: fakeApi({ generations: { 1: [{ name: 'bulbasaur', id: 1 }] } }) });
+  await svc.prefetchGame('Red');
+  assert.equal(writes.length, 1);
+  assert.ok(writes[0].request.url.endsWith('/versions/generation-i/red-blue/1.png'));
+  assert.equal(writes[0].request.mode, 'no-cors');
+  assert.equal(writes[0].body, 'sprite bytes');
+  assert.deepEqual(deleted, keys.slice(0, 2).map((r) => r.url));
+});
+
+test('an HTTP error response is never saved as a prefetched sprite', async (t) => {
+  const previous = globalThis.caches;
+  t.after(() => { if (previous === undefined) delete globalThis.caches; else globalThis.caches = previous; });
+  let writes = 0;
+  globalThis.caches = { open: async () => ({ match: async () => undefined, put: async () => { ++writes; } }) };
+  globalThis.fetch = async () => new Response('not found', { status: 404 });
+  await service({ api: fakeApi({ generations: { 1: [{ name: 'bulbasaur', id: 1 }] } }) }).prefetchGame('Red');
+  assert.equal(writes, 0);
+});

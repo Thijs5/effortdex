@@ -9,7 +9,7 @@
    graphite ink, a single poké-red accent and a graphite EV meter.
 
    Theming: the light palette lives on bare :root. The dark palette (a
-   warm night look, not green) is applied two ways so both entry points
+   neutral charcoal look) is applied two ways so both entry points
    win correctly: via prefers-color-scheme when the user hasn't chosen
    (guarded by :not([data-theme="light"])), and via [data-theme="dark"]
    when they picked dark with the header menu. */
@@ -18,6 +18,7 @@
 
 :root {
   color-scheme: light;
+  --page-type-tint: 7%;
 
   /* Color — ink */
   --ink: #1b1916;          /* graphite, faintly warm */
@@ -128,30 +129,32 @@
   --transition-bar: 0.35s ease;
 }
 
-/* Dark palette shared by both dark entry points below — a warm night
+/* Dark palette shared by both dark entry points below — a neutral charcoal
    look. Kept in sync by hand: change one, change both. */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
     color-scheme: dark;
+    --page-type-tint: 0%;
+    --roster-card-ground: var(--surface);
 
-    --ink: #e9e5db;
-    --ink-soft: #a39d8f;
+    --ink: #edf0f2;
+    --ink-soft: #b0b7bf;
 
-    --paper: #17150f;
-    --paper-panel: #211e17;
-    --lcd: #242017;
-    --lcd-deep: #2f2a1f;
-    --lcd-line: #3a3428;
-    --line: #3a3428;
-    --surface: #211e17;
+    --paper: #14171b;
+    --paper-panel: #1c2025;
+    --lcd: #23282e;
+    --lcd-deep: #2b3138;
+    --lcd-line: #394149;
+    --line: #394149;
+    --surface: #1c2025;
 
-    --poke-red: #ef4d26;
+    --poke-red: #ce3a1e;
     --poke-red-dark: #8f1f06;
     --on-red: #fff4ec;
 
-    --meter: #d8d2c4;        /* light warm grey fill on a dark track */
+    --meter: #c4cdd6;        /* light neutral grey fill on a dark track */
     --meter-max: #e8bf55;
-    --meter-track: #34301f;
+    --meter-track: #303841;
 
     --good: #3fcf8e;
     --good-soft: #1e3a2c;
@@ -183,9 +186,9 @@
     --shadow-lcd: none;
 
     --footer-bg: var(--paper);
-    --footer-ink: #8b8578;
-    --cart-shell: #332e22;
-    --cart-edge: rgba(233, 229, 219, 0.26);
+    --footer-ink: #929ba5;
+    --cart-shell: #303740;
+    --cart-edge: rgba(237, 240, 242, 0.26);
 
     --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.45), 0 16px 34px -20px rgba(0, 0, 0, 0.7);
     --shadow-suggestions: 0 12px 28px -10px rgba(0, 0, 0, 0.62);
@@ -195,25 +198,27 @@
 
 :root[data-theme='dark'] {
   color-scheme: dark;
+    --page-type-tint: 0%;
+    --roster-card-ground: var(--surface);
 
-  --ink: #e9e5db;
-  --ink-soft: #a39d8f;
+  --ink: #edf0f2;
+  --ink-soft: #b0b7bf;
 
-  --paper: #17150f;
-  --paper-panel: #211e17;
-  --lcd: #242017;
-  --lcd-deep: #2f2a1f;
-  --lcd-line: #3a3428;
-  --line: #3a3428;
-  --surface: #211e17;
+  --paper: #14171b;
+  --paper-panel: #1c2025;
+  --lcd: #23282e;
+  --lcd-deep: #2b3138;
+  --lcd-line: #394149;
+  --line: #394149;
+  --surface: #1c2025;
 
-  --poke-red: #ef4d26;
+  --poke-red: #ce3a1e;
   --poke-red-dark: #8f1f06;
   --on-red: #fff4ec;
 
-  --meter: #d8d2c4;
+  --meter: #c4cdd6;
   --meter-max: #e8bf55;
-  --meter-track: #34301f;
+  --meter-track: #303841;
 
   --good: #3fcf8e;
   --good-soft: #1e3a2c;
@@ -245,9 +250,9 @@
   --shadow-lcd: none;
 
   --footer-bg: var(--paper);
-  --footer-ink: #8b8578;
-  --cart-shell: #332e22;
-  --cart-edge: rgba(233, 229, 219, 0.26);
+  --footer-ink: #929ba5;
+  --cart-shell: #303740;
+  --cart-edge: rgba(237, 240, 242, 0.26);
 
   --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.45), 0 16px 34px -20px rgba(0, 0, 0, 0.7);
   --shadow-suggestions: 0 12px 28px -10px rgba(0, 0, 0, 0.62);

@@ -33,7 +33,6 @@ export class IvDialog extends BaseDialog {
   $grid: HTMLElement;
   $summary: HTMLElement;
   $calc: HTMLElement;
-  $calcStatName: HTMLElement;
   $calcStat: HTMLSelectElement;
   $calcObserved: HTMLInputElement;
   $calcBtn: HTMLButtonElement | null;
@@ -42,6 +41,12 @@ export class IvDialog extends BaseDialog {
   $calcResults: HTMLElement;
   $saveBtn: HTMLButtonElement | null;
   $helpBtn: HTMLButtonElement | null;
+  $intro: HTMLElement;
+  $knownHint: HTMLElement;
+  $readingStatus: HTMLElement;
+  $observedHint: HTMLElement;
+  _observedStatKey: string | null = null;
+  _prefilledReadingId: string | null = null;
 
   constructor() {
     super('iv-dialog', 'iv-dialog-title');
@@ -50,7 +55,12 @@ export class IvDialog extends BaseDialog {
     // No width override here — the default 420px from lib/design-system.js's
     // .ds-dialog already matches what this dialog needs.
     style.textContent = `
-      .ivs { display: grid; gap: var(--space-2); min-width: 0; }
+      .iv-intro, .iv-known-hint, .iv-reading-status, .iv-observed-hint {
+        margin: 0; font-size: var(--font-size-xs); color: var(--ink-soft); line-height: 1.5;
+      }
+      .iv-intro strong { display: block; color: var(--ink); }
+      .iv-known-title { margin: var(--space-4) 0 var(--space-1); font-size: var(--font-size-sm); }
+      .iv-known-hint { margin-bottom: var(--space-3); }
       .iv-grid { display: grid; gap: var(--space-2); }
       .iv-row {
         display: grid; grid-template-columns: 3.5em 1fr; align-items: center; gap: var(--space-2);
@@ -64,20 +74,25 @@ export class IvDialog extends BaseDialog {
       .iv-row--perfect .iv-row-label { color: var(--teal); }
       .iv-summary { margin: 0; font-size: var(--font-size-2xs); color: var(--ink-soft); }
       .iv-calc {
-        display: grid; gap: var(--space-2); margin-top: var(--space-1);
-        padding: var(--space-3); background: var(--lcd); border-radius: var(--radius-sm);
+        margin-top: var(--space-3); padding: var(--space-3);
+        border: 1px solid var(--lcd-line); border-radius: var(--radius-sm);
       }
-      .iv-calc > summary { cursor: pointer; font-size: var(--font-size-2xs); color: var(--ink-soft); }
-      .iv-calc-hint, .iv-calc-note { margin: var(--space-2) 0 0; font-size: var(--font-size-2xs); color: var(--ink-soft); }
+      .iv-calc > summary { cursor: pointer; font-size: var(--font-size-xs); color: var(--ink); min-height: 44px; align-content: center; }
+      .iv-calc-content { display: grid; gap: var(--space-3); padding-top: var(--space-2); }
+      .iv-calc-note { margin: 0; font-size: var(--font-size-xs); color: var(--ink-soft); line-height: 1.5; }
       .iv-calc-fields { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
-      .iv-calc-fields select,
-      .iv-calc-fields input { width: auto; flex: 1 1 6em; }
+      .iv-calc-fields label { display: grid; gap: var(--space-1); flex: 1 1 8em; font-size: var(--font-size-2xs); color: var(--ink-soft); }
+      .iv-calc-fields input { width: 100%; min-width: 0; }
+      .iv-calc-stat-label { display: grid; gap: var(--space-1); font-size: var(--font-size-2xs); color: var(--ink-soft); }
+      .iv-calc-fields button { align-self: end; }
       .iv-calc-results { display: flex; flex-wrap: wrap; gap: var(--space-2); min-height: 1.5em; }
+      .iv-calc-results:empty { display: none; }
       .iv-calc-chip {
         border: 1px solid var(--lcd-line); border-radius: var(--radius-pill); background: var(--surface);
         padding: var(--space-1) var(--space-3); font-family: var(--font-mono); font-size: var(--font-size-2xs);
-        cursor: pointer;
+        cursor: pointer; min-width: 44px; min-height: 44px; color: var(--ink);
       }
+      .iv-calc-chip[aria-pressed="true"] { border-color: var(--teal); background: var(--lcd); }
       .iv-calc-chip:hover { border-color: var(--teal); color: var(--teal); }
       .iv-calc-readings { list-style: none; margin: 0; padding: 0; display: grid; gap: var(--space-1); }
       .iv-calc-readings:empty { display: none; }
@@ -87,7 +102,7 @@ export class IvDialog extends BaseDialog {
       }
       .iv-calc-reading-delete {
         border: none; background: none; color: var(--ink-soft); cursor: pointer; padding: 0 var(--space-1);
-        font-size: var(--font-size-2xs); line-height: 1;
+        font-size: var(--font-size-2xs); line-height: 1; min-width: 44px; min-height: 44px;
       }
       .iv-calc-reading-delete:hover { color: var(--poke-red); }
       .help-btn {
@@ -110,20 +125,30 @@ export class IvDialog extends BaseDialog {
     this.$title.innerHTML = `IVs
       <button type="button" class="help-btn" aria-expanded="false" aria-label="What are IVs?" title="Individual Values (IVs) are hidden, randomly-rolled bonus stat points fixed the moment this Pokémon was caught or hatched — 0-31 each (0-15 in Gen I/II, called DVs, with HP derived from the other four rather than stored on its own). Unlike EVs, they never change from training or leveling up. Enter them if you already know them (breeding, the in-game IV Judge), or use the calculator below to narrow one down from an observed stat.">?</button>`;
     this.$body.innerHTML = `
+      <p class="iv-intro"></p>
+      <details class="iv-calc" hidden>
+        <summary>Estimate from game stats</summary>
+        <div class="iv-calc-content">
+          <p class="iv-reading-status"></p>
+          <label class="iv-calc-stat-label">Stat to estimate
+            <select class="iv-calc-stat ds-field" aria-label="Stat"></select>
+          </label>
+          <ul class="iv-calc-readings" aria-live="polite"></ul>
+          <p class="iv-calc-note" aria-live="polite" hidden></p>
+          <div class="iv-calc-results" aria-live="polite"></div>
+          <div class="iv-calc-fields">
+            <label>Current in-game stat
+              <input type="number" inputmode="numeric" class="iv-calc-observed ds-field" min="1" aria-label="Observed stat value" placeholder="e.g. 66" />
+            </label>
+            <button type="button" class="ds-btn ds-btn--ghost iv-calc-btn">Log reading</button>
+          </div>
+          <p class="iv-observed-hint"></p>
+        </div>
+      </details>
+      <h3 class="iv-known-title">Known IVs</h3>
+      <p class="iv-known-hint"></p>
       <div class="iv-grid"></div>
       <p class="iv-summary" hidden></p>
-      <details class="iv-calc" hidden>
-        <summary>Don't know an IV? Calculate it from a stat</summary>
-        <p class="iv-calc-hint">Check this Pokémon's actual <em class="iv-calc-stat-name"></em> stat right now (its summary screen in-game) and log it below — uses its current level and EVs, so check it now rather than typing in an old reading. Logging another reading later (after it levels up or gains EVs) narrows the candidates further.</p>
-        <div class="iv-calc-fields">
-          <select class="iv-calc-stat ds-field" aria-label="Stat"></select>
-          <input type="number" inputmode="numeric" class="iv-calc-observed ds-field" min="1" aria-label="Observed stat value" placeholder="Actual stat" />
-          <button type="button" class="ds-btn ds-btn--ghost iv-calc-btn">Log reading</button>
-        </div>
-        <ul class="iv-calc-readings" aria-live="polite"></ul>
-        <p class="iv-calc-note" aria-live="polite" hidden></p>
-        <div class="iv-calc-results" aria-live="polite"></div>
-      </details>
     `;
     this.$footer.innerHTML = `<button type="button" class="ds-btn ds-btn--primary iv-dialog-save-btn">Save</button>`;
     this.$footer.hidden = false;
@@ -131,7 +156,6 @@ export class IvDialog extends BaseDialog {
     this.$grid = this.shadow.querySelector<HTMLElement>('.iv-grid')!;
     this.$summary = this.shadow.querySelector<HTMLElement>('.iv-summary')!;
     this.$calc = this.shadow.querySelector<HTMLElement>('.iv-calc')!;
-    this.$calcStatName = this.shadow.querySelector<HTMLElement>('.iv-calc-stat-name')!;
     this.$calcStat = this.shadow.querySelector<HTMLSelectElement>('.iv-calc-stat')!;
     this.$calcObserved = this.shadow.querySelector<HTMLInputElement>('.iv-calc-observed')!;
     this.$calcBtn = this.shadow.querySelector<HTMLButtonElement>('.iv-calc-btn');
@@ -140,6 +164,10 @@ export class IvDialog extends BaseDialog {
     this.$calcResults = this.shadow.querySelector<HTMLElement>('.iv-calc-results')!;
     this.$saveBtn = this.shadow.querySelector<HTMLButtonElement>('.iv-dialog-save-btn');
     this.$helpBtn = this.shadow.querySelector<HTMLButtonElement>('.help-btn');
+    this.$intro = this.shadow.querySelector<HTMLElement>('.iv-intro')!;
+    this.$knownHint = this.shadow.querySelector<HTMLElement>('.iv-known-hint')!;
+    this.$readingStatus = this.shadow.querySelector<HTMLElement>('.iv-reading-status')!;
+    this.$observedHint = this.shadow.querySelector<HTMLElement>('.iv-observed-hint')!;
     this.$calcStat.innerHTML = STATS.map(({ key, label }) => `<option value="${key}">${label}</option>`).join('');
 
     this.$saveBtn?.addEventListener('click', () => this._save());
@@ -171,18 +199,22 @@ export class IvDialog extends BaseDialog {
       this._updateSummary();
     });
     this.$calcStat.addEventListener('change', () => this._updateCalcHint());
+    // Keep native disclosure/select keyboard interaction out of the
+    // enclosing dialog's Enter-to-Save shortcut.
+    for (const control of [this.$calc.querySelector('summary')!, this.$calcStat]) {
+      control.addEventListener('keydown', (event) => {
+        if ((event as KeyboardEvent).key === 'Enter') event.stopPropagation();
+      });
+    }
+    this.$calcObserved.addEventListener('input', () => this._updateReadingAction());
     this.$calcBtn?.addEventListener('click', () => this._logReading());
     this.$calcResults.addEventListener('click', (e) => {
       const chip = (e.target as HTMLElement).closest<HTMLElement>('.iv-calc-chip');
       if (!chip || !this._entry) return;
       const statKey = this.$calcStat.value as StatKey;
       const iv = Number(chip.dataset.iv);
-      // Set pending *before* store.setIv, not after: store.setIv's save
-      // synchronously dispatches the store's 'change' event, which flows
-      // back through `.entry =` and re-renders the grid from
-      // `_pendingIvs` immediately.
       if (this._pendingIvs) this._pendingIvs[statKey] = iv;
-      store.setIv(this._entry.uid, statKey, iv);
+      this._renderGrid(this._entry, store.usesStatExpSystem());
     });
     this.$calcReadings.addEventListener('click', (e) => {
       const del = (e.target as HTMLElement).closest<HTMLElement>('.iv-calc-reading-delete');
@@ -204,6 +236,11 @@ export class IvDialog extends BaseDialog {
   open(): void {
     const e = this._entry as RosterEntry;
     this._pendingIvs = { ...e.ivs };
+    this._observedStatKey = null;
+    this._prefilledReadingId = null;
+    const firstReadingStat = STATS.find(({ key }) => e.events.some(ev => ev.kind === 'stat-reading' && ev.statKey === key));
+    this.$calcStat.value = firstReadingStat?.key ?? 'hp';
+    (this.$calc as HTMLDetailsElement).open = !!firstReadingStat;
     this._renderGrid(e, store.usesStatExpSystem());
     super.open();
   }
@@ -212,7 +249,8 @@ export class IvDialog extends BaseDialog {
     this._pendingIvs = null;
   }
   _onEnter(): void {
-    this.$saveBtn?.click();
+    if (this.shadow.activeElement === this.$calcObserved) this._logReading();
+    else this.$saveBtn?.click();
   }
 
   /** Applies every stat whose pending IV actually changed, then closes. */
@@ -236,6 +274,8 @@ export class IvDialog extends BaseDialog {
 
     const ivs = this._pendingIvs || e.ivs;
     const { max, legacy } = store.ivRange();
+    this.$intro.innerHTML = `<strong>IVs are optional</strong>Battles and ${statExp ? 'Stat Experience' : 'EVs'} are tracked without them. IVs are hidden values from 0–${max}, separate from the stats shown in-game.`;
+    this.$knownHint.textContent = `Already know an exact ${legacy ? 'DV' : 'IV'}? Enter it here. Saved values are prefilled; leave unknown values blank.`;
     // Sp. Def's row is dropped entirely in Gen I/II — it isn't a second
     // input, it's the same stored value as Sp. Atk (ivRange()'s doc
     // comment), so showing both would look editable when only one is.
@@ -248,7 +288,7 @@ export class IvDialog extends BaseDialog {
         const perfect = value === max;
         const control = derived
           ? `<span class="iv-row-derived">${value == null ? 'unknown' : value} (derived)</span>`
-          : `<input type="number" inputmode="numeric" class="ds-field" data-stat="${key}" min="0" max="${max}" value="${value == null ? '' : value}" placeholder="?" aria-label="${escapeHtml(displayLabel)} IV" />`;
+          : `<input type="number" inputmode="numeric" class="ds-field" data-stat="${key}" min="0" max="${max}" value="${value == null ? '' : value}" placeholder="Unknown" aria-label="${escapeHtml(displayLabel)} IV" />`;
         return `<div class="iv-row${perfect ? ' iv-row--perfect' : ''}"><span class="iv-row-label">${escapeHtml(displayLabel)}</span>${control}</div>`;
       })
       .join('');
@@ -280,16 +320,50 @@ export class IvDialog extends BaseDialog {
     const perfectCount = knownValues.filter((v) => v === max).length;
     this.$summary.textContent =
       knownCount === 0
-        ? `Enter what you know — 0-${max} per stat.`
+        ? 'All IVs unknown — you can leave them that way.'
         : `${knownCount}/${rows.length} known${perfectCount > 0 ? `, ${perfectCount} perfect (${max})` : ''}.`;
     this._updateCalcHint();
   }
 
   _updateCalcHint(): void {
-    const stat = STATS.find((s) => s.key === this.$calcStat.value);
-    this.$calcStatName.textContent = stat ? stat.label : '';
+    const readings = this._entry!.events.filter(ev => ev.kind === 'stat-reading');
+    this.$readingStatus.textContent = readings.length
+      ? `Using ${readings.length} saved stat reading${readings.length === 1 ? '' : 's'} from Add Pokémon and Level. No need to enter them again.`
+      : 'No stat readings saved yet. Readings logged in Level or when adding this Pokémon appear here automatically.';
+    for (const option of this.$calcStat.options) {
+      const count = readings.filter(ev => ev.statKey === option.value).length;
+      const label = STATS.find(s => s.key === option.value)!.label;
+      option.textContent = `${label}${count ? ` · ${count} saved` : ''}`;
+    }
     this._renderCalcReadings();
     this._renderCalcResults();
+    const current = this._currentReadings().at(-1);
+    if (this._observedStatKey !== this.$calcStat.value || this._prefilledReadingId !== (current?.id ?? null)) {
+      this.$calcObserved.value = current ? String(current.observedStat) : '';
+      this._observedStatKey = this.$calcStat.value;
+      this._prefilledReadingId = current?.id ?? null;
+    }
+    this._updateReadingAction();
+  }
+
+  /** Only an observation at the current level/EVs belongs in the current-stat field. */
+  _currentReadings(): StatReadingEvent[] {
+    const e = this._entry!;
+    const key = this.$calcStat.value as StatKey;
+    return e.events.filter((ev): ev is StatReadingEvent => ev.kind === 'stat-reading' && ev.statKey === key &&
+      ev.level === e.level && ev.evs[key] === e.evs[key]);
+  }
+
+  _updateReadingAction(): void {
+    const value = Number(this.$calcObserved.value);
+    const duplicate = this._currentReadings().some(r => r.observedStat === value);
+    if (this.$calcBtn) {
+      this.$calcBtn.disabled = duplicate || !Number.isInteger(value) || value < 1;
+      this.$calcBtn.textContent = duplicate ? 'Already saved' : 'Log reading';
+    }
+    this.$observedHint.textContent = duplicate
+      ? `Prefilled from a saved reading at Lv. ${this._entry!.level}. Already included above; edit only if the in-game stat changed.`
+      : `New reading at Lv. ${this._entry!.level} · ${this._entry!.evs[this.$calcStat.value as StatKey]} EVs in this stat. Copy the stat from the game, check your level, EVs and nature, then log it to history.`;
   }
 
   /** This stat's logged readings (level + observed value at the time), newest first, each deletable. */
@@ -325,26 +399,28 @@ export class IvDialog extends BaseDialog {
     this.$calcNote.hidden = false;
     if (matches.length === 0) {
       this.$calcNote.textContent =
-        'No IV 0-31 fits every reading logged for this stat — one of them was probably mislogged (wrong level/EVs at the time, or a typo). Delete the wrong one below.';
+        'No IV 0-31 fits every saved reading. Check the nature, level and EVs, or remove an incorrect reading above.';
     } else if (matches.length === 1) {
-      this.$calcNote.textContent = 'Only one IV fits — tap it to fill it in.';
+      this.$calcNote.textContent = 'Only one IV fits — select it, then Save to apply.';
       this.$calcResults.innerHTML = `<button type="button" class="iv-calc-chip" data-iv="${matches[0]}">${matches[0]}</button>`;
     } else {
-      this.$calcNote.textContent = `${matches.length} IVs fit every reading logged so far — that's normal, not an error. Log another reading after this Pokémon levels up (or gains EVs) to narrow it further; tap one below if you already know which from elsewhere (breeding, the IV Judge).`;
+      this.$calcNote.textContent = `${matches.length} IVs fit every reading logged so far — normal, not an error. Another reading after a level-up can narrow the range. Select only if you know the exact IV, then Save.`;
       this.$calcResults.innerHTML = matches
         .map((iv) => `<button type="button" class="iv-calc-chip" data-iv="${iv}">${iv}</button>`)
         .join('');
     }
+    for (const chip of this.$calcResults.querySelectorAll<HTMLElement>('.iv-calc-chip')) {
+      chip.setAttribute('aria-pressed', String((this._pendingIvs || e.ivs)[statKey] === Number(chip.dataset.iv)));
+    }
   }
 
-  /** Logs the typed observed stat (at the entry's current level/EVs) as a new reading, then clears the input. */
+  /** Logs a fresh observation; the entry update prefills it and prevents duplicate logging. */
   _logReading(): void {
     const e = this._entry as RosterEntry;
     const statKey = this.$calcStat.value as StatKey;
     const observed = Number(this.$calcObserved.value);
-    if (!observed || !e.baseStats) return;
+    if (!Number.isInteger(observed) || observed < 1 || !e.baseStats || this._currentReadings().some(r => r.observedStat === observed)) return;
     store.logStatReading(e.uid, statKey, observed);
-    this.$calcObserved.value = '';
   }
 }
 customElements.define('iv-dialog', IvDialog);

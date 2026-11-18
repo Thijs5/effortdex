@@ -310,6 +310,7 @@ export async function logPartyBattle(page, opponentSpecies, { deselect, select }
     await page.locator('#battle-participants').getByRole('button', { name: new RegExp(species, 'i') }).click();
   }
   const combobox = search.getByRole('combobox', { name: 'Defeated Pokémon…' });
+  if (!await combobox.isVisible()) await page.locator('#battle-choose-opponent-btn').click();
   await combobox.waitFor({ state: 'visible' });
   await combobox.fill(opponentSpecies);
   await page.getByRole('option').filter({ hasText: new RegExp(opponentSpecies, 'i') }).first().click();

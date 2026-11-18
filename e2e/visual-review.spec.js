@@ -25,7 +25,7 @@ for (const layout of [
     await page.goto('/');
     await createParty(page, { name: 'Emerald Review', baseGame: 'Emerald' });
     for (const name of ['Bulbasaur', 'Charmander', 'Ivysaur', 'Caterpie', 'Onix', 'Chansey']) {
-      await addPokemon(page, name, { level: 10, stats: { ATK: 20 } });
+      await addPokemon(page, name, { level: 10, stats: { ATK: 15 } });
     }
     const partyUrl = page.url();
     await openDetail(page, 'Bulbasaur');
@@ -50,6 +50,10 @@ for (const layout of [
         await expect(page.locator('.tier-badge')).toHaveText('LC');
       }
       await capture(dialog);
+      if (dialog === 'ivs') {
+        await page.locator('iv-dialog summary').click();
+        await capture('ivs-known-values');
+      }
       if (dialog === 'level') {
         for (const name of ['Level plus 1', 'ATK plus 1', 'ATK minus 1']) {
           const box = await page.getByRole('button', { name, exact: true }).boundingBox();
@@ -88,11 +92,16 @@ for (const layout of [
     await expect(menu).toBeFocused();
     await page.locator('#party-log-battle-btn').click();
     const search = page.locator('#battle-search');
+    await capture('defeat-empty');
+    await page.locator('#battle-choose-opponent-btn').click();
     await search.getByRole('combobox').fill('Caterpie');
+    await expect(page.getByRole('option').filter({ hasText: /Caterpie/i }).first()).toBeVisible();
+    await capture('defeat-search');
     await page.getByRole('option').filter({ hasText: /Caterpie/i }).first().click();
     await expect(page.locator('#battle-result-summary')).toContainText('Ready to log');
     await page.locator('#battle-participants').getByRole('button', { name: /Charmander/i }).click();
     await expect(page.locator('#battle-result-summary')).toContainText('Charmander');
+    await capture('defeat-ready');
     await page.locator('#battle-log-btn').click();
     await expect(rosterCard(page, 'Charmander').locator('.roster-card-evbar .value')).toHaveText('1/510');
     await page.locator('#battle-log-btn').click();
@@ -101,7 +110,7 @@ for (const layout of [
     if (layout.name === 'iphone13') {
       await page.setViewportSize({ width: 390, height: 320 });
       await expect(page.locator('#battle-log-btn')).toBeInViewport();
-      await expect(search.getByRole('combobox')).toBeInViewport();
+      await expect(search.getByRole('combobox')).toBeHidden();
       await capture('battle-keyboard');
     }
     await search.locator('.sheet-close').click();
@@ -127,11 +136,12 @@ test('six long participant names keep search and confirmation visible above a ph
   await page.locator('#party-log-battle-btn').click();
   for (let i = 1; i < 6; ++i) await page.locator('#battle-participants button').nth(i).click();
   const input = page.locator('#battle-search').getByRole('combobox');
+  await page.locator('#battle-choose-opponent-btn').click();
   await input.fill('Caterpie');
   await page.getByRole('option').filter({ hasText: /Caterpie/i }).first().click();
   await expect(page.locator('#battle-result-summary')).toContainText('Ready to log');
   await page.setViewportSize({ width: 390, height: 260 });
-  await expect(input).toBeInViewport({ ratio: 1 });
+  await expect(input).toBeHidden();
   await expect(page.locator('#battle-log-btn')).toBeInViewport({ ratio: 1 });
   const screenshot = info.outputPath('iphone13-long-summary-keyboard.png');
   await page.screenshot({ path: screenshot });

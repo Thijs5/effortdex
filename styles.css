@@ -54,7 +54,7 @@ html[data-modal-open] body {
      the full-bleed background, so the type tint fills the whole page
      rather than stopping at the card. Unset elsewhere → resolves to
      plain --paper-panel. */
-  background: color-mix(in srgb, var(--page-type, var(--paper-panel)) 7%, var(--paper-panel));
+  background: color-mix(in srgb, var(--page-type, var(--paper-panel)) var(--page-type-tint), var(--paper-panel));
   display: flex;
   flex-direction: column;
 }
@@ -87,7 +87,7 @@ html[data-modal-open] body {
 
 .app-header-identity {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   gap: var(--space-3);
   min-width: 0;
 }
@@ -143,6 +143,8 @@ html[data-modal-open] body {
 /* Menu button — a quiet mono pill, not a chip. */
 .bezel-menu { position: relative; }
 .bezel-btn--menu {
+  min-height: 44px;
+  min-width: 60px;
   padding: var(--space-2) var(--space-3);
   border: 1px solid var(--line);
   border-radius: var(--radius-btn);
@@ -303,7 +305,7 @@ html[data-modal-open] body {
   min-height: 1.2rem;
   margin: 0 0 var(--space-3);
   font-size: var(--font-size-sm);
-  color: var(--good);
+  color: var(--ink-soft);
 }
 .status-line:empty { display: none; }
 
@@ -530,7 +532,7 @@ html[data-modal-open] body {
   display: flex;
   align-items: center;
   gap: var(--space-2);
-  padding: var(--space-1) var(--space-2);
+  padding: var(--space-3);
   border: 1.5px solid var(--line);
   border-radius: var(--radius-md);
   background: var(--surface);
@@ -558,7 +560,7 @@ html[data-modal-open] body {
 .battle-slot--fainted .battle-slot-sprite { filter: grayscale(1) opacity(0.55); }
 .battle-slot-body { min-width: 0; flex: 1 1 auto; display: grid; gap: 1px; }
 .battle-slot-name {
-  font-size: var(--font-size-2xs);
+  font-size: var(--font-size-sm);
   font-weight: 700;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -936,12 +938,12 @@ html[data-modal-open] body {
      single-typed cards leave --type2 unset so it falls back to --type and
      the wash reads as one even colour. No type set at all → both fall
      back to --surface and it's a plain surface card. */
-  background:
+  background: var(--roster-card-ground,
     linear-gradient(135deg,
       color-mix(in srgb, var(--type, var(--surface)) 14%, var(--surface)) 0%,
       color-mix(in srgb, var(--type, var(--surface)) 6%, var(--surface)) 46%,
       color-mix(in srgb, var(--type2, var(--type, var(--surface))) 7%, var(--surface)) 60%,
-      color-mix(in srgb, var(--type2, var(--type, var(--surface))) 16%, var(--surface)) 100%);
+      color-mix(in srgb, var(--type2, var(--type, var(--surface))) 16%, var(--surface)) 100%));
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
   padding: var(--space-3) var(--space-4);
@@ -1543,3 +1545,28 @@ textarea.ds-field { resize: vertical; }
     padding-bottom: var(--space-4);
   }
 }
+
+/* ADR 0031: search-only typing and a separate keyboard-free defeat review. */
+.battle-composer-intro { margin: 0 0 var(--space-3); color: var(--ink-soft); font-size: var(--font-size-sm); }
+.battle-opponent-card { display: flex; align-items: center; gap: var(--space-3); width: 100%; padding: var(--space-3); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--lcd); color: var(--ink); text-align: left; cursor: pointer; }
+.battle-opponent-card:hover { border-color: var(--teal); }
+.battle-opponent-art { flex: 0 0 68px; height: 68px; display: grid; place-items: center; background: var(--surface); border-radius: var(--radius-md); font-size: 28px; color: var(--ink-soft); }
+.battle-opponent-art img { width: 64px; height: 64px; image-rendering: pixelated; object-fit: contain; }
+.battle-opponent-copy { display: grid; gap: var(--space-1); min-width: 0; }
+#battle-opponent-name { font-family: var(--font-display); font-size: var(--font-size-xl); }
+#battle-opponent-hint { font-size: var(--font-size-xs); color: var(--teal); }
+.battle-confirm-state { margin: var(--space-3) 0 var(--space-4); padding: var(--space-2) 0; border-bottom: 1px solid var(--line); color: var(--ink-soft); font-weight: 700; font-size: var(--font-size-sm); }
+.battle-sheet-extra[data-state="logged"] .battle-confirm-state { color: var(--ink); }
+.battle-sheet-extra[data-state="logged"] .battle-opponent-card { border-color: var(--line); }
+.battle-team-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
+.battle-team-heading .battle-sheet-eyebrow { margin: 0; }
+#battle-selected-count { font-size: var(--font-size-xs); color: var(--ink-soft); }
+.battle-composer-actions { display: grid; grid-template-columns: 92px minmax(0, 1fr); gap: var(--space-2); }
+.battle-composer-actions button { min-height: 44px; }
+.battle-sheet-extra .battle-result-summary { margin-top: var(--space-3); background: transparent; color: var(--ink); padding: 0; font-weight: 500; }
+
+/* The same Poké Ball mark anchors the header, favicon, and install icon. */
+.app-header h1 a { align-items: center; gap: var(--space-2); }
+.brand-mark { position: relative; display: inline-flex; flex: 0 0 28px; width: 28px; height: 28px; }
+.brand-mark img { display: block; width: 100%; height: 100%; }
+.brand-mark .power-led { position: absolute; right: -2px; bottom: 0; width: 6px; height: 6px; margin: 0; outline: 2px solid var(--surface); border-radius: 50%; }

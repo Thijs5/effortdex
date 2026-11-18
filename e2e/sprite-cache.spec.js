@@ -165,6 +165,10 @@ test.describe('Sprite cache manager', () => {
   test('a generation\'s cached-sprite count is visible in its header without opening the section', async ({ page }) => {
     await mockGenerationOne(page);
     await page.goto('/');
+    // Seed after startup cleanup for disabled caching has run.
+    await page.getByRole('button', { name: 'Menu' }).click();
+    await page.getByRole('menuitem', { name: 'Settings' }).click();
+    await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
     // Seed exactly Red & Blue's two sprites directly into Cache Storage —
     // simulating what a real service worker would have written, since
     // one isn't running on localhost (see file header comment).
@@ -180,8 +184,6 @@ test.describe('Sprite cache manager', () => {
       );
     }, SPRITE_CACHE_NAME);
 
-    await page.getByRole('button', { name: 'Menu' }).click();
-    await page.getByRole('menuitem', { name: 'Settings' }).click();
     await page.getByRole('button', { name: 'Manage storage' }).click();
 
     // Gen I has 3 rows x 2 species = 6 total sprite URLs; 2 are seeded.
@@ -194,6 +196,10 @@ test.describe('Sprite cache manager', () => {
   test('Clear removes exactly that row\'s sprites from the cache, leaving a sibling row untouched', async ({ page }) => {
     await mockGenerationOne(page);
     await page.goto('/');
+    // Seed after startup cleanup for disabled caching has run.
+    await page.getByRole('button', { name: 'Menu' }).click();
+    await page.getByRole('menuitem', { name: 'Settings' }).click();
+    await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
     await page.evaluate(async (cacheName) => {
       const cache = await caches.open(cacheName);
       // One Red & Blue sprite, one Yellow sprite.
@@ -207,8 +213,6 @@ test.describe('Sprite cache manager', () => {
       );
     }, SPRITE_CACHE_NAME);
 
-    await page.getByRole('button', { name: 'Menu' }).click();
-    await page.getByRole('menuitem', { name: 'Settings' }).click();
     await page.getByRole('button', { name: 'Manage storage' }).click();
     await page.getByText('Generation I', { exact: true }).click();
 

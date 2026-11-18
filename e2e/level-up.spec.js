@@ -54,7 +54,7 @@ test.describe('Level popup', () => {
     await dialog.locator('.level-up-dialog-close').click();
     await expect(card.getByTitle('Set level')).toContainText('Lv. 10');
     const ivDialog = await openIvs(card);
-    await ivDialog.getByText("Don't know an IV?").click();
+    if (!await ivDialog.getByLabel('Stat', { exact: true }).isVisible()) await ivDialog.getByText('Estimate from game stats').click();
     await ivDialog.getByLabel('Stat', { exact: true }).selectOption('atk');
     await expect(ivDialog.getByText(/Lv\. 12/)).toBeHidden();
   });
@@ -74,7 +74,7 @@ test.describe('Level popup', () => {
 
     await expect(card.getByTitle('Set level')).toContainText('Lv. 12');
     const ivDialog = await openIvs(card);
-    await ivDialog.getByText("Don't know an IV?").click();
+    if (!await ivDialog.getByLabel('Stat', { exact: true }).isVisible()) await ivDialog.getByText('Estimate from game stats').click();
     await ivDialog.getByLabel('Stat', { exact: true }).selectOption('atk');
     await expect(ivDialog.getByText('Lv. 12 — 20')).toBeVisible();
   });
@@ -101,7 +101,7 @@ test.describe('Level popup', () => {
     await expect(dialog).toBeHidden();
 
     const ivDialog = await openIvs(card);
-    await ivDialog.getByText("Don't know an IV?").click();
+    if (!await ivDialog.getByLabel('Stat', { exact: true }).isVisible()) await ivDialog.getByText('Estimate from game stats').click();
     await ivDialog.getByLabel('Stat', { exact: true }).selectOption('atk');
     await expect(ivDialog.getByText('Lv. 10 — 20')).toBeVisible();
     await expect(ivDialog.getByText('Lv. 12 — 20')).toBeHidden(); // untouched, correctly not logged again
@@ -158,7 +158,7 @@ test.describe('Level popup', () => {
     await expect(dialog).toBeHidden();
 
     const ivDialog = await openIvs(card);
-    await ivDialog.getByText("Don't know an IV?").click();
+    if (!await ivDialog.getByLabel('Stat', { exact: true }).isVisible()) await ivDialog.getByText('Estimate from game stats').click();
     await ivDialog.getByLabel('Stat', { exact: true }).selectOption('atk');
     await expect(ivDialog.getByText('Lv. 12 — 27')).toBeVisible();
   });

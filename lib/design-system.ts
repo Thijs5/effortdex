@@ -264,8 +264,8 @@ const css = `
     font-size: var(--font-size-2xs);
     font-weight: 600;
     color: var(--ink-soft);
-    padding: var(--space-2) var(--space-3);
-    min-height: 38px;
+    padding: var(--space-3);
+    min-height: 44px;
     touch-action: manipulation;
     transition: background var(--transition-fast), border-color var(--transition-fast);
   }
