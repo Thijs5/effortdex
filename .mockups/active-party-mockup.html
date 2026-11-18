@@ -1,0 +1,551 @@
+<title>Active Party Bar</title>
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,600;12..96,700&family=Public+Sans:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap">
+<style>
+  /* ---------- tokens: lifted from Effortdex's own tokens.css (Field Guide skin) ---------- */
+  :root {
+    color-scheme: light;
+    --ink: #1b1916;
+    --ink-soft: #5f5b53;
+    --paper: #f4f2ee;
+    --paper-panel: #fffefb;
+    --lcd: #fbfaf6;
+    --lcd-deep: #ece8e0;
+    --lcd-line: #e6e2da;
+    --line: #e6e2da;
+    --surface: #fffefb;
+    --poke-red: #e3350d;
+    --poke-red-dark: #9c2408;
+    --on-red: #fff8ef;
+    --accent: var(--poke-red);
+    --accent-dark: var(--poke-red-dark);
+    --meter: #2c2822;
+    --meter-max: #d99a1c;
+    --meter-track: #e2dbc9;
+    --good: #1f8f52;
+    --good-soft: #dcefe3;
+    --gold: #d99a1c;
+    --gold-soft: #f3e6c9;
+    --teal: #2f7d6b;
+    --teal-strong: #23604f;
+    --on-teal: #ffffff;
+    --teal-soft: #d6e7e0;
+    --danger: #b3401e;
+    --danger-soft: #f8ddd3;
+    --sprite-drop: rgba(20, 18, 15, 0.4);
+    --shadow-panel: 0 1px 2px rgba(27, 25, 22, 0.05), 0 16px 34px -20px rgba(27, 25, 22, 0.24);
+    --font-display: 'Bricolage Grotesque', system-ui, sans-serif;
+    --font-body: 'Public Sans', system-ui, sans-serif;
+    --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+    --radius-sm: 8px;
+    --radius-md: 12px;
+    --radius-lg: 20px;
+    --radius-pill: 999px;
+    --radius-btn: 11px;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme='light']) {
+      color-scheme: dark;
+      --ink: #e9e5db;
+      --ink-soft: #a39d8f;
+      --paper: #17150f;
+      --paper-panel: #211e17;
+      --lcd: #242017;
+      --lcd-deep: #2f2a1f;
+      --lcd-line: #3a3428;
+      --line: #3a3428;
+      --surface: #211e17;
+      --poke-red: #ef4d26;
+      --poke-red-dark: #8f1f06;
+      --on-red: #fff4ec;
+      --meter: #d8d2c4;
+      --meter-max: #e8bf55;
+      --meter-track: #34301f;
+      --good: #3fcf8e;
+      --good-soft: #1e3a2c;
+      --gold: #e8bf55;
+      --gold-soft: #4a3c1c;
+      --teal: #6fbfa8;
+      --teal-strong: #8fd4bf;
+      --on-teal: #14201b;
+      --teal-soft: #24352f;
+      --danger: #e8926e;
+      --danger-soft: #4a2418;
+      --sprite-drop: rgba(255, 255, 255, 0.32);
+      --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.45), 0 16px 34px -20px rgba(0, 0, 0, 0.7);
+    }
+  }
+  :root[data-theme='dark'] {
+    color-scheme: dark;
+    --ink: #e9e5db; --ink-soft: #a39d8f;
+    --paper: #17150f; --paper-panel: #211e17; --lcd: #242017; --lcd-deep: #2f2a1f;
+    --lcd-line: #3a3428; --line: #3a3428; --surface: #211e17;
+    --poke-red: #ef4d26; --poke-red-dark: #8f1f06; --on-red: #fff4ec;
+    --meter: #d8d2c4; --meter-max: #e8bf55; --meter-track: #34301f;
+    --good: #3fcf8e; --good-soft: #1e3a2c; --gold: #e8bf55; --gold-soft: #4a3c1c;
+    --teal: #6fbfa8; --teal-strong: #8fd4bf; --on-teal: #14201b; --teal-soft: #24352f;
+    --danger: #e8926e; --danger-soft: #4a2418;
+    --sprite-drop: rgba(255, 255, 255, 0.32);
+    --shadow-panel: 0 1px 2px rgba(0, 0, 0, 0.45), 0 16px 34px -20px rgba(0, 0, 0, 0.7);
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--paper);
+    color: var(--ink);
+    font-family: var(--font-body);
+    padding: clamp(1.2rem, 3vw, 2.8rem);
+  }
+  h1, h2, h3 { font-family: var(--font-display); text-wrap: balance; margin: 0; }
+
+  .masthead { max-width: 1180px; margin: 0 auto 2rem; }
+  .eyebrow {
+    font-size: 0.72rem; text-transform: uppercase; letter-spacing: 0.09em;
+    color: var(--teal-strong); font-weight: 700; margin: 0 0 0.5rem;
+  }
+  .masthead h1 { font-size: clamp(1.5rem, 3vw, 2.1rem); font-weight: 700; }
+  .masthead p { color: var(--ink-soft); font-size: 0.94rem; max-width: 60ch; line-height: 1.55; margin: 0.6rem 0 0; }
+
+  .workbench {
+    max-width: 1180px; margin: 0 auto;
+    display: grid;
+    grid-template-columns: minmax(320px, 400px) minmax(320px, 400px) minmax(240px, 280px);
+    gap: 1.6rem;
+    align-items: start;
+  }
+  @media (max-width: 1080px) {
+    .workbench { grid-template-columns: 1fr; justify-items: center; }
+    .legend { width: 100%; max-width: 400px; }
+  }
+
+  /* ---------- phone frame ---------- */
+  .frame-label {
+    font-family: var(--font-mono); font-size: 0.72rem; letter-spacing: 0.04em;
+    color: var(--ink-soft); margin: 0 0 0.6rem; display: flex; align-items: center; gap: 0.5em;
+  }
+  .frame-label b { color: var(--ink); font-weight: 700; }
+  .phone {
+    width: 100%; max-width: 400px;
+    background: var(--paper-panel);
+    border: 1px solid var(--line);
+    border-radius: 26px;
+    box-shadow: var(--shadow-panel);
+    overflow: hidden;
+    position: relative;
+  }
+  .phone-screen { max-height: 760px; overflow-y: auto; }
+
+  /* ---------- app header (trimmed) ---------- */
+  .app-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.7rem 1rem; border-bottom: 1px solid var(--line); background: var(--surface);
+  }
+  .app-wordmark { font-family: var(--font-display); font-weight: 700; font-size: 1rem; color: var(--accent); }
+  .app-header-party { font-size: 0.78rem; color: var(--ink-soft); }
+  .bezel-dot { width: 26px; height: 26px; border-radius: 50%; background: var(--lcd-deep); border: 1px solid var(--line); }
+
+  /* ---------- view-nav ---------- */
+  .view-nav {
+    position: relative;
+    display: flex; align-items: center; gap: 0.6rem;
+    padding: 0.7rem 1rem;
+    background: var(--surface); border-bottom: 1px solid var(--line);
+  }
+  .back-link { font-size: 0.8rem; color: var(--teal); text-decoration: none; }
+  .ds-btn {
+    font: inherit; cursor: pointer; border-radius: var(--radius-btn);
+    padding: 0.55em 1em; font-size: 0.85rem; font-weight: 600; border: 1px solid transparent;
+    white-space: nowrap;
+  }
+  .ds-btn--primary { background: var(--accent); color: var(--on-red); margin-left: auto; box-shadow: 0 6px 14px -8px var(--poke-red-dark); }
+  .ds-btn--ghost { background: transparent; border-color: var(--lcd-line); color: var(--ink); }
+  .ds-btn--outline { background: var(--surface); border-color: var(--lcd-line); color: var(--ink); }
+  .ds-btn--icon { padding: 0.5em; line-height: 0; }
+
+  /* ---------- party identity ---------- */
+  .party-identity-row { display: flex; align-items: flex-start; gap: 0.8rem; padding: 0.9rem 1rem 0; }
+  .party-identity { flex: 1; min-width: 0; }
+  .party-identity-head { display: flex; align-items: center; gap: 0.5rem; flex-wrap: wrap; }
+  .party-identity h2 { font-size: 1.25rem; }
+  .game-chip {
+    display: inline-flex; align-items: center; gap: 0.35em;
+    font-family: var(--font-mono); font-size: 0.68rem; letter-spacing: 0.02em;
+    color: var(--ink-soft); background: var(--lcd); border: 1px solid var(--line);
+    border-radius: var(--radius-pill); padding: 0.15em 0.65em 0.2em;
+  }
+
+  /* ---------- NEW: active party bar ---------- */
+  .active-party {
+    margin: 0.9rem 1rem 0;
+    background: var(--lcd);
+    border: 1px solid var(--line);
+    border-radius: var(--radius-md);
+    padding: 0.75rem 0.8rem 0.8rem;
+    position: relative;
+  }
+  .active-party-head { display: flex; align-items: baseline; justify-content: space-between; gap: 0.6rem; margin-bottom: 0.55rem; }
+  .active-party-title { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-soft); font-weight: 700; }
+  .heal-btn {
+    display: inline-flex; align-items: center; gap: 0.4em;
+    background: var(--teal-soft); color: var(--teal-strong); border: 1px solid transparent;
+    border-radius: var(--radius-pill); padding: 0.3em 0.8em 0.32em; font-size: 0.74rem; font-weight: 700;
+    cursor: pointer;
+  }
+  .party-slots { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.4rem; }
+  .slot {
+    display: flex; flex-direction: column; align-items: center; gap: 0.25rem;
+    padding: 0.4rem 0.15rem 0.35rem; border-radius: var(--radius-sm);
+    border: 1.5px solid var(--line); background: var(--surface); cursor: pointer;
+    position: relative;
+  }
+  .slot--fainted { background: var(--lcd-deep); border-style: dashed; opacity: 0.75; }
+  .slot-sprite-wrap { position: relative; width: 34px; height: 34px; }
+  .slot-sprite { width: 100%; height: 100%; display: block; filter: drop-shadow(0 2px 2px var(--sprite-drop)); }
+  .slot--fainted .slot-sprite { filter: grayscale(1) opacity(0.55); }
+  .faint-badge {
+    position: absolute; top: -4px; right: -6px; width: 16px; height: 16px; border-radius: 50%;
+    background: var(--danger-soft); color: var(--poke-red-dark); font-size: 0.6rem; font-weight: 800;
+    display: flex; align-items: center; justify-content: center; border: 1px solid var(--surface);
+  }
+  .slot-lvl { font-family: var(--font-mono); font-size: 0.62rem; color: var(--ink-soft); }
+  .active-party-status { margin: 0.55rem 0 0; font-size: 0.74rem; color: var(--poke-red-dark); }
+
+  /* ---------- roster ---------- */
+  .roster-toolbar { display: flex; gap: 0.5rem; padding: 0.9rem 1rem 0; }
+  .search-field {
+    flex: 1; min-width: 0; padding: 0.55em 0.8em; border: 1px solid var(--lcd-line);
+    border-radius: var(--radius-sm); background: var(--surface); font-size: 0.85rem; color: var(--ink-soft);
+  }
+  .roster { display: grid; gap: 0.55rem; padding: 0.7rem 1rem 1.2rem; }
+  .roster-card {
+    display: flex; align-items: center; gap: 0.6rem;
+    background: linear-gradient(135deg, color-mix(in srgb, var(--type, var(--surface)) 15%, var(--surface)), var(--surface) 65%);
+    border: 1px solid var(--line); border-radius: var(--radius-md);
+    padding: 0.55rem 0.7rem;
+  }
+  .roster-card--fainted { opacity: 0.62; }
+  .card-sprite { width: 32px; height: 32px; flex: 0 0 auto; filter: drop-shadow(0 2px 2px var(--sprite-drop)); }
+  .roster-card--fainted .card-sprite { filter: grayscale(1) opacity(0.6); }
+  .card-body { min-width: 0; flex: 1; display: grid; gap: 0.15rem; }
+  .card-name { font-family: var(--font-display); font-weight: 700; font-size: 0.92rem; }
+  .card-meta { font-size: 0.72rem; color: var(--ink-soft); display: flex; align-items: center; gap: 0.4em; flex-wrap: wrap; }
+  .fainted-tag {
+    font-size: 0.62rem; font-weight: 700; letter-spacing: 0.02em; text-transform: uppercase;
+    background: var(--danger-soft); color: var(--poke-red-dark); padding: 0.1em 0.5em; border-radius: var(--radius-pill);
+  }
+  .ev-track { height: 6px; border-radius: 4px; background: var(--meter-track); overflow: hidden; margin-top: 0.15rem; width: 100%; max-width: 160px; }
+  .ev-fill { height: 100%; background: var(--meter); border-radius: 4px; }
+
+  /* ---------- battle sheet (frame B) ---------- */
+  .sheet-header {
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0.8rem 1rem; border-bottom: 1px solid var(--line); background: var(--surface);
+  }
+  .sheet-header h2 { font-size: 1.05rem; }
+  .sheet-close { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--lcd-line); background: var(--surface); color: var(--ink-soft); cursor: pointer; font-size: 0.9rem; }
+  .sheet-section { padding: 0.9rem 1rem 0; }
+  .sheet-eyebrow { font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; color: var(--ink-soft); font-weight: 700; margin-bottom: 0.5rem; }
+
+  .participant-strip { display: grid; grid-template-columns: repeat(6, 1fr); gap: 0.4rem; }
+  .p-chip {
+    display: flex; flex-direction: column; align-items: center; gap: 0.25rem;
+    padding: 0.4rem 0.15rem 0.35rem; border-radius: var(--radius-sm);
+    border: 2px solid var(--line); background: var(--surface); cursor: pointer; position: relative;
+  }
+  .p-chip--selected { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 8%, var(--surface)); }
+  .p-chip--locked { opacity: 0.45; cursor: not-allowed; border-style: dashed; }
+  .p-chip-sprite { width: 30px; height: 30px; filter: drop-shadow(0 2px 2px var(--sprite-drop)); }
+  .p-chip--locked .p-chip-sprite { filter: grayscale(1); }
+  .p-check {
+    position: absolute; top: -6px; right: -6px; width: 16px; height: 16px; border-radius: 50%;
+    background: var(--accent); color: var(--on-red); font-size: 0.6rem; display: flex; align-items: center; justify-content: center;
+    border: 1.5px solid var(--surface);
+  }
+  .p-chip-lvl { font-family: var(--font-mono); font-size: 0.6rem; color: var(--ink-soft); }
+
+  .opponent-field {
+    margin-top: 0.9rem; padding: 0.6rem 0.75rem; border: 1px solid var(--lcd-line); border-radius: var(--radius-sm);
+    background: var(--surface); font-size: 0.82rem; color: var(--ink-soft);
+  }
+  .opponent-result {
+    margin-top: 0.5rem; display: flex; align-items: center; gap: 0.6rem;
+    padding: 0.55rem 0.7rem; border-radius: var(--radius-sm); background: var(--teal-soft); border: 1px solid transparent;
+  }
+  .opponent-result img, .opponent-result .card-sprite { width: 28px; height: 28px; }
+  .opponent-result-body { flex: 1; min-width: 0; }
+  .opponent-result-name { font-weight: 700; font-size: 0.85rem; }
+  .opponent-result-meta { font-size: 0.68rem; color: var(--ink-soft); }
+  .yield-badge {
+    font-family: var(--font-mono); font-size: 0.68rem; font-weight: 700; color: var(--teal-strong);
+    background: var(--surface); border: 1px solid var(--teal); padding: 0.1em 0.5em; border-radius: var(--radius-pill);
+  }
+
+  .sheet-footer { padding: 0.9rem 1rem 1.1rem; margin-top: 0.6rem; border-top: 1px solid var(--line); background: var(--surface); }
+  .apply-preview { font-size: 0.72rem; color: var(--ink-soft); line-height: 1.5; margin: 0 0 0.7rem; }
+  .apply-preview b { color: var(--ink); font-weight: 600; }
+  .sheet-footer .ds-btn--primary { width: 100%; margin-left: 0; text-align: center; }
+
+  /* ---------- numbered redline markers ---------- */
+  .mark {
+    position: absolute; width: 20px; height: 20px; border-radius: 50%;
+    background: var(--accent); color: var(--on-red); font-family: var(--font-mono); font-weight: 700; font-size: 0.72rem;
+    display: flex; align-items: center; justify-content: center; box-shadow: 0 0 0 3px var(--paper-panel);
+    z-index: 5;
+  }
+
+  /* ---------- legend ---------- */
+  .legend {
+    background: var(--paper-panel); border: 1px solid var(--line); border-radius: var(--radius-md);
+    padding: 1.1rem 1.1rem 1.2rem; box-shadow: var(--shadow-panel);
+    position: sticky; top: 1.5rem;
+  }
+  .legend h3 { font-size: 0.9rem; margin-bottom: 0.9rem; }
+  .legend-item { display: flex; gap: 0.65rem; padding: 0.7rem 0; border-top: 1px solid var(--line); }
+  .legend-item:first-of-type { border-top: none; padding-top: 0; }
+  .legend-num {
+    flex: 0 0 auto; width: 20px; height: 20px; border-radius: 50%; background: var(--accent); color: var(--on-red);
+    font-family: var(--font-mono); font-weight: 700; font-size: 0.72rem; display: flex; align-items: center; justify-content: center;
+  }
+  .legend-item h4 { font-size: 0.82rem; margin: 0 0 0.25rem; font-family: var(--font-body); font-weight: 700; }
+  .legend-item p { margin: 0; font-size: 0.76rem; color: var(--ink-soft); line-height: 1.5; }
+  .legend-note {
+    margin-top: 1rem; padding-top: 0.9rem; border-top: 1px dashed var(--line);
+    font-size: 0.74rem; color: var(--ink-soft); line-height: 1.55;
+  }
+  .legend-note b { color: var(--ink); }
+</style>
+
+<div class="masthead">
+  <p class="eyebrow">Effortdex &mdash; UI mockup</p>
+  <h1>Active party &amp; faint tracking on the roster page</h1>
+  <p>
+    No new route: the existing roster (<code style="font-family:var(--font-mono)">#/parties/&lt;slug&gt;</code>)
+    gains an active-six bar with tap-to-toggle fainted state, and the nav-bar's
+    primary action flips from &ldquo;Add a Pok&eacute;mon&rdquo; to &ldquo;Log a battle,&rdquo;
+    since that's the action run hundreds of times per playthrough. Faint status and
+    Pok&eacute;center heals are plain state on the party &mdash; nothing here writes
+    to the EV event log.
+  </p>
+</div>
+
+<div class="workbench">
+  <!-- FRAME A: Roster at rest, mid-Rustboro-gym-run, two mons down -->
+  <div>
+    <p class="frame-label"><b>A</b> &mdash; Roster, mid-run (2 fainted)</p>
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="app-header">
+          <span class="app-wordmark">Effortdex</span>
+          <span class="app-header-party">Emerald Run</span>
+          <span class="bezel-dot"></span>
+        </div>
+
+        <div class="view-nav">
+          <a class="back-link">&larr; All parties</a>
+          <button class="ds-btn ds-btn--primary">+ Log a battle</button>
+          <span class="mark" style="top: 8px; right: -6px;">2</span>
+        </div>
+
+        <div class="party-identity-row">
+          <div class="party-identity">
+            <div class="party-identity-head">
+              <h2>Emerald Run</h2>
+              <span class="game-chip">Pok&eacute;mon Emerald</span>
+            </div>
+          </div>
+          <button class="ds-btn ds-btn--ghost">Edit</button>
+        </div>
+
+        <div class="active-party">
+          <span class="mark" style="top: -10px; left: -10px;">1</span>
+          <div class="active-party-head">
+            <span class="active-party-title">Active party &middot; 4/6 able</span>
+            <button class="heal-btn">&#10021; Heal at Pok&eacute;center</button>
+          </div>
+          <div class="party-slots">
+            <div class="slot">
+              <div class="slot-sprite-wrap"><svg class="slot-sprite" viewBox="0 0 24 24"><path d="M12 3c4 0 7 3.2 7 8 0 3.6-1.8 6.4-4.3 8.2-.5.4-1.1.6-1.7.6h-2c-.6 0-1.2-.2-1.7-.6C6.8 17.4 5 14.6 5 11c0-4.8 3-8 7-8z" fill="#e0703c"/><circle cx="9.3" cy="10.5" r="1" fill="#1b1916"/><circle cx="14.7" cy="10.5" r="1" fill="#1b1916"/></svg></div>
+              <span class="slot-lvl">Lv21</span>
+            </div>
+            <div class="slot slot--fainted">
+              <div class="slot-sprite-wrap">
+                <svg class="slot-sprite" viewBox="0 0 24 24"><path d="M12 3c4 0 7 3.2 7 8 0 3.6-1.8 6.4-4.3 8.2-.5.4-1.1.6-1.7.6h-2c-.6 0-1.2-.2-1.7-.6C6.8 17.4 5 14.6 5 11c0-4.8 3-8 7-8z" fill="#a8a878"/><circle cx="9.3" cy="10.5" r="1" fill="#1b1916"/><circle cx="14.7" cy="10.5" r="1" fill="#1b1916"/></svg>
+                <span class="faint-badge">&times;</span>
+              </div>
+              <span class="slot-lvl">Lv18</span>
+            </div>
+            <div class="slot slot--fainted">
+              <div class="slot-sprite-wrap">
+                <svg class="slot-sprite" viewBox="0 0 24 24"><path d="M12 3c4 0 7 3.2 7 8 0 3.6-1.8 6.4-4.3 8.2-.5.4-1.1.6-1.7.6h-2c-.6 0-1.2-.2-1.7-.6C6.8 17.4 5 14.6 5 11c0-4.8 3-8 7-8z" fill="#ee5eaa"/><circle cx="9.3" cy="10.5" r="1" fill="#1b1916"/><circle cx="14.7" cy="10.5" r="1" fill="#1b1916"/></svg>
+                <span class="faint-badge">&times;</span>
+              </div>
+              <span class="slot-lvl">Lv15</span>
+            </div>
+            <div class="slot">
+              <div class="slot-sprite-wrap"><svg class="slot-sprite" viewBox="0 0 24 24"><path d="M12 3c4 0 7 3.2 7 8 0 3.6-1.8 6.4-4.3 8.2-.5.4-1.1.6-1.7.6h-2c-.6 0-1.2-.2-1.7-.6C6.8 17.4 5 14.6 5 11c0-4.8 3-8 7-8z" fill="#4a90d9"/><circle cx="9.3" cy="10.5" r="1" fill="#1b1916"/><circle cx="14.7" cy="10.5" r="1" fill="#1b1916"/></svg></div>
+              <span class="slot-lvl">Lv19</span>
+            </div>
+            <div class="slot">
+              <div class="slot-sprite-wrap"><svg class="slot-sprite" viewBox="0 0 24 24"><path d="M12 3c4 0 7 3.2 7 8 0 3.6-1.8 6.4-4.3 8.2-.5.4-1.1.6-1.7.6h-2c-.6 0-1.2-.2-1.7-.6C6.8 17.4 5 14.6 5 11c0-4.8 3-8 7-8z" fill="#b45444"/><circle cx="9.3" cy="10.5" r="1" fill="#1b1916"/><circle cx="14.7" cy="10.5" r="1" fill="#1b1916"/></svg></div>
+              <span class="slot-lvl">Lv20</span>
+            </div>
+            <div class="slot">
+              <div class="slot-sprite-wrap"><svg class="slot-sprite" viewBox="0 0 24 24"><path d="M12 3c4 0 7 3.2 7 8 0 3.6-1.8 6.4-4.3 8.2-.5.4-1.1.6-1.7.6h-2c-.6 0-1.2-.2-1.7-.6C6.8 17.4 5 14.6 5 11c0-4.8 3-8 7-8z" fill="#4f5aa8"/><circle cx="9.3" cy="10.5" r="1" fill="#1b1916"/><circle cx="14.7" cy="10.5" r="1" fill="#1b1916"/></svg></div>
+              <span class="slot-lvl">Lv17</span>
+            </div>
+          </div>
+          <p class="active-party-status">Zigzagoon and Ralts are down &mdash; tap a fainted slot, or Heal, before they can battle.</p>
+        </div>
+
+        <div class="roster-toolbar">
+          <input class="search-field" placeholder="Search by name or species&hellip;" disabled />
+          <button class="ds-btn ds-btn--outline ds-btn--icon" title="Add a Pok&eacute;mon" style="position:relative;">+
+            <span class="mark" style="top:-10px; right:-10px; width:16px; height:16px; font-size:0.6rem;">3</span>
+          </button>
+        </div>
+
+        <div class="roster">
+          <div class="roster-card" style="--type:#e0703c;">
+            <svg class="card-sprite" viewBox="0 0 24 24"><path d="M12 3c4 0 7 3.2 7 8 0 3.6-1.8 6.4-4.3 8.2-.5.4-1.1.6-1.7.6h-2c-.6 0-1.2-.2-1.7-.6C6.8 17.4 5 14.6 5 11c0-4.8 3-8 7-8z" fill="#e0703c"/></svg>
+            <div class="card-body">
+              <span class="card-name">Combusken</span>
+              <span class="card-meta">Lv21 &middot; Adamant</span>
+              <div class="ev-track"><div class="ev-fill" style="width:34%"></div></div>
+            </div>
+          </div>
+          <div class="roster-card roster-card--fainted" style="--type:#a8a878;">
+            <svg class="card-sprite" viewBox="0 0 24 24"><path d="M12 3c4 0 7 3.2 7 8 0 3.6-1.8 6.4-4.3 8.2-.5.4-1.1.6-1.7.6h-2c-.6 0-1.2-.2-1.7-.6C6.8 17.4 5 14.6 5 11c0-4.8 3-8 7-8z" fill="#a8a878"/></svg>
+            <div class="card-body">
+              <span class="card-name">Zigzagoon</span>
+              <span class="card-meta">Lv18 &middot; Jolly <span class="fainted-tag">Fainted</span></span>
+              <div class="ev-track"><div class="ev-fill" style="width:18%"></div></div>
+            </div>
+          </div>
+          <div class="roster-card roster-card--fainted" style="--type:#ee5eaa;">
+            <svg class="card-sprite" viewBox="0 0 24 24"><path d="M12 3c4 0 7 3.2 7 8 0 3.6-1.8 6.4-4.3 8.2-.5.4-1.1.6-1.7.6h-2c-.6 0-1.2-.2-1.7-.6C6.8 17.4 5 14.6 5 11c0-4.8 3-8 7-8z" fill="#ee5eaa"/></svg>
+            <div class="card-body">
+              <span class="card-name">Ralts</span>
+              <span class="card-meta">Lv15 &middot; Modest <span class="fainted-tag">Fainted</span></span>
+              <div class="ev-track"><div class="ev-fill" style="width:9%"></div></div>
+            </div>
+          </div>
+          <div class="roster-card" style="--type:#4a90d9;">
+            <svg class="card-sprite" viewBox="0 0 24 24"><path d="M12 3c4 0 7 3.2 7 8 0 3.6-1.8 6.4-4.3 8.2-.5.4-1.1.6-1.7.6h-2c-.6 0-1.2-.2-1.7-.6C6.8 17.4 5 14.6 5 11c0-4.8 3-8 7-8z" fill="#4a90d9"/></svg>
+            <div class="card-body">
+              <span class="card-name">Wingull</span>
+              <span class="card-meta">Lv19 &middot; Timid</span>
+              <div class="ev-track"><div class="ev-fill" style="width:22%"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FRAME B: Log a battle sheet, participant strip pre-selected -->
+  <div>
+    <p class="frame-label"><b>B</b> &mdash; Log a battle sheet</p>
+    <div class="phone">
+      <div class="phone-screen">
+        <div class="sheet-header">
+          <h2>Log a battle</h2>
+          <button class="sheet-close">&times;</button>
+        </div>
+
+        <div class="sheet-section" style="position:relative;">
+          <span class="mark" style="top:-6px; left:-6px;">4</span>
+          <p class="sheet-eyebrow">Who's in this battle?</p>
+          <div class="participant-strip">
+            <div class="p-chip p-chip--selected">
+              <svg class="p-chip-sprite" viewBox="0 0 24 24"><path d="M12 3c4 0 7 3.2 7 8 0 3.6-1.8 6.4-4.3 8.2-.5.4-1.1.6-1.7.6h-2c-.6 0-1.2-.2-1.7-.6C6.8 17.4 5 14.6 5 11c0-4.8 3-8 7-8z" fill="#e0703c"/></svg>
+              <span class="p-check">&#10003;</span>
+              <span class="p-chip-lvl">Combusken</span>
+            </div>
+            <div class="p-chip p-chip--locked" title="Fainted &mdash; heal before battling">
+              <svg class="p-chip-sprite" viewBox="0 0 24 24"><path d="M12 3c4 0 7 3.2 7 8 0 3.6-1.8 6.4-4.3 8.2-.5.4-1.1.6-1.7.6h-2c-.6 0-1.2-.2-1.7-.6C6.8 17.4 5 14.6 5 11c0-4.8 3-8 7-8z" fill="#a8a878"/></svg>
+              <span class="p-chip-lvl">Zigzagoon</span>
+            </div>
+            <div class="p-chip p-chip--locked" title="Fainted &mdash; heal before battling">
+              <svg class="p-chip-sprite" viewBox="0 0 24 24"><path d="M12 3c4 0 7 3.2 7 8 0 3.6-1.8 6.4-4.3 8.2-.5.4-1.1.6-1.7.6h-2c-.6 0-1.2-.2-1.7-.6C6.8 17.4 5 14.6 5 11c0-4.8 3-8 7-8z" fill="#ee5eaa"/></svg>
+              <span class="p-chip-lvl">Ralts</span>
+            </div>
+            <div class="p-chip p-chip--selected">
+              <svg class="p-chip-sprite" viewBox="0 0 24 24"><path d="M12 3c4 0 7 3.2 7 8 0 3.6-1.8 6.4-4.3 8.2-.5.4-1.1.6-1.7.6h-2c-.6 0-1.2-.2-1.7-.6C6.8 17.4 5 14.6 5 11c0-4.8 3-8 7-8z" fill="#4a90d9"/></svg>
+              <span class="p-check">&#10003;</span>
+              <span class="p-chip-lvl">Wingull</span>
+            </div>
+            <div class="p-chip">
+              <svg class="p-chip-sprite" viewBox="0 0 24 24"><path d="M12 3c4 0 7 3.2 7 8 0 3.6-1.8 6.4-4.3 8.2-.5.4-1.1.6-1.7.6h-2c-.6 0-1.2-.2-1.7-.6C6.8 17.4 5 14.6 5 11c0-4.8 3-8 7-8z" fill="#b45444"/></svg>
+              <span class="p-chip-lvl">Makuhita</span>
+            </div>
+            <div class="p-chip">
+              <svg class="p-chip-sprite" viewBox="0 0 24 24"><path d="M12 3c4 0 7 3.2 7 8 0 3.6-1.8 6.4-4.3 8.2-.5.4-1.1.6-1.7.6h-2c-.6 0-1.2-.2-1.7-.6C6.8 17.4 5 14.6 5 11c0-4.8 3-8 7-8z" fill="#4f5aa8"/></svg>
+              <span class="p-chip-lvl">Poochyena</span>
+            </div>
+          </div>
+
+          <div class="opponent-field">Search a species&hellip;</div>
+          <div class="opponent-result">
+            <svg class="card-sprite" viewBox="0 0 24 24"><path d="M12 4a8 8 0 1 0 0 16 8 8 0 0 0 0-16z" fill="#a89058"/></svg>
+            <div class="opponent-result-body">
+              <div class="opponent-result-name">Geodude</div>
+              <div class="opponent-result-meta">Lv12 &middot; Rustboro Gym &middot; Roxanne</div>
+            </div>
+            <span class="yield-badge">+1 Def</span>
+          </div>
+        </div>
+
+        <div class="sheet-footer">
+          <p class="apply-preview">
+            Would apply <b>+1 Def</b> to <b>Combusken</b> and <b>Wingull</b> &mdash;
+            the two selected, able participants. Zigzagoon and Ralts are excluded
+            while fainted, Exp. Share included.
+          </p>
+          <button class="ds-btn ds-btn--primary">Log battle</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LEGEND -->
+  <div class="legend">
+    <h3>What's new</h3>
+    <div class="legend-item">
+      <span class="legend-num">1</span>
+      <div>
+        <h4>Active party bar</h4>
+        <p>The current six, pinned above the roster. Tap a slot to mark it fainted/healed. Plain state on the party &mdash; not an event.</p>
+      </div>
+    </div>
+    <div class="legend-item">
+      <span class="legend-num">2</span>
+      <div>
+        <h4>Nav-bar primary swaps</h4>
+        <p>&ldquo;+ Log a battle&rdquo; replaces &ldquo;+ Add a Pok&eacute;mon&rdquo; as the pinned action &mdash; it's the one run hundreds of times per playthrough.</p>
+      </div>
+    </div>
+    <div class="legend-item">
+      <span class="legend-num">3</span>
+      <div>
+        <h4>Add a Pok&eacute;mon, demoted</h4>
+        <p>Moves into the roster toolbar as an icon button next to search/filter, where adding a mon to the box actually belongs.</p>
+      </div>
+    </div>
+    <div class="legend-item">
+      <span class="legend-num">4</span>
+      <div>
+        <h4>Participant strip</h4>
+        <p>Pre-checked from the last battle minus anyone fainted. Fainted slots are locked, not selectable. EVs apply per selected mon, unchanged math &mdash; no new event kind.</p>
+      </div>
+    </div>
+    <div class="legend-note">
+      <b>Not shown because it isn't UI:</b> fainting, healing and the active
+      six are plain fields on the party (like held item), never written to
+      <code style="font-family:var(--font-mono)">&lt;ev-history-log&gt;</code>.
+      Only the battle's EV yield itself still goes through the event store,
+      once per selected participant &mdash; same call as today's single-mon
+      <code style="font-family:var(--font-mono)">logBattle()</code>.
+    </div>
+  </div>
+</div>

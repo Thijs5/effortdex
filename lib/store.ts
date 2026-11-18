@@ -12,7 +12,7 @@
 // stay plain mutable state on purpose — event-sourcing those would be
 // property-sourcing, not fact-recording.
 
-import { STATS, POWER_ITEMS, VITAMINS, FEATHERS, FEATHER_BONUS, FEATHER_MIN_GEN, EV_BERRIES, EV_BERRY_REDUCTION, EV_BERRY_MIN_GEN, EV_BERRY_SNAP_THRESHOLD, EV_BERRY_SNAP_TARGET, NATURES, NATURE_MIN_GEN, STAT_CAP, TOTAL_CAP, POWER_ITEM_BONUS_LEGACY, POWER_ITEM_BONUS_MODERN, POWER_ITEM_MODERN_MIN_GEN, POWER_ITEM_MIN_GEN, MACHO_BRACE_MULTIPLIER, MACHO_BRACE_MIN_GEN, MACHO_BRACE_MAX_GEN, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, VITAMIN_CUTOFF_MIN_GEN, VITAMIN_CUTOFF_MAX_GEN, STAT_EXP_MAX_GEN, STAT_EXP_STAT_CAP, STAT_EXP_VITAMIN_BONUS, STAT_EXP_VITAMIN_CEILING, POKERUS_MIN_GEN, MIN_LEVEL, MAX_LEVEL, DEFAULT_LEVEL, IV_MIN, IV_MAX_MODERN, IV_MAX_LEGACY } from './constants.ts';
+import { STATS, POWER_ITEMS, VITAMINS, FEATHERS, FEATHER_BONUS, FEATHER_MIN_GEN, EV_BERRIES, EV_BERRY_REDUCTION, EV_BERRY_MIN_GEN, EV_BERRY_SNAP_THRESHOLD, EV_BERRY_SNAP_TARGET, NATURES, NATURE_MIN_GEN, STAT_CAP, TOTAL_CAP, POWER_ITEM_BONUS_LEGACY, POWER_ITEM_BONUS_MODERN, POWER_ITEM_MODERN_MIN_GEN, POWER_ITEM_MIN_GEN, MACHO_BRACE_MULTIPLIER, MACHO_BRACE_MIN_GEN, MACHO_BRACE_MAX_GEN, VITAMIN_BONUS, VITAMIN_STAT_CUTOFF, VITAMIN_CUTOFF_MIN_GEN, VITAMIN_CUTOFF_MAX_GEN, STAT_EXP_MAX_GEN, STAT_EXP_STAT_CAP, STAT_EXP_VITAMIN_BONUS, STAT_EXP_VITAMIN_CEILING, POKERUS_MIN_GEN, MIN_LEVEL, MAX_LEVEL, DEFAULT_LEVEL, IV_MIN, IV_MAX_MODERN, IV_MAX_LEGACY, MAX_ACTIVE_PARTY } from './constants.ts';
 import { emptyEvs, emptyIvs, totalEvs } from './utils.ts';
 import { uniqueSlug } from './slug.ts';
 import { matchGameVersion } from './game-versions.ts';
@@ -71,6 +71,12 @@ export interface PersistedEntry {
   machoBrace: boolean;
   ivs: Record<StatKey, number | null>;
   events: RosterEvent[];
+  /** Whether this Pokémon is currently fainted — plain state, like
+   * `nature`/`powerItem` above, not an event: fainting never changes a
+   * recorded EV, it only gates which of `Party.activeUids` a battle can
+   * apply to (`logBattle`/`_applyExpShare`), and clears the moment it's
+   * healed, the same way it does in-game. */
+  fainted: boolean;
 }
 
 /** Fields `projectEntry` derives from `events` — never set directly. */
@@ -93,6 +99,12 @@ export interface Party {
   overrides: PartyOverrides;
   slug: string;
   pokemon: RosterEntry[];
+  /** The current in-game party (`MAX_ACTIVE_PARTY`, i.e. 6, at most) —
+   * a subset of `pokemon`, the party's whole box. Plain state, not an
+   * event: which six are active right now never changes an EV, so it's
+   * never part of the history a user reviews (see `PersistedEntry.fainted`
+   * for the same reasoning). Ordered by when each member joined. */
+  activeUids: string[];
 }
 
 export interface StoreState {
@@ -258,6 +270,7 @@ function makeParty(
     overrides: { ...defaultOverrides(), ...overrides },
     slug: uniqueSlug(name, existingSlugs),
     pokemon: [],
+    activeUids: [],
   };
 }
 
@@ -500,6 +513,7 @@ function persistedEntry(entry: RosterEntry): PersistedEntry {
     machoBrace: entry.machoBrace,
     ivs: entry.ivs,
     events: entry.events,
+    fainted: entry.fainted,
   };
 }
 
@@ -699,8 +713,29 @@ export class Store extends EventTarget {
         if (typeof entry.ivs !== 'object' || entry.ivs === null) entry.ivs = emptyIvs();
         else entry.ivs = { ...emptyIvs(), ...entry.ivs };
         if (!Array.isArray(entry.events)) entry.events = [];
+        if (typeof entry.fainted !== 'boolean') entry.fainted = false;
         projectEntry(entry);
       }
+      // Backfills `activeUids` for parties saved before it existed
+      // (fills up to the cap from the existing roster in add order —
+      // the same "just is in the party" default `addPokemon` uses for a
+      // single new member), and drops any uid whose Pokémon was since
+      // removed. Only backfills when `activeUids` didn't exist at all —
+      // a party that already has one, even below the cap, has that
+      // shortfall on purpose (someone benched via setActive) and must
+      // not be silently refilled back up to six on every load.
+      const existingUids = new Set(party.pokemon.map((e: any) => e.uid));
+      const hadActiveUids = Array.isArray(party.activeUids);
+      const active: string[] = hadActiveUids
+        ? [...new Set<string>(party.activeUids.filter((uid: string) => existingUids.has(uid)))].slice(0, MAX_ACTIVE_PARTY)
+        : [];
+      if (!hadActiveUids) {
+        for (const entry of party.pokemon) {
+          if (active.length >= MAX_ACTIVE_PARTY) break;
+          if (!active.includes(entry.uid)) active.push(entry.uid);
+        }
+      }
+      party.activeUids = active;
     }
   }
 
@@ -997,6 +1032,7 @@ export class Store extends EventTarget {
         baseGame: p.baseGame,
         overrides: p.overrides,
         slug: p.slug,
+        activeUids: p.activeUids,
         pokemon: p.pokemon.map(persistedEntry),
       })),
     };
@@ -1130,12 +1166,73 @@ export class Store extends EventTarget {
       events: [
         makeEvent('add', { ...monSnapshot(mon), level: clampLevel(level, DEFAULT_LEVEL) }),
       ],
+      fainted: false,
     };
     const projected = projectEntry(entry);
     // Invariant: the UI never offers "add" without an active party.
-    (this.activeParty as Party).pokemon.push(projected);
+    const party = this.activeParty as Party;
+    party.pokemon.push(projected);
+    // Joins the active six automatically while there's room — matching
+    // how a freshly caught/bred Pokémon just is in the party until the
+    // player benches it, not a state the player has to opt into.
+    if (party.activeUids.length < MAX_ACTIVE_PARTY) party.activeUids.push(projected.uid);
     this._save();
     return projected;
+  }
+
+  /**
+   * Adds/removes a roster Pokémon from the active party (`Party.activeUids`,
+   * `MAX_ACTIVE_PARTY` at most) — plain state, not an event (see
+   * `Party.activeUids`'s own doc comment). No-ops past the cap rather than
+   * bumping an existing member out; the UI decides who to bench first.
+   *
+   * Benching a fainted Pokémon heals it: `fainted` only exists to gate
+   * EV/Exp.-Share credit for the *current* active party, so there's
+   * nothing worth carrying across a bench — it comes back healed
+   * whenever it's readded, the same as any other roster member.
+   */
+  setActive(uid: string, active: boolean): void {
+    const party = this.activeParty;
+    const entry = this._find(uid);
+    if (!party || !entry) return;
+    const already = party.activeUids.includes(uid);
+    if (active) {
+      if (already || party.activeUids.length >= MAX_ACTIVE_PARTY) return;
+      party.activeUids = [...party.activeUids, uid];
+    } else {
+      if (!already) return;
+      party.activeUids = party.activeUids.filter((u) => u !== uid);
+      entry.fainted = false;
+    }
+    this._save();
+  }
+
+  /**
+   * Marks a roster Pokémon fainted/healed — plain state on the entry
+   * (see `PersistedEntry.fainted`'s own doc comment), never an event.
+   * A fainted Pokémon is excluded from `logBattleForParticipants` and
+   * `_applyExpShare`.
+   */
+  setFainted(uid: string, fainted: boolean): void {
+    const entry = this._find(uid);
+    if (!entry) return;
+    entry.fainted = !!fainted;
+    this._save();
+  }
+
+  /** Heals every fainted member of the active party at once — a Pokémon Center visit. Plain state, nothing logged. */
+  healParty(): void {
+    const party = this.activeParty;
+    if (!party) return;
+    let touched = false;
+    for (const uid of party.activeUids) {
+      const entry = this._find(uid);
+      if (entry?.fainted) {
+        entry.fainted = false;
+        touched = true;
+      }
+    }
+    if (touched) this._save();
   }
 
   /** Sets (or clears, with a falsy/unrecognized natureId) the roster Pokémon's nature. */
@@ -1286,6 +1383,7 @@ export class Store extends EventTarget {
     const party = this.activeParty;
     if (!party) return;
     party.pokemon = party.pokemon.filter((e) => e.uid !== uid);
+    party.activeUids = party.activeUids.filter((u) => u !== uid);
     this._save();
   }
 
@@ -1305,6 +1403,27 @@ export class Store extends EventTarget {
     if (clamped === fromIndex) return;
     const [entry] = party.pokemon.splice(fromIndex, 1);
     party.pokemon.splice(clamped, 0, entry);
+    this._save();
+  }
+
+  /**
+   * Moves `uid` to `toIndex` within `Party.activeUids` — reordering the
+   * current in-game six themselves (docs/adr/0029), distinct from
+   * `reorderPokemon`'s reorder of the whole roster. Order matters here:
+   * the first uid is the "lead," which is what a fresh "Log a battle"
+   * pre-selects (`components/pages/parties/roster.ts`).
+   */
+  reorderActive(uid: string, toIndex: number): void {
+    const party = this.activeParty;
+    if (!party) return;
+    const fromIndex = party.activeUids.indexOf(uid);
+    if (fromIndex === -1) return;
+    const clamped = Math.max(0, Math.min(toIndex, party.activeUids.length - 1));
+    if (clamped === fromIndex) return;
+    const active = [...party.activeUids];
+    const [moved] = active.splice(fromIndex, 1);
+    active.splice(clamped, 0, moved);
+    party.activeUids = active;
     this._save();
   }
 
@@ -1623,19 +1742,17 @@ export class Store extends EventTarget {
   }
 
   /**
-   * Records the defeat of `opponent` as a battle event. The event stores
-   * the *applied* EVs (held item, Pokérus and the 252/510 caps already
-   * resolved — frozen facts, per ADR 0006) plus which aids actually
-   * applied, so the log never claims a bonus the party's rules didn't
-   * grant. Also grants every other Exp.-Share-holding Pokémon in the
-   * party its own share of this same battle (see `_applyExpShare`).
+   * Records the defeat of `opponent` as a battle event on `entry` — the
+   * shared append behind `logBattle` and `logBattleForParticipants`.
+   * The event stores the *applied* EVs (held item, Pokérus and the
+   * 252/510 caps already resolved — frozen facts, per ADR 0006) plus
+   * which aids actually applied, so the log never claims a bonus the
+   * party's rules didn't grant.
    */
-  logBattle(uid: string, opponent: DomainPokemon) {
-    const entry = this._find(uid);
-    if (!entry) return null;
+  _logBattleFor(entry: RosterEntry, opponent: DomainPokemon): BattleEvent {
     const { applied } = this._battleYield(entry, opponent);
     const aids = this.effectiveAids(entry);
-    const result = this._append(
+    return this._append(
       entry,
       makeEvent('battle', {
         opponentName: opponent.name,
@@ -1645,23 +1762,73 @@ export class Store extends EventTarget {
         machoBrace: aids.machoBrace,
         pokerus: aids.pokerus,
       })
-    );
-    this._applyExpShare(uid, opponent);
+    ) as BattleEvent;
+  }
+
+  /**
+   * Records the defeat of `opponent` for a single roster Pokémon `uid`.
+   * Also grants every other Exp.-Share-holding, non-fainted Pokémon in
+   * the party its own share of this same battle (see `_applyExpShare`).
+   */
+  logBattle(uid: string, opponent: DomainPokemon) {
+    const entry = this._find(uid);
+    if (!entry) return null;
+    const result = this._logBattleFor(entry, opponent);
+    this._applyExpShare(new Set([uid]), opponent);
     return result;
   }
 
   /**
-   * Every *other* Pokémon in the active party currently holding an Exp.
-   * Share earns this same battle's base EV yield too — unaffected by the
-   * battling Pokémon's own held item (see `_battleYield`'s viaExpShare),
-   * but doubled by the recipient's own Pokérus if active, per Bulbapedia:
-   * "if the Pokémon with the Exp. Share has Pokérus, the amount of
-   * effort points received is doubled." Clamped to each recipient's own
-   * current 252/510 room, same as a normal battle.
+   * Records the defeat of `opponent` for every Pokémon in `uids` (a
+   * multi-participant battle — the same fight, logged once per active
+   * party member who actually took part) — each gets its own independent
+   * `battle` event, not a shared one, same math as a single-mon
+   * `logBattle`. Any fainted uid is silently skipped, matching the
+   * roster UI's own locked/unselectable participant chips. Exp. Share
+   * then applies once for the whole battle, to holders *not* already
+   * credited directly — see `_applyExpShare`. Returns one `{ uid,
+   * applied }` per uid actually credited — the caller (roster.ts) uses
+   * `applied` to spell out each participant's own actual, already-
+   * clamped yield rather than a single ambiguous summary (a maxed-out
+   * participant's own `applied` is correctly empty, even mid-battle).
    */
-  _applyExpShare(battlerUid: string, opponent: DomainPokemon): void {
-    for (const shareEntry of this.activeParty?.pokemon ?? []) {
-      if (shareEntry.uid === battlerUid || !shareEntry.expShare) continue;
+  logBattleForParticipants(uids: string[], opponent: DomainPokemon): { uid: string; applied: EvMap }[] {
+    const active = new Set(this.activeParty?.activeUids ?? []);
+    const credited = new Set<string>();
+    const results: { uid: string; applied: EvMap }[] = [];
+    for (const uid of uids) {
+      if (!active.has(uid) || credited.has(uid)) continue;
+      const entry = this._find(uid);
+      if (!entry || entry.fainted) continue;
+      const event = this._logBattleFor(entry, opponent);
+      results.push({ uid, applied: event.applied });
+      credited.add(uid);
+    }
+    if (credited.size) this._applyExpShare(credited, opponent);
+    return results;
+  }
+
+  /**
+   * Every *other*, non-fainted Pokémon in the active party currently
+   * holding an Exp. Share earns this same battle's base EV yield too —
+   * unaffected by the battling Pokémon's own held item (see
+   * `_battleYield`'s viaExpShare), but doubled by the recipient's own
+   * Pokérus if active, per Bulbapedia: "if the Pokémon with the Exp.
+   * Share has Pokérus, the amount of effort points received is
+   * doubled." Clamped to each recipient's own current 252/510 room,
+   * same as a normal battle. `creditedUids` is whoever already got a
+   * direct battle event this same fight (`logBattle`/
+   * `logBattleForParticipants`) — skipped here so they're never credited
+   * twice for one battle. A fainted holder gets nothing, same as it
+   * would in-game.
+   */
+  _applyExpShare(creditedUids: Set<string>, opponent: DomainPokemon): void {
+    const party = this.activeParty;
+    if (!party) return;
+    for (const uid of party.activeUids) {
+      if (creditedUids.has(uid)) continue;
+      const shareEntry = this._find(uid);
+      if (!shareEntry || !shareEntry.expShare || shareEntry.fainted) continue;
       const { applied } = this._battleYield(shareEntry, opponent, { viaExpShare: true });
       const aids = this.effectiveAids(shareEntry);
       this._append(
@@ -1902,6 +2069,7 @@ export class Store extends EventTarget {
       overrides: p.overrides,
       slug: p.slug,
       pokemon: p.pokemon.map(persistedEntry),
+      activeUids: p.activeUids,
     }));
   }
 
@@ -1950,6 +2118,13 @@ export class Store extends EventTarget {
    * journaled, so there's nothing principled to merge them by.
    */
   applyImport(importedParties: ExportedParty[], selectedUids: Set<string>): void {
+    // Tracks parties created fresh by this import (as opposed to an
+    // existing local party an import is merging into) — `_normalizeEntries`
+    // below can't tell "just created, activeUids not filled in yet" apart
+    // from "existing party, deliberately benched down to this count" once
+    // both look like a plain array, so those two get backfilled to the
+    // cap explicitly here instead of relying on it.
+    const newLocalParties = new Map<string, string[] | undefined>();
     for (const party of importedParties) {
       const selectedPokemon = party.pokemon.filter((e) => selectedUids.has(e.uid));
       if (!selectedPokemon.length) continue;
@@ -1965,8 +2140,10 @@ export class Store extends EventTarget {
           overrides: { ...defaultOverrides(), ...party.overrides },
           slug: uniqueSlug(party.name, existingSlugs),
           pokemon: [],
+          activeUids: [], // filled to the cap below, once its Pokémon are in
         };
         this.state.parties.push(localParty);
+        newLocalParties.set(localParty.id, Array.isArray(party.activeUids) ? party.activeUids : undefined);
       }
 
       for (const entry of selectedPokemon) {
@@ -1981,6 +2158,16 @@ export class Store extends EventTarget {
         projectEntry(localEntry);
       }
     }
+    // Preserve a transferred active party's order and deliberate benching.
+    // Older exports without activeUids use the usual first-six default.
+    for (const [id, importedActive] of newLocalParties) {
+      const party = this.state.parties.find((p) => p.id === id);
+      if (party) party.activeUids = importedActive ?? party.pokemon.slice(0, MAX_ACTIVE_PARTY).map((e) => e.uid);
+    }
+    // Backfills `activeUids` (and `fainted` on any entry an older export
+    // didn't carry it for) now that every imported party/Pokémon is in —
+    // same coercion `_load()` runs on startup.
+    this._normalizeEntries();
     this._ensureActiveParty();
     this._save();
   }

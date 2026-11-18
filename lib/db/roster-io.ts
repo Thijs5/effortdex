@@ -19,9 +19,9 @@ const META_IMPORTED = 'rosterImported';
 const META_REV = 'rosterRev'; // docs/adr/0025 P4b — monotonic, mirrors the blob's `rev`
 
 /** The columns of a `parties` row (everything but `pokemon`, plus `order`). */
-const PARTY_FIELDS = ['id', 'name', 'description', 'baseGame', 'overrides', 'slug'];
+const PARTY_FIELDS = ['id', 'name', 'description', 'baseGame', 'overrides', 'slug', 'activeUids'];
 /** The source-of-truth columns of a `rosterEntries` row (everything but `events`, plus `partyId`/`order`). */
-const ENTRY_FIELDS = ['uid', 'nickname', 'nature', 'powerItem', 'machoBrace', 'ivs'];
+const ENTRY_FIELDS = ['uid', 'nickname', 'nature', 'powerItem', 'machoBrace', 'ivs', 'fainted'];
 
 function pick(obj: any, keys: string[]): Record<string, any> {
   const out: Record<string, any> = {};

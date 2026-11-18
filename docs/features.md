@@ -83,6 +83,75 @@ Covered by `e2e/add-pokemon.spec.js`.
 
 Covered by `e2e/roster-filter-reorder.spec.js`, `e2e/roster-search.spec.js`.
 
+## Active party & fainting (`docs/adr/0029`)
+
+Only 6 of a party's Pokémon (`Party.pokemon` — really the whole box) can
+actually be battling at once, matching the games' own party limit. An
+**active-party grid** under the roster's identity row shows exactly 6
+cells in a responsive layout (more columns on a wide screen, not a fixed
+count leaving whitespace around still-tiny buttons): a card per active
+member (sprite, name, level or a "Fainted" tag) with its own drag
+handle and a **"⋯" menu** — **Level up**, **Swap out**, and **Mark
+fainted**/**Heal** — plus a dashed "bring someone in" card per open
+slot. This grid is the *only* place active-party membership is
+managed — the roster card has no control of its own. The three actions
+share one menu rather than one always-visible icon button each, so a
+card's limited width only ever has to fit a single trigger; **Level
+up** opens that Pokémon's own Level dialog (the same one the detail
+page's own Level control uses, not a separate quick-increment control).
+**Swap out** (on a filled card, or an empty one's own tap) opens a
+picker of the bench to fill that slot; a filled card's picker also
+offers a plain **"Bench — leave this slot open"** option. Dragging a
+card's handle reorders `Party.activeUids` itself (`store.reorderActive`)
+— the first uid is the "lead," which matters beyond cosmetics (see
+below). A contextual **"Heal at Pokécenter"** button appears whenever
+anyone's down and clears every faint at once. Benching a fainted
+Pokémon (via the bench option or a swap) heals it — `fainted` only
+matters for the *current* active party, so there's nothing worth
+carrying across a bench. "+ Log a battle" (multi-participant, in this
+section's own header) is the page's one accent-colored primary button;
+"+ Add a Pokémon" (the page's top-nav-bar action) is a quieter,
+ghost-styled button — the two used to be equal-weight primaries
+competing for attention, but Log a battle is the page's actual
+repeated, core action once a party exists, while adding a Pokémon is
+comparatively occasional.
+
+None of this — who's active, who's fainted, a Pokécenter visit — is
+logged as a roster event: it never changes a recorded EV, so
+`<ev-history-log>` never mentions it, the same reasoning ADR 0006 already
+applies to `nickname`/`nature`/held item. A fainted Pokémon is excluded
+from battle participation and from Exp. Share's passive grant, matching
+how a fainted party member earns nothing in-game. "Log a battle"
+pre-selects only the lead — the first non-fainted active member —
+leaving the rest of the participant strip opt-in, since most battles are
+one Pokémon. Fainted status shows only on the active-party card, never
+on the roster card, whose job is EV tracking rather than battle
+readiness.
+
+The opponent-search dropdown itself previews the gain before anything's
+picked: each suggestion row shows every selected participant's own,
+already-clamped EV yield for that specific opponent (e.g. "Bulbasaur +1
+HP · Charmander (no EVs — maxed)") — the same breakdown a single-mon
+search shows as one number, just spelled out by name once several
+participants are selected, so a maxed-out one never reads as ambiguous.
+Picking an opponent only *stages* it — nothing is applied to the roster
+until "+ Log this battle" (`#battle-log-btn`) is actually pressed, shown
+in the same sheet just above the opponent search, disabled until an
+opponent's been picked. This isn't the earlier confirm-then-apply
+attempt that was tried and reverted (that added a whole second popup on
+top of the sheet, and Cancel meant re-searching from scratch) — there's
+no extra popup here, just one more control inside the sheet that's
+already open, and changing participants or the picked opponent simply
+re-stages rather than requiring a cancel. `#battle-result-summary`
+shows "Ready to log vs …" while staged and "Logged vs …" once the button
+commits it — the same per-participant breakdown either side. The
+participant selection itself never carries over: opening the sheet
+always starts from just the lead, and closing it clears the selection
+outright — a fresh battle starts fresh, not from whoever was left
+checked last time.
+
+Covered by `e2e/active-party.spec.js`.
+
 ## Pokémon detail page (`#/parties/<slug>/<uid>`)
 
 `components/pages/parties/pokemon.js` is a thin wrapper; nearly everything lives in
@@ -130,10 +199,14 @@ way (✕, Escape, backdrop click) discards the pending edit.
   tier in plain English) and common competitive sets for the species,
   sourced from Pokémon Showdown/Smogon data (see below).
 
-A **"Log a battle" FAB** opens a battle-search dialog; picking a result
+The view's nav bar carries a **"Log a battle"** button (`#detail-log-battle-btn`)
+that opens a battle-search sheet for this one Pokémon; picking a result
 calls `store.logBattle()`, applying that opponent's EV yield (or, on a
 Gen I/II party, its base Special-Experience-era stat) immediately — no
 separate Save step, since a single battle is already one atomic action.
+The roster page (above) has its own multi-participant version of the
+same sheet for logging one battle against several active party members
+at once.
 
 Covered by `e2e/ev-training.spec.js`, `e2e/nature.spec.js`,
 `e2e/iv-tracking.spec.js`, `e2e/level-up.spec.js`,

@@ -276,13 +276,21 @@ html[data-modal-open] body {
 }
 
 /* ---------- shared bits ---------- */
+.roster-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-1);
+}
 .panel h2,
-.roster-panel > h2 {
+.roster-panel-head > h2 {
   font-family: var(--font-display);
   font-size: var(--font-size-xl);
-  margin: 0 0 var(--space-1);
+  margin: 0;
   letter-spacing: -0.01em;
 }
+.panel h2 { margin-bottom: var(--space-1); }
 
 .hint {
   margin: 0 0 var(--space-4);
@@ -462,6 +470,335 @@ html[data-modal-open] body {
   overflow: hidden;
 }
 .party-identity-row #edit-party-btn { flex: 0 0 auto; }
+
+/* ---------- active party bar (docs/adr/0029) ---------- */
+/* The current in-game six (Party.activeUids) — status display and the
+   faint/heal toggle, pinned just under the party identity row. Plain
+   state, not history: nothing here writes to <ev-history-log>. */
+.battle-party {
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  background: var(--lcd);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+}
+.battle-party-head {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+.battle-party-title {
+  font-size: var(--font-size-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-weight: 700;
+  color: var(--ink-soft);
+}
+.battle-party-head-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.heal-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4em;
+  border: none;
+  cursor: pointer;
+  background: var(--teal-soft);
+  color: var(--teal-strong);
+  border-radius: var(--radius-pill);
+  padding: 0.35em 0.9em;
+  font-size: var(--font-size-xs);
+  font-weight: 700;
+  white-space: nowrap;
+}
+.heal-btn:hover { background: var(--teal); color: var(--on-teal); }
+
+/* The active-party grid: every slot — filled or empty — gets a real card
+   with room for a name/level and its own quick-action buttons, instead
+   of the tiny tap-only icons this replaced. auto-fill (not a fixed
+   column count) so a wide screen fills its width with more, comfortably
+   sized cards rather than stretching 3 columns into mostly whitespace
+   around still-tiny buttons. */
+.battle-party-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: var(--space-2);
+}
+.battle-slot {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-3);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+.battle-slot--fainted { background: var(--lcd-deep); border-style: dashed; opacity: 0.85; }
+.battle-slot--empty {
+  border-style: dashed;
+  justify-content: center;
+  color: var(--ink-soft);
+  font-size: var(--font-size-xs);
+  font-weight: 600;
+  min-height: 52px;
+  cursor: pointer;
+  text-align: center;
+}
+.battle-slot--empty:hover { border-color: var(--teal); color: var(--teal-strong); }
+.battle-slot-sprite-wrap { position: relative; width: 34px; height: 34px; flex: 0 0 auto; }
+.battle-slot-sprite {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 2px 2px var(--sprite-drop));
+}
+.battle-slot--fainted .battle-slot-sprite { filter: grayscale(1) opacity(0.55); }
+.battle-slot-body { min-width: 0; flex: 1 1 auto; display: grid; gap: 1px; }
+.battle-slot-name {
+  font-size: var(--font-size-2xs);
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.battle-slot-lvl { font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--ink-soft); }
+.battle-slot-faint-tag { font-size: var(--font-size-2xs); font-weight: 800; color: var(--poke-red-dark); }
+.battle-slot--dragging { opacity: 0.6; box-shadow: var(--shadow-panel); }
+.battle-slot--drop-target { outline: 2px dashed var(--teal); outline-offset: 2px; }
+.battle-slot-handle {
+  flex: 0 0 auto;
+  border: none;
+  background: transparent;
+  padding: var(--space-2);
+  margin: calc(var(--space-2) * -1);
+  margin-right: 0;
+  font-size: var(--font-size-md);
+  line-height: 1;
+  color: var(--ink-soft);
+  cursor: grab;
+  touch-action: none;
+}
+.battle-slot-handle:hover { color: var(--ink); }
+.battle-slot--dragging .battle-slot-handle { cursor: grabbing; }
+/* The active-party card's "⋯" menu (Level up / Swap out / Mark
+   fainted-Heal) — one menu instead of one always-visible icon button
+   apiece, so a card's limited width doesn't have to fit a button per
+   action. Same look as the header dropdown (.header-menu, above), which
+   this mirrors rather than shares: that one is fixed to the header, this
+   one is positioned relative to its own card. */
+.battle-slot-menu-wrap { position: relative; flex: 0 0 auto; }
+.battle-slot-menu-btn {
+  width: 28px;
+  height: 28px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  border: 1px solid var(--lcd-line);
+  background: var(--surface);
+  color: var(--ink-soft);
+  cursor: pointer;
+  padding: 0;
+}
+.battle-slot-menu-btn svg { width: 16px; height: 16px; }
+.battle-slot-menu-btn:hover { border-color: var(--teal); color: var(--teal-strong); }
+.battle-slot-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 20;
+  min-width: 160px;
+  display: grid;
+  gap: 2px;
+  padding: var(--space-2);
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-suggestions);
+}
+.battle-slot-menu[hidden] { display: none; }
+.battle-slot-menu-item {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  padding: var(--space-2) var(--space-3);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  text-align: left;
+  font-size: var(--font-size-sm);
+  color: inherit;
+  cursor: pointer;
+}
+.battle-slot-menu-item:hover { background: var(--lcd); }
+
+/* Swap picker dialog — a plain list of the bench, reusing the same
+   sprite/name/level look as the roster card without its full weight. */
+.swap-dialog-bench-btn {
+  display: block;
+  width: 100%;
+  margin-bottom: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px dashed var(--poke-red-dark);
+  border-radius: var(--radius-md);
+  background: var(--danger-soft);
+  color: var(--poke-red-dark);
+  font-weight: 700;
+  font-size: var(--font-size-sm);
+  cursor: pointer;
+  text-align: center;
+}
+.swap-dialog-bench-btn:hover { background: color-mix(in srgb, var(--danger-soft) 70%, var(--poke-red-dark)); }
+.swap-dialog-list { display: grid; gap: var(--space-2); }
+.swap-dialog-option {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  cursor: pointer;
+  text-align: left;
+  width: 100%;
+}
+.swap-dialog-option:hover { border-color: var(--teal); background: var(--teal-soft); }
+.swap-dialog-option-sprite {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 2px 2px var(--sprite-drop));
+  flex: 0 0 auto;
+}
+.swap-dialog-option-name { flex: 1 1 auto; font-weight: 700; font-size: var(--font-size-sm); }
+.swap-dialog-option-lvl { font-family: var(--font-mono); font-size: var(--font-size-xs); color: var(--ink-soft); }
+
+/* Shared by the active-party bar and the battle sheet's participant
+   strip — same slot look, ".party-slots--select" layers the
+   selectable/locked states the battle sheet needs on top. */
+.party-slots {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(56px, 1fr));
+  gap: var(--space-2);
+}
+.party-slot {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.25rem;
+  padding: var(--space-2) var(--space-1);
+  border: 1.5px solid var(--line);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  cursor: pointer;
+}
+.party-slot:hover { border-color: var(--teal); }
+.party-slot--fainted {
+  background: var(--lcd-deep);
+  border-style: dashed;
+  opacity: 0.75;
+}
+.party-slot-sprite-wrap { position: relative; width: 32px; height: 32px; }
+.party-slot-sprite {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  image-rendering: pixelated;
+  filter: drop-shadow(0 2px 2px var(--sprite-drop));
+}
+.party-slot--fainted .party-slot-sprite { filter: grayscale(1) opacity(0.55); }
+.party-slot-faint-badge {
+  position: absolute;
+  top: -4px;
+  right: -6px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--danger-soft);
+  color: var(--poke-red-dark);
+  font-size: 0.6rem;
+  font-weight: 800;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--surface);
+}
+.party-slot-lvl {
+  font-family: var(--font-mono);
+  font-size: var(--font-size-2xs);
+  color: var(--ink-soft);
+}
+/* Shared by the battle party bar and the battle sheet's participant
+   status line — a fainted-member warning is poke-red, everything else
+   (the battle sheet's "select at least one" hint) overrides to --ink-soft. */
+.party-slots-status { margin: var(--space-2) 0 0; font-size: var(--font-size-xs); color: var(--poke-red-dark); }
+
+/* The battle sheet's participant strip: same slot, plus a selectable
+   ring for "will battle" and a locked/dashed look for a fainted mon
+   that can't be picked. */
+.party-slots--select .party-slot { border-width: 2px; }
+.party-slots--select .party-slot--selected {
+  border-color: var(--accent);
+  background: color-mix(in srgb, var(--accent) 8%, var(--surface));
+}
+.party-slots--select .party-slot--locked {
+  cursor: not-allowed;
+  opacity: 0.45;
+}
+.party-slots--select .party-slot--locked .party-slot-sprite { filter: grayscale(1); }
+.party-slot-check {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  width: 15px;
+  height: 15px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: var(--on-red);
+  font-size: 0.6rem;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1.5px solid var(--surface);
+}
+.battle-sheet-eyebrow {
+  margin: 0 0 var(--space-2);
+  font-size: var(--font-size-2xs);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--ink-soft);
+  font-weight: 700;
+}
+.battle-sheet-extra .party-slots-status { margin-top: var(--space-2); color: var(--ink-soft); }
+#battle-log-btn { width: 100%; }
+
+/* The staged (picked, not yet logged) or last-logged battle's
+   per-participant breakdown, shown in place — the sheet stays open
+   after picking (roster.ts) so this and the dropdown's own live preview
+   use the same wording either side of the pick, instead of a result
+   that only shows up as a toast after the sheet's already gone.
+   Defaults to the "logged" (confirmed) styling; roster.ts adds
+   `--pending` while a picked opponent is only staged, waiting on
+   #battle-log-btn. */
+.battle-result-summary {
+  margin: 0 0 var(--space-2);
+  padding: var(--space-3);
+  border-radius: var(--radius-md);
+  background: var(--good-soft);
+  color: var(--good);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+.battle-result-summary--pending {
+  background: var(--lcd);
+  color: var(--ink);
+}
 
 .empty-state {
   font-size: var(--font-size-md);
@@ -759,6 +1096,10 @@ html[data-modal-open] body {
   object-fit: contain;
   image-rendering: pixelated;
 }
+
+/* Fainted status is shown only on the active-party grid's own slot
+   (docs/adr/0029) — the roster card's job is EV tracking, not battle
+   readiness, so it doesn't repeat the tag or dim itself. */
 
 /* ---------- Pokémon detail view ("/<slug>/<uid>") ---------- */
 .pokemon-view {

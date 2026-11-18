@@ -15,14 +15,20 @@ const MOBILE_QUERY = '(max-width: 640px) and (pointer: coarse)';
 // when the field is focused with nothing typed yet.
 const RECENT_LIMIT = 5;
 
-type EvModifier = (mon: DomainPokemon) => EvMap | undefined;
+// A caller with a single applicable Pokémon (the detail page's own
+// battle search) returns an EvMap, formatted the normal way. One with
+// several — the roster's multi-participant battle search — returns a
+// pre-formatted string instead (one row's worth of space can't lay out
+// a per-participant breakdown as stat/number pairs), used as-is.
+type EvModifier = (mon: DomainPokemon) => EvMap | string | undefined;
 
 /**
  * <pokemon-search placeholder="…" show-ev-yield>
  * Autocomplete text input over the full PokeAPI species list, styled to
  * match <game-version-picker> (sprite/swatch + label rows, same tap
  * targets and dropdown chrome). Dispatches a `pokemon-pick` CustomEvent
- * (detail: { name }) when a species is chosen.
+ * (detail: { name }) when a species is chosen. Preventing that event's
+ * default keeps the sheet open for an explicit confirmation action.
  *
  * On narrow touch viewports, focusing the input opens a full-screen
  * sheet instead of an inline dropdown: a header, then the input, then
@@ -108,10 +114,15 @@ export class PokemonSearch extends BaseElement {
         }
         .option-ev-yield {
           flex: 0 0 auto;
+          max-width: 45%;
           font-family: var(--font-mono);
           font-size: var(--font-size-2xs);
           color: var(--teal);
-          white-space: nowrap;
+          text-align: right;
+          /* A single Pokémon's own yield ("+1 HP") never wraps in
+             practice; a multi-participant breakdown (roster.ts's battle
+             search) can run long enough to need it. */
+          white-space: normal;
         }
         .thumb {
           flex: 0 0 auto;
@@ -179,6 +190,26 @@ export class PokemonSearch extends BaseElement {
           width: auto;
           margin: var(--space-2) var(--space-3);
         }
+        /* A second slot, kept apart from sheet-extra, for a caller's
+           primary action (e.g. the battle sheet's "Log this battle") —
+           ordered after the suggestions list so it's a true sheet
+           footer, pinned to the bottom of .wrap.sheet's own
+           visualViewport-tracked height (_positionSheet) rather than
+           sitting up near the header where an opening keyboard could
+           cover it. margin-top: auto (not just flex order) because
+           ul.suggestions has the "hidden" attribute — out of flow
+           entirely, so its own flex: 1 1 auto contributes nothing to
+           push this down — until there's a query with matches;
+           margin-top: auto keeps the footer pinned to the bottom of the
+           sheet either way. */
+        slot[name="sheet-footer"] { display: none; }
+        .wrap.sheet slot[name="sheet-footer"] {
+          display: block;
+          order: 4;
+          flex: 0 0 auto;
+          margin-top: auto;
+          padding: var(--space-2) var(--space-3) var(--space-3);
+        }
         .wrap.sheet ul.suggestions {
           order: 3;
           position: static;
@@ -203,6 +234,7 @@ export class PokemonSearch extends BaseElement {
                autocomplete="off" autocapitalize="none" autocorrect="off" spellcheck="false"
                inputmode="search" enterkeyhint="go" />
         <ul id="ps-list" class="suggestions" hidden role="listbox"></ul>
+        <slot name="sheet-footer"></slot>
       </div>
     `;
 
@@ -256,12 +288,35 @@ export class PokemonSearch extends BaseElement {
         // native <dialog> restores focus to whatever was focused when
         // it opened). Without this check, that stale timeout fires
         // after the refocus and wrongly hides the list it just showed.
-        if (this.shadow.activeElement === this.$input) return;
+        // A slot="sheet-extra" caller (the battle sheet's participant
+        // strip) renders its buttons as light-DOM children of this
+        // element, not into the shadow root — focus landing there
+        // shouldn't read as "focus left the sheet" and close it.
+        // this.contains(document.activeElement) is NOT that check: once
+        // focus is anywhere inside an attached shadow root (including
+        // this component's own sheet-close button), document.activeElement
+        // retargets to the *host* itself, so `this.contains(this)` is
+        // trivially true — that broke the close button. Scope the check
+        // to this element's actual light-DOM children instead.
+        const focusInSlottedContent = [...this.children].some((child) => child.contains(document.activeElement));
+        if (this.shadow.activeElement === this.$input || focusInSlottedContent) return;
         this._hideList();
         this._closeSheet();
       }, 120)
     );
-    this.$sheetClose.addEventListener('click', () => this.$input.blur());
+    // Closes directly rather than relying on the blur-driven path above:
+    // `.blur()` only fires a 'blur' event (and so only reaches
+    // `_closeSheet()`) when the input actually has focus, which isn't
+    // true once a slot="sheet-extra" caller's own content has taken it
+    // (the battle sheet's participant chips re-focus themselves after
+    // every click) — this button must close the sheet regardless of
+    // where focus currently is. Still blurs first, best-effort, to drop
+    // the on-screen keyboard.
+    this.$sheetClose.addEventListener('click', () => {
+      this.$input.blur();
+      this._hideList();
+      this._closeSheet();
+    });
     // Selection on pointerup with a movement threshold (not pointerdown +
     // preventDefault, which breaks touch scrolling on iOS) — shared with
     // <game-version-picker> via lib/combobox.js.
@@ -512,6 +567,15 @@ export class PokemonSearch extends BaseElement {
           const span = li.querySelector('.option-ev-yield');
           if (!span) return;
           const evs = this._evModifier ? this._evModifier(mon) : mon.evYield;
+          if (typeof evs === 'string') {
+            // A string-returning evModifier (the roster's multi-
+            // participant battle sheet) already fully owns its own
+            // wording, "(no EVs — maxed)" per participant included — an
+            // empty string here means there's nothing to show yet (e.g.
+            // no participant selected), never "capped".
+            span.textContent = evs;
+            return;
+          }
           const formatted = evs ? formatEvYield(evs) : '';
           const baseHadYield = formatEvYield(mon.evYield) !== '';
           span.textContent = formatted || (this._evModifier && baseHadYield ? 'Capped' : '');
@@ -581,11 +645,12 @@ export class PokemonSearch extends BaseElement {
     this.$input.value = '';
     this._hideList();
     const wasSheet = this._sheetOpen;
-    this.dispatchEvent(
-      new CustomEvent('pokemon-pick', { detail: { name }, bubbles: true, composed: true })
+    const closeOnPick = this.dispatchEvent(
+      new CustomEvent('pokemon-pick', { detail: { name }, bubbles: true, composed: true, cancelable: true })
     );
     if (wasSheet) {
-      this.$input.blur();
+      if (closeOnPick) this.$input.blur();
+      else this.$input.focus();
     } else if (this.shadow.activeElement === this.$input) {
       // The input stays focused after a mouse pick (see the pointerdown
       // handler above) — without this, re-picking another recent option

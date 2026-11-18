@@ -69,13 +69,16 @@ test.describe('Sprite cache manager', () => {
     // instead of depending on a real fetch landing there — same
     // technique as the settings.spec.js test this one replaced.
     await page.goto('/');
+    // Wait for app initialization before seeding: startup cleanup for
+    // disabled caching can otherwise delete the synthetic entry.
+    await page.getByRole('button', { name: 'Menu' }).click();
+    await page.getByRole('menuitem', { name: 'Settings' }).click();
+    await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
     await page.evaluate(async () => {
       const cache = await caches.open('e2e-synthetic-cache');
       await cache.put('/synthetic-cache-entry', new Response(new Uint8Array(2048)));
     });
 
-    await page.getByRole('button', { name: 'Menu' }).click();
-    await page.getByRole('menuitem', { name: 'Settings' }).click();
     await page.getByRole('button', { name: 'Manage storage' }).click();
 
     await expect(page.getByRole('heading', { name: 'Storage' })).toBeVisible();

@@ -1477,6 +1477,207 @@ test('Exp. Share, a power item, and the Macho Brace are all mutually exclusive �
   assert.equal(entry.machoBrace, false);
 });
 
+test('addPokemon joins the active party automatically while there is room, and stops at 6', () => {
+  const first = store.addPokemon(mon());
+  assert.deepEqual(store.activeParty.activeUids, [first.uid]);
+  const rest = [];
+  for (let i = 0; i < 6; i++) rest.push(store.addPokemon(mon({ id: 2 + i, name: `mon${i}` })));
+  // Only the first 6 overall (first + the first 5 of rest) are active.
+  assert.equal(store.activeParty.activeUids.length, 6);
+  assert.ok(!store.activeParty.activeUids.includes(rest[5].uid));
+});
+
+test('reorderActive moves a uid within Party.activeUids, independent of the roster\'s own order', () => {
+  const a = store.addPokemon(mon());
+  const b = store.addPokemon(mon({ id: 2, name: 'charmander' }));
+  const c = store.addPokemon(mon({ id: 3, name: 'squirtle' }));
+  assert.deepEqual(store.activeParty.activeUids, [a.uid, b.uid, c.uid]);
+
+  store.reorderActive(c.uid, 0);
+  assert.deepEqual(store.activeParty.activeUids, [c.uid, a.uid, b.uid]);
+  // The roster's own order (Party.pokemon) is untouched.
+  assert.deepEqual(store.activeParty.pokemon.map((e) => e.uid), [a.uid, b.uid, c.uid]);
+});
+
+test('setActive adds/removes a Pokémon from the active party, refusing past the 6-member cap', () => {
+  const benched = store.addPokemon(mon());
+  store.setActive(benched.uid, false);
+  assert.deepEqual(store.activeParty.activeUids, []);
+
+  store.setActive(benched.uid, true);
+  assert.deepEqual(store.activeParty.activeUids, [benched.uid]);
+
+  for (let i = 0; i < 5; i++) store.addPokemon(mon({ id: 2 + i, name: `mon${i}` }));
+  assert.equal(store.activeParty.activeUids.length, 6);
+  const seventh = store.addPokemon(mon({ id: 20, name: 'seventh' }));
+  store.setActive(seventh.uid, true); // no room — no-op
+  assert.equal(store.activeParty.activeUids.length, 6);
+  assert.ok(!store.activeParty.activeUids.includes(seventh.uid));
+});
+
+// Regression: _normalizeEntries() used to refill Party.activeUids back
+// up to MAX_ACTIVE_PARTY from roster order on every load, unable to
+// tell "never set" (needs backfilling) apart from "deliberately below
+// the cap" (someone benched via setActive) once both are just a short
+// array — so a fresh Store reading the same localStorage un-benched
+// anyone who wasn't at a full six.
+test('a deliberate bench (setActive) survives reloading the store, instead of being refilled back to six', () => {
+  const kept = [store.addPokemon(mon())];
+  for (let i = 0; i < 5; i++) kept.push(store.addPokemon(mon({ id: 2 + i, name: `mon${i}` })));
+  store.setActive(kept[4].uid, false);
+  store.setActive(kept[5].uid, false);
+  assert.equal(store.activeParty.activeUids.length, 4);
+
+  const reloaded = new Store();
+  assert.equal(reloaded.activeParty.activeUids.length, 4);
+  assert.ok(!reloaded.activeParty.activeUids.includes(kept[4].uid));
+  assert.ok(!reloaded.activeParty.activeUids.includes(kept[5].uid));
+});
+
+test('benching a fainted Pokémon heals it — fainted status doesn\'t outlive its time in the active party', () => {
+  const entry = store.addPokemon(mon());
+  store.setFainted(entry.uid, true);
+  assert.equal(entry.fainted, true);
+
+  store.setActive(entry.uid, false); // bench it
+  assert.equal(entry.fainted, false);
+
+  store.setActive(entry.uid, true); // readd — stays healed
+  assert.equal(entry.fainted, false);
+});
+
+test('setFainted/healParty toggle plain state — never an event, never touches EVs', () => {
+  const entry = store.addPokemon(mon());
+  assert.equal(entry.fainted, false);
+  store.setFainted(entry.uid, true);
+  assert.equal(entry.fainted, true);
+  assert.equal(entry.history.length, 1); // still just the 'add' entry — no faint event logged
+  store.healParty();
+  assert.equal(entry.fainted, false);
+});
+
+test('logBattleForParticipants logs an independent battle event per selected, non-fainted Pokémon', () => {
+  const a = store.addPokemon(mon());
+  const b = store.addPokemon(mon({ id: 2, name: 'charmander' }));
+  const fainted = store.addPokemon(mon({ id: 3, name: 'squirtle' }));
+  store.setFainted(fainted.uid, true);
+
+  const opp = opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 });
+  const results = store.logBattleForParticipants([a.uid, b.uid, fainted.uid], opp);
+
+  assert.equal(results.length, 2); // the fainted uid was skipped
+  assert.equal(a.evs.atk, 1);
+  assert.equal(b.evs.atk, 1);
+  assert.equal(fainted.evs.atk, 0);
+  assert.equal(a.history[0].kind, 'battle');
+  assert.equal(b.history[0].kind, 'battle');
+});
+
+test('logBattleForParticipants grants Exp. Share only to holders not already credited directly, and never to a fainted holder', () => {
+  const a = store.addPokemon(mon());
+  const b = store.addPokemon(mon({ id: 2, name: 'charmander' })); // also a direct participant AND an Exp. Share holder
+  const benchedHolder = store.addPokemon(mon({ id: 3, name: 'squirtle' }));
+  const faintedHolder = store.addPokemon(mon({ id: 4, name: 'pidgey' }));
+  store.setExpShare(b.uid, true);
+  store.setExpShare(benchedHolder.uid, true);
+  store.setExpShare(faintedHolder.uid, true);
+  store.setFainted(faintedHolder.uid, true);
+
+  const opp = opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 });
+  store.logBattleForParticipants([a.uid, b.uid], opp);
+
+  assert.equal(a.evs.atk, 1); // direct participant
+  assert.equal(b.evs.atk, 1); // direct participant, not double-counted via its own Exp. Share
+  assert.equal(b.history.filter((h) => h.kind === 'battle').length, 1);
+  assert.equal(benchedHolder.evs.atk, 1); // Exp. Share, not a direct participant
+  assert.equal(faintedHolder.evs.atk, 0); // fainted — gets nothing even though it holds Exp. Share
+});
+
+test('multi-participant logging credits each active participant once and skips benched entries', () => {
+  const a = store.addPokemon(mon());
+  const benched = store.addPokemon(mon({ id: 2, name: 'ivysaur' }));
+  store.setActive(benched.uid, false);
+  const opp = opponent({ atk: 1 });
+  const results = store.logBattleForParticipants([a.uid, a.uid, benched.uid, 'missing'], opp);
+  assert.deepEqual(results.map((r) => r.uid), [a.uid]);
+  assert.equal(a.evs.atk, 1);
+  assert.equal(benched.evs.atk, 0);
+});
+
+test('a battle with no eligible participants grants no Exp. Share EVs', () => {
+  const holder = store.addPokemon(mon());
+  store.setExpShare(holder.uid, true);
+  const fainted = store.addPokemon(mon({ id: 2, name: 'ivysaur' }));
+  store.setFainted(fainted.uid, true);
+  const opp = opponent({ atk: 1 });
+  assert.deepEqual(store.logBattleForParticipants([], opp), []);
+  assert.deepEqual(store.logBattleForParticipants([fainted.uid, 'missing'], opp), []);
+  assert.equal(holder.evs.atk, 0);
+});
+
+test('normalization removes duplicate, missing, and excess active members', () => {
+  const entries = Array.from({ length: 7 }, () => store.addPokemon(mon()));
+  store.activeParty.activeUids = ['missing', entries[0].uid, ...entries.map((e) => e.uid)];
+  store._save();
+  const reloaded = new Store();
+  assert.deepEqual(reloaded.activeParty.activeUids, entries.slice(0, 6).map((e) => e.uid));
+});
+
+test('a new imported party preserves active order, deliberate benching, and fainted status', () => {
+  const a = store.addPokemon(mon());
+  const b = store.addPokemon(mon({ id: 2, name: 'ivysaur' }));
+  const c = store.addPokemon(mon({ id: 4, name: 'charmander' }));
+  store.setActive(a.uid, false);
+  store.reorderActive(c.uid, 0);
+  store.setFainted(b.uid, true);
+  const payload = structuredClone(store.exportPayload());
+  const recipient = new Store();
+  recipient.state.parties = [];
+  recipient.applyImport(payload, new Set([a.uid, b.uid, c.uid]));
+  assert.deepEqual(recipient.activeParty.activeUids, [c.uid, b.uid]);
+  assert.equal(recipient.activeParty.pokemon.find((e) => e.uid === b.uid).fainted, true);
+
+  // An existing device keeps its own current active party on merge.
+  recipient.setActive(c.uid, false);
+  recipient.applyImport(payload, new Set([a.uid, b.uid, c.uid]));
+  assert.deepEqual(recipient.activeParty.activeUids, [b.uid]);
+});
+
+test('a partial transfer keeps only selected active members and preserves an empty active party', () => {
+  const a = store.addPokemon(mon());
+  const b = store.addPokemon(mon());
+  const payload = structuredClone(store.exportPayload());
+  const recipient = new Store();
+  recipient.state.parties = [];
+  recipient.applyImport(payload, new Set([b.uid]));
+  assert.deepEqual(recipient.activeParty.activeUids, [b.uid]);
+
+  payload[0].activeUids = [];
+  const emptyRecipient = new Store();
+  emptyRecipient.state.parties = [];
+  emptyRecipient.applyImport(payload, new Set([a.uid, b.uid]));
+  assert.deepEqual(emptyRecipient.activeParty.activeUids, []);
+});
+
+// Regression: _applyExpShare used to loop over the whole roster instead
+// of just Party.activeUids, so an Exp. Share holder removed from the
+// active party (setActive(uid, false)) — as opposed to merely not
+// picked as a participant this fight — still earned EVs from a battle
+// it wasn't on the field for.
+test('_applyExpShare never credits a holder that has actually been removed from the active party', () => {
+  const a = store.addPokemon(mon());
+  const benched = store.addPokemon(mon({ id: 2, name: 'squirtle' }));
+  store.setExpShare(benched.uid, true);
+  store.setActive(benched.uid, false);
+  assert.ok(!store.activeParty.activeUids.includes(benched.uid));
+
+  const opp = opponent({ hp: 0, atk: 1, def: 0, spa: 0, spd: 0, spe: 0 });
+  store.logBattleForParticipants([a.uid], opp);
+
+  assert.equal(a.evs.atk, 1);
+  assert.equal(benched.evs.atk, 0); // off the field — no share of the battle
+});
+
 test('isFullyTrained: 510 total under the modern system, every stat maxed under Stat Experience', () => {
   // Modern EV system — the 510 combined total is the bar.
   store.createParty('Emerald run', '', 'Emerald');
@@ -1654,6 +1855,11 @@ test('applyImport adds a brand-new party and Pokémon wholesale', () => {
   assert.equal(party.pokemon[0].nickname, 'Sparky');
   assert.equal(party.pokemon[0].speciesName, 'pikachu');
   assert.equal(party.pokemon[0].level, 10);
+  // Regression: a brand-new local party from import must still get its
+  // activeUids backfilled — not left empty by _normalizeEntries's "already
+  // an array, must be a deliberate bench" guard, which only applies to a
+  // party that existed before this import.
+  assert.deepEqual(party.activeUids, ['remote-mon-1']);
 });
 
 test('applyImport skips Pokémon not in the selected set entirely', () => {

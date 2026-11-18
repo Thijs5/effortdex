@@ -14,8 +14,9 @@ import {
   versionedSpriteOnError,
   NATURES,
   TYPE_COLORS,
+  MAX_ACTIVE_PARTY,
 } from '../../../lib/constants.ts';
-import { titleCase, totalEvs, natureOptionsHtml, escapeHtml, sortedNatures, natureLabel } from '../../../lib/utils.ts';
+import { titleCase, totalEvs, natureOptionsHtml, escapeHtml, sortedNatures, natureLabel, formatEvYield } from '../../../lib/utils.ts';
 import { POKERUS_ICON_SVG } from '../../../lib/icons.ts';
 import { api, store } from '../../../lib/services.ts';
 import { versionedSpriteUrl, versionedSpriteIsOpaque } from '../../../lib/pokeapi-client.ts';
@@ -30,6 +31,8 @@ import '../../organisms/stat-reading-grid.ts';
 import '../../atoms/ev-bar.ts';
 import '../../atoms/level-input.ts';
 import type { Party, RosterEntry } from '../../../lib/store.ts';
+import type { EvMap } from '../../../lib/constants.ts';
+import type { DomainPokemon } from '../../../lib/pokeapi-client.ts';
 
 export const view = document.getElementById('party-view')!;
 const backToParties = document.getElementById('back-to-parties') as HTMLAnchorElement;
@@ -42,6 +45,32 @@ const editPartyBtn = document.getElementById('edit-party-btn')!;
 
 const addSearch = document.getElementById('add-search') as import('../../organisms/pokemon-search.ts').PokemonSearch;
 const addStatus = document.getElementById('add-status')!;
+
+// Battle party (Party.activeUids — docs/adr/0029): the current in-game
+// six, faint/heal toggling, and the "Log a battle" sheet's participant
+// strip. Not to be confused with `store.activeParty`, the whole
+// currently-selected playthrough.
+const battlePartySection = document.getElementById('battle-party')!;
+const battlePartySlots = document.getElementById('battle-party-slots')!;
+const healPartyBtn = document.getElementById('heal-party-btn')!;
+const battlePartyStatus = document.getElementById('battle-party-status')!;
+const partyLogBattleBtn = document.getElementById('party-log-battle-btn')!;
+const battleSearch = document.getElementById('battle-search') as import('../../organisms/pokemon-search.ts').PokemonSearch;
+const battleParticipants = document.getElementById('battle-participants')!;
+const battleParticipantsStatus = document.getElementById('battle-participants-status')!;
+const battleResultSummary = document.getElementById('battle-result-summary')!;
+const battleLogBtn = document.getElementById('battle-log-btn') as HTMLButtonElement;
+
+// The swap picker (docs/adr/0029): opened from a filled slot's swap
+// button (pre-scoped to that uid) or an empty slot (nothing to swap
+// out, just bring someone in).
+const swapDialog = document.getElementById('swap-dialog') as HTMLDialogElement;
+const swapDialogTitle = document.getElementById('swap-dialog-title')!;
+const swapDialogClose = document.getElementById('swap-dialog-close')!;
+const swapDialogList = document.getElementById('swap-dialog-list')!;
+const swapDialogEmpty = document.getElementById('swap-dialog-empty')!;
+const swapDialogBenchBtn = document.getElementById('swap-dialog-bench-btn') as HTMLButtonElement;
+
 const roster = document.getElementById('roster')!;
 const emptyState = document.getElementById('empty-state')!;
 const rosterToolbar = document.getElementById('roster-toolbar')!;
@@ -97,6 +126,18 @@ const addDialogCancelBtn = document.getElementById('add-pokemon-dialog-cancel-bt
 addDialogNature.innerHTML = natureOptionsHtml();
 
 const addDialogSpriteFallback = wireSpriteFallback(addDialogSprite);
+
+/** The versioned-sprite-with-fallback trio every sprite <img> on this
+ * page needs (roster cards, battle party slots, participant chips) —
+ * factored out so the three call sites can't drift from each other. */
+function spriteFor(entry: RosterEntry): { src: string; onerror: string } {
+  const modernSprite = entry.sprite || FALLBACK_SPRITE;
+  const versionedSprite = versionedSpriteUrl(store.spriteBaseGame(), entry.speciesId);
+  return {
+    src: versionedSprite || modernSprite,
+    onerror: versionedSprite ? versionedSpriteOnError(modernSprite) : FALLBACK_ONERROR,
+  };
+}
 
 backToParties.href = router.partyPath(null);
 interceptLinkClick(backToParties, () => router.navigateHome());
@@ -188,15 +229,373 @@ addForm.addEventListener('submit', (e) => {
     for (const { statKey, value } of readings) store.logStatReading(entry.uid, statKey, value, statBatchId);
   }
   addDialog.close();
-  addStatus.textContent = `Added ${titleCase(mon.name)}!`;
+  showAddStatus(`Added ${titleCase(mon.name)}!`);
   // Warm the evolution-chain cache now.
   api.getEvolutionOptions(mon.name).catch(() => {});
-  // Restart (not stack) the toast timer.
+});
+
+/** Shared by the add-a-Pokémon toast above and the battle-log toast
+ * below — restarts (not stacks) the timer so a second toast doesn't
+ * cut the first one's clear short. */
+function showAddStatus(text: string): void {
+  addStatus.textContent = text;
   clearTimeout(addStatusTimer);
   addStatusTimer = setTimeout(() => {
     addStatus.textContent = '';
   }, 3000);
+}
+
+/* ------------------------------------------------------------------ */
+/* Battle party (docs/adr/0029) — the active six, faint/heal, and the   */
+/* multi-participant "Log a battle" sheet.                              */
+/* ------------------------------------------------------------------ */
+
+/** Builds one slot/chip's markup — shared by the battle party bar
+ * (faint/heal toggle) and the battle sheet's participant strip
+ * (select/lock toggle); `selectable` picks which behavior applies. */
+function renderPartySlot(entry: RosterEntry, selectable: boolean, selected: boolean): HTMLButtonElement {
+  const sprite = spriteFor(entry);
+  const locked = selectable && entry.fainted;
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'party-slot';
+  btn.dataset.uid = entry.uid;
+  if (entry.fainted) btn.classList.add('party-slot--fainted');
+  if (selectable) {
+    btn.setAttribute('aria-pressed', String(selected));
+    if (selected) btn.classList.add('party-slot--selected');
+    if (locked) btn.classList.add('party-slot--locked');
+  }
+  btn.disabled = locked;
+  const displayName = entry.nickname || titleCase(entry.speciesName);
+  btn.title = entry.fainted ? `${displayName} — fainted${selectable ? ', heal it before it can battle' : ' — tap to heal'}` : displayName;
+  btn.setAttribute('aria-label', btn.title);
+  btn.innerHTML = `
+    <span class="party-slot-sprite-wrap">
+      <img class="party-slot-sprite" src="${sprite.src}" alt="" ${sprite.onerror} />
+      ${entry.fainted ? '<span class="party-slot-faint-badge" aria-hidden="true">&times;</span>' : ''}
+      ${selectable && selected ? '<span class="party-slot-check" aria-hidden="true">&#10003;</span>' : ''}
+    </span>
+    <span class="party-slot-lvl">Lv${entry.level}</span>
+  `;
+  return btn;
+}
+
+function activePokemon(party: Party): RosterEntry[] {
+  return party.activeUids.map((uid) => party.pokemon.find((e) => e.uid === uid)).filter((e): e is RosterEntry => !!e);
+}
+
+// Which active-party card's "⋯" menu is currently open, module state
+// rather than per-card closures: renderBattleSlotCard runs fresh on
+// every render (this whole grid is rebuilt from scratch on every store
+// change, same as the rest of this page), so wiring a full
+// wireDisclosureMenu (lib/dom.ts) — which adds its own document-level
+// click listener with no teardown — on every one of those renders would
+// leak a listener per render. One listener, wired once at module load,
+// closes whichever card's menu is open on an outside click instead.
+let openBattleSlotMenuUid: string | null = null;
+function closeBattleSlotMenu(): void {
+  if (openBattleSlotMenuUid === null) return;
+  const card = battlePartySlots.querySelector<HTMLElement>(`.battle-slot[data-uid="${openBattleSlotMenuUid}"]`);
+  card?.querySelector<HTMLElement>('.battle-slot-menu')?.setAttribute('hidden', '');
+  card?.querySelector<HTMLElement>('.battle-slot-menu-btn')?.setAttribute('aria-expanded', 'false');
+  openBattleSlotMenuUid = null;
+}
+document.addEventListener('click', (e) => {
+  if (openBattleSlotMenuUid === null) return;
+  const openWrap = battlePartySlots.querySelector(`.battle-slot[data-uid="${openBattleSlotMenuUid}"] .battle-slot-menu-wrap`);
+  if (openWrap && !e.composedPath().includes(openWrap)) closeBattleSlotMenu();
 });
+
+/** One filled active-party card — sprite/name/level (or a fainted tag in
+ * place of the level), plus a "⋯" menu (Level up / Swap out / Mark
+ * fainted-Heal) — consolidated into one menu, rather than one icon
+ * button apiece, so a fourth action (Level up) didn't mean a fourth
+ * always-visible button competing with sprite/name for the card's
+ * limited width. */
+function renderBattleSlotCard(entry: RosterEntry): HTMLDivElement {
+  const sprite = spriteFor(entry);
+  const displayName = entry.nickname || titleCase(entry.speciesName);
+  const card = document.createElement('div');
+  card.className = 'battle-slot';
+  card.dataset.uid = entry.uid;
+  if (entry.fainted) card.classList.add('battle-slot--fainted');
+  card.innerHTML = `
+    <button type="button" class="battle-slot-handle" aria-label="Reorder ${escapeHtml(displayName)}">&#9776;</button>
+    <span class="battle-slot-sprite-wrap">
+      <img class="battle-slot-sprite" src="${sprite.src}" alt="" ${sprite.onerror} />
+    </span>
+    <span class="battle-slot-body">
+      <span class="battle-slot-name">${escapeHtml(displayName)}</span>
+      ${entry.fainted ? '<span class="battle-slot-faint-tag">Fainted</span>' : `<span class="battle-slot-lvl">Lv${entry.level}</span>`}
+    </span>
+    <span class="battle-slot-menu-wrap">
+      <button type="button" class="battle-slot-menu-btn" aria-label="More actions for ${escapeHtml(displayName)}" aria-haspopup="menu" aria-expanded="false" title="More">
+        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="17.5" r="1.7"/></svg>
+      </button>
+      <div class="battle-slot-menu" role="menu" aria-label="More actions for ${escapeHtml(displayName)}" hidden>
+        <button class="battle-slot-menu-item" type="button" role="menuitem" data-action="level">Level up</button>
+        <button class="battle-slot-menu-item" type="button" role="menuitem" data-action="swap">Swap out</button>
+        <button class="battle-slot-menu-item" type="button" role="menuitem" data-action="faint">${entry.fainted ? 'Heal' : 'Mark fainted'}</button>
+      </div>
+    </span>
+  `;
+  const menuBtn = card.querySelector<HTMLButtonElement>('.battle-slot-menu-btn')!;
+  const menu = card.querySelector<HTMLElement>('.battle-slot-menu')!;
+  menuBtn.addEventListener('click', (e) => {
+    e.stopPropagation(); // else the outside-click listener above sees this same click and immediately re-closes it
+    const wasOpen = openBattleSlotMenuUid === entry.uid;
+    closeBattleSlotMenu();
+    if (wasOpen) return;
+    menu.hidden = false;
+    menuBtn.setAttribute('aria-expanded', 'true');
+    openBattleSlotMenuUid = entry.uid;
+  });
+  menu.addEventListener('click', (e) => {
+    const item = (e.target as HTMLElement).closest<HTMLElement>('.battle-slot-menu-item');
+    if (!item) return;
+    closeBattleSlotMenu();
+    const party = store.activeParty;
+    if (item.dataset.action === 'level') { if (party) router.navigateToPokemonDialog(party.slug, entry.uid, 'level'); }
+    else if (item.dataset.action === 'swap') openSwapDialog(entry.uid);
+    else if (item.dataset.action === 'faint') store.setFainted(entry.uid, !entry.fainted);
+  });
+  wireDragHandle({
+    handle: card.querySelector<HTMLElement>('.battle-slot-handle')!,
+    item: card,
+    container: battlePartySlots,
+    itemSelector: '.battle-slot:not(.battle-slot--empty)',
+    draggingClass: 'battle-slot--dragging',
+    dropTargetClass: 'battle-slot--drop-target',
+    onDrop: (item, endIndex) => store.reorderActive((item as HTMLElement).dataset.uid ?? '', endIndex),
+  });
+  return card;
+}
+
+/** An open slot in the grid — its own "bring someone in" tap target. */
+function renderBattleSlotEmpty(): HTMLButtonElement {
+  const btn = document.createElement('button');
+  btn.type = 'button';
+  btn.className = 'battle-slot battle-slot--empty';
+  btn.textContent = '+ Bring in a Pokémon';
+  btn.addEventListener('click', () => openSwapDialog(null));
+  return btn;
+}
+
+function renderBattleParty(party: Party): void {
+  battlePartySection.hidden = party.pokemon.length === 0;
+  if (!party.pokemon.length) return;
+
+  const active = activePokemon(party);
+  battlePartySlots.innerHTML = ''; // wipes any open "⋯" menu's DOM too — its own state must follow
+  openBattleSlotMenuUid = null;
+  for (const entry of active) battlePartySlots.appendChild(renderBattleSlotCard(entry));
+  for (let i = active.length; i < MAX_ACTIVE_PARTY; i++) battlePartySlots.appendChild(renderBattleSlotEmpty());
+
+  const fainted = active.filter((e) => e.fainted);
+  healPartyBtn.hidden = fainted.length === 0;
+  battlePartyStatus.hidden = fainted.length === 0;
+  if (fainted.length) {
+    const names = fainted.map((e) => e.nickname || titleCase(e.speciesName));
+    const list = names.length > 1 ? `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}` : names[0];
+    const verb = fainted.length > 1 ? 'are' : 'is';
+    battlePartyStatus.textContent = `${list} ${verb} down — choose Heal in the card menu, or heal at the Pokémon Center.`;
+  }
+}
+
+healPartyBtn.addEventListener('click', () => store.healParty());
+
+/* ---- Swap picker: replace/bring in an active-party member ---- */
+
+function openSwapDialog(outUid: string | null): void {
+  const party = store.activeParty;
+  if (!party) return;
+  const outEntry = outUid ? party.pokemon.find((e) => e.uid === outUid) : null;
+  swapDialogTitle.textContent = outEntry
+    ? `Swap out ${outEntry.nickname || titleCase(outEntry.speciesName)}`
+    : 'Bring in a Pokémon';
+
+  // The roster card has no active-party control of its own (docs/adr/0029)
+  // — this dialog is the only way in or out, so a filled slot also offers
+  // a plain "bench, no replacement" option alongside the swap-in list.
+  swapDialogBenchBtn.hidden = !outUid;
+  swapDialogBenchBtn.onclick = () => {
+    if (outUid) store.setActive(outUid, false);
+    swapDialog.close();
+  };
+
+  const bench = party.pokemon.filter((e) => !party.activeUids.includes(e.uid));
+  swapDialogList.innerHTML = '';
+  swapDialogEmpty.hidden = bench.length > 0;
+  for (const entry of bench) {
+    const sprite = spriteFor(entry);
+    const displayName = entry.nickname || titleCase(entry.speciesName);
+    const option = document.createElement('button');
+    option.type = 'button';
+    option.className = 'swap-dialog-option';
+    option.innerHTML = `
+      <img class="swap-dialog-option-sprite" src="${sprite.src}" alt="" ${sprite.onerror} />
+      <span class="swap-dialog-option-name">${escapeHtml(displayName)}</span>
+      <span class="swap-dialog-option-lvl">Lv${entry.level}</span>
+    `;
+    option.addEventListener('click', () => {
+      if (outUid) store.setActive(outUid, false);
+      store.setActive(entry.uid, true);
+      swapDialog.close();
+    });
+    swapDialogList.appendChild(option);
+  }
+  swapDialog.showModal();
+  focusDialogStart(swapDialog);
+}
+swapDialogClose.addEventListener('click', () => swapDialog.close());
+swapDialog.addEventListener('click', (e) => {
+  if (e.target === swapDialog) swapDialog.close();
+});
+
+/* ---- "Log a battle" sheet: participant strip + opponent search ---- */
+
+// Which active, non-fainted uids are checked for the next battle —
+// module state, not persisted; each fresh sheet starts with the lead.
+let battleSelected = new Set<string>();
+let battlePickToken = 0;
+
+// An opponent picked from the search but not yet logged — set by
+// stageBattlePick, cleared by the actual #battle-log-btn press (or by
+// anything that invalidates it: closing the sheet, or changing who's
+// selected once a pick is already staged).
+let pendingBattle: { mon: DomainPokemon; uids: string[] } | null = null;
+
+function clearPendingBattle(): void {
+  ++battlePickToken;
+  pendingBattle = null;
+  battleLogBtn.disabled = true;
+  battleResultSummary.hidden = true;
+  battleResultSummary.classList.remove('battle-result-summary--pending');
+}
+
+function renderBattleParticipants(): void {
+  const party = store.activeParty;
+  // A full rebuild replaces whichever chip was just clicked, dropping
+  // its focus — with nothing left inside the <pokemon-search> host to
+  // hold focus, its own blur handler reads that as "focus left the
+  // sheet" and closes it. Re-focus the rebuilt chip for the same uid
+  // once it's back in the DOM.
+  const focusedUid = (document.activeElement as HTMLElement | null)?.dataset?.uid;
+  battleParticipants.innerHTML = '';
+  if (!party) return;
+  const active = activePokemon(party);
+  for (const entry of active) {
+    const slot = renderPartySlot(entry, true, battleSelected.has(entry.uid));
+    if (!entry.fainted) {
+      slot.addEventListener('click', () => {
+        if (battleSelected.has(entry.uid)) battleSelected.delete(entry.uid);
+        else battleSelected.add(entry.uid);
+        // Who's selected no longer matches whatever was staged for the
+        // pending pick (if any) — force a fresh pick rather than logging
+        // a breakdown for the old roster of participants.
+        clearPendingBattle();
+        renderBattleParticipants();
+      });
+    }
+    battleParticipants.appendChild(slot);
+    if (entry.uid === focusedUid) slot.focus();
+  }
+  battleParticipantsStatus.hidden = battleSelected.size > 0;
+  battleParticipantsStatus.textContent = 'Select at least one Pokémon first.';
+}
+
+partyLogBattleBtn.addEventListener('click', () => {
+  const party = store.activeParty;
+  if (!party) return;
+  const active = activePokemon(party);
+  const able = active.filter((e) => !e.fainted);
+  // Every fresh open starts from just the lead — not whoever was left
+  // selected the last time the sheet was open; most battles are one
+  // Pokémon, so the rest of the strip stays opt-in.
+  battleSelected = able.length ? new Set([able[0].uid]) : new Set();
+  renderBattleParticipants();
+  clearPendingBattle();
+  battleSearch.hidden = false;
+  battleSearch.focus();
+});
+battleSearch.addEventListener('sheet-close', () => {
+  battleSearch.hidden = true;
+  battleSelected = new Set(); // closed sheet carries no selection into the next open
+  clearPendingBattle();
+});
+// Mirrors <pokemon-detail>'s own `evModifier`, but returns a
+// pre-formatted string (every selected participant's own name and
+// yield) rather than one EvMap — with several participants, "would
+// Bulbasaur alone gain X" is the wrong question; this is the same
+// breakdown #battle-result-summary shows once staged, just computed
+// from `previewDefeat` before anything is applied, so it's visible in
+// the dropdown while still picking an opponent, not only after.
+battleSearch.evModifier = (mon) =>
+  participantEvSummary([...battleSelected], (uid) => store.previewDefeat(uid, mon)?.applied);
+
+battleSearch.addEventListener('pokemon-pick', (e) => {
+  // Keep the sheet open to confirm the staged battle. Cancelling the
+  // pick's default avoids a timed close/reopen race with the Close button.
+  e.preventDefault();
+  if (battleSelected.size === 0) return; // the sheet already shows the "select someone" hint
+  stageBattlePick((e as CustomEvent).detail.name);
+});
+
+/** Looks up the picked opponent and stages it as `pendingBattle` — shows
+ * the same participant breakdown the dropdown already previewed, and
+ * arms #battle-log-btn. Nothing is applied to the roster until that
+ * button is actually pressed (see its own click handler below). */
+async function stageBattlePick(name: string): Promise<void> {
+  clearPendingBattle();
+  const token = battlePickToken;
+  const partyId = store.activeParty?.id;
+  const uids = [...battleSelected]; // snapshot — battleSelected can change before the button's pressed
+  try {
+    const mon = await api.getPokemon(name);
+    if (token !== battlePickToken || partyId !== store.activeParty?.id || battleSearch.hidden) return;
+    pendingBattle = { mon, uids };
+    const summary = participantEvSummary(uids, (uid) => store.previewDefeat(uid, mon)?.applied);
+    battleResultSummary.textContent = `Ready to log vs ${titleCase(mon.name)} — ${summary}`;
+    battleResultSummary.classList.add('battle-result-summary--pending');
+    battleResultSummary.hidden = false;
+    battleLogBtn.disabled = false;
+  } catch (err) {
+    if (token !== battlePickToken || partyId !== store.activeParty?.id || battleSearch.hidden) return;
+    showAddStatus((err instanceof Error && err.message) || 'Could not look up that Pokémon.');
+  }
+}
+
+battleLogBtn.addEventListener('click', () => {
+  if (!pendingBattle) return;
+  const { mon, uids } = pendingBattle;
+  const applied = store.logBattleForParticipants(uids, mon);
+  const summary = participantEvSummary(uids, (uid) => applied.find((r) => r.uid === uid)?.applied);
+  battleResultSummary.textContent = `Logged vs ${titleCase(mon.name)} — ${summary}`;
+  battleResultSummary.classList.remove('battle-result-summary--pending');
+  pendingBattle = null;
+  battleLogBtn.disabled = true;
+});
+
+/** "Bulbasaur +1 HP · Charmander (no EVs — maxed)" — `uids`' own names
+ * and yields (`applyForUid` supplies the EvMap, already-clamped whether
+ * it's a live preview or the actual applied result), so a maxed-out
+ * participant reads as unambiguous fact rather than a single count that
+ * goes ambiguous the moment one of several selected Pokémon can't gain
+ * any more of this stat. Takes `uids` explicitly rather than reading
+ * `battleSelected` itself — by the time a `logPartyBattle` result is
+ * ready, the sheet may have already closed and reset that selection. */
+function participantEvSummary(uids: string[], applyForUid: (uid: string) => EvMap | undefined): string {
+  const party = store.activeParty;
+  const parts = uids.map((uid) => {
+    const entry = party?.pokemon.find((e) => e.uid === uid);
+    const name = entry ? entry.nickname || titleCase(entry.speciesName) : '?';
+    const applied = applyForUid(uid);
+    const yieldText = applied ? formatEvYield(applied) : '';
+    return `${name} ${yieldText || '(no EVs — maxed)'}`;
+  });
+  return parts.join(' · ');
+}
 
 /* ------------------------------------------------------------------ */
 /* Roster rows — link to each Pokémon's own detail page                */
@@ -316,7 +715,13 @@ function refreshAddSearchAllowedSpecies(party: Party): void {
   if (signature === addSearchAllowedFor) return;
   addSearchAllowedFor = signature;
   availableSpeciesFor(party, api).then((allowed) => {
-    if (signature === addSearchAllowedFor) addSearch.allowedSpecies = allowed;
+    if (signature === addSearchAllowedFor) {
+      addSearch.allowedSpecies = allowed;
+      // Same restriction applies to who a battle can be logged against —
+      // both searches only ever offer species actually reachable in this
+      // party's own generation (GitHub issue #31).
+      battleSearch.allowedSpecies = allowed;
+    }
   });
 }
 
@@ -504,6 +909,10 @@ export function render(party: Party): void {
     // user land here with a URL that already encodes a view" (ADR 0013).
     const isFreshLoad = currentPartySlug === null;
     currentPartySlug = party.slug;
+    // A fresh battle-selection default per party — carrying another
+    // party's uids over would silently select the wrong Pokémon next
+    // time "Log a battle" opens.
+    battleSelected = new Set();
     if (isFreshLoad) {
       const restored = readRosterStateFromQuery();
       rosterSearchInput.value = restored.q;
@@ -533,8 +942,18 @@ export function render(party: Party): void {
   activePartyDescription.hidden = !party.description;
   activePartyDescription.textContent = party.description;
   renderRoster(party);
+  renderBattleParty(party);
   // Most-recently-added species first, deduped.
   addSearch.recent = [...party.pokemon]
     .reverse()
     .map((e) => ({ name: e.speciesName, sprite: e.sprite, id: e.speciesId }));
+  // Most-recently-defeated opponents across the whole active party, most
+  // recent first — lets a grinding session re-pick the same opponent
+  // without retyping it, the same convenience <pokemon-detail> gives its
+  // own single-mon battle search.
+  const recentBattles = activePokemon(party)
+    .flatMap((e) => e.history.filter((h) => h.kind === 'battle').map((h) => ({ h, uid: e.uid })))
+    .sort((a, b) => b.h.timestamp - a.h.timestamp)
+    .map(({ h }) => ({ name: h.opponentName, sprite: h.sprite }));
+  battleSearch.recent = recentBattles;
 }

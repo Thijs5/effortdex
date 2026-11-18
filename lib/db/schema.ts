@@ -98,6 +98,7 @@ export interface PartyRow {
   baseGame: string;
   overrides: unknown;
   slug: string;
+  activeUids: string[];
   order: number;
 }
 
@@ -108,6 +109,7 @@ export interface RosterEntryRow {
   powerItem: string | null;
   machoBrace: boolean;
   ivs: Record<string, number | null>;
+  fainted: boolean;
   partyId: string;
   order: number;
 }

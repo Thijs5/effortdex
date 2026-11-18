@@ -67,6 +67,42 @@ for (const [label, path] of Object.entries(FIXTURES)) {
   });
 }
 
+// Regression: PARTY_FIELDS used to omit `activeUids` entirely, so the
+// IndexedDB roster mirror (every structural _save, e.g. setActive)
+// silently dropped which six were active — readRoster then always came
+// back with it missing, and _normalizeEntries backfilled everyone back
+// in on the next load, un-benching anyone who wasn't at a full six.
+test('writeRoster -> readRoster round-trips a deliberately-below-cap Party.activeUids, not just a full six', async () => {
+  const db = await freshDb();
+  const store = new Store();
+  store.createParty('Party 1');
+  const a = store.addPokemon({ id: 1, name: 'bulbasaur', sprite: null });
+  store.addPokemon({ id: 4, name: 'charmander', sprite: null });
+  store.setActive(a.uid, false); // deliberately below MAX_ACTIVE_PARTY
+
+  await writeRoster(db, store.state);
+  const rebuilt = await readRoster(db);
+
+  assert.deepEqual(rebuilt.parties[0].activeUids, store.state.parties[0].activeUids);
+  assert.ok(!rebuilt.parties[0].activeUids.includes(a.uid));
+});
+
+test('fainted status survives IndexedDB writes and a full store reload', async () => {
+  const db = await freshDb();
+  const original = new Store();
+  original.createParty('Emerald run', '', 'Emerald');
+  const entry = original.addPokemon({ id: 1, name: 'bulbasaur', sprite: null });
+  original.setFainted(entry.uid, true);
+  await writeRoster(db, original.state);
+
+  const reloaded = new Store({
+    mirrorRoster: async () => {},
+    loadRoster: () => readRoster(db),
+  });
+  await reloaded.init();
+  assert.equal(reloaded.activeParty.pokemon[0].fainted, true);
+});
+
 test('pre-event-sourcing blob (_migrateV1) round-trips through the rows', async () => {
   const db = await freshDb();
   localStorage.setItem(
