@@ -499,6 +499,7 @@ html[data-modal-open] body {
 }
 .battle-party-head-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
 .heal-btn {
+  min-height: 44px;
   display: inline-flex;
   align-items: center;
   gap: 0.4em;
@@ -639,20 +640,21 @@ html[data-modal-open] body {
 /* Swap picker dialog — a plain list of the bench, reusing the same
    sprite/name/level look as the roster card without its full weight. */
 .swap-dialog-bench-btn {
+  min-height: 44px;
   display: block;
   width: 100%;
   margin-bottom: var(--space-3);
   padding: var(--space-2) var(--space-3);
-  border: 1px dashed var(--poke-red-dark);
+  border: 1px dashed var(--line);
   border-radius: var(--radius-md);
-  background: var(--danger-soft);
-  color: var(--poke-red-dark);
+  background: var(--lcd);
+  color: var(--ink-soft);
   font-weight: 700;
   font-size: var(--font-size-sm);
   cursor: pointer;
   text-align: center;
 }
-.swap-dialog-bench-btn:hover { background: color-mix(in srgb, var(--danger-soft) 70%, var(--poke-red-dark)); }
+.swap-dialog-bench-btn:hover { background: var(--teal-soft); }
 .swap-dialog-list { display: grid; gap: var(--space-2); }
 .swap-dialog-option {
   display: flex;

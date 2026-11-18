@@ -16,7 +16,7 @@ for (const layout of [
     await mockPokeApi(page);
     await page.route('**/raw.githubusercontent.com/**/sprites/pokemon/**', async (route) => {
       const id = route.request().url().match(/\/(\d+)\.png$/)?.[1];
-      if (id && ['1', '2', '3', '4', '10', '95', '113'].includes(id)) {
+      if (id && ['1', '2', '3', '4', '10', '72', '95', '113', '293', '309', '322', '341', '366'].includes(id)) {
         await route.fulfill({ contentType: 'image/png', body: readFileSync(new URL(`./fixtures/sprites/${id}.png`, import.meta.url)) });
       } else await route.fallback();
     });
@@ -33,6 +33,8 @@ for (const layout of [
       await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       const path = info.outputPath(`${layout.name}-${name}.png`);
       await page.evaluate(() => document.fonts.ready);
+      await page.locator('img:visible').evaluateAll((images) => Promise.all(images.map((img) =>
+        (/** @type {HTMLImageElement} */ (img)).decode().catch(() => {}))));
       await page.screenshot({ path });
       await info.attach(name, { path, contentType: 'image/png' });
     };
