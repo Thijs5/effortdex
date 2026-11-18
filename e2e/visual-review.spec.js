@@ -16,7 +16,7 @@ for (const layout of [
     await mockPokeApi(page);
     await page.route('**/raw.githubusercontent.com/**/sprites/pokemon/**', async (route) => {
       const id = route.request().url().match(/\/(\d+)\.png$/)?.[1];
-      if (id && ['1', '2', '3', '4', '10', '72', '95', '113', '293', '309', '322', '341', '366'].includes(id)) {
+      if (id && ['1', '2', '3', '4', '10', '72', '95', '113', '263', '293', '309', '322', '341', '366'].includes(id)) {
         await route.fulfill({ contentType: 'image/png', body: readFileSync(new URL(`./fixtures/sprites/${id}.png`, import.meta.url)) });
       } else await route.fallback();
     });
