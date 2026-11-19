@@ -18,6 +18,8 @@ import {
 } from '../../../lib/constants.ts';
 import { titleCase, totalEvs, natureOptionsHtml, escapeHtml, sortedNatures, natureLabel, formatEvYield } from '../../../lib/utils.ts';
 import { POKERUS_ICON_SVG } from '../../../lib/icons.ts';
+import { battleMatchup } from '../../../lib/battle-matchup.ts';
+import { matchGameVersion } from '../../../lib/game-versions.ts';
 import { api, store } from '../../../lib/services.ts';
 import { versionedSpriteUrl, versionedSpriteIsOpaque } from '../../../lib/pokeapi-client.ts';
 import { wireSpriteFallback } from '../../../lib/sprite-fallback.ts';
@@ -499,10 +501,36 @@ swapDialog.addEventListener('click', (e) => {
 let battleSelected = new Set<string>();
 let battlePickToken = 0;
 
+battleSearch.evModifier = (mon) => {
+  if (!battleSelected.size) return 'Base yield: ' + (formatEvYield(mon.evYield) || '0 EVs');
+  const gains = [...battleSelected].map(uid => {
+    const applied = store.previewDefeat(uid, mon)?.applied;
+    return applied ? formatEvYield(applied) || '0 EVs' : 'Unavailable';
+  });
+  if (new Set(gains).size === 1) return gains[0] + (gains.length > 1 ? ' each' : '');
+  return participantEvSummary([...battleSelected], uid => store.previewDefeat(uid, mon)?.applied);
+};
+
 // Each confirmation consumes the opponent; recipients stay selected until close.
 let pendingBattle: { mon: DomainPokemon; uids: string[] } | null = null;
 
+const matchupPanel = document.getElementById('battle-matchup')!;
+
+function renderBattleMatchup(mon: DomainPokemon): void {
+  const game = matchGameVersion(store.activeParty?.baseGame);
+  const matchup = battleMatchup(mon, game?.gen ?? 9, game?.name === 'Legends Arceus');
+  matchupPanel.hidden = !matchup;
+  if (!matchup) return;
+  document.getElementById('battle-matchup-types')!.textContent =
+    matchup.types.map(titleCase).join(' / ') + ' · ' + (game ? 'Gen ' + game.gen : 'Modern rules');
+  document.getElementById('battle-weaknesses')!.textContent =
+    matchup.weaknesses.map(w => w.name + ' ×' + w.multiplier).join(' · ') || 'None';
+  document.getElementById('battle-immunities')!.textContent = matchup.immunities.join(' · ') || 'None';
+  document.getElementById('battle-attack-advice')!.textContent = matchup.advice;
+}
+
 function clearPendingBattle(): void {
+  matchupPanel.hidden = true;
   ++battlePickToken;
   pendingBattle = null;
   battleLogBtn.disabled = true;
@@ -563,6 +591,7 @@ partyLogBattleBtn.addEventListener('click', () => {
   battleSearch.showReview();
 });
 battleChooseBtn.addEventListener('click', () => {
+  matchupPanel.hidden = true;
   ++battlePickToken;
   if (battleComposer.dataset.state === 'loading') clearPendingBattle();
   battleSearch.focus();
@@ -613,6 +642,7 @@ async function stageBattlePick(name: string): Promise<void> {
 function stageKnownBattle(mon: DomainPokemon): void {
   const uids = [...battleSelected];
   pendingBattle = { mon, uids };
+  renderBattleMatchup(mon);
   battleComposer.dataset.state = 'ready';
   battleOpponentName.textContent = titleCase(mon.name);
   battleOpponentHint.textContent = 'Tap to change opponent';

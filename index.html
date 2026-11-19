@@ -196,6 +196,13 @@
           <div id="battle-participants" class="party-slots party-slots--select"></div>
           <p id="battle-participants-status" class="party-slots-status" hidden></p>
           <p id="battle-result-summary" class="battle-result-summary" hidden aria-live="polite"></p>
+          <section id="battle-matchup" hidden aria-labelledby="battle-matchup-title">
+            <h3 id="battle-matchup-title">Battle matchup</h3>
+            <p id="battle-matchup-types"></p>
+            <dl><dt>Weak to</dt><dd id="battle-weaknesses"></dd>
+              <dt>Type immunities</dt><dd id="battle-immunities"></dd></dl>
+            <p id="battle-attack-advice"></p>
+          </section>
         </div>
         <div slot="sheet-footer" class="battle-composer-actions">
           <button id="battle-log-btn" class="ds-btn ds-btn--primary" type="button" disabled>Log defeat</button>

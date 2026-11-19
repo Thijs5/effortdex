@@ -14,6 +14,7 @@ const MOBILE_QUERY = '(max-width: 640px) and (pointer: coarse)';
 // How many recently-picked species (via the `recent` property) show up
 // when the field is focused with nothing typed yet.
 const RECENT_LIMIT = 5;
+const RECENT_OPPONENT_LIMIT = 24;
 
 // A caller with a single applicable Pokémon (the detail page's own
 // battle search) returns an EvMap, formatted the normal way. One with
@@ -133,6 +134,24 @@ export class PokemonSearch extends BaseElement {
           border-radius: var(--radius-sm);
           object-fit: contain;
         }
+        .wrap.sheet:not(.reviewing) .recent-grid:not([hidden]) {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(min(100%, 9rem), 1fr));
+          align-content: start;
+          gap: var(--space-2);
+          padding: var(--space-2) var(--space-3);
+        }
+        .recent-grid .status { grid-column: 1 / -1; }
+        .recent-grid li.option {
+          display: grid;
+          grid-template-columns: 28px minmax(0, 1fr);
+          align-content: start;
+          gap: var(--space-1) var(--space-2);
+          border: 1px solid var(--lcd-line);
+        }
+        .recent-grid .option-num { display: none; }
+        .recent-grid .option-name { white-space: normal; overflow-wrap: anywhere; }
+        .recent-grid .option-ev-yield { grid-column: 1 / -1; max-width: none; text-align: left; }
         li.status {
           padding: var(--space-2) var(--space-3);
           font-size: var(--font-size-2xs);
@@ -424,7 +443,7 @@ export class PokemonSearch extends BaseElement {
     const seen = new Set<string>();
     this._recent = (list || [])
       .filter((r) => r && r.name && !seen.has(r.name) && seen.add(r.name))
-      .slice(0, RECENT_LIMIT)
+      .slice(0, this.hasAttribute('show-ev-yield') ? RECENT_OPPONENT_LIMIT : RECENT_LIMIT)
       .map((r) => ({ name: r.name, sprite: r.sprite || null, id: r.id || null }));
     // Already showing recents with nothing typed — refresh in place so
     // a newly-logged pick shows up without needing a re-focus. Checking
@@ -565,6 +584,7 @@ export class PokemonSearch extends BaseElement {
   }
 
   _showLoading(): void {
+    this.$list.classList.remove('recent-grid');
     this.$list.innerHTML = '<li class="status" role="presentation">Loading species…</li>';
     this.$list.hidden = false;
     this.$input.setAttribute('aria-expanded', 'true');
@@ -572,6 +592,8 @@ export class PokemonSearch extends BaseElement {
   }
 
   _renderList(): void {
+    const recentGrid = this._showingRecent && this.hasAttribute('show-ev-yield');
+    this.$list.classList.toggle('recent-grid', recentGrid);
     if (!this._matches.length) {
       this.$list.innerHTML = '<li class="status" role="presentation">No matching Pok&eacute;mon.</li>';
       this.$list.hidden = false;
@@ -580,7 +602,7 @@ export class PokemonSearch extends BaseElement {
       return;
     }
     const showEv = this.hasAttribute('show-ev-yield');
-    const header = this._showingRecent ? '<li class="status" role="presentation">Recent</li>' : '';
+    const header = this._showingRecent ? `<li class="status" role="presentation">${recentGrid ? 'Recent defeats' : 'Recent'}</li>` : '';
     this.$list.innerHTML =
       header +
       this._matches
