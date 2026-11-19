@@ -1,7 +1,10 @@
 import { categoryGuide, moveOptions, trainingPlan } from '../../../molecules/training-plan.ts';
 import { matchGameVersion } from '../../../../lib/game-versions.ts';
 import type { DomainPokemon } from '../../../../lib/pokeapi-client.ts';
-import { STATS } from '../../../../lib/constants.ts';
+import { defensiveMatchups, speciesTypes } from '../../../../lib/type-matchups.ts';
+import { versionedSpriteUrl, modernSpriteUrl } from '../../../../lib/pokeapi-client.ts';
+import { wireSpriteFallback } from '../../../../lib/sprite-fallback.ts';
+import { STATS, TYPE_COLORS, typeTextColor, typeLabel, FALLBACK_SPRITE } from '../../../../lib/constants.ts';
 import { titleCase } from '../../../../lib/utils.ts';
 import { gen1SpecialStat } from '../../../../lib/gen1-special-stats.ts';
 import { api, store } from '../../../../lib/services.ts';
@@ -19,6 +22,8 @@ export class TrainingGuideDialog extends BaseDialog {
   private preview: DomainPokemon | null = null;
   private request = 0;
   private loading = false;
+  private spriteFallback: ReturnType<typeof wireSpriteFallback>;
+  private spriteKey = '';
 
   constructor() {
     super('training-guide-dialog', 'training-guide-dialog-title');
@@ -43,8 +48,21 @@ export class TrainingGuideDialog extends BaseDialog {
       .dex-nav { display:flex; align-items:center; justify-content:space-between; gap:4px; }
       .dex-nav button,.restore { min-height:44px; min-width:44px; color:var(--ink); background:var(--surface); border:1px solid var(--lcd-line); border-radius:var(--radius-sm); }
       .dex-nav button:disabled { opacity:.45; }
-      .dex-name { text-align:center; }
-      .base-values { display:flex; flex-wrap:wrap; gap:4px 12px; }
+      .species-card { padding:var(--space-3); border-radius:var(--radius-sm); border:1px solid var(--lcd-line);
+        background:linear-gradient(120deg,color-mix(in srgb,var(--species-color) 17%,var(--surface)),var(--surface)); }
+      .dex-nav { justify-content:flex-start; }
+      .dex-nav button { flex:none; }
+      .dex-nav .prev { margin-left:auto; }
+      .dex-nav h3,.plan h4 { margin:0; font-size:var(--font-size-xs); }
+      .species-face { display:flex; align-items:center; gap:var(--space-3); min-width:0; }
+      .species-face img { width:clamp(80px,24vw,108px); height:auto; aspect-ratio:1; object-fit:contain; image-rendering:pixelated; }
+      .dex-name { display:block; font-size:1.2rem; overflow-wrap:anywhere; }
+      .type-list,.match-list { display:flex; flex-wrap:wrap; gap:5px; margin-block:6px; }
+      .type-chip { border-radius:var(--radius-pill); padding:3px 8px; font-size:var(--font-size-xs); font-weight:650; }
+      .match-list .type-chip { color:var(--ink); background:var(--surface); border:1px solid var(--lcd-line); border-left:4px solid var(--chip); }
+      .matchups { margin-top:var(--space-3); }
+      .base-values { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:5px; }
+      .base-values span { background:var(--lcd); padding:6px; text-align:center; border-radius:var(--radius-sm); font-variant-numeric:tabular-nums; }
       summary { cursor:pointer; padding-block:10px; font-weight:600; }
       .plan { font-size:var(--font-size-xs); }
       .training-guide-attribution { margin: var(--space-3) 0 0; font-size: var(--font-size-2xs); color: var(--ink-soft); }
@@ -53,10 +71,13 @@ export class TrainingGuideDialog extends BaseDialog {
 
     this.$title.textContent = 'Training guide';
     this.$body.innerHTML = `
-      <section class="plan"><h3>Plan by National Pokédex number</h3>
-      <div class="dex-nav"><button type="button" class="prev" aria-label="Previous Pokédex number">←</button>
-      <strong class="dex-name" aria-live="polite"></strong>
+      <section class="plan"><div class="species-card">
+      <div class="dex-nav"><h3>National Pokédex</h3><button type="button" class="prev" aria-label="Previous Pokédex number">←</button>
       <button type="button" class="next" aria-label="Next Pokédex number">→</button></div>
+      <div class="species-face"><img class="dex-sprite" alt=""><div><strong class="dex-name" aria-live="polite"></strong>
+      <div class="type-list" aria-label="Pokémon types"></div></div></div></div>
+      <section class="matchups"><h4>Type weaknesses</h4><div class="match-list weaknesses"></div>
+      <details class="resistances"><summary>Resistances and immunities</summary><div class="match-list reduced"></div></details></section>
       <p><strong>Base stats</strong></p><p class="base-values"></p>
       <p class="projection" hidden></p>
       <button type="button" class="restore" hidden></button>
@@ -66,6 +87,7 @@ export class TrainingGuideDialog extends BaseDialog {
       <div class="result" aria-live="polite"></div></section>
       <section class="spots"><h3>Where to train</h3><ev-training-guide></ev-training-guide>
       <p class="training-guide-attribution">Locations via Bulbapedia &amp; Marriland's EV training guides</p></section>`;
+    this.spriteFallback = wireSpriteFallback(this.$body.querySelector('.dex-sprite')!);
     this.$body.querySelector('.prev')!.addEventListener('click', () => void this.browse(-1));
     this.$body.querySelector('.next')!.addEventListener('click', () => void this.browse(1));
     this.$body.querySelector('.restore')!.addEventListener('click', () => this.resetPreview());
@@ -163,6 +185,35 @@ export class TrainingGuideDialog extends BaseDialog {
     const base = mon?.baseStats ?? entry.baseStats;
     const merged = store.specialStatMerged();
     this.$body.querySelector('.dex-name')!.textContent = (id < 10000 ? '#' + id + ' ' : '') + name;
+    const game = store.spriteBaseGame();
+    const modern = mon?.sprite || (mon ? modernSpriteUrl(id) : entry.sprite || modernSpriteUrl(id)) || FALLBACK_SPRITE;
+    const spriteKey = [id, game, modern].join('|');
+    if (spriteKey !== this.spriteKey) {
+      this.spriteKey = spriteKey;
+      this.spriteFallback.setVersionedSprite(versionedSpriteUrl(game, id), modern);
+    }
+    const gen = matchGameVersion(store.activeParty?.baseGame)?.gen ?? 9;
+    const types = speciesTypes(id, (mon ?? api.peekCached(entry.speciesName))?.types ?? [], gen);
+    const chip = (type: string, factor?: number) => {
+      const badge = document.createElement('span');
+      badge.className = 'type-chip';
+      const color = TYPE_COLORS[type] ?? 'var(--lcd-line)';
+      badge.style.setProperty('--chip', color);
+      if (factor === undefined) {
+        badge.style.backgroundColor = color;
+        badge.style.color = typeTextColor(type);
+      }
+      badge.textContent = typeLabel(type) + (factor === undefined ? '' : ' ×' + factor);
+      return badge;
+    };
+    this.$body.querySelector<HTMLElement>('.species-card')!.style.setProperty('--species-color', TYPE_COLORS[types[0]] ?? 'var(--lcd-line)');
+    this.$body.querySelector('.type-list')!.replaceChildren(...types.map(type => chip(type)));
+    const matchups = defensiveMatchups(types, gen);
+    const weak = matchups.filter(m => m.factor > 1);
+    const reduced = matchups.filter(m => m.factor < 1);
+    this.$body.querySelector('.weaknesses')!.replaceChildren(...(weak.length ? weak.map(m => chip(m.type, m.factor)) : [types.length ? 'None' : 'Type data unavailable']));
+    this.$body.querySelector<HTMLElement>('.resistances')!.hidden = !reduced.length;
+    this.$body.querySelector('.reduced')!.replaceChildren(...reduced.map(m => chip(m.type, m.factor)));
     this.$body.querySelector('.base-values')!.replaceChildren(...STATS.filter(s => !merged || s.key !== 'spd').map(({ key, label }) => {
       const stat = document.createElement('span');
       const special = merged && key === 'spa';

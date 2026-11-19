@@ -45,6 +45,11 @@ test.describe('EV-training location guide', () => {
     await expect(dialog.getByRole('button', { name: 'Previous Pokédex number' })).toBeDisabled();
     await dialog.getByRole('button', { name: 'Next Pokédex number' }).click();
     await expect(dialog.locator('.dex-name')).toHaveText('#2 Ivysaur');
+    await expect(dialog.locator('.dex-sprite')).toHaveAttribute('src', /\/2\.png$/);
+    await expect(dialog.locator('.type-list .type-chip')).toHaveText(['Grass', 'Poison']);
+    await expect(dialog.locator('.weaknesses .type-chip')).toHaveText(['Fire ×2', 'Flying ×2', 'Ice ×2', 'Psychic ×2']);
+    await dialog.getByText('Resistances and immunities').click();
+    await expect(dialog.locator('.reduced')).toContainText('Grass ×0.25');
     await expect(dialog.locator('.base-values')).toContainText('HP 60');
     await dialog.getByRole('button', { name: 'Next Pokédex number' }).click();
     await expect(dialog.locator('.dex-status')).toContainText('Try again');
