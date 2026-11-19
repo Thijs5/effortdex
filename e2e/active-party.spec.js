@@ -474,11 +474,16 @@ test.describe('Keyboard-free defeat review', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await page.screenshot({ path: info.outputPath('recent-defeats-dark.png') });
     const before = await rosterCard(page, 'Bulbasaur').locator('.roster-card-evbar .value').textContent();
+    const recentPosition = await recents.first().boundingBox();
     await recents.first().tap();
     await expect(page.locator('#battle-opponent-name')).toHaveText('Caterpie');
     await expect(page.locator('#battle-search').getByRole('combobox')).toBeHidden();
     await expect(page.locator('#battle-log-btn')).toBeEnabled();
     await expect(rosterCard(page, 'Bulbasaur').locator('.roster-card-evbar .value')).toHaveText(before || '');
+    await expect(recents.first()).toBeVisible();
+    expect(await recents.first().boundingBox()).toEqual(recentPosition);
+    await recents.nth(1).tap();
+    await expect(page.locator('#battle-opponent-name')).toHaveText('Ivysaur');
     await page.screenshot({ path: info.outputPath('recent-defeats-staged-dark.png') });
     await page.locator('#battle-search .sheet-close').tap();
     await page.reload();

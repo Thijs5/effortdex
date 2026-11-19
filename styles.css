@@ -1611,15 +1611,12 @@ textarea.ds-field { resize: vertical; }
 }
 
 /* Once picked, the opponent and its typing share one compact identity row. */
-.battle-sheet-extra[data-state="ready"] .battle-recents,
 .battle-recents:has(.battle-recents-empty),
-.battle-sheet-extra:is([data-state="ready"], [data-state="empty"]) .battle-confirm-state {
+.battle-sheet-extra:is([data-state="ready"], [data-state="empty"], [data-state="loading"]) .battle-confirm-state {
   display: none;
 }
-.battle-opponents:not(:has(.battle-recent-card)) .battle-current,
-.battle-sheet-extra[data-state="ready"] .battle-current { flex: 1; }
-.battle-opponents:not(:has(.battle-recent-card)) .battle-opponent-card,
-.battle-sheet-extra[data-state="ready"] .battle-opponent-card {
+.battle-opponents:not(:has(.battle-recent-card)) .battle-current { flex: 1; }
+.battle-opponents:not(:has(.battle-recent-card)) .battle-opponent-card {
   flex-direction: row;
   justify-content: flex-start;
   min-height: 64px;

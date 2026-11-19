@@ -652,12 +652,12 @@ battleSearch.addEventListener('pokemon-pick', (e) => {
  * arms #battle-log-btn. Nothing is applied to the roster until that
  * button is actually pressed (see its own click handler below). */
 async function stageBattlePick(name: string): Promise<void> {
-  clearPendingBattle();
-  const token = battlePickToken;
+  const token = ++battlePickToken;
+  pendingBattle = null;
+  battleLogBtn.disabled = true;
   const partyId = store.activeParty?.id;
   battleComposer.dataset.state = 'loading';
-  battleOpponentName.textContent = titleCase(name);
-  battleOpponentHint.textContent = 'Loading opponent…';
+  battleOpponentHint.textContent = 'Loading…';
   battleConfirmState.textContent = 'Looking up opponent…';
   try {
     const mon = await api.getPokemon(name);
@@ -665,6 +665,9 @@ async function stageBattlePick(name: string): Promise<void> {
     stageKnownBattle(mon);
   } catch (err) {
     if (token !== battlePickToken || partyId !== store.activeParty?.id || battleSearch.hidden) return;
+    clearPendingBattle();
+    battleComposer.dataset.state = 'error';
+    battleOpponentName.textContent = titleCase(name);
     battleConfirmState.textContent = 'Could not load opponent';
     battleOpponentHint.textContent = 'Tap to try again';
     battleResultSummary.textContent = (err instanceof Error && err.message) || 'Could not look up that Pokémon.';
