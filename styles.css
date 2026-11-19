@@ -1603,8 +1603,8 @@ textarea.ds-field { resize: vertical; }
 
 /* Consistent form actions: quiet dismissal plus one broad primary action. */
 @media (max-width: 640px) {
-  .party-dialog-actions { flex-wrap: nowrap; }
-  .party-dialog-actions .spacer { display: none; }
-  .party-dialog-actions > .ds-btn--ghost { flex: 0 0 92px; }
-  .party-dialog-actions > .ds-btn--primary { flex: 1; min-width: 0; }
+  :is(#party-form, #add-pokemon-form) > .party-dialog-actions { flex-wrap: nowrap; }
+  :is(#party-form, #add-pokemon-form) > .party-dialog-actions .spacer { display: none; }
+  :is(#party-form, #add-pokemon-form) > .party-dialog-actions > .ds-btn--ghost { flex: 0 0 92px; }
+  :is(#party-form, #add-pokemon-form) > .party-dialog-actions > .ds-btn--primary { flex: 1; min-width: 0; }
 }

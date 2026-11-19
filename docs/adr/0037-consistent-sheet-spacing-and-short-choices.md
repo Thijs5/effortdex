@@ -22,6 +22,8 @@ and the swap picker styled a status message like an actionable dashed card.
   icons, and gutters. Use a semantic heading. Apply safe-area padding once.
 - Give mobile party forms a consistent Cancel plus broad primary-action footer.
   Keep party deletion in the scrolling edit body, away from routine confirmation.
+  Scope horizontal button sizing to the party/add forms; the filter dialog's
+  stacked footer retains normal button heights and its scrollable body space.
 - Show evolution stages in aligned grid columns, with arrows attached to their
   destination and compact vertical stage cards. Branches stack in their stage.
   Preserve evolution staging, save/discard, and 44px minimum touch targets.
@@ -33,4 +35,5 @@ Screenshot review covers phone light/dark, desktop, and narrow/short viewports.
 E2E assertions check compact sheet bounds, choice-to-Save distance, expanded help
 with reachable actions, nature save/discard, 320px form footer layout, three-stage
 alignment, and evolution saving. Existing battle, party, and stat-entry flows
-remain regression-covered.
+remain regression-covered. A short-viewport filter test bounds each pinned
+button's height, checks the available body height, and exercises reset/confirm.

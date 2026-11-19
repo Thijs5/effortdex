@@ -69,6 +69,35 @@ test('editing at 320px has a broad primary action and keeps deletion out of the 
   expect((await search.getByRole('combobox').boundingBox())?.x).toBeCloseTo(title?.x || 0, 0);
 });
 
+test('the stacked filter footer stays compact in a short phone viewport', async ({ page }, info) => {
+  await page.goto('/');
+  await createParty(page, { name: 'Filter spacing', baseGame: 'Emerald' });
+  await addPokemon(page, 'Bulbasaur');
+  await page.locator('#roster-filter-btn').tap();
+  await page.getByLabel('Minimum level', { exact: true }).fill('20');
+  await expect(page.locator('#roster-filter-done')).toContainText('Show 0');
+  await page.setViewportSize({ width: 390, height: 360 });
+  const dialog = page.locator('#roster-filter-dialog');
+  const clear = page.locator('#roster-filter-clear');
+  const done = page.locator('#roster-filter-done');
+  for (const control of [clear, done]) {
+    const bounds = await control.boundingBox();
+    expect(bounds?.height).toBeGreaterThanOrEqual(44);
+    expect(bounds?.height).toBeLessThanOrEqual(52);
+    await expect(control).toBeInViewport({ ratio: 1 });
+  }
+  const resetBounds = await clear.boundingBox();
+  const doneBounds = await done.boundingBox();
+  expect(resetBounds?.width).toBeCloseTo(doneBounds?.width || 0, 0);
+  expect(doneBounds?.y).toBeGreaterThan((resetBounds?.y || 0) + (resetBounds?.height || 0));
+  expect((await dialog.locator('.dialog-body').boundingBox())?.height).toBeGreaterThanOrEqual(140);
+  await clear.tap();
+  await expect(done).toContainText('Show 1');
+  await page.screenshot({ path: info.outputPath('iphone13-filter-footer-short-viewport.png') });
+  await done.tap();
+  await expect(dialog).toBeHidden();
+});
+
 test('all three evolution stages stay on one row at 320px and still save a chosen evolution', async ({ page }, info) => {
   await page.setViewportSize({ width: 320, height: 844 });
   await page.goto('/');
