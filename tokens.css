@@ -101,12 +101,12 @@
   --font-body: 'Public Sans', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', ui-monospace, monospace;
 
-  --font-size-2xs: 0.68rem;
-  --font-size-xs: 0.72rem;
-  --font-size-sm: 0.8rem;
-  --font-size-md: 0.88rem;
-  --font-size-lg: 1rem;
-  --font-size-xl: 1.15rem;
+  --font-size-2xs: 0.75rem;
+  --font-size-xs: 0.8125rem;
+  --font-size-sm: 0.9375rem;
+  --font-size-md: 1rem;
+  --font-size-lg: 1.125rem;
+  --font-size-xl: 1.375rem;
   --font-size-input: 16px; /* >=16px keeps mobile Safari from zooming on focus */
 
   /* Spacing scale */

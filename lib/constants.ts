@@ -254,6 +254,15 @@ export const TYPE_COLORS: Record<string, string> = {
   fairy: '#e08fc0',
 };
 
+/** Preserve type hues while keeping small badge labels readable. */
+export function typeTextColor(type: string): string {
+  const hex = TYPE_COLORS[type] ?? '#5f5b53';
+  const channels = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
+    .map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
+  const luminance = channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
+  return luminance > 0.179 ? '#000000' : '#ffffff';
+}
+
 /** A type name title-cased for display ("water" -> "Water"). */
 export function typeLabel(type: string): string {
   return type ? type[0].toUpperCase() + type.slice(1) : '';

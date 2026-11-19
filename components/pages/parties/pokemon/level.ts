@@ -80,7 +80,7 @@ export class LevelDialog extends BaseDialog {
     `;
     this.shadow.appendChild(style);
 
-    this.$title.textContent = 'Level';
+    this.$title.textContent = 'Level & stats';
     this.$body.innerHTML = `
       <div class="field-inline level-up-field"><span>Level</span>
         <span class="level-up-from">Lv. <span class="level-up-from-value"></span> →</span>
@@ -113,6 +113,8 @@ export class LevelDialog extends BaseDialog {
     this.$inputStep = this.shadow.querySelector<HTMLButtonElement>('.level-up-input-step');
 
     this.$input.addEventListener('change', () => this._previewInput());
+    this.$input.addEventListener('next-input', () => this.$statsGrid.focusFirst());
+    this.$statsGrid.addEventListener('stats-complete', () => this.$saveBtn?.focus());
     this.$saveBtn?.addEventListener('click', () => this._save());
     this.$inputStep?.addEventListener('click', () => {
       const e = this._entry as RosterEntry;
@@ -176,6 +178,7 @@ export class LevelDialog extends BaseDialog {
    */
   async _save(): Promise<void> {
     const e = this._entry as RosterEntry;
+    if (!this.$statsGrid.validate()) return;
     const batchId = crypto.randomUUID();
     store.setLevel(e.uid, Number(this.$input.value), batchId);
     for (const { statKey, value } of this.$statsGrid.readings) {

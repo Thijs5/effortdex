@@ -79,7 +79,7 @@ export class EvHistoryLog extends BaseElement {
         .hist-actions { display: flex; gap: var(--space-2); flex: 0 0 auto; margin-left: auto; }
         .delete-hist-btn {
           border: none; background: transparent; cursor: pointer; font-size: var(--font-size-input);
-          color: var(--ink-soft); line-height: 1; padding: var(--space-2);
+          color: var(--ink-soft); line-height: 1; padding: var(--space-2); min-width: 44px; min-height: 44px;
         }
         .delete-hist-btn:hover { color: var(--poke-red); }
         /* One Save committing several events at once (the Level popup's
@@ -94,7 +94,7 @@ export class EvHistoryLog extends BaseElement {
         ul.hist-list li.hist-batch details { display: block; }
         ul.hist-list li.hist-batch summary {
           display: flex; align-items: center; gap: var(--space-2) var(--space-3);
-          cursor: pointer; list-style: none;
+          cursor: pointer; list-style: none; min-height: 44px;
         }
         ul.hist-list li.hist-batch summary::-webkit-details-marker { display: none; }
         ul.hist-list li.hist-batch summary > div { flex: 1 1 140px; min-width: 0; }

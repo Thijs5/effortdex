@@ -50,8 +50,8 @@ test.describe('IV tracking', () => {
     const level = await openLevelUpDialog(card);
     await level.getByLabel('New level').fill('90');
     await level.getByLabel('New level').blur();
-    await level.getByRole('button', { name: 'ATK plus 1', exact: true }).click();
-    await level.getByLabel(/ATK adjustment/).fill('+49');
+    await level.getByRole('button', { name: 'Current stats', exact: true }).click();
+    await level.getByLabel('ATK reading').fill('115');
     await level.getByRole('button', { name: 'Save', exact: true }).click();
     dialog = await openIvs(card);
     await expect(dialog.getByText(/Using 3 saved stat readings/)).toBeVisible();

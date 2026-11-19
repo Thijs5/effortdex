@@ -439,6 +439,10 @@ html[data-modal-open] body {
 }
 
 .back-link {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  min-width: 44px;
   font-size: var(--font-size-sm);
   color: var(--teal);
   text-decoration: none;
@@ -1489,7 +1493,7 @@ textarea.ds-field { resize: vertical; }
   align-items: center;
   gap: var(--space-2);
   flex-wrap: wrap;
-  padding: var(--space-3) var(--space-4) var(--space-4);
+  padding: var(--space-3) var(--space-4) max(var(--space-4), env(safe-area-inset-bottom));
   background: var(--paper-panel);
   box-shadow: 0 -4px 8px -4px rgba(23, 26, 19, 0.15);
 }
@@ -1578,3 +1582,14 @@ textarea.ds-field { resize: vertical; }
 .brand-mark { position: relative; display: inline-flex; flex: 0 0 28px; width: 28px; height: 28px; }
 .brand-mark img { display: block; width: 100%; height: 100%; }
 .brand-mark .power-led { position: absolute; right: -2px; bottom: 0; width: 6px; height: 6px; margin: 0; outline: 2px solid var(--surface); border-radius: 50%; }
+
+/* Companion-use audit: touch targets stay stable while content scrolls. */
+@media (max-width: 640px) {
+  .device.is-scrolled .view-nav > .ds-btn--primary { min-height: 44px; }
+  .header-menu-item { min-height: 44px; }
+  .field-label--checkbox { min-height: 44px; padding-block: var(--space-2); }
+}
+@media (max-width: 640px) {
+  .battle-slot-handle, .roster-card-handle { min-width: 44px; min-height: 44px; margin: 0; }
+  .sprite-cache-generation > summary { min-height: 44px; align-content: center; }
+}
