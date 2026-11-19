@@ -24,6 +24,9 @@ test.describe('EV-training location guide', () => {
 
     await expect(dialog.locator('ev-training-guide h3.section-title')).toHaveText(['HP', 'ATK', 'DEF', 'SPA', 'SPD', 'SPE']);
     // Emerald's curated HP spot (lib/ev-training-locations.js's RSE set).
+    await dialog.getByText('Which moves are physical or special?').click();
+    await expect(dialog.locator('.categories p').nth(1)).toContainText('Ghost');
+    await expect(dialog.locator('.categories p').nth(2)).toContainText('Dark');
     await dialog.getByRole('combobox').selectOption('Ghost');
     await expect(dialog.locator('.result')).toContainText('Next, train 252 ATK EVs');
     await dialog.getByRole('combobox').selectOption('Dark');

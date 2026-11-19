@@ -4,6 +4,16 @@ import type { RosterEntry } from '../../lib/store.ts';
 const specialTypes = ['Dark', 'Dragon', 'Electric', 'Fire', 'Grass', 'Ice', 'Psychic', 'Water'];
 const physicalTypes = ['Bug', 'Fighting', 'Flying', 'Ghost', 'Ground', 'Normal', 'Poison', 'Rock', 'Steel'];
 
+export function categoryGuide(gen: number): string {
+  if (!gen) return 'Choose a known base game to see its move category rules.';
+  if (gen >= 4) return '<p>Each damaging move has its own category. Check the physical or special symbol in its move details. For example, Fire Punch is physical and Flamethrower is special.</p>';
+  const physical = physicalTypes.filter(type => gen !== 1 || type !== 'Steel');
+  const special = specialTypes.filter(type => gen !== 1 || type !== 'Dark');
+  return `<p>A damaging move’s type determines its category in this game.</p>
+    <p><strong>Physical · Attack</strong><br>${physical.join(', ')}</p>
+    <p><strong>Special · ${gen === 1 ? 'Special' : 'Special Attack'}</strong><br>${special.join(', ')}</p>`;
+}
+
 export function moveOptions(gen: number): string[] {
   return gen === 3 ? [...specialTypes, ...physicalTypes].sort() : ['Physical', 'Special'];
 }

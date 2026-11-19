@@ -1,4 +1,4 @@
-import { moveOptions, trainingPlan } from '../../../molecules/training-plan.ts';
+import { categoryGuide, moveOptions, trainingPlan } from '../../../molecules/training-plan.ts';
 import { matchGameVersion } from '../../../../lib/game-versions.ts';
 import { store } from '../../../../lib/services.ts';
 import { evTrainingLocations } from '../../../../lib/ev-training-locations.ts';
@@ -33,6 +33,7 @@ export class TrainingGuideDialog extends BaseDialog {
       select { display:block; width:100%; min-height:44px; margin-block:4px;
         padding-inline:10px; background:var(--surface); color:var(--ink); border:1px solid var(--lcd-line);
         border-radius:var(--radius-sm); font:inherit; }
+      summary { cursor:pointer; padding-block:10px; font-weight:600; }
       .plan { font-size:var(--font-size-xs); }
       .training-guide-attribution { margin: var(--space-3) 0 0; font-size: var(--font-size-2xs); color: var(--ink-soft); }
     `;
@@ -41,7 +42,9 @@ export class TrainingGuideDialog extends BaseDialog {
     this.$title.textContent = 'Training guide';
     this.$body.innerHTML = `
       <section class="plan"><h3>Suggested training</h3>
-      <label>Training focus<select></select></label><div class="result" aria-live="polite"></div></section>
+      <label>Training focus<select></select></label>
+      <details><summary>Which moves are physical or special?</summary><div class="categories"></div></details>
+      <div class="result" aria-live="polite"></div></section>
       <section class="spots"><h3>Where to train</h3><ev-training-guide></ev-training-guide>
       <p class="training-guide-attribution">Locations via Bulbapedia &amp; Marriland's EV training guides</p></section>`;
     this.$guide = this.shadow.querySelector('ev-training-guide')!;
@@ -61,6 +64,7 @@ export class TrainingGuideDialog extends BaseDialog {
     const gen = matchGameVersion(store.activeParty?.baseGame)?.gen ?? 0;
     if (e?.uid !== this._entry?.uid || e?.speciesId !== this._entry?.speciesId || select.dataset.gen !== String(gen)) {
       select.dataset.gen = String(gen);
+      this.$body.querySelector('.categories')!.innerHTML = categoryGuide(gen);
       const moves = document.createElement('optgroup');
       moves.label = gen === 3 ? 'Main damaging move’s type' : 'Main damaging move’s category';
       moves.append(...moveOptions(gen).map(v => new Option(v, v)));
