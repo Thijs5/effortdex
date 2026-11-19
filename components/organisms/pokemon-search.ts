@@ -221,7 +221,7 @@ export class PokemonSearch extends BaseElement {
           order: 4;
           flex: 0 0 auto;
           margin-top: auto;
-          padding: var(--space-3) var(--space-4) max(var(--space-4), env(safe-area-inset-bottom));
+          padding: var(--space-3) var(--space-4) calc(var(--modal-bottom-clearance) + env(safe-area-inset-bottom, 0px));
         }
         .wrap.sheet ul.suggestions {
           order: 3;

@@ -53,10 +53,10 @@ test.describe('Dialog polish', () => {
     const dialog = await openLevelUpDialog(card);
 
     await dialog.locator('.level-up-field').getByText('Level', { exact: true }).click();
-    await expect(dialog.getByLabel('New level')).toHaveValue('10'); // unchanged
+    await expect(dialog.getByLabel('New level')).toHaveValue('11'); // unchanged next-level preview
 
     await dialog.getByRole('button', { name: 'Level plus 1' }).click();
-    await expect(dialog.getByLabel('New level')).toHaveValue('11'); // the button still works
+    await expect(dialog.getByLabel('New level')).toHaveValue('12'); // the button still works
   });
 
   test('on a Gen I party the Items dialog hides the Training-item section and flags Pokérus as unavailable', async ({ page }) => {

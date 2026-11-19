@@ -193,7 +193,7 @@ const css = `
      trickery. Owns its own padding now that .ds-dialog has none. */
   .ds-dialog-footer {
     display: flex;
-    padding: var(--space-3) var(--space-4) max(var(--space-4), env(safe-area-inset-bottom));
+    padding: var(--space-3) var(--space-4) calc(var(--modal-bottom-clearance) + env(safe-area-inset-bottom, 0px));
     background: var(--paper-panel);
     /* The shadow reads as "there's scrollable content behind this bar",
        which a plain border alone didn't. */

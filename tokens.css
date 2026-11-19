@@ -115,6 +115,9 @@
   --space-3: 0.55rem;
   --space-4: 0.9rem;
   --space-5: 1.4rem;
+  /* Touch confirmation stays above the iPhone home indicator, including
+     browser states that report a zero safe-area inset. */
+  --modal-bottom-clearance: var(--space-4);
 
   /* Radius scale — friendlier rounded-rectangle */
   --radius-sm: 8px;
@@ -261,4 +264,8 @@
 
 @media (prefers-reduced-motion: reduce) {
   * { animation-duration: 0.001ms !important; transition-duration: 0.001ms !important; }
+}
+
+@media (max-width: 640px), (pointer: coarse) {
+  :root { --modal-bottom-clearance: 28px; }
 }

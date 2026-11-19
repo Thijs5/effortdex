@@ -221,7 +221,7 @@ test.describe('Active party and faint tracking', () => {
     await expect(battlePartySlot(page, 'Charmander').locator('.battle-slot-menu')).toBeVisible();
   });
 
-  test('"Level up" in the "⋯" menu opens that Pokémon\'s own Level dialog, prefilled to its current level', async ({ page }) => {
+  test('"Level up" in the "⋯" menu opens that Pokémon\'s own Level dialog, prefilled to its next level', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
     await addPokemon(page, 'Bulbasaur', { level: 10 });
@@ -432,7 +432,7 @@ test.describe('Keyboard-free defeat review', () => {
     await mockPokeApi(page);
     await page.route('**/raw.githubusercontent.com/**/sprites/pokemon/**', async route => {
       const id = route.request().url().match(/\/(\d+)\.png$/)?.[1];
-      if (id && ['1', '4', '10', '95', '113'].includes(id)) {
+      if (id && ['1', '2', '4', '10', '95', '113'].includes(id)) {
         await route.fulfill({ contentType: 'image/png', body: readFileSync(new URL(`./fixtures/sprites/${id}.png`, import.meta.url)) });
       } else await route.fallback();
     });
@@ -441,13 +441,26 @@ test.describe('Keyboard-free defeat review', () => {
     await addPokemon(page, 'Bulbasaur');
     await addPokemon(page, 'Charmander');
     await logPartyBattle(page, 'Caterpie', { select: ['Charmander'] });
-    for (const opponent of ['Onix', 'Chansey', 'Caterpie']) await logPartyBattle(page, opponent);
+    for (const opponent of ['Onix', 'Chansey', 'Ivysaur', 'Caterpie']) await logPartyBattle(page, opponent);
     const recents = page.locator('#battle-recent-opponents button');
-    await expect(recents).toHaveText(['Caterpie', 'Chansey', 'Onix']);
+    await expect(recents).toHaveText(['Caterpie', 'Ivysaur', 'Chansey', 'Onix']);
     await expect(page.locator('#battle-participants .party-slot--selected')).toHaveCount(2);
     await expect(page.locator('#battle-log-btn')).toBeDisabled();
     for (const width of [390, 320]) {
       await page.setViewportSize({ width, height: 844 });
+      const cards = await Promise.all((await recents.all()).map(card => card.boundingBox()));
+      expect(cards[0]?.y).toBeCloseTo(cards[1]?.y || 0, 0);
+      expect(cards[2]?.y).toBeCloseTo(cards[3]?.y || 0, 0);
+      expect(cards[2]?.y).toBeGreaterThan(cards[0]?.y || 0);
+      const currentTitle = await page.locator('.battle-current > .battle-sheet-eyebrow').boundingBox();
+      const recentTitle = await page.locator('#battle-recents-label').boundingBox();
+      expect(currentTitle?.y).toBeCloseTo(recentTitle?.y || 0, 0);
+      const currentHeadingEnd = await page.locator('.battle-current > .battle-sheet-eyebrow').evaluate(title => {
+        const range = document.createRange();
+        range.selectNodeContents(title);
+        return range.getBoundingClientRect().right;
+      });
+      expect(currentHeadingEnd + 8).toBeLessThanOrEqual(recentTitle?.x || 0);
       for (const card of await recents.all()) {
         const box = await card.boundingBox();
         expect(box?.width).toBeGreaterThanOrEqual(44);
@@ -466,6 +479,7 @@ test.describe('Keyboard-free defeat review', () => {
     await expect(page.locator('#battle-search').getByRole('combobox')).toBeHidden();
     await expect(page.locator('#battle-log-btn')).toBeEnabled();
     await expect(rosterCard(page, 'Bulbasaur').locator('.roster-card-evbar .value')).toHaveText(before || '');
+    await page.screenshot({ path: info.outputPath('recent-defeats-staged-dark.png') });
     await page.locator('#battle-search .sheet-close').tap();
     await page.reload();
     await expect(rosterCard(page, 'Bulbasaur').locator('.roster-card-evbar .value')).toHaveText(before || '');
@@ -517,6 +531,7 @@ test.describe('Keyboard-free defeat review', () => {
     await page.locator('#battle-log-btn').evaluate(btn => btn.dispatchEvent(new MouseEvent('click', { bubbles: true })));
     await expect(rosterCard(page, 'Bulbasaur').locator('.roster-card-evbar .value')).toHaveText('1/510');
     const after = await page.locator('#battle-log-btn').boundingBox();
+    expect(844 - (after?.y || 0) - (after?.height || 0)).toBeGreaterThanOrEqual(27);
     // The raised button's press/hover animation may translate it 1px.
     expect(Math.abs((after?.y ?? -100) - (before?.y ?? 100))).toBeLessThanOrEqual(2);
     expect(after?.height).toBe(before?.height);

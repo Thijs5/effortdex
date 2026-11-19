@@ -87,3 +87,22 @@ narrow party-form primary actions, and a swap status card that resembled a butto
 [ADR 0037](adr/0037-consistent-sheet-spacing-and-short-choices.md) records the
 changes. Long stat-entry forms retain their keyboard-free steppers and pinned
 confirmation; the compact variant is limited to short choices.
+
+## Companion-flow follow-up
+
+The increase editor now restores the Stat / Reading / Increase layout, with a
+reserved reference line so repeated +/− taps do not move the next controls or
+evolution. The form starts one level higher (maximum 100), without changing the
+record until Save. Direct totals and corrections remain available.
+
+Defeat review places a larger current opponent beside four recent defeats in a
+2×2 grid, with aligned headings. The 320px screenshot exposed touching headings;
+the shorter “Opponent” heading keeps an explicit gap at both phone widths.
+Card-area height is reserved when no opponent is selected or no recent defeats
+exist. Recent selection stages a fresh defeat and never records it by itself.
+
+Standard dialog, party-form and defeat-review footers now share a 28px touch
+clearance plus any safe-area inset, keeping actions above the gesture area even
+when the browser reports zero inset. Short-viewport transcription still keeps
+the focused field above the pinned action bar. [ADR 0038](adr/0038-stable-level-up-and-touch-footer-clearance.md)
+records the decisions, flow checks and native-device limits.

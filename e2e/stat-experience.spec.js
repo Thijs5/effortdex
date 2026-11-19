@@ -157,8 +157,9 @@ test.describe('Gen I/II Stat Experience', () => {
     await expect(dialog).toBeHidden();
 
     await card.getByText(/History/).click();
+    await card.locator('ev-history-log .hist-batch summary').click();
     await expect(card.locator('ev-history-log').getByText('ATK reading logged')).toBeVisible();
-    await expect(card.locator('ev-history-log').getByText('30 at Lv. 10')).toBeVisible();
+    await expect(card.locator('ev-history-log').getByText('30 at Lv. 11')).toBeVisible();
   });
 
   test('the Gen I Level dialog collapses Sp. Atk / Sp. Def into a single "Special" reading row', async ({ page }) => {
