@@ -647,8 +647,13 @@ function renderRecentOpponents(): void {
   // Preserve a focused quick-pick through unrelated store rendering.
   const focusedName = (document.activeElement as HTMLElement | null)?.dataset.opponent;
   battleRecents.replaceChildren();
-  const recent = battleSearch.recent.slice(0, 3);
-  document.getElementById('battle-recents-label')!.hidden = recent.length === 0;
+  const recent = battleSearch.recent.slice(0, 4);
+  if (!recent.length) {
+    const empty = document.createElement('p');
+    empty.className = 'battle-recents-empty';
+    empty.textContent = 'Your last defeated Pokémon appear here.';
+    battleRecents.appendChild(empty);
+  }
   for (const mon of recent) {
     const button = document.createElement('button');
     button.type = 'button';

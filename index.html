@@ -184,11 +184,12 @@
         <div slot="sheet-extra" class="battle-sheet-extra" data-state="empty">
           <p class="battle-composer-intro">Record an opponent your team defeated.</p>
           <div class="battle-opponents">
+          <div class="battle-current"><span class="battle-sheet-eyebrow">Opponent</span>
           <button id="battle-choose-opponent-btn" class="battle-opponent-card" type="button" aria-label="Choose defeated Pokémon">
             <span class="battle-opponent-art"><img id="battle-opponent-sprite" alt="" hidden /><span id="battle-opponent-placeholder" aria-hidden="true">?</span></span>
-            <span class="battle-opponent-copy"><span class="battle-sheet-eyebrow">Defeated opponent</span><strong id="battle-opponent-name">Choose a Pokémon</strong><span id="battle-opponent-hint">Search or choose a recent opponent →</span></span>
-          </button>
-          <div class="battle-recents"><span class="battle-sheet-eyebrow" id="battle-recents-label" hidden>Recent defeats</span><div id="battle-recent-opponents" role="group" aria-labelledby="battle-recents-label"></div></div>
+            <span class="battle-opponent-copy"><strong id="battle-opponent-name">Choose a Pokémon</strong><span id="battle-opponent-hint">Search or choose a recent opponent →</span></span>
+          </button></div>
+          <div class="battle-recents"><span class="battle-sheet-eyebrow" id="battle-recents-label">Recent defeats</span><div id="battle-recent-opponents" role="group" aria-labelledby="battle-recents-label"></div></div>
           </div>
           <p id="battle-confirm-state" class="battle-confirm-state" role="status">Not logged yet</p>
           <div class="battle-team-heading"><span class="battle-sheet-eyebrow">Who battled?</span><span id="battle-selected-count"></span></div>
@@ -495,10 +496,9 @@
         </label>
         <p class="hint">Restricts the battle-log and add-Pok&eacute;mon pickers to species from up to the chosen generation, instead of following the base game's own &mdash; for a ROM hack/mod whose dex doesn't match its base game's real generation.</p>
       </details>
-
+      <button type="button" id="party-delete-btn" class="ds-btn ds-btn--ghost ds-btn--danger" hidden>Delete party</button>
       </div>
       <div class="party-dialog-actions">
-        <button type="button" id="party-delete-btn" class="ds-btn ds-btn--ghost ds-btn--danger" hidden>Delete party</button>
         <span class="spacer"></span>
         <button type="button" id="party-cancel-btn" class="ds-btn ds-btn--ghost">Cancel</button>
         <button type="submit" id="party-submit-btn" class="ds-btn ds-btn--primary">Create party</button>
@@ -547,7 +547,7 @@
        button opens this pre-scoped to the slot being replaced; an empty
        slot opens it with nothing to swap out, just add. Bench list is
        rebuilt fresh each open (roster.ts). -->
-  <dialog id="swap-dialog" class="party-dialog swap-dialog ds-dialog" aria-labelledby="swap-dialog-title">
+  <dialog id="swap-dialog" class="party-dialog swap-dialog ds-dialog ds-dialog--compact" aria-labelledby="swap-dialog-title">
     <header class="ds-dialog-header">
       <h2 id="swap-dialog-title">Bring in a Pok&eacute;mon</h2>
       <button type="button" id="swap-dialog-close" class="ds-dialog-close" aria-label="Close">

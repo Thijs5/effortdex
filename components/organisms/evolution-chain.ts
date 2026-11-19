@@ -38,10 +38,10 @@ export class EvolutionChain extends BaseElement {
            edge instead of actually wrapping to fit. */
         :host { display: grid; gap: var(--space-2); min-width: 0; }
         .evo-note { margin: 0; font-size: var(--font-size-2xs); color: var(--ink-soft); }
-        .evo-chain { display: flex; align-items: center; gap: var(--space-3) var(--space-4); flex-wrap: wrap; row-gap: var(--space-4); min-width: 0; }
-        .evo-stage { display: flex; flex-direction: column; gap: var(--space-2); }
-        .evo-link { display: flex; align-items: center; gap: var(--space-3); }
-        .evo-arrow { color: var(--ink-soft); font-size: var(--font-size-md); }
+        .evo-chain { display: grid; grid-template-columns: repeat(var(--evo-stages, 1), minmax(0, 1fr)); align-items: start; gap: var(--space-1); min-width: 0; }
+        .evo-stage { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+        .evo-link { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: var(--space-1); min-width: 0; }
+        .evo-arrow { color: var(--ink-soft); font-size: var(--font-size-md); align-self: start; padding-top: 28px; }
         .evolve-status { margin: 0; font-size: var(--font-size-2xs); color: var(--teal); min-height: 1em; }
       </style>
       <p class="evo-note" hidden></p>
@@ -188,7 +188,8 @@ export class EvolutionChain extends BaseElement {
     const currentNode = nodes.find((n) => n.name === currentName);
     const nextNames = new Set(nodes.filter((n) => n.parent === currentName).map((n) => n.name));
     const prevName = currentNode?.parent ?? null;
-    const maxDepth = Math.max(...nodes.map((n) => n.depth));
+    const maxDepth = Math.max(0, ...nodes.map((n) => n.depth));
+    this.$chain.style.setProperty('--evo-stages', String(maxDepth + 1));
 
     // Each arrow is grouped into the same wrapping unit as the stage it
     // points at (rather than a sibling flex item of its own) — otherwise
@@ -219,7 +220,7 @@ export class EvolutionChain extends BaseElement {
     const label = titleCase(node.name);
     const sprite = spriteByName.get(node.name) || FALLBACK_SPRITE;
     const boost = node.minLevel ? `Lv. ${node.minLevel}` : '';
-    const attrs = `icon="${escapeHtml(sprite)}" label="${escapeHtml(label)}" boost="${escapeHtml(boost)}"`;
+    const attrs = `compact icon="${escapeHtml(sprite)}" label="${escapeHtml(label)}" boost="${escapeHtml(boost)}"`;
 
     if (node.name === currentName) {
       return `<ds-item-button ${attrs} class="evo-current-btn" active disabled title="Current form"></ds-item-button>`;

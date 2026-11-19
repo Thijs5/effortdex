@@ -5,8 +5,7 @@ import { addPokemon, openDetail, openIvs, openLevelUpDialog } from './support/po
 import { mockPokeApi } from './support/pokeapi-mock.js';
 
 // The Level field lives only in this popup now (moved out of Training &
-// EVs). It's prefilled to the current level (not +1 — this is as much
-// "log/fix stats now" as "level up"), and both the evolution chain and
+// EVs). It previews the next level and both the evolution chain and
 // the stat-reading rows (feeding possibleIvsFromReadings) are visible
 // immediately, not gated behind an actual increase — see
 // e2e/evolution.spec.js for the evolution-chain-specific coverage.
@@ -24,7 +23,7 @@ test.describe('Level popup', () => {
     await mockPokeApi(page);
   });
 
-  test('opens prefilled to the current level, with stats already visible', async ({ page }) => {
+  test('opens prefilled to the next level, with stats already visible', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
     await addPokemon(page, 'Bulbasaur', { level: 10 });
@@ -32,11 +31,29 @@ test.describe('Level popup', () => {
     const dialog = await openLevelUpDialog(card);
 
     await expect(dialog.locator('.level-up-from')).toHaveText('Lv. 10 →'); // read-only — only the new-level field is editable
-    await expect(dialog.getByLabel('New level')).toHaveValue('10');
+    await expect(dialog.getByLabel('New level')).toHaveValue('11');
     await expect(dialog.getByRole('heading', { name: 'Evolution' })).toBeVisible();
     await expect(dialog.getByRole('heading', { name: 'Log stats' })).toBeVisible();
     await expect(dialog.getByLabel('HP reading')).toBeVisible();
     await expect(dialog.getByRole('button', { name: 'Save' })).toBeVisible();
+  });
+
+  test('the automatic next level is only a preview, and stops at level 100', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Level cap', baseGame: 'Emerald' });
+    await addPokemon(page, 'Bulbasaur', { level: 99 });
+    const card = await openDetail(page, 'Bulbasaur');
+    let dialog = await openLevelUpDialog(card);
+    await expect(dialog.getByLabel('New level')).toHaveValue('100');
+    await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(card.getByTitle('Set level')).toContainText('Lv. 99');
+    dialog = await openLevelUpDialog(card);
+    await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(card.getByTitle('Set level')).toContainText('Lv. 100');
+    dialog = await openLevelUpDialog(card);
+    await expect(dialog.getByLabel('New level')).toHaveValue('100');
+    await dialog.getByRole('button', { name: 'Level plus 1', exact: true }).click();
+    await expect(dialog.getByLabel('New level')).toHaveValue('100');
   });
 
   test('nothing is applied until Save: typing a level or a stat is only a preview', async ({ page }) => {
@@ -103,7 +120,7 @@ test.describe('Level popup', () => {
     const ivDialog = await openIvs(card);
     if (!await ivDialog.getByLabel('Stat', { exact: true }).isVisible()) await ivDialog.getByText('Estimate from game stats').click();
     await ivDialog.getByLabel('Stat', { exact: true }).selectOption('atk');
-    await expect(ivDialog.getByText('Lv. 10 — 20')).toBeVisible();
+    await expect(ivDialog.getByText('Lv. 11 — 20')).toBeVisible();
     await expect(ivDialog.getByText('Lv. 12 — 20')).toBeHidden(); // untouched, correctly not logged again
   });
 
@@ -122,7 +139,8 @@ test.describe('Level popup', () => {
     await dialog.getByRole('button', { name: 'Increases (+)', exact: true }).click();
     const increase = dialog.getByLabel(/ATK adjustment from last reading/);
     await expect(increase).toHaveValue('7');
-    await expect(dialog.locator('.reading-text').filter({ hasText: '20 → 27' })).toBeVisible();
+    await expect(dialog.locator('.row[data-stat="atk"] .reading-current')).toHaveText('27');
+    await expect(dialog.locator('.row[data-stat="atk"] .reading-origin')).toHaveText('was 20');
     await dialog.getByRole('button', { name: 'ATK plus 1', exact: true }).click();
     await expect(increase).toHaveValue('8');
     await dialog.getByRole('button', { name: 'ATK minus 1', exact: true }).click();
@@ -207,7 +225,8 @@ test.describe('Level popup', () => {
 
     await card.getByText(/History/).click();
     const histLog = card.locator('ev-history-log');
-    const entry = histLog.locator('li', { hasText: 'ATK reading logged' });
+    await histLog.locator('li.hist-batch summary').click();
+    const entry = histLog.locator('.hist-batch-items li', { hasText: 'ATK reading logged' });
     await expect(entry).toBeVisible();
 
     page.once('dialog', (d) => d.dismiss()); // "cancel"

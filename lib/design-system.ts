@@ -153,6 +153,15 @@ const css = `
       max-height: var(--dialog-vv-height, 100dvh);
       border-radius: 0;
     }
+    /* A single short choice should not separate its field and Save with
+       an empty screen. Longer forms keep the full-height sheet above. */
+    .ds-dialog.ds-dialog--compact {
+      top: auto;
+      bottom: max(0px, calc(100dvh - var(--dialog-vv-top, 0px) - var(--dialog-vv-height, 100dvh)));
+      height: auto;
+      max-height: min(85dvh, var(--dialog-vv-height, 100dvh));
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    }
   }
 
   /* Desktop (roomy pointer devices): the dialog is one column that grows
@@ -184,7 +193,7 @@ const css = `
      trickery. Owns its own padding now that .ds-dialog has none. */
   .ds-dialog-footer {
     display: flex;
-    padding: var(--space-3) var(--space-4) max(var(--space-4), env(safe-area-inset-bottom));
+    padding: var(--space-3) var(--space-4) calc(var(--modal-bottom-clearance) + env(safe-area-inset-bottom, 0px));
     background: var(--paper-panel);
     /* The shadow reads as "there's scrollable content behind this bar",
        which a plain border alone didn't. */

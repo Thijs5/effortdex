@@ -33,6 +33,8 @@ test('transcribing all game stats advances fields, keeps the focused field above
   }
   await expect(dialog.getByRole('button', { name: 'Save', exact: true })).toBeFocused();
   await expect(dialog.getByRole('button', { name: 'Save', exact: true })).toBeInViewport({ ratio: 1 });
+  const saveBounds = await dialog.getByRole('button', { name: 'Save', exact: true }).boundingBox();
+  expect(360 - (saveBounds?.y || 0) - (saveBounds?.height || 0)).toBeGreaterThanOrEqual(27);
   await page.screenshot({ path: info.outputPath('iphone13-stats-keyboard.png') });
   await page.setViewportSize({ width: 390, height: 844 });
   await dialog.getByRole('button', { name: 'Save', exact: true }).tap();
@@ -95,11 +97,20 @@ test('level-up increases stay keyboard-free for all six saved stats', async ({ p
   const dialog = await openLevelUpDialog(card);
   await expect(dialog.getByRole('heading', { name: 'Level & stats', exact: true })).toBeFocused();
   await expect(dialog.getByRole('button', { name: 'Increases (+)', exact: true })).toHaveAttribute('aria-pressed', 'true');
-  await dialog.getByRole('button', { name: 'Level plus 1', exact: true }).tap();
+  await expect(dialog.getByLabel('New level')).toHaveValue('11');
+  const stepControls = dialog.locator('stat-reading-grid .step');
+  const originalBoxes = await Promise.all((await stepControls.all()).map(control => control.boundingBox()));
+  const evolutionY = (await dialog.locator('evolution-chain').boundingBox())?.y;
   for (const stat of ['HP', 'ATK', 'DEF', 'SPA', 'SPD', 'SPE']) {
     await dialog.getByRole('button', { name: `${stat} plus 1`, exact: true }).tap();
     await expect(dialog.getByRole('button', { name: `${stat} plus 1`, exact: true })).toBeFocused();
     await expect(dialog.getByLabel(new RegExp(`${stat} adjustment`))).toHaveValue('1');
+    const currentBoxes = await Promise.all((await stepControls.all()).map(control => control.boundingBox()));
+    for (let index = 0; index < originalBoxes.length; index++) {
+      expect(Math.abs((currentBoxes[index]?.y || 0) - (originalBoxes[index]?.y || 0))).toBeLessThanOrEqual(1);
+      expect(currentBoxes[index]?.height).toBe(originalBoxes[index]?.height);
+    }
+    expect((await dialog.locator('evolution-chain').boundingBox())?.y).toBeCloseTo(evolutionY || 0, 0);
   }
   await dialog.getByLabel(/ATK adjustment/).fill('-99');
   await dialog.getByRole('button', { name: 'Save', exact: true }).tap();

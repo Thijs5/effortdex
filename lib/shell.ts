@@ -247,6 +247,7 @@ if (vv) {
   // iOS can settle the viewport a frame after focus moves in/out of a field.
   addEventListener('focusin', () => requestAnimationFrame(syncDialogViewport));
   addEventListener('focusout', () => requestAnimationFrame(syncDialogViewport));
+  addEventListener('input', () => requestAnimationFrame(revealFocusedField));
 }
 
 /* ------------------------------------------------------------------ */

@@ -28,6 +28,10 @@ export class DsItemButton extends BaseElement {
       <style>
         :host { display: block; }
         .item-btn { position: relative; width: 100%; }
+        :host([compact]) { min-width: 0; }
+        :host([compact]) .item-btn { flex-direction: column; justify-content: center; text-align: center; min-height: 80px; padding: var(--space-2); }
+        :host([compact]) .ds-item-btn-label { font-size: var(--font-size-xs); white-space: normal; overflow-wrap: anywhere; }
+
         .item-btn:disabled { cursor: not-allowed; opacity: 0.5; }
         .item-btn.ds-item-btn--active:disabled { opacity: 1; }
         .item-btn[data-capped] { opacity: 0.55; }

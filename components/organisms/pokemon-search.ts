@@ -149,7 +149,7 @@ export class PokemonSearch extends BaseElement {
           display: flex;
           flex-direction: column;
           background: var(--surface);
-          padding-bottom: env(safe-area-inset-bottom, 0px);
+          padding-bottom: 0;
         }
         .wrap.sheet .sheet-header {
           display: flex;
@@ -157,23 +157,24 @@ export class PokemonSearch extends BaseElement {
           justify-content: space-between;
           order: 0;
           flex: 0 0 auto;
-          padding: var(--space-3);
+          gap: var(--space-2);
+          padding: var(--space-4) var(--space-4) var(--space-3);
           border-bottom: 1px solid var(--lcd-line);
-          font-size: var(--font-size-2xs);
-          text-transform: uppercase;
-          letter-spacing: 0.06em;
-          color: var(--ink-soft);
+          font-family: var(--font-display);
+          font-size: var(--font-size-xl);
+          font-weight: 700;
+          color: var(--ink);
         }
         .sheet-close {
           min-width: 44px; min-height: 44px;
           border: none; background: transparent; cursor: pointer;
-          font-size: var(--font-size-lg); line-height: 1;
+          display: grid; place-items: center; font-size: var(--font-size-lg); line-height: 1;
           color: var(--ink-soft); padding: var(--space-1);
         }
         .sheet-close:hover { color: var(--ink); }
         .sheet-back { min-width: 44px; min-height: 44px; border: none; background: none; color: var(--teal); cursor: pointer; }
-        .wrap.sheet.reviewing .sheet-header { font-family: var(--font-display); font-size: var(--font-size-lg); text-transform: none; letter-spacing: normal; }
-        .wrap.sheet.reviewing slot[name="sheet-extra"] { flex: 1 1 auto; max-height: none; padding: var(--space-3); width: 100%; max-width: 560px; align-self: center; }
+        .sheet-title { flex: 1; min-width: 0; margin: 0; font: inherit; }
+        .wrap.sheet.reviewing slot[name="sheet-extra"] { flex: 1 1 auto; max-height: none; padding: var(--space-3) var(--space-4); width: 100%; max-width: 560px; align-self: center; }
         .wrap.sheet.reviewing slot[name="sheet-footer"] { width: 100%; max-width: 560px; align-self: center; }
         .wrap.sheet.reviewing input.ds-field,
         .wrap.sheet.reviewing ul.suggestions { display: none; }
@@ -200,7 +201,7 @@ export class PokemonSearch extends BaseElement {
              overflow past the sheet's edges. width: auto instead
              stretches to fill the space the margin leaves. */
           width: auto;
-          margin: var(--space-2) var(--space-3);
+          margin: var(--space-3) var(--space-4);
         }
         /* A second slot, kept apart from sheet-extra, for a caller's
            primary action (e.g. the battle sheet's "Log this battle") —
@@ -220,7 +221,7 @@ export class PokemonSearch extends BaseElement {
           order: 4;
           flex: 0 0 auto;
           margin-top: auto;
-          padding: var(--space-2) var(--space-3) var(--space-3);
+          padding: var(--space-3) var(--space-4) calc(var(--modal-bottom-clearance) + env(safe-area-inset-bottom, 0px));
         }
         .wrap.sheet ul.suggestions {
           order: 3;
@@ -233,13 +234,14 @@ export class PokemonSearch extends BaseElement {
           border: none;
           border-radius: 0;
           box-shadow: none;
+          padding-bottom: max(var(--space-1), env(safe-area-inset-bottom));
         }
       </style>
       <div class="wrap">
         <div class="sheet-header">
           <button type="button" class="sheet-back" aria-label="Back to defeat review" hidden>←</button>
-          <span class="sheet-title"></span>
-          <button type="button" class="sheet-close" aria-label="Close search">&#10005;</button>
+          <h2 class="sheet-title"></h2>
+          <button type="button" class="sheet-close" aria-label="Close search"><svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button>
         </div>
         <slot name="sheet-extra"></slot>
         <input class="ds-field" type="text" role="combobox" aria-expanded="false"

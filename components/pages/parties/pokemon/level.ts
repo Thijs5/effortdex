@@ -22,8 +22,8 @@ import type { LevelInput } from '../../../atoms/level-input.ts';
  * Set `.entry` to a Store roster entry — kept live on every assignment,
  * same as the app's other extracted dialogs. Call `open()` to seed the
  * level/evolve/stat-reading state fresh from the entry (as much
- * "log/fix stats now" as "level up" — prefilled to the current level,
- * not +1) and show it.
+ * "log/fix stats now" as "level up" — prefilled to the next level,
+ * capped at 100) and show it.
  *
  * Routed under "#/parties/<slug>/<uid>/level" (docs/adr/0023) — still
  * instantiated and owned by pokemon-detail.js's own shadow DOM; the
@@ -131,8 +131,7 @@ export class LevelDialog extends BaseDialog {
   }
 
   /**
-   * Opens the popup fresh each time, prefilled to the current level (not
-   * +1 — this is as much "log/fix stats now" as it is "level up"). Both
+   * Opens the popup fresh each time, prefilled to the next level (capped at 100). Both
    * the evolution chain and the stat-reading rows (Gen III+ only) are
    * shown immediately rather than gated behind an actual increase.
    * Nothing here touches the store yet — typing a level or a stat is
@@ -141,7 +140,7 @@ export class LevelDialog extends BaseDialog {
   open(): void {
     const e = this._entry as RosterEntry;
     this.$fromValue.textContent = String(e.level);
-    this.$input.value = String(e.level);
+    this.$input.value = String(Math.min(MAX_LEVEL, e.level + 1));
     this.$evolve.hidden = false;
     this.$evoChain.entry = e;
     this.$evoChain.load();
