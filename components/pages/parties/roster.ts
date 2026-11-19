@@ -521,11 +521,31 @@ function renderBattleMatchup(mon: DomainPokemon): void {
   const matchup = battleMatchup(mon, game?.gen ?? 9, game?.name === 'Legends Arceus');
   matchupPanel.hidden = !matchup;
   if (!matchup) return;
-  document.getElementById('battle-matchup-types')!.textContent =
-    matchup.types.map(titleCase).join(' / ') + ' · ' + (game ? 'Gen ' + game.gen : 'Modern rules');
-  document.getElementById('battle-weaknesses')!.textContent =
-    matchup.weaknesses.map(w => w.name + ' ×' + w.multiplier).join(' · ') || 'None';
-  document.getElementById('battle-immunities')!.textContent = matchup.immunities.join(' · ') || 'None';
+  function typeChip(label: string, multiplier?: number): HTMLElement {
+    const chip = document.createElement('span');
+    chip.className = 'matchup-chip';
+    chip.style.setProperty('--type-color', TYPE_COLORS[label.split(' ')[0].toLowerCase()]);
+    chip.textContent = titleCase(label.split(' ')[0]);
+    const category = label.split(' ')[1];
+    if (category) {
+      const detail = document.createElement('small');
+      detail.textContent = category.slice(1, -1);
+      chip.append(detail);
+    }
+    if (multiplier !== undefined) {
+      const value = document.createElement('b');
+      value.textContent = '×' + multiplier;
+      value.classList.toggle('high-multiplier', multiplier > 2);
+      chip.append(value);
+    }
+    return chip;
+  }
+  document.getElementById('battle-matchup-gen')!.textContent = game ? 'Gen ' + game.gen : 'Modern rules';
+  document.getElementById('battle-matchup-types')!.replaceChildren(...matchup.types.map(t => typeChip(t)));
+  document.getElementById('battle-weaknesses')!.replaceChildren(...(matchup.weaknesses.length
+    ? matchup.weaknesses.map(w => typeChip(w.name, w.multiplier)) : ['None']));
+  document.getElementById('battle-immunities')!.replaceChildren(...(matchup.immunities.length
+    ? matchup.immunities.map(t => typeChip(t)) : ['None']));
   document.getElementById('battle-attack-advice')!.textContent = matchup.advice;
 }
 

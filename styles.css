@@ -1613,16 +1613,63 @@ textarea.ds-field { resize: vertical; }
 
 #battle-matchup {
   margin-top: var(--space-4);
-  border-top: 1px solid var(--line);
-  padding-top: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--radius-md);
 }
-#battle-matchup h3, #battle-matchup p { margin: 0; }
-#battle-matchup-types { color: var(--ink-soft); }
+.matchup-heading, #battle-matchup-types, #battle-matchup dd {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+}
+.matchup-heading { justify-content: space-between; }
+.matchup-heading h3 { margin: 0; font: 700 var(--font-size-lg)/1.2 var(--font-display); }
+#battle-matchup-gen { font: var(--font-size-xs) var(--font-mono); color: var(--ink-soft); }
+#battle-matchup-types { margin: var(--space-2) 0 0; }
 #battle-matchup dl {
   display: grid;
-  grid-template-columns: auto 1fr;
-  gap: var(--space-2) var(--space-3);
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 12rem), 1fr));
+  gap: var(--space-3);
+  border-top: 1px solid var(--line);
+  padding-top: var(--space-3);
   margin: var(--space-3) 0;
 }
-#battle-matchup dt { font-weight: 600; }
-#battle-matchup dd { margin: 0; }
+#battle-matchup dt { font-weight: 700; }
+#battle-matchup dd { margin: var(--space-1) 0 0; color: var(--ink-soft); }
+.matchup-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: .35em;
+  padding: .25em .55em;
+  border-radius: var(--radius-sm);
+  background: color-mix(in srgb, var(--type-color) 14%, var(--surface));
+  color: var(--ink);
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+}
+.matchup-chip::before {
+  content: '';
+  width: .55em;
+  height: .55em;
+  border-radius: 50%;
+  background: var(--type-color);
+}
+.matchup-chip small { color: var(--ink-soft); font-weight: 400; }
+.matchup-chip b { font-family: var(--font-mono); }
+.matchup-chip .high-multiplier {
+  background: var(--ink);
+  color: var(--surface);
+  border-radius: .25em;
+  padding: 0 .25em;
+}
+#battle-attack-advice {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  border-inline-start: 3px solid var(--teal);
+  background: var(--teal-soft);
+  color: var(--ink);
+  font-size: var(--font-size-sm);
+}
+#battle-attack-advice:empty { display: none; }
