@@ -186,18 +186,18 @@
           <div class="battle-current"><span class="battle-sheet-eyebrow">Opponent</span>
           <button id="battle-choose-opponent-btn" class="battle-opponent-card" type="button" aria-label="Choose defeated Pokémon">
             <span class="battle-opponent-art"><img id="battle-opponent-sprite" alt="" hidden /><span id="battle-opponent-placeholder" aria-hidden="true">?</span></span>
-            <span class="battle-opponent-copy"><strong id="battle-opponent-name">Choose a Pokémon</strong><span id="battle-matchup-types" hidden></span><span id="battle-opponent-hint">Search or choose a recent opponent →</span></span>
+            <span class="battle-opponent-copy"><strong id="battle-opponent-name">Choose a Pokémon</strong><span id="battle-matchup-types" hidden></span><span id="battle-result-summary" hidden></span><span id="battle-opponent-hint">Search or choose a recent opponent →</span></span>
           </button></div>
           <div class="battle-recents"><span class="battle-sheet-eyebrow" id="battle-recents-label">Recent defeats</span><div id="battle-recent-opponents" role="group" aria-labelledby="battle-recents-label"></div></div>
           </div>
-          <p id="battle-confirm-state" class="battle-confirm-state" role="status">Not logged yet</p>
+          <p id="battle-confirm-state" class="battle-confirm-state" role="status"></p>
+          <p id="battle-lookup-error" hidden role="alert"></p>
           <div class="battle-team-heading"><span class="battle-sheet-eyebrow">Who battled?</span><span id="battle-selected-count"></span></div>
           <div id="battle-participants" class="party-slots party-slots--select"></div>
           <p id="battle-participants-status" class="party-slots-status" hidden></p>
-          <p id="battle-result-summary" class="battle-result-summary" hidden aria-live="polite"></p>
           <details id="battle-matchup" hidden>
             <summary>
-              <span class="matchup-lead"><small>Strongest weakness</small><strong id="battle-matchup-lead"></strong></span>
+              <span class="matchup-lead"><small>Strongest weakness</small><span id="battle-matchup-lead" class="matchup-types"></span></span>
               <b id="battle-matchup-factor"></b>
               <span class="matchup-chevron" aria-hidden="true"></span>
             </summary>

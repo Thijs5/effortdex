@@ -69,6 +69,7 @@ const battleOpponentName = document.getElementById('battle-opponent-name')!;
 const battleOpponentSprite = document.getElementById('battle-opponent-sprite') as HTMLImageElement;
 const battleOpponentHint = document.getElementById('battle-opponent-hint')!;
 const battleConfirmState = document.getElementById('battle-confirm-state')!;
+const battleLookupError = document.getElementById('battle-lookup-error')!;
 const battleComposer = document.querySelector<HTMLElement>('.battle-sheet-extra')!;
 const battleOpponentFallback = wireSpriteFallback(battleOpponentSprite);
 
@@ -518,25 +519,29 @@ let pendingBattle: { mon: DomainPokemon; uids: string[] } | null = null;
 const matchupPanel = document.getElementById('battle-matchup') as HTMLDetailsElement;
 const opponentTypes = document.getElementById('battle-matchup-types')!;
 
+function battleTypeLabel(name: string): HTMLElement {
+  const type = name.toLowerCase();
+  const label = document.createElement('span');
+  label.className = 'battle-type-label';
+  label.style.setProperty('--type-hue', TYPE_COLORS[type]);
+  label.style.color = typeTextColor(type);
+  label.textContent = titleCase(type);
+  return label;
+}
+
 function renderBattleMatchup(mon: DomainPokemon): void {
   const game = matchGameVersion(store.activeParty?.baseGame);
   const matchup = battleMatchup(mon, game?.gen ?? 9, game?.name === 'Legends Arceus');
   matchupPanel.hidden = !matchup;
   opponentTypes.hidden = !matchup;
   if (!matchup) return;
-  opponentTypes.replaceChildren(...matchup.types.map(type => {
-    const label = document.createElement('span');
-    label.className = 'opponent-type';
-    label.style.setProperty('--type-hue', TYPE_COLORS[type]);
-    label.style.color = typeTextColor(type);
-    label.textContent = titleCase(type);
-    return label;
-  }));
+  opponentTypes.replaceChildren(...matchup.types.map(battleTypeLabel));
   opponentTypes.setAttribute('aria-label', matchup.types.map(titleCase).join(' / '));
   const highest = matchup.weaknesses[0]?.multiplier;
   const strongest = matchup.weaknesses.filter(w => w.multiplier === highest);
-  document.getElementById('battle-matchup-lead')!.textContent =
-    strongest.map(w => w.name).join(', ') || 'No type weakness';
+  document.getElementById('battle-matchup-lead')!.replaceChildren(
+    ...(strongest.length ? strongest.map(w => battleTypeLabel(w.name)) : ['No type weakness']),
+  );
   const factor = document.getElementById('battle-matchup-factor')!;
   factor.hidden = !highest;
   factor.textContent = highest ? '×' + highest : '';
@@ -552,7 +557,10 @@ function renderBattleMatchup(mon: DomainPokemon): void {
     const row = document.createElement('div');
     const value = document.createElement('strong');
     value.textContent = label;
-    row.append(value, ' · ' + names.join(', '));
+    const types = document.createElement('span');
+    types.className = 'matchup-types';
+    types.append(...names.map(battleTypeLabel));
+    row.append(value, types);
     return row;
   });
   document.getElementById('battle-weaknesses')!.replaceChildren(...(rows.length ? rows : ['None']));
@@ -569,14 +577,25 @@ function clearPendingBattle(): void {
   battleLogBtn.disabled = true;
   battleLogBtn.textContent = 'Log defeat';
   battleComposer.dataset.state = 'empty';
-  battleConfirmState.textContent = 'Not logged yet';
+  battleConfirmState.textContent = '';
+  battleLookupError.hidden = true;
   battleChooseBtn.setAttribute('aria-label', 'Choose defeated Pokémon');
   battleOpponentName.textContent = 'Choose opponent';
   battleOpponentHint.textContent = 'Search →';
   battleOpponentSprite.hidden = true;
   document.getElementById('battle-opponent-placeholder')!.hidden = false;
   battleResultSummary.hidden = true;
-  battleResultSummary.classList.remove('battle-result-summary--pending');
+  renderParticipantGains([], () => undefined);
+}
+
+function renderParticipantGains(uids: string[], getGain: (uid: string) => EvMap | undefined): void {
+  for (const slot of battleParticipants.querySelectorAll<HTMLButtonElement>('.party-slot')) {
+    const uid = slot.dataset.uid!;
+    const gain = uids.includes(uid) ? getGain(uid) : undefined;
+    const text = gain ? formatEvYield(gain) || '0 EVs' : '';
+    slot.querySelector('.battle-slot-gain')!.textContent = text;
+    slot.setAttribute('aria-label', text ? `${slot.title}, ${text}` : slot.title);
+  }
 }
 
 function renderBattleParticipants(): void {
@@ -592,14 +611,17 @@ function renderBattleParticipants(): void {
   const active = activePokemon(party);
   for (const entry of active) {
     const slot = renderPartySlot(entry, true, battleSelected.has(entry.uid));
+    const gain = document.createElement('span');
+    gain.className = 'battle-slot-gain';
+    slot.append(gain);
     if (!entry.fainted) {
       slot.addEventListener('click', () => {
         if (battleSelected.has(entry.uid)) battleSelected.delete(entry.uid);
         else battleSelected.add(entry.uid);
         const opponent = pendingBattle?.mon;
         clearPendingBattle();
-        if (opponent) stageKnownBattle(opponent);
         renderBattleParticipants();
+        if (opponent) stageKnownBattle(opponent);
       });
     }
     battleParticipants.appendChild(slot);
@@ -625,9 +647,6 @@ partyLogBattleBtn.addEventListener('click', () => {
   battleSearch.showReview();
 });
 battleChooseBtn.addEventListener('click', () => {
-  matchupPanel.hidden = true;
-  matchupPanel.open = false;
-  opponentTypes.hidden = true;
   ++battlePickToken;
   if (battleComposer.dataset.state === 'loading') clearPendingBattle();
   battleSearch.focus();
@@ -660,6 +679,7 @@ async function stageBattlePick(name: string): Promise<void> {
   battleLogBtn.disabled = true;
   const partyId = store.activeParty?.id;
   battleComposer.dataset.state = 'loading';
+  battleLookupError.hidden = true;
   battleOpponentHint.textContent = 'Loading…';
   battleConfirmState.textContent = 'Looking up opponent…';
   try {
@@ -673,14 +693,15 @@ async function stageBattlePick(name: string): Promise<void> {
     battleOpponentName.textContent = titleCase(name);
     battleConfirmState.textContent = 'Could not load opponent';
     battleOpponentHint.textContent = 'Tap to try again';
-    battleResultSummary.textContent = (err instanceof Error && err.message) || 'Could not look up that Pokémon.';
-    battleResultSummary.hidden = false;
+    battleLookupError.textContent = (err instanceof Error && err.message) || 'Could not look up that Pokémon.';
+    battleLookupError.hidden = false;
   }
 }
 
 function stageKnownBattle(mon: DomainPokemon): void {
   const uids = [...battleSelected];
   pendingBattle = { mon, uids };
+  matchupPanel.open = false;
   renderBattleMatchup(mon);
   battleComposer.dataset.state = 'ready';
   battleOpponentName.textContent = titleCase(mon.name);
@@ -689,11 +710,12 @@ function stageKnownBattle(mon: DomainPokemon): void {
   battleOpponentSprite.hidden = false;
   document.getElementById('battle-opponent-placeholder')!.hidden = true;
   battleOpponentFallback.setVersionedSprite(versionedSpriteUrl(store.spriteBaseGame(), mon.id), mon.sprite || FALLBACK_SPRITE);
-  battleConfirmState.textContent = 'Not logged yet';
+  battleConfirmState.textContent = '';
   const summary = formatEvYield(mon.evYield);
   battleResultSummary.textContent = `Base yield: ${summary || 'No EV yield'}`;
-  battleResultSummary.classList.add('battle-result-summary--pending');
   battleResultSummary.hidden = false;
+  renderParticipantGains(uids, uid => store.previewDefeat(uid, mon)?.applied);
+  battleLogBtn.textContent = 'Log defeat';
   battleLogBtn.disabled = uids.length === 0;
 }
 
@@ -702,13 +724,15 @@ battleLogBtn.addEventListener('click', () => {
   const { mon, uids } = pendingBattle;
   // Disarm before the synchronous store change, so queued taps cannot
   // reuse the same opponent. A recent card stages a fresh confirmation.
-  clearPendingBattle();
+  pendingBattle = null;
+  battleLogBtn.disabled = true;
   const applied = store.logBattleForParticipants(uids, mon);
-  const summary = participantEvSummary(uids, (uid) => applied.find((r) => r.uid === uid)?.applied);
+  const gainFor = (uid: string) => applied.find(r => r.uid === uid)?.applied;
+  renderParticipantGains(applied.map(r => r.uid), gainFor);
+  const summary = participantEvSummary(applied.map(r => r.uid), gainFor);
   battleComposer.dataset.state = 'logged';
-  battleConfirmState.textContent = `✓ Defeat logged · ${titleCase(mon.name)}`;
-  battleResultSummary.textContent = `Logged vs ${titleCase(mon.name)} — ${summary}`;
-  battleResultSummary.hidden = false;
+  battleLogBtn.textContent = '✓ Defeat logged';
+  battleConfirmState.textContent = `Defeat logged · ${titleCase(mon.name)} · ${summary}`;
   battleChooseBtn.focus({ preventScroll: true });
 });
 

@@ -795,28 +795,6 @@ html[data-modal-open] body {
 .battle-sheet-extra .party-slots-status { margin-top: var(--space-2); color: var(--ink-soft); }
 #battle-log-btn { width: 100%; }
 
-/* The staged (picked, not yet logged) or last-logged battle's
-   per-participant breakdown, shown in place — the sheet stays open
-   after picking (roster.ts) so this and the dropdown's own live preview
-   use the same wording either side of the pick, instead of a result
-   that only shows up as a toast after the sheet's already gone.
-   Defaults to the "logged" (confirmed) styling; roster.ts adds
-   `--pending` while a picked opponent is only staged, waiting on
-   #battle-log-btn. */
-.battle-result-summary {
-  margin: 0 0 var(--space-2);
-  padding: var(--space-3);
-  border-radius: var(--radius-md);
-  background: var(--good-soft);
-  color: var(--good);
-  font-size: var(--font-size-sm);
-  font-weight: 600;
-}
-.battle-result-summary--pending {
-  background: var(--lcd);
-  color: var(--ink);
-}
-
 .empty-state {
   font-size: var(--font-size-md);
   color: var(--ink-soft);
@@ -1574,16 +1552,37 @@ textarea.ds-field { resize: vertical; }
 .battle-recent-card:hover { border-color: var(--teal); }
 .battle-recent-card img { width: 40px; height: 40px; object-fit: contain; image-rendering: pixelated; }
 .battle-recent-card span { width: 100%; overflow: hidden; text-overflow: ellipsis; font-size: var(--font-size-2xs); }
-#battle-opponent-hint { font-size: var(--font-size-xs); color: var(--ink-soft); }
-.battle-confirm-state { margin: var(--space-3) 0 var(--space-4); padding: var(--space-2) 0; border-bottom: 1px solid var(--line); color: var(--ink-soft); font-weight: 700; font-size: var(--font-size-sm); }
-.battle-sheet-extra[data-state="logged"] .battle-confirm-state { color: var(--ink); }
-.battle-sheet-extra[data-state="logged"] .battle-opponent-card { border-color: var(--line); }
+#battle-opponent-hint, #battle-result-summary { font-size: var(--font-size-xs); color: var(--ink-soft); }
+.battle-confirm-state {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  clip-path: inset(50%);
+  overflow: hidden;
+  white-space: nowrap;
+}
+#battle-lookup-error { margin: var(--space-2) 0 0; font-size: var(--font-size-sm); }
+.battle-slot-gain {
+  min-height: 1lh;
+  color: var(--ink-soft);
+  font: var(--font-size-2xs)/1.25 var(--font-mono);
+  overflow-wrap: anywhere;
+}
+.battle-sheet-extra[data-state="logged"] .battle-slot-gain { color: var(--good); }
 .battle-team-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
 .battle-team-heading .battle-sheet-eyebrow { margin: 0; }
 #battle-selected-count { font-size: var(--font-size-xs); color: var(--ink-soft); }
 .battle-composer-actions { display: grid; grid-template-columns: minmax(0, 1fr); }
 .battle-composer-actions button { min-height: 44px; }
-.battle-sheet-extra .battle-result-summary { margin-top: var(--space-3); background: transparent; color: var(--ink); padding: 0; font-weight: 500; }
+#battle-search:has(.battle-sheet-extra[data-state="logged"]) #battle-log-btn {
+  background: var(--lcd);
+  color: var(--ink);
+  border-color: var(--line);
+  box-shadow: none;
+  opacity: 1;
+  cursor: default;
+}
 
 /* The same Poké Ball mark anchors the header, favicon, and install icon. */
 .app-header h1 a { align-items: center; gap: var(--space-2); }
@@ -1610,20 +1609,6 @@ textarea.ds-field { resize: vertical; }
   :is(#party-form, #add-pokemon-form) > .party-dialog-actions > .ds-btn--primary { flex: 1; min-width: 0; }
 }
 
-/* Once picked, the opponent and its typing share one compact identity row. */
-.battle-recents:has(.battle-recents-empty),
-.battle-sheet-extra:is([data-state="ready"], [data-state="empty"], [data-state="loading"]) .battle-confirm-state {
-  display: none;
-}
-.battle-opponents:not(:has(.battle-recent-card)) .battle-current { flex: 1; }
-.battle-opponents:not(:has(.battle-recent-card)) .battle-opponent-card {
-  flex-direction: row;
-  justify-content: flex-start;
-  min-height: 64px;
-  gap: var(--space-3);
-  padding: var(--space-2) var(--space-3);
-  text-align: left;
-}
 #battle-matchup-types { color: var(--ink-soft); font-size: var(--font-size-sm); }
 .battle-team-heading { margin-top: var(--space-4); }
 #battle-matchup {
@@ -1644,7 +1629,7 @@ textarea.ds-field { resize: vertical; }
 #battle-matchup summary::-webkit-details-marker { display: none; }
 .matchup-lead { display: grid; gap: .2rem; flex: 1; }
 .matchup-lead small { color: var(--ink-soft); font-weight: 500; }
-.matchup-lead strong, .battle-sheet-extra[data-state="ready"] #battle-opponent-name {
+.battle-sheet-extra:is([data-state="ready"], [data-state="logged"], [data-state="loading"]) #battle-opponent-name {
   font-size: var(--font-size-lg);
   line-height: 1.2;
   font-family: var(--font-display);
@@ -1673,17 +1658,17 @@ textarea.ds-field { resize: vertical; }
 }
 #battle-matchup dt { font-weight: 600; }
 #battle-matchup dd { margin: 0; }
+#battle-weaknesses > div { display: flex; align-items: baseline; flex-wrap: wrap; gap: .25rem .5rem; }
 #battle-matchup dd div + div { margin-top: var(--space-1); }
 #battle-attack-advice { margin: var(--space-2) 0; }
 #battle-matchup-gen { color: var(--ink-soft); }
-#battle-matchup-types:not([hidden]) {
+#battle-matchup-types:not([hidden]), .matchup-types {
   display: flex;
   flex-wrap: wrap;
-  justify-content: center;
   gap: .25rem;
 }
-.battle-opponents:not(:has(.battle-recent-card)) #battle-matchup-types { justify-content: flex-start; }
-.opponent-type {
+#battle-matchup-types:not([hidden]) { justify-content: center; }
+.battle-type-label {
   padding: .12em .45em;
   border-radius: var(--radius-sm);
   background: var(--type-hue);

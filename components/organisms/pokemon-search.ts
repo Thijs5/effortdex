@@ -120,10 +120,9 @@ export class PokemonSearch extends BaseElement {
           font-size: var(--font-size-2xs);
           color: var(--teal);
           text-align: right;
-          /* A single Pokémon's own yield ("+1 HP") never wraps in
-             practice; a multi-participant breakdown (roster.ts's battle
-             search) can run long enough to need it. */
           white-space: normal;
+          overflow-wrap: anywhere;
+          text-transform: none;
         }
         .thumb {
           flex: 0 0 auto;
@@ -133,6 +132,28 @@ export class PokemonSearch extends BaseElement {
           background: var(--sprite-bg);
           border-radius: var(--radius-sm);
           object-fit: contain;
+        }
+        .suggestions:not(.recent-grid) li.option:has(.option-ev-yield) {
+          display: grid;
+          grid-template-columns: 28px minmax(0, 1fr) auto;
+          column-gap: var(--space-2);
+          row-gap: 0;
+          border: 1px solid var(--lcd-line);
+        }
+        .suggestions:not(.recent-grid) li.option + li.option:has(.option-ev-yield) {
+          margin-top: var(--space-1);
+        }
+        .suggestions:not(.recent-grid) li.option:has(.option-ev-yield) .thumb { grid-area: 1 / 1 / span 2; }
+        .suggestions:not(.recent-grid) li.option:has(.option-ev-yield) .option-num { grid-area: 1 / 3; }
+        .suggestions:not(.recent-grid) li.option:has(.option-ev-yield) .option-name {
+          grid-area: 1 / 2;
+          white-space: normal;
+          overflow-wrap: anywhere;
+        }
+        .suggestions:not(.recent-grid) .option-ev-yield {
+          grid-area: 2 / 2 / auto / span 2;
+          max-width: none;
+          text-align: left;
         }
         .wrap.sheet:not(.reviewing) .recent-grid:not([hidden]) {
           display: grid;
