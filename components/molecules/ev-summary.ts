@@ -12,11 +12,16 @@ export class EvSummary extends BaseElement {
   static template = `
       <style>
         :host { display: block; }
+        .columns { display: grid; grid-template-columns: 40px 42px 1fr; gap: var(--space-3); margin-bottom: var(--space-2); color: var(--ink-soft); font-size: var(--font-size-2xs); }
+        .columns span:last-child { text-align: right; }
+        .note { margin: var(--space-3) 0 0; color: var(--ink-soft); font-size: var(--font-size-xs); line-height: 1.5; }
         .bars { display: grid; gap: var(--space-2); }
         .total { margin-top: var(--space-3); padding-top: var(--space-3); border-top: 1px dashed var(--lcd-line); }
       </style>
+      <div class="columns" aria-hidden="true"><span>Stat</span><span>Game</span><span>EVs / cap</span></div>
       <div class="bars"></div>
       <div class="total"></div>
+      <p class="note">Game: latest recorded or calculated stat. EVs: training points.</p>
     `;
 
   $bars: HTMLElement;

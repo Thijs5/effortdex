@@ -128,6 +128,8 @@ const addDialogStatsGrid = document.getElementById(
   'add-pokemon-dialog-stats-grid'
 ) as import('../../organisms/stat-reading-grid.ts').StatReadingGrid;
 const addDialogSubmitBtn = document.getElementById('add-pokemon-dialog-submit-btn') as HTMLButtonElement;
+addDialogLevel.addEventListener('next-input', () => addDialogStatsGrid.focusFirst());
+addDialogStatsGrid.addEventListener('stats-complete', () => addDialogSubmitBtn.focus());
 const addDialogCancelBtn = document.getElementById('add-pokemon-dialog-cancel-btn')!;
 
 // Populated once — the nature list doesn't depend on species or game version.
@@ -226,6 +228,7 @@ let addStatusTimer: ReturnType<typeof setTimeout> | undefined;
 
 addForm.addEventListener('submit', (e) => {
   e.preventDefault();
+  if (!addDialogStatsGrid.validate()) return;
   if (!pendingAddMon) return;
   const mon = pendingAddMon;
   const entry = store.addPokemon(mon, Number(addDialogLevel.value), addDialogNature.value || null);

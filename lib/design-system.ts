@@ -23,6 +23,7 @@ const css = `
   .ds-field:focus-visible { outline: 3px solid var(--teal); outline-offset: 1px; }
 
   .ds-btn {
+    font-family: inherit;
     border: none;
     border-radius: var(--radius-btn);
     padding: var(--space-3) var(--space-4);
@@ -74,6 +75,7 @@ const css = `
 
   @media (max-width: 640px) {
     .ds-btn, .ds-field { min-height: 44px; }
+    .ds-disclosure > summary { min-height: 44px; align-content: center; }
   }
 
   /* Modal dialog chrome, shared by the light-DOM party/add-Pokémon dialogs and
@@ -182,7 +184,7 @@ const css = `
      trickery. Owns its own padding now that .ds-dialog has none. */
   .ds-dialog-footer {
     display: flex;
-    padding: var(--space-3) var(--space-4) var(--space-4);
+    padding: var(--space-3) var(--space-4) max(var(--space-4), env(safe-area-inset-bottom));
     background: var(--paper-panel);
     /* The shadow reads as "there's scrollable content behind this bar",
        which a plain border alone didn't. */

@@ -13,7 +13,7 @@ export class EvBar extends BaseElement {
         /* No trailing badge column: the maxed badge overlays the track's
            right end instead (see .badge), so the bar runs the full row
            width with no dead space reserved on the right. */
-        .row { display: grid; grid-template-columns: 34px auto 1fr auto; align-items: center; gap: var(--space-3); }
+        .row { display: grid; grid-template-columns: 40px 42px minmax(0, 1fr) auto; align-items: center; gap: var(--space-3); }
         /* Bare mode (no label, no actual-stat hint — e.g. the roster's
            total bar): the track fills the row and the count sits just to
            its right, tight against it rather than in a wide fixed
@@ -49,7 +49,7 @@ export class EvBar extends BaseElement {
           font-family: var(--font-mono);
           font-size: var(--font-size-2xs);
           color: var(--ink-soft);
-          opacity: 0.7;
+          opacity: 1;
           white-space: nowrap;
           min-width: 3ch;
           text-align: right;

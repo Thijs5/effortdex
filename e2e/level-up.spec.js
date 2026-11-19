@@ -94,7 +94,7 @@ test.describe('Level popup', () => {
     // point, not assumed still accurate at a new level, so leaving it
     // untouched must not silently log a second, stale reading.
     dialog = await openLevelUpDialog(card);
-    await expect(dialog.locator('.reading-text[data-stat="atk"]')).toHaveText('20');
+    await expect(dialog.getByLabel('ATK reading')).toHaveValue('20');
     await dialog.getByLabel('New level').fill('12');
     await dialog.getByLabel('New level').blur();
     await dialog.getByRole('button', { name: 'Save' }).click();
@@ -107,59 +107,32 @@ test.describe('Level popup', () => {
     await expect(ivDialog.getByText('Lv. 12 — 20')).toBeHidden(); // untouched, correctly not logged again
   });
 
-  test('a stat with a prior reading gets an Adjust box + "−1"/"+1"; the reading holds still and a "→" previews the new value', async ({ page }) => {
+  test('current totals and level-up increases share the same unsaved stat values', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
-    await addPokemon(page, 'Bulbasaur', { level: 10 });
+    await addPokemon(page, 'Bulbasaur', { level: 10, stats: { ATK: 20 } });
     const card = await openDetail(page, 'Bulbasaur');
-
-    // Log one ATK reading so, on reopen, ATK has something to adjust from.
-    let dialog = await openLevelUpDialog(card);
-    await dialog.getByLabel('ATK reading').fill('20');
-    await dialog.getByRole('button', { name: 'Save' }).click();
-    await expect(dialog).toBeHidden();
-
-    dialog = await openLevelUpDialog(card);
-    const atkReading = dialog.locator('.reading-text[data-stat="atk"]');
-    const atkAdjust = dialog.getByLabel(/ATK adjustment from last reading/);
-    await expect(atkReading).toHaveText('20'); // just the reading, no "→" yet
-    await expect(atkAdjust).toHaveValue('+0');
-    // Adjust box + "−1"/"+1" only on the row that has a previous reading;
-    // DEF (no reading) stays a plain editable field.
-    await expect(dialog.getByRole('button', { name: 'ATK plus 1' })).toBeVisible();
-    await expect(dialog.getByRole('button', { name: 'ATK minus 1' })).toBeVisible();
-    await expect(dialog.getByRole('button', { name: 'DEF plus 1' })).toHaveCount(0);
-    await expect(dialog.getByRole('button', { name: 'DEF minus 1' })).toHaveCount(0);
-    await expect(dialog.getByLabel(/DEF adjustment/)).toHaveCount(0);
-    await expect(dialog.getByLabel('DEF reading')).toBeVisible();
-
-    // "+1" / "−1" bump the Adjust box and the "→" preview, never the reading.
-    await dialog.getByRole('button', { name: 'ATK plus 1' }).click();
-    await dialog.getByRole('button', { name: 'ATK plus 1' }).click();
-    await dialog.getByRole('button', { name: 'ATK minus 1' }).click();
-    await expect(atkAdjust).toHaveValue('+1');
-    await expect(atkReading.locator('.reading-prev')).toHaveText('20');
-    await expect(atkReading.locator('.reading-new')).toHaveText('21');
-
-    // Typing straight into the Adjust box drives the same preview.
-    await atkAdjust.fill('7');
-    await expect(atkReading.locator('.reading-new')).toHaveText('27');
-
-    // Back to no change — the "→" and the new value disappear.
-    await atkAdjust.fill('0');
-    await expect(atkReading).toHaveText('20');
-    await expect(atkReading.locator('.reading-new')).toHaveCount(0);
-
-    // A real adjustment is what Save records, at the new level.
-    await atkAdjust.fill('7');
+    const dialog = await openLevelUpDialog(card);
+    await expect(dialog.getByRole('button', { name: 'Increases (+)', exact: true })).toHaveAttribute('aria-pressed', 'true');
+    await dialog.getByRole('button', { name: 'Current stats', exact: true }).click();
+    const total = dialog.getByLabel('ATK reading');
+    await expect(total).toHaveValue('20');
+    await expect(dialog.getByText('Last 20 · Lv. 10')).toBeVisible();
+    await total.fill('27');
+    await dialog.getByRole('button', { name: 'Increases (+)', exact: true }).click();
+    const increase = dialog.getByLabel(/ATK adjustment from last reading/);
+    await expect(increase).toHaveValue('7');
+    await expect(dialog.locator('.reading-text').filter({ hasText: '20 → 27' })).toBeVisible();
+    await dialog.getByRole('button', { name: 'ATK plus 1', exact: true }).click();
+    await expect(increase).toHaveValue('8');
+    await dialog.getByRole('button', { name: 'ATK minus 1', exact: true }).click();
+    await increase.fill('0');
+    await dialog.getByRole('button', { name: 'Current stats', exact: true }).click();
+    await expect(total).toHaveValue('20');
+    await total.fill('27');
     await dialog.getByLabel('New level').fill('12');
-    await dialog.getByLabel('New level').blur();
-    await dialog.getByRole('button', { name: 'Save' }).click();
-    await expect(dialog).toBeHidden();
-
+    await dialog.getByRole('button', { name: 'Save', exact: true }).click();
     const ivDialog = await openIvs(card);
-    if (!await ivDialog.getByLabel('Stat', { exact: true }).isVisible()) await ivDialog.getByText('Estimate from game stats').click();
-    await ivDialog.getByLabel('Stat', { exact: true }).selectOption('atk');
     await expect(ivDialog.getByText('Lv. 12 — 27')).toBeVisible();
   });
 
@@ -242,7 +215,7 @@ test.describe('Level popup', () => {
     await expect(entry).toBeVisible(); // still there
   });
 
-  test('pressing Enter in a field saves the dialog, same as clicking Save', async ({ page }) => {
+  test('pressing Enter in the level moves to stats without saving', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
     await addPokemon(page, 'Bulbasaur', { level: 10 });
@@ -251,6 +224,9 @@ test.describe('Level popup', () => {
 
     await dialog.getByLabel('New level').fill('12');
     await dialog.getByLabel('New level').press('Enter');
+    await expect(dialog).toBeVisible();
+    await expect(dialog.getByLabel('HP reading')).toBeFocused();
+    await dialog.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(dialog).toBeHidden();
     await expect(card.getByTitle('Set level')).toContainText('Lv. 12');
   });

@@ -25,7 +25,7 @@ export class LevelInput extends BaseElement {
         :host { display: inline-block; }
         input { width: 100%; }
       </style>
-      <input type="text" inputmode="numeric" pattern="[0-9]*" class="ds-field" />
+      <input type="text" inputmode="numeric" enterkeyhint="next" pattern="[0-9]*" class="ds-field" />
     `;
 
   $input: HTMLInputElement;
@@ -48,6 +48,14 @@ export class LevelInput extends BaseElement {
       if (digits !== this.$input.value) this.$input.value = digits;
     });
     this.$input.addEventListener('change', () => this.dispatchEvent(new Event('change', { bubbles: true, composed: true })));
+    this.$input.addEventListener('focus', () => this.$input.select());
+    this.$input.addEventListener('keydown', (event) => {
+      if (event.key !== 'Enter') return;
+      event.preventDefault(); event.stopPropagation();
+      // Move into the stat form; never submit a half-entered Pokémon.
+      this.$input.blur();
+      this.dispatchEvent(new Event('next-input'));
+    });
   }
 
   get value(): string {

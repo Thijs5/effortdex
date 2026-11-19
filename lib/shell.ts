@@ -216,9 +216,30 @@ syncNavCondensed();
 const vv = window.visualViewport;
 if (vv) {
   const rootStyle = document.documentElement.style;
+  const revealFocusedField = () => {
+    let active = document.activeElement;
+    while (active?.shadowRoot?.activeElement) active = active.shadowRoot.activeElement;
+    if (!(active instanceof HTMLElement) || !active.matches('input, textarea, select')) return;
+    let node: Element | null = active;
+    let dialog: HTMLDialogElement | null = null;
+    while (node && !dialog) {
+      dialog = node.closest('dialog[open]');
+      const root = node.getRootNode();
+      node = root instanceof ShadowRoot ? root.host : null;
+    }
+    const body = dialog?.querySelector<HTMLElement>('.dialog-body');
+    if (!body) return;
+    const field = active.getBoundingClientRect();
+    const bounds = body.getBoundingClientRect();
+    // Browser focus scrolling can count the layout viewport, including
+    // the pinned footer. Scroll the actual body after viewport layout.
+    if (field.bottom > bounds.bottom - 8) body.scrollTop += field.bottom - bounds.bottom + 8;
+    else if (field.top < bounds.top + 8) body.scrollTop -= bounds.top + 8 - field.top;
+  };
   const syncDialogViewport = () => {
     rootStyle.setProperty('--dialog-vv-top', `${vv.offsetTop}px`);
     rootStyle.setProperty('--dialog-vv-height', `${vv.height}px`);
+    requestAnimationFrame(revealFocusedField);
   };
   syncDialogViewport();
   vv.addEventListener('resize', syncDialogViewport);

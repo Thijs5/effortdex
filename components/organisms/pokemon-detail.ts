@@ -1,4 +1,4 @@
-import { POWER_ITEMS, MACHO_BRACE_SPRITE, EXP_SHARE_SPRITE, NATURES, STATS, STAT_LABEL, MACHO_BRACE_MULTIPLIER, FALLBACK_SPRITE, FALLBACK_ONERROR, TYPE_COLORS, typeLabel } from '../../lib/constants.ts';
+import { POWER_ITEMS, MACHO_BRACE_SPRITE, EXP_SHARE_SPRITE, NATURES, STATS, STAT_LABEL, MACHO_BRACE_MULTIPLIER, FALLBACK_SPRITE, FALLBACK_ONERROR, TYPE_COLORS, typeLabel, typeTextColor } from '../../lib/constants.ts';
 import { titleCase, natureEffectHint, dayLabel } from '../../lib/utils.ts';
 import { api, store } from '../../lib/services.ts';
 import { versionedSpriteUrl, versionedSpriteIsOpaque } from '../../lib/pokeapi-client.ts';
@@ -102,8 +102,8 @@ export class PokemonDetail extends BaseElement {
            button rather than owning its own row. */
         header {
           display: grid; grid-template-columns: auto 1fr auto;
-          grid-template-areas: "sprite titles more";
-          align-items: center; column-gap: var(--space-4); row-gap: 0;
+          grid-template-areas: "sprite titles more" "meta meta meta";
+          align-items: center; column-gap: var(--space-3); row-gap: var(--space-3);
           padding-bottom: var(--space-4);
           border-bottom: 1px dashed color-mix(in srgb, var(--type, var(--lcd-line)) 30%, var(--lcd-line));
         }
@@ -122,17 +122,15 @@ export class PokemonDetail extends BaseElement {
           box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--type, var(--line)) 38%, var(--line));
         }
         /* Type badges sit under the name now (not under the sprite) —
-           readable size, left-aligned with the name. Solid type colour,
-           white text in both themes, the shape the games (and PokéAPI's
-           own type name-icons) use. The literal #fff here is the same
-           deliberate ADR 0003 exception as ev-bar's Poké Ball. */
+           readable size, left-aligned with the name. Solid type colour with contrasting label ink; the type hue
+           stays recognizable in both themes. */
         .type-badges { display: flex; flex-wrap: wrap; gap: 4px; }
         .type-badges:empty { display: none; }
         .type-badge {
           font-size: var(--font-size-2xs); font-weight: 600;
           letter-spacing: 0.07em; text-transform: uppercase; white-space: nowrap;
           padding: 2px 8px; border-radius: var(--radius-pill);
-          background: var(--type, var(--ink-soft)); color: #fff;
+          background: var(--type, var(--ink-soft)); color: var(--type-ink, #fff);
           box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.18);
         }
         .sprite {
@@ -197,7 +195,7 @@ export class PokemonDetail extends BaseElement {
            own phrasing), then the editable name — one line, one glance.
            Both prefixes are softer weight/color than the editable name
            so the three parts stay visually distinct. */
-        .name-row { display: flex; align-items: baseline; gap: 0.45em; min-width: 0; }
+        .name-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0 var(--space-2); min-width: 0; }
         .species-num {
           font-family: var(--font-mono); font-size: var(--font-size-xs);
           color: var(--ink-soft); white-space: nowrap;
@@ -211,7 +209,7 @@ export class PokemonDetail extends BaseElement {
         .nature-btn {
           font-family: var(--font-display); font-weight: 500; font-size: var(--font-size-input);
           color: var(--ink-soft); white-space: nowrap; border: none; background: none;
-          padding: 0; cursor: pointer;
+          padding: var(--space-2); min-height: 44px; cursor: pointer;
         }
         .nature-btn:hover { color: var(--teal); }
         .nature-btn--empty { font-size: var(--font-size-xs); font-style: italic; }
@@ -229,15 +227,15 @@ export class PokemonDetail extends BaseElement {
         .nickname {
           display: block; flex: 1 1 auto; min-width: 0; width: auto; border: none; background: transparent;
           font-family: var(--font-display); font-weight: 700; font-size: var(--font-size-lg);
-          letter-spacing: -0.01em; padding: 0; color: var(--ink);
+          letter-spacing: -0.01em; padding: 0; min-height: 44px; width: 100%; order: -1; color: var(--ink);
         }
         .nickname:focus-visible { outline: 2px solid var(--teal); border-radius: var(--radius-sm); }
-        .meta { display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
+        .meta { grid-area: meta; display: flex; align-items: center; gap: var(--space-2); flex-wrap: wrap; }
         .level-up-btn {
           display: inline-flex; align-items: center; gap: 0.3em;
           border: 1px solid var(--lcd-line); background: var(--surface); cursor: pointer;
           border-radius: var(--radius-pill); font-family: var(--font-mono); font-size: var(--font-size-xs);
-          color: var(--ink-soft); padding: 0.2em 0.6em; min-height: 30px; touch-action: manipulation;
+          color: var(--ink); padding: var(--space-2) var(--space-3); min-height: 44px; touch-action: manipulation;
         }
         .level-up-btn:hover { color: var(--teal); border-color: var(--teal); }
         .level-up-btn svg { width: 11px; height: 11px; color: var(--teal); }
@@ -245,7 +243,7 @@ export class PokemonDetail extends BaseElement {
         /* A quiet kebab, not a labelled button — the header already
            carries the level / item / nature controls. */
         .more-btn {
-          width: 32px; height: 32px; padding: 0;
+          width: 44px; height: 44px; padding: 0;
           display: grid; place-items: center;
           border: 1px solid var(--line); border-radius: var(--radius-pill);
           background: var(--surface); color: var(--ink-soft); cursor: pointer;
@@ -271,7 +269,7 @@ export class PokemonDetail extends BaseElement {
         .more-menu-item {
           display: flex; align-items: center; width: 100%; padding: var(--space-2) var(--space-3);
           border: none; border-radius: var(--radius-sm); background: transparent;
-          text-align: left; font-size: var(--font-size-md); color: inherit; cursor: pointer;
+          text-align: left; min-height: 44px; font-size: var(--font-size-md); color: inherit; cursor: pointer;
         }
         .more-menu-item:hover { background: var(--lcd); }
         /* Remove used to be its own bordered "Release" button at the
@@ -296,7 +294,7 @@ export class PokemonDetail extends BaseElement {
           background: transparent; color: var(--ink-soft);
           border: 1px dashed var(--lcd-line);
         }
-        .held-item-btn { border: none; cursor: pointer; font-family: inherit; }
+        .held-item-btn { min-height: 44px; border: 1px solid var(--line); cursor: pointer; font-family: inherit; }
         .held-item-btn:hover { filter: brightness(0.97); }
         /* .status-pill--empty's background is transparent, so the filter
            above has nothing to darken — give the dashed/no-item state its
@@ -333,21 +331,22 @@ export class PokemonDetail extends BaseElement {
           <div class="titles">
             <div class="name-row">
               <span class="species-num"></span>
-              <button class="nature-btn" type="button" title="Nature" hidden></button>
               <input class="nickname" aria-label="Nickname" />
             </div>
             <span class="type-badges" aria-hidden="true"></span>
+          </div>
             <div class="meta">
               <button class="level-up-btn" type="button" title="Set level">
                 <span class="level-value"></span>
+                <span>· Stats</span>
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" aria-hidden="true"><path d="M12 6v12M6 12h12"/></svg>
               </button>
+              <button class="nature-btn" type="button" title="Nature" hidden></button>
               <button class="held-item-btn ds-pill-badge status-pill" type="button" title="Held item" hidden>
                 <img class="held-item-btn-sprite" alt="" hidden ${FALLBACK_ONERROR} />
                 <span class="held-item-btn-label"></span>
               </button>
             </div>
-          </div>
           <div class="more-btn-wrap">
             <button class="more-btn" type="button" title="More" aria-label="More" aria-haspopup="menu" aria-expanded="false">
               <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="17.5" r="1.7"/></svg>
@@ -370,7 +369,7 @@ export class PokemonDetail extends BaseElement {
 
         <div class="card-body">
           <div class="card-col card-col--left">
-            <h3 class="section-title">EV values</h3>
+            <h3 class="section-title">Stats & EVs</h3>
             <ev-summary></ev-summary>
           </div>
         </div>
@@ -644,7 +643,7 @@ export class PokemonDetail extends BaseElement {
       api.getPokemon(e.speciesName).then(() => this.render()).catch(() => {});
     }
     this.$typeBadges.innerHTML = types
-      .map((t) => `<span class="type-badge" style="--type:${TYPE_COLORS[t] ?? 'var(--ink-soft)'}">${typeLabel(t)}</span>`)
+      .map((t) => `<span class="type-badge" style="--type:${TYPE_COLORS[t] ?? '#5f5b53'};--type-ink:${typeTextColor(t)}">${typeLabel(t)}</span>`)
       .join('');
     const primaryColor = types[0] ? TYPE_COLORS[types[0]] : undefined;
     if (primaryColor) {

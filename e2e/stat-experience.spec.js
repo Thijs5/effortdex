@@ -169,7 +169,7 @@ test.describe('Gen I/II Stat Experience', () => {
     const dialog = await openLevelUpDialog(card);
 
     const rows = dialog.locator('.stat-label');
-    await expect(rows).toHaveText(['HP', 'ATK', 'DEF', 'Special', 'SPE']);
+    await expect(rows).toHaveText(['HP', 'Attack', 'Defense', 'Special', 'Speed']);
   });
 
   test("the history filter dropdown hides Wings/berries/Pokérus on a Gen I party — none of them exist yet", async ({ page }) => {

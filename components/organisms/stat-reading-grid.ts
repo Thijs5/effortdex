@@ -4,249 +4,168 @@ import { store } from '../../lib/services.ts';
 import { BaseElement } from '../base-element.ts';
 import type { RosterEntry, StatKey, StatReadingEvent } from '../../lib/store.ts';
 
-/** The signed form the Adjust field shows: `+3`, `+0`, `-2`. */
-const fmtOffset = (n: number): string => (n >= 0 ? `+${n}` : String(n));
-/** Lenient read of that field back to a number: `+3` → 3, `` / junk → 0. */
-const parseOffset = (v: string): number => Number(String(v).replace(/^\+/, '')) || 0;
+export interface EnteredReading { statKey: StatKey; value: number; }
+const names: Record<StatKey, string> = { hp: 'HP', atk: 'Attack', def: 'Defense', spa: 'Sp. Atk', spd: 'Sp. Def', spe: 'Speed' };
 
-/** One reading the user filled in, ready to hand to `store.logStatReading`. */
-export interface EnteredReading {
-  statKey: StatKey;
-  value: number;
-}
-
-/**
- * <stat-reading-grid> — the six-stat "read these off the in-game summary
- * screen" grid, shared by the Level popup (`components/pages/parties/
- * pokemon/level.js`) and the add-Pokémon dialog
- * (`components/pages/parties/roster.js`). Gen I collapses Sp. Atk / Sp.
- * Def into one "Special" row (same merge <ev-summary> uses).
- *
- * With `prior-readings` set and `.entry` assigned, a stat that already
- * has a logged reading shows that value as read-only text plus an Adjust
- * box (`+N` / `-N`) flanked by `-1` / `+1` steppers — the reading holds
- * still while a `→` previews the new value. Without `prior-readings` (the
- * add dialog: a brand-new entry can't have any), every row is a plain
- * number input.
- *
- * Nothing here touches the store. Call `reset()` to (re)build the grid
- * fresh — each open of the owning dialog does this — and read `.readings`
- * on that dialog's own Save to get the `{ statKey, value }[]` the caller
- * then logs (sharing whatever batchId it wants).
- */
+/** Game-companion entry: level-up increases for prior readings and
+ * totals for unrecorded stats. Both views edit the same unsaved values. Untouched
+ * prior observations are references, never new readings at a new level. */
 export class StatReadingGrid extends BaseElement {
   static styles = `
     :host { display: block; }
-    .hint { margin: 0 0 var(--space-2); font-size: var(--font-size-2xs); color: var(--ink-soft); }
-    .fields {
-      display: grid; grid-template-columns: 3.25em minmax(4em, 1fr);
-      align-items: center; gap: var(--space-2) var(--space-3); min-width: 0;
-    }
-    .fields.has-change { grid-template-columns: 3.25em minmax(4em, 1fr) auto; }
-    .head, .row { display: contents; }
-    .head span {
-      font-size: var(--font-size-2xs);
-      letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft);
-    }
-    .stat-label { font-size: var(--font-size-xs); color: var(--ink-soft); }
-    .reading {
-      display: flex; align-items: baseline; gap: 0.45ch; min-width: 0;
-      font-family: var(--font-display); font-weight: 500; font-size: var(--font-size-input); color: var(--ink);
-    }
-    .reading-text { display: inline-flex; align-items: baseline; gap: 0.45ch; }
-    .reading-prev, .reading-arrow { color: var(--ink-soft); }
-    .reading-new { color: var(--teal); }
-    .value {
-      flex: 1 1 auto; width: auto; min-width: 0; padding: 0; font: inherit;
-      border: none; background: none; color: var(--ink); cursor: text;
-    }
-    .value::placeholder {
-      color: var(--ink-soft); opacity: 0.55;
-      font-family: var(--font-mono); font-size: var(--font-size-xs);
-    }
-    .value, .delta { min-height: 44px; }
-    .value:hover { color: var(--teal); }
-    .value:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: var(--radius-sm); }
-    .change { display: flex; align-items: center; gap: var(--space-2); }
-    .delta {
-      width: 3.5ch; padding: 0; border: none; background: none; text-align: center; cursor: text;
-      font-family: var(--font-display); font-weight: 500; font-size: var(--font-size-input); color: var(--ink-soft);
-    }
-    .delta:hover { color: var(--teal); }
-    .delta:focus-visible { outline: 2px solid var(--teal); outline-offset: 2px; border-radius: var(--radius-sm); }
-    .step {
-      flex: 0 0 auto; min-width: 44px; min-height: 44px; padding: 0.2em 0.5em;
-      font-family: var(--font-mono); font-size: var(--font-size-sm); line-height: 1;
-      border: 1px solid var(--lcd-line); border-radius: var(--radius-sm);
-      background: var(--surface); color: var(--ink-soft); cursor: pointer; touch-action: manipulation;
-    }
-    .step:hover { color: var(--teal); border-color: var(--teal); }
+    .hint { margin: 0 0 var(--space-3); color: var(--ink-soft); font-size: var(--font-size-xs); line-height: 1.5; }
+    .mode { display: flex; gap: var(--space-1); margin-bottom: var(--space-3); }
+    .mode button { flex: 1; min-height: 44px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink-soft); font: inherit; font-size: var(--font-size-sm); cursor: pointer; }
+    .mode button[aria-pressed=true] { background: var(--lcd); color: var(--ink); border-color: var(--teal); font-weight: 700; }
+    .row { display: grid; grid-template-columns: minmax(80px, 1fr) minmax(0, 190px); gap: var(--space-2) var(--space-3); align-items: center; padding-block: var(--space-2); border-bottom: 1px solid var(--line); }
+    .stat-label { font-size: var(--font-size-sm); font-weight: 600; }
+    .previous { display: block; margin-top: 2px; color: var(--ink-soft); font-size: var(--font-size-xs); font-weight: 400; }
+    .controls { display: flex; align-items: center; gap: var(--space-1); min-width: 0; }
+    .value, .delta { min-width: 0; width: 100%; min-height: 44px; text-align: center; font-variant-numeric: tabular-nums; padding: var(--space-2); }
+    .row[data-changed=true] .value, .row[data-changed=true] .delta { border-color: var(--teal); }
+    .step { flex: 0 0 44px; min-height: 44px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink-soft); font: inherit; cursor: pointer; touch-action: manipulation; }
+    .reading-text { display: block; color: var(--teal); font-size: var(--font-size-xs); font-variant-numeric: tabular-nums; }
+    .error { grid-column: 1 / -1; color: var(--poke-red); font-size: var(--font-size-xs); margin: 0; }
+    [aria-invalid=true] { outline: 2px solid var(--poke-red); }
   `;
   static template = `
-    <p class="hint">Read these off the in-game summary screen. Skip the ones you can't.</p>
-    <p class="hint change" hidden>Use +1 or the adjust box to change one.</p>
+    <div class="mode" role="group" aria-label="Stat entry method" hidden>
+      <button type="button" data-mode="increases" aria-pressed="false">Increases (+)</button>
+      <button type="button" data-mode="totals" aria-pressed="true">Current stats</button>
+    </div>
+    <p class="hint">Copy the numbers from the game's summary screen. All stats are optional.</p>
     <div class="fields"></div>
   `;
-
   _entry: RosterEntry | null = null;
-  $hintChange: HTMLElement;
+  _mode = 'totals';
   $fields: HTMLElement;
+  $mode: HTMLElement;
 
   constructor() {
     super();
-    this.$hintChange = this.$('.hint.change');
     this.$fields = this.$('.fields');
-
-    // Delegated — the rows are rebuilt on every reset(), so a single
-    // listener here outlives any individual +1 / -1 button or Adjust box.
-    this.$fields.addEventListener('click', (e) => {
-      const btn = (e.target as HTMLElement).closest<HTMLElement>('.step');
+    this.$mode = this.$('.mode');
+    this.$mode.addEventListener('click', e => {
+      const mode = (e.target as HTMLElement).closest<HTMLButtonElement>('[data-mode]')?.dataset.mode;
+      if (mode) { this._mode = mode; this.render(); }
+    });
+    this.$fields.addEventListener('click', e => {
+      const btn = (e.target as HTMLElement).closest<HTMLButtonElement>('.step');
       if (!btn) return;
+      // Safari does not consistently focus tapped buttons; explicitly
+      // leave a numeric field so step adjustments dismiss its keyboard.
+      btn.focus({ preventScroll: true });
+      const value = this._field(btn.dataset.stat, 'value')!;
+      const next = Math.max(1, (Number(value.value) || Number(value.dataset.last) || 1) + Number(btn.dataset.dir));
+      value.value = String(next);
       const delta = this._field(btn.dataset.stat, 'delta');
-      if (!delta) return;
-      delta.value = fmtOffset(parseOffset(delta.value) + Number(btn.dataset.dir));
+      if (delta) delta.value = String(next - Number(value.dataset.last));
       this._syncRow(btn.dataset.stat);
     });
-    this.$fields.addEventListener('input', (e) => {
-      const t = e.target as HTMLElement;
-      if (t.classList.contains('delta')) this._syncRow(t.dataset.stat);
+    this.$fields.addEventListener('input', e => {
+      const input = e.target as HTMLInputElement;
+      if (input.classList.contains('delta')) {
+        const value = this._field(input.dataset.stat, 'value')!;
+        const offset = input.value.trim() === '' ? 0 : Number(input.value);
+        if (Number.isSafeInteger(offset)) value.value = String(Math.max(1, Number(value.dataset.last) + offset));
+      }
+      this._syncRow(input.dataset.stat);
+    });
+    this.$fields.addEventListener('focusin', e => {
+      const input = e.target as HTMLInputElement;
+      if (input.matches('input')) input.select();
+    });
+    this.$fields.addEventListener('keydown', e => {
+      const event = e as KeyboardEvent;
+      if (event.key !== 'Enter' || !(event.target instanceof HTMLInputElement)) return;
+      // Enter means next stat, not commit half a form through its owner.
+      event.preventDefault(); event.stopPropagation();
+      const inputs = [...this.$fields.querySelectorAll<HTMLInputElement>('input')].filter(i => i.type !== 'hidden');
+      const next = inputs[inputs.indexOf(event.target) + 1];
+      if (next) { next.focus(); next.scrollIntoView({ block: 'nearest' }); }
+      else {
+        event.target.blur();
+        this.dispatchEvent(new Event('stats-complete', { bubbles: true, composed: true }));
+      }
     });
   }
+  set entry(e: RosterEntry | null) { this._entry = e; }
+  get entry(): RosterEntry | null { return this._entry; }
 
-  set entry(e: RosterEntry | null) {
-    this._entry = e;
-  }
-  get entry(): RosterEntry | null {
-    return this._entry;
-  }
-
-  /** The readings the user actually filled in or adjusted, in stat order. */
   get readings(): EnteredReading[] {
-    const out: EnteredReading[] = [];
-    for (const input of this.$fields.querySelectorAll<HTMLInputElement>('input.value')) {
-      const value = Number(input.value);
-      // A plain row's data-prefill is ""; an anchored row's is its last
-      // reading — either way, unchanged means "don't log it again".
-      if (value > 0 && input.value !== input.dataset.prefill) {
-        out.push({ statKey: input.dataset.stat as StatKey, value });
-      }
-    }
-    return out;
+    return [...this.$fields.querySelectorAll<HTMLInputElement>('input.value')]
+      .filter(i => i.value !== '' && i.value !== i.dataset.prefill && Number.isSafeInteger(Number(i.value)) && Number(i.value) > 0)
+      .map(i => ({ statKey: i.dataset.stat as StatKey, value: Number(i.value) }));
   }
-
-  /** Rebuilds the grid from scratch (no carry-forward) — every dialog open calls this. */
   reset(): void {
-    this.$fields.innerHTML = '';
-    this.render();
+    this._mode = this.hasAttribute('prior-readings') && this._entry?.events.some(e => e.kind === 'stat-reading') ? 'increases' : 'totals';
+    this.$fields.replaceChildren(); this.render();
   }
-
+  focusFirst(): void {
+    const input = [...this.$fields.querySelectorAll<HTMLInputElement>('input')].find(i => i.type !== 'hidden');
+    input?.focus();
+    input?.scrollIntoView({ block: 'nearest' });
+  }
   _field(key: string | undefined, cls: string): HTMLInputElement | null {
-    return this.$fields.querySelector<HTMLInputElement>(`input.${cls}[data-stat="${key}"]`);
+    return this.$fields.querySelector(`input.${cls}[data-stat="${key}"]`);
   }
-
-  /** The "45" or "45 → 47" markup for an anchored row's reading cell. */
-  _readingHtml(last: number, next: number): string {
-    if (next === last) return `<span class="reading-prev">${last}</span>`;
-    return (
-      `<span class="reading-prev">${last}</span>` +
-      `<span class="reading-arrow">→</span>` +
-      `<span class="reading-new">${next}</span>`
-    );
+  _valid(input: HTMLInputElement): boolean {
+    const text = input.value.trim();
+    const delta = input.classList.contains('delta');
+    const last = Number(this._field(input.dataset.stat, 'value')?.dataset.last);
+    return text === '' || ((delta ? /^[+-]?\d+$/ : /^\d+$/).test(text) && Number.isSafeInteger(Number(text)) &&
+      (delta ? last + Number(text) > 0 : Number(text) > 0));
   }
-
-  /**
-   * Re-derives one anchored row from its Adjust field: the hidden "new
-   * value" the caller's Save reads, and the "45 → 47" preview. No-op for
-   * a plain row (no Adjust field / data-last).
-   */
+  /** Called before any owning form mutates the store. */
+  validate(): boolean {
+    const inputs = [...this.$fields.querySelectorAll<HTMLInputElement>('input')].filter(i => i.type !== 'hidden');
+    for (const input of inputs) this._syncRow(input.dataset.stat);
+    const invalid = inputs.find(i => !this._valid(i));
+    invalid?.focus();
+    return !invalid;
+  }
   _syncRow(key: string | undefined): void {
-    const hidden = this._field(key, 'value');
-    const delta = this._field(key, 'delta');
-    const text = this.$fields.querySelector(`.reading-text[data-stat="${key}"]`);
-    if (!hidden || !delta || !text || hidden.dataset.last == null) return;
-    const last = Number(hidden.dataset.last);
-    const next = Math.max(1, last + parseOffset(delta.value));
-    hidden.value = String(next);
-    text.innerHTML = this._readingHtml(last, next);
+    const value = this._field(key, 'value')!;
+    const row = value.closest<HTMLElement>('.row')!;
+    const input = this._mode === 'increases' && value.dataset.last ? this._field(key, 'delta')! : value;
+    const valid = this._valid(input);
+    input.setAttribute('aria-invalid', String(!valid));
+    row.querySelector<HTMLElement>('.error')!.hidden = valid;
+    row.dataset.changed = String(value.value !== '' && value.value !== value.dataset.prefill);
+    const preview = row.querySelector<HTMLElement>('.reading-text');
+    if (preview) preview.textContent = value.dataset.last != null && value.value !== value.dataset.prefill && valid
+      ? `${value.dataset.last} → ${value.value}` : '';
   }
-
-  /**
-   * Carries forward whatever the user already typed or adjusted in each
-   * row before rebuilding — a re-render triggered by something else (a
-   * live entry update) shouldn't drop a half-entered reading. `reset()`
-   * clears the fields first, so it starts clean.
-   */
   protected render(): void {
-    const carried = new Map(
-      [...this.$fields.querySelectorAll<HTMLInputElement>('input.value')].map(
-        (i) => [i.dataset.stat, i.value] as [string | undefined, string]
-      )
-    );
-
-    // Gen I keeps Special as one stat — drop the Sp. Def row and relabel
-    // Sp. Atk as "Special" (same merge <ev-summary> uses).
+    const carried = new Map([...this.$fields.querySelectorAll<HTMLInputElement>('input.value')].map(i => [i.dataset.stat, i.value]));
     const merged = store.specialStatMerged();
     const events = this.hasAttribute('prior-readings') ? this._entry?.events ?? [] : [];
-    const rows = STATS.filter((s) => !(merged && s.key === 'spd')).map((s) => ({
-      key: s.key,
-      label: merged && s.key === 'spa' ? 'Special' : s.label,
-      last: events
-        .filter((ev): ev is StatReadingEvent => ev.kind === 'stat-reading' && ev.statKey === s.key)
-        .at(-1),
+    const rows = STATS.filter(s => !(merged && s.key === 'spd')).map(s => ({ ...s,
+      last: events.filter((e): e is StatReadingEvent => e.kind === 'stat-reading' && e.statKey === s.key).at(-1),
     }));
-
-    const hasChange = rows.some((r) => r.last);
-    this.$fields.classList.toggle('has-change', hasChange);
-    this.$hintChange.hidden = !hasChange;
-
-    const head =
-      `<div class="head"><span>Stat</span><span>Reading</span>` +
-      (hasChange ? `<span>Adjust</span>` : '') +
-      `</div>`;
-
-    this.$fields.innerHTML =
-      head +
-      rows
-        .map(({ key, label, last }) => {
-          const carriedVal = carried.get(key);
-          const label_ = `<span class="stat-label">${escapeHtml(label)}</span>`;
-
-          // No prior reading: a plain editable field, no Adjust cell.
-          if (!last) {
-            const input =
-              `<input type="number" inputmode="numeric" class="value" data-stat="${key}" ` +
-              `data-prefill="" min="1" value="${escapeHtml(carriedVal ?? '')}" ` +
-              `aria-label="${escapeHtml(label)} reading" placeholder="—" />`;
-            return (
-              `<div class="row">${label_}` +
-              `<span class="reading">${input}</span>` +
-              (hasChange ? `<span></span>` : '') +
-              `</div>`
-            );
-          }
-
-          // Prior reading: the reading holds still; -1 / +1 / Adjust drive
-          // a hidden "new value" (what Save reads) and the "→" preview.
-          const lastVal = last.observedStat;
-          const next = carriedVal != null && carriedVal !== '' ? Number(carriedVal) : lastVal;
-          const offset = next - lastVal;
-          return (
-            `<div class="row">${label_}` +
-            `<span class="reading">` +
-            `<input type="hidden" class="value" data-stat="${key}" data-prefill="${lastVal}" data-last="${lastVal}" value="${next}" ` +
-            `aria-label="${escapeHtml(label)} new reading" />` +
-            `<span class="reading-text" data-stat="${key}">${this._readingHtml(lastVal, next)}</span>` +
-            `</span>` +
-            `<span class="change">` +
-            `<button type="button" class="step" data-stat="${key}" data-dir="-1" aria-label="${escapeHtml(label)} minus 1">&minus;1</button>` +
-            `<input type="text" inputmode="numeric" class="delta" data-stat="${key}" ` +
-            `value="${fmtOffset(offset)}" aria-label="${escapeHtml(label)} adjustment from last reading (${lastVal} at Lv. ${last.level})" />` +
-            `<button type="button" class="step" data-stat="${key}" data-dir="1" aria-label="${escapeHtml(label)} plus 1">+1</button>` +
-            `</span>` +
-            `</div>`
-          );
-        })
-        .join('');
+    this.$mode.hidden = !rows.some(r => r.last);
+    this.$<HTMLElement>('.hint').textContent = this._mode === 'increases'
+      ? 'Enter level-up increases. Without a prior reading, enter the total.'
+      : rows.some(r => r.last) ? "Copy the game's totals. Unchanged previous readings are skipped."
+        : "Copy the game's totals. Skip any stat you don't know.";
+    for (const button of this.$mode.querySelectorAll<HTMLElement>('button')) button.setAttribute('aria-pressed', String(button.dataset.mode === this._mode));
+    this.$fields.innerHTML = rows.map(({ key, label, last }) => {
+      const displayLabel = merged && key === 'spa' ? 'Special' : names[key];
+      const accessibleLabel = merged && key === 'spa' ? 'Special' : label;
+      const value = carried.get(key) ?? (last ? String(last.observedStat) : '');
+      const increases = last && this._mode === 'increases';
+      return `<div class="row" data-stat="${key}">
+        <label class="stat-label" for="${increases ? 'delta' : 'value'}-${key}">${displayLabel}${last ? `<span class="previous">Last ${last.observedStat} · Lv. ${last.level}</span>` : this._mode === 'increases' ? '<span class="previous">Enter total</span>' : ''}<span class="reading-text"></span></label>
+        <div class="controls">
+          ${last ? `<button type="button" class="step" data-stat="${key}" data-dir="-1" aria-label="${accessibleLabel} minus 1">−1</button>` : ''}
+          <input id="value-${key}" type="${increases ? 'hidden' : 'text'}" inputmode="numeric" enterkeyhint="next" class="value ds-field" data-stat="${key}" data-prefill="${last?.observedStat ?? ''}" ${last ? `data-last="${last.observedStat}"` : ''} value="${escapeHtml(value)}" placeholder="Skip" aria-label="${accessibleLabel} reading" aria-describedby="error-${key}" />
+          ${increases ? `<input id="delta-${key}" type="text" inputmode="numeric" enterkeyhint="next" class="delta ds-field" data-stat="${key}" value="${value === '' ? '' : Number(value) - last.observedStat}" aria-label="${accessibleLabel} adjustment from last reading (${last.observedStat} at Lv. ${last.level})" aria-describedby="error-${key}" />` : ''}
+          ${last ? `<button type="button" class="step" data-stat="${key}" data-dir="1" aria-label="${accessibleLabel} plus 1">+1</button>` : ''}
+        </div>
+        <p class="error" id="error-${key}" hidden>Enter a ${increases ? 'whole-number increase' : 'positive whole-number stat'}, or leave blank to skip.</p>
+      </div>`;
+    }).join('');
+    for (const row of rows) this._syncRow(row.key);
   }
 }
 customElements.define('stat-reading-grid', StatReadingGrid);
