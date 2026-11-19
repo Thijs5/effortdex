@@ -14,6 +14,7 @@ import {
   versionedSpriteOnError,
   NATURES,
   TYPE_COLORS,
+  typeTextColor,
   MAX_ACTIVE_PARTY,
 } from '../../../lib/constants.ts';
 import { titleCase, totalEvs, natureOptionsHtml, escapeHtml, sortedNatures, natureLabel, formatEvYield } from '../../../lib/utils.ts';
@@ -523,13 +524,15 @@ function renderBattleMatchup(mon: DomainPokemon): void {
   matchupPanel.hidden = !matchup;
   opponentTypes.hidden = !matchup;
   if (!matchup) return;
-  opponentTypes.replaceChildren(...matchup.types.map((type, index) => {
+  opponentTypes.replaceChildren(...matchup.types.map(type => {
     const label = document.createElement('span');
     label.className = 'opponent-type';
     label.style.setProperty('--type-hue', TYPE_COLORS[type]);
+    label.style.color = typeTextColor(type);
     label.textContent = titleCase(type);
-    return index ? [document.createTextNode(' / '), label] : [label];
-  }).flat());
+    return label;
+  }));
+  opponentTypes.setAttribute('aria-label', matchup.types.map(titleCase).join(' / '));
   const highest = matchup.weaknesses[0]?.multiplier;
   const strongest = matchup.weaknesses.filter(w => w.multiplier === highest);
   document.getElementById('battle-matchup-lead')!.textContent =
@@ -681,7 +684,7 @@ function stageKnownBattle(mon: DomainPokemon): void {
   renderBattleMatchup(mon);
   battleComposer.dataset.state = 'ready';
   battleOpponentName.textContent = titleCase(mon.name);
-  battleChooseBtn.setAttribute('aria-label', 'Change opponent, ' + titleCase(mon.name) + (opponentTypes.hidden ? '' : ', ' + opponentTypes.textContent));
+  battleChooseBtn.setAttribute('aria-label', 'Change opponent, ' + titleCase(mon.name) + (opponentTypes.hidden ? '' : ', ' + opponentTypes.getAttribute('aria-label')));
   battleOpponentHint.textContent = 'Change opponent';
   battleOpponentSprite.hidden = false;
   document.getElementById('battle-opponent-placeholder')!.hidden = true;
