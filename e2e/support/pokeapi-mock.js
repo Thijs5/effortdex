@@ -138,6 +138,9 @@ function pokemonPayload(species) {
     name: species.name,
     sprites: { front_default: `${SPRITE_BASE}${species.id}.png` },
     types: (species.types ?? ['normal']).map((name, i) => ({ slot: i + 1, type: { name } })),
+    moves: species.name === 'bulbasaur' ? [{ move: { name: 'vine-whip' }, version_group_details: [
+      { version_group: { name: 'firered-leafgreen' }, move_learn_method: { name: 'level-up' }, level_learned_at: 10 },
+    ] }] : [],
     stats: STAT_ORDER.map(([key, statName]) => ({
       stat: { name: statName },
       effort: species.evYield[key],

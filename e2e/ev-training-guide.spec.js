@@ -42,9 +42,15 @@ test.describe('EV-training location guide', () => {
     await addPokemon(page, 'Bulbasaur');
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openTrainingGuide(card);
+    await expect(dialog.locator('.evolution')).toContainText('Ivysaur');
+    await expect(dialog.locator('.next-move')).toHaveText('Next at Lv. 10 · Vine Whip');
+    await expect(dialog.locator('.stab')).toContainText('Poison attacks use Attack');
+    await expect(dialog.locator('.yield')).toContainText('+1 SPA');
     await expect(dialog.getByRole('button', { name: 'Previous Pokédex number' })).toBeDisabled();
     await dialog.getByRole('button', { name: 'Next Pokédex number' }).click();
     await expect(dialog.locator('.dex-name')).toHaveText('#2 Ivysaur');
+    await expect(dialog.locator('.next-move')).toContainText('No level-up moves listed');
+    await expect(dialog.locator('.yield')).toContainText('+2 SPA');
     await expect(dialog.locator('.dex-sprite')).toHaveAttribute('src', /\/2\.png$/);
     await expect(dialog.locator('.type-list .type-chip')).toHaveText(['Grass', 'Poison']);
     await expect(dialog.locator('.weaknesses .type-chip')).toHaveText(['Fire ×2', 'Flying ×2', 'Ice ×2', 'Psychic ×2']);

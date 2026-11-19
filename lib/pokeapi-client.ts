@@ -9,6 +9,7 @@
 // key (two components asking for the same species at once share one
 // fetch instead of racing two).
 
+import { levelMoves, type LevelMove } from './training-reference.ts';
 import { emptyEvs } from './utils.ts';
 import { MemoCache, NotFoundError } from './memo-cache.ts';
 import type { CacheBackend } from './memo-cache.ts';
@@ -57,7 +58,9 @@ const GENERATION_KEY_PREFIX = 'effortdex:generation:';
 // client's own vocabulary — MemoCache just stores whatever key it's
 // handed. Keep in sync with the get()/`key =` calls throughout.
 const NATIONAL_DEX_KEY_PREFIX = 'effortdex:national-dex:';
+const LEARNSET_KEY_PREFIX = 'effortdex:learnset:';
 const CACHE_KEY_PREFIXES = [
+  LEARNSET_KEY_PREFIX,
   NATIONAL_DEX_KEY_PREFIX,
   SPECIES_LIST_KEY,
   MON_KEY_PREFIX,
@@ -228,6 +231,14 @@ export class PokeApiClient {
       if (!res.ok) throw new Error(`Unknown Pokémon: "${name}".`);
       const data = await res.json();
       return this._toDomainPokemon(data);
+    });
+  }
+
+  async getLevelMoves(name: string, group: string): Promise<LevelMove[]> {
+    return this._cache.get(LEARNSET_KEY_PREFIX + group + ':' + name, async () => {
+      const response = await fetch('https://pokeapi.co/api/v2/pokemon/' + encodeURIComponent(name));
+      if (!response.ok) throw new Error('Could not load level-up moves.');
+      return levelMoves((await response.json()).moves ?? [], group);
     });
   }
 

@@ -52,6 +52,12 @@ function multiplier(attack: string, defense: string, gen: number): number {
   return 1;
 }
 
+export function strongAgainst(attack: string, gen: number): string[] {
+  return Object.keys(defenses).filter(defense =>
+    (gen >= 6 || defense !== 'fairy') && (gen >= 2 || !['dark', 'steel'].includes(defense)) &&
+    multiplier(attack, defense, gen) > 1);
+}
+
 export function defensiveMatchups(types: string[], gen: number) {
   if (!types.length || types.some(type => !Object.hasOwn(defenses, type))) return [];
   return Object.keys(defenses)

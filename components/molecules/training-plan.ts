@@ -1,7 +1,7 @@
 import { STATS, STAT_CAP, TOTAL_CAP, type EvMap, type StatKey } from '../../lib/constants.ts';
 import type { RosterEntry } from '../../lib/store.ts';
 
-const specialTypes = ['Dark', 'Dragon', 'Electric', 'Fire', 'Grass', 'Ice', 'Psychic', 'Water'];
+export const specialTypes = ['Dark', 'Dragon', 'Electric', 'Fire', 'Grass', 'Ice', 'Psychic', 'Water'];
 const physicalTypes = ['Bug', 'Fighting', 'Flying', 'Ghost', 'Ground', 'Normal', 'Poison', 'Rock', 'Steel'];
 
 export function categoryGuide(gen: number): string {

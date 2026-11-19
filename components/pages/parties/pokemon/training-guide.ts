@@ -1,7 +1,9 @@
-import { categoryGuide, moveOptions, trainingPlan } from '../../../molecules/training-plan.ts';
+import { categoryGuide, moveOptions, trainingPlan, specialTypes } from '../../../molecules/training-plan.ts';
 import { matchGameVersion } from '../../../../lib/game-versions.ts';
 import type { DomainPokemon } from '../../../../lib/pokeapi-client.ts';
-import { defensiveMatchups, speciesTypes } from '../../../../lib/type-matchups.ts';
+import { learnsetGroup, type LevelMove } from '../../../../lib/training-reference.ts';
+import { availableSpeciesFor } from '../../../../lib/species-availability.ts';
+import { defensiveMatchups, speciesTypes, strongAgainst } from '../../../../lib/type-matchups.ts';
 import { versionedSpriteUrl, modernSpriteUrl } from '../../../../lib/pokeapi-client.ts';
 import { wireSpriteFallback } from '../../../../lib/sprite-fallback.ts';
 import { STATS, TYPE_COLORS, typeTextColor, typeLabel, FALLBACK_SPRITE } from '../../../../lib/constants.ts';
@@ -24,6 +26,8 @@ export class TrainingGuideDialog extends BaseDialog {
   private loading = false;
   private spriteFallback: ReturnType<typeof wireSpriteFallback>;
   private spriteKey = '';
+  private referenceKey = '';
+  private referenceRequest = 0;
 
   constructor() {
     super('training-guide-dialog', 'training-guide-dialog-title');
@@ -60,6 +64,9 @@ export class TrainingGuideDialog extends BaseDialog {
       .type-list,.match-list { display:flex; flex-wrap:wrap; gap:5px; margin-block:6px; }
       .type-chip { border-radius:var(--radius-pill); padding:3px 8px; font-size:var(--font-size-xs); font-weight:650; }
       .match-list .type-chip { color:var(--ink); background:var(--surface); border:1px solid var(--lcd-line); border-left:4px solid var(--chip); }
+      .battle-facts { border-block:1px solid var(--lcd-line); padding-block:8px; }
+      .battle-facts p { margin-block:6px; }
+      .battle-facts strong { font-weight:650; }
       .matchups { margin-top:var(--space-3); }
       .base-values { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:5px; }
       .base-values span { background:var(--lcd); padding:6px; text-align:center; border-radius:var(--radius-sm); font-variant-numeric:tabular-nums; }
@@ -79,6 +86,9 @@ export class TrainingGuideDialog extends BaseDialog {
       <section class="matchups"><h4>Type weaknesses</h4><div class="match-list weaknesses"></div>
       <details class="resistances"><summary>Resistances and immunities</summary><div class="match-list reduced"></div></details></section>
       <p><strong>Base stats</strong></p><p class="base-values"></p>
+      <section class="battle-facts"><h4>Battle and training</h4>
+      <p class="stab"></p><details><summary>Super-effective targets for same-type attacks</summary><div class="coverage"></div></details><p class="yield"></p><p class="evolution"></p>
+      <p class="next-move"></p><details class="learnset" hidden><summary>Level-up moves</summary><ul></ul></details></section>
       <p class="projection" hidden></p>
       <button type="button" class="restore" hidden></button>
       <div class="dex-status" role="status"></div><h3>Suggested training</h3>
@@ -88,6 +98,9 @@ export class TrainingGuideDialog extends BaseDialog {
       <section class="spots"><h3>Where to train</h3><ev-training-guide></ev-training-guide>
       <p class="training-guide-attribution">Locations via Bulbapedia &amp; Marriland's EV training guides</p></section>`;
     this.spriteFallback = wireSpriteFallback(this.$body.querySelector('.dex-sprite')!);
+    this.$body.addEventListener('keydown', event => {
+      if (event.key === 'Enter' && (event.target as Element).matches('summary, select')) event.stopPropagation();
+    });
     this.$body.querySelector('.prev')!.addEventListener('click', () => void this.browse(-1));
     this.$body.querySelector('.next')!.addEventListener('click', () => void this.browse(1));
     this.$body.querySelector('.restore')!.addEventListener('click', () => this.resetPreview());
@@ -140,7 +153,14 @@ export class TrainingGuideDialog extends BaseDialog {
     this.renderPlan();
   }
 
+  open(): void {
+    super.open();
+    this.renderPlan();
+  }
+
   _onClose(): void {
+    this.referenceKey = '';
+    this.referenceRequest++;
     this.resetPreview();
   }
 
@@ -176,6 +196,45 @@ export class TrainingGuideDialog extends BaseDialog {
     }
   }
 
+  private loadReference(name: string, level: number, game: string): void {
+    if (!this.isOpen()) return;
+    const key = [name, level, game, store.activeParty?.overrides?.availableGeneration].join('|');
+    if (this.referenceKey === key) return;
+    this.referenceKey = key;
+    const token = ++this.referenceRequest;
+    const evolution = this.$body.querySelector('.evolution')!;
+    const nextMove = this.$body.querySelector('.next-move')!;
+    const list = this.$body.querySelector<HTMLDetailsElement>('.learnset')!;
+    list.hidden = true;
+    list.open = false;
+    nextMove.textContent = 'Loading level-up moves…';
+    evolution.textContent = 'Loading evolutions…';
+    const group = learnsetGroup(game);
+    const moves: Promise<LevelMove[]> = group ? api.getLevelMoves(name, group) : Promise.resolve([]);
+    moves.then(rows => {
+      if (token !== this.referenceRequest) return;
+      const upcoming = rows.filter(move => move.level > level);
+      const first = upcoming[0];
+      nextMove.textContent = first
+        ? 'Next at Lv. ' + first.level + ' · ' + upcoming.filter(m => m.level === first.level).map(m => titleCase(m.name)).join(', ')
+        : rows.length ? 'No further level-up moves after Lv. ' + level + '.' : 'No level-up moves listed for this game.';
+      list.hidden = !rows.length;
+      list.querySelector('ul')!.replaceChildren(...rows.map(move => {
+        const item = document.createElement('li');
+        item.textContent = 'Lv. ' + move.level + ' · ' + titleCase(move.name);
+        return item;
+      }));
+    }).catch(() => { if (token === this.referenceRequest) nextMove.textContent = 'Level-up moves unavailable.'; });
+
+    Promise.all([api.getEvolutionChain(name), availableSpeciesFor(store.activeParty, api)]).then(([chain, allowed]) => {
+      if (token !== this.referenceRequest) return;
+      const next = chain.filter(node => node.parent === name && (!allowed || allowed.has(node.name)));
+      evolution.textContent = next.length ? 'Next evolution · ' + next.map(node =>
+        titleCase(node.name) + (node.minLevel ? ' (Lv. ' + node.minLevel + '+)' : '')).join(', ')
+        : 'No further evolution listed for this game.';
+    }).catch(() => { if (token === this.referenceRequest) evolution.textContent = 'Evolution data unavailable.'; });
+  }
+
   private renderPlan(): void {
     const entry = this._entry;
     if (!entry) return;
@@ -194,6 +253,22 @@ export class TrainingGuideDialog extends BaseDialog {
     }
     const gen = matchGameVersion(store.activeParty?.baseGame)?.gen ?? 9;
     const types = speciesTypes(id, (mon ?? api.peekCached(entry.speciesName))?.types ?? [], gen);
+    const profile = mon ?? api.peekCached(entry.speciesName);
+    const damageStat = (type: string) => specialTypes.includes(typeLabel(type)) ? (gen === 1 ? 'Special' : 'Special Attack') : 'Attack';
+    this.$body.querySelector('.stab')!.textContent = !types.length ? '' : gen <= 3
+      ? 'Same-type bonus · ' + types.map(type => typeLabel(type) + ' attacks use ' + damageStat(type)).join(' · ')
+      : 'Same-type bonus · ' + types.map(typeLabel).join(' and ') + ' attacks. Physical moves use Attack and special moves use Special Attack.';
+    this.$body.querySelector('.coverage')!.replaceChildren(...types.map(type => {
+      const line = document.createElement('p');
+      const targets = strongAgainst(type, gen);
+      line.textContent = typeLabel(type) + ' → ' + (targets.length ? targets.map(typeLabel).join(', ') : 'No single-type targets');
+      return line;
+    }));
+    const yieldText = profile && STATS.filter(s => profile.evYield?.[s.key] > 0).map(s => '+' + profile.evYield[s.key] + ' ' + s.label).join(', ');
+    this.$body.querySelector('.yield')!.textContent = store.usesStatExpSystem()
+      ? 'Defeating this species builds Stat Experience across stats.'
+      : 'Base EV yield when defeated · ' + (yieldText || 'Unavailable');
+    this.loadReference(mon?.name ?? entry.speciesName, entry.level, store.activeParty?.baseGame ?? '');
     const chip = (type: string, factor?: number) => {
       const badge = document.createElement('span');
       badge.className = 'type-chip';
