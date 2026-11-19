@@ -62,6 +62,7 @@ const battleSearch = document.getElementById('battle-search') as import('../../o
 const battleParticipants = document.getElementById('battle-participants')!;
 const battleParticipantsStatus = document.getElementById('battle-participants-status')!;
 const battleResultSummary = document.getElementById('battle-result-summary')!;
+const battleEvGain = document.getElementById('battle-ev-gain')!;
 const battleLogBtn = document.getElementById('battle-log-btn') as HTMLButtonElement;
 const battleChooseBtn = document.getElementById('battle-choose-opponent-btn') as HTMLButtonElement;
 const battleRecents = document.getElementById('battle-recent-opponents')!;
@@ -505,11 +506,6 @@ let battlePickToken = 0;
 
 battleSearch.evModifier = (mon) => {
   if (!battleSelected.size) return 'Base yield: ' + (formatEvYield(mon.evYield) || '0 EVs');
-  const gains = [...battleSelected].map(uid => {
-    const applied = store.previewDefeat(uid, mon)?.applied;
-    return applied ? formatEvYield(applied) || '0 EVs' : 'Unavailable';
-  });
-  if (new Set(gains).size === 1) return gains[0] + (gains.length > 1 ? ' each' : '');
   return participantEvSummary([...battleSelected], uid => store.previewDefeat(uid, mon)?.applied);
 };
 
@@ -537,34 +533,47 @@ function renderBattleMatchup(mon: DomainPokemon): void {
   if (!matchup) return;
   opponentTypes.replaceChildren(...matchup.types.map(battleTypeLabel));
   opponentTypes.setAttribute('aria-label', matchup.types.map(titleCase).join(' / '));
-  const highest = matchup.weaknesses[0]?.multiplier;
-  const strongest = matchup.weaknesses.filter(w => w.multiplier === highest);
+  const highest = matchup.attacks[0]?.multiplier;
+  const strongest = matchup.attacks.filter(attack => attack.multiplier > 1 && attack.multiplier === highest);
   document.getElementById('battle-matchup-lead')!.replaceChildren(
     ...(strongest.length ? strongest.map(w => battleTypeLabel(w.name)) : ['No type weakness']),
   );
   const factor = document.getElementById('battle-matchup-factor')!;
-  factor.hidden = !highest;
-  factor.textContent = highest ? '×' + highest : '';
-  document.getElementById('battle-matchup-gen')!.textContent = game ? 'Gen ' + game.gen : 'Modern rules';
-  const groups = new Map<string, string[]>();
-  for (const { name, category, multiplier } of matchup.weaknesses) {
-    const label = '×' + multiplier + (category ? ' ' + category : '');
-    const names = groups.get(label) ?? [];
-    names.push(name);
-    groups.set(label, names);
+  factor.hidden = !strongest.length;
+  factor.textContent = strongest.length ? '×' + highest : '';
+  document.getElementById('battle-matchup-gen')!.textContent =
+    game?.name === 'Legends Arceus' ? game.name : game ? 'Gen ' + game.gen : 'Modern rules';
+  const groups = new Map<number, typeof matchup.attacks>();
+  for (const attack of matchup.attacks) {
+    const group = groups.get(attack.multiplier) ?? [];
+    group.push(attack);
+    groups.set(attack.multiplier, group);
   }
-  const rows = Array.from(groups, ([label, names]) => {
-    const row = document.createElement('div');
+  const rows = Array.from(groups, ([multiplier, attacks]) => {
+    const row = document.createElement('li');
     const value = document.createElement('strong');
-    value.textContent = label;
-    const types = document.createElement('span');
-    types.className = 'matchup-types';
-    types.append(...names.map(battleTypeLabel));
+    value.textContent = '×' + multiplier;
+    const types = document.createElement('div');
+    if (multiplier > 1) {
+      for (const category of new Set(attacks.map(attack => attack.category))) {
+        const group = document.createElement('div');
+        group.className = 'matchup-types';
+        if (category) {
+          const label = document.createElement('small');
+          label.textContent = titleCase(category);
+          group.append(label);
+        }
+        group.append(...attacks.filter(attack => attack.category === category).map(attack => battleTypeLabel(attack.name)));
+        types.append(group);
+      }
+    } else {
+      const names = attacks.map(attack => attack.name).join(', ');
+      types.textContent = multiplier === 0 ? 'Immune · ' + names : names;
+    }
     row.append(value, types);
     return row;
   });
-  document.getElementById('battle-weaknesses')!.replaceChildren(...(rows.length ? rows : ['None']));
-  document.getElementById('battle-immunities')!.textContent = matchup.immunities.join(', ') || 'None';
+  document.getElementById('battle-damage-list')!.replaceChildren(...rows);
   document.getElementById('battle-attack-advice')!.textContent = matchup.advice;
 }
 
@@ -585,17 +594,7 @@ function clearPendingBattle(): void {
   battleOpponentSprite.hidden = true;
   document.getElementById('battle-opponent-placeholder')!.hidden = false;
   battleResultSummary.hidden = true;
-  renderParticipantGains([], () => undefined);
-}
-
-function renderParticipantGains(uids: string[], getGain: (uid: string) => EvMap | undefined): void {
-  for (const slot of battleParticipants.querySelectorAll<HTMLButtonElement>('.party-slot')) {
-    const uid = slot.dataset.uid!;
-    const gain = uids.includes(uid) ? getGain(uid) : undefined;
-    const text = gain ? formatEvYield(gain) || '0 EVs' : '';
-    slot.querySelector('.battle-slot-gain')!.textContent = text;
-    slot.setAttribute('aria-label', text ? `${slot.title}, ${text}` : slot.title);
-  }
+  battleEvGain.textContent = '—';
 }
 
 function renderBattleParticipants(): void {
@@ -611,9 +610,6 @@ function renderBattleParticipants(): void {
   const active = activePokemon(party);
   for (const entry of active) {
     const slot = renderPartySlot(entry, true, battleSelected.has(entry.uid));
-    const gain = document.createElement('span');
-    gain.className = 'battle-slot-gain';
-    slot.append(gain);
     if (!entry.fainted) {
       slot.addEventListener('click', () => {
         if (battleSelected.has(entry.uid)) battleSelected.delete(entry.uid);
@@ -714,7 +710,7 @@ function stageKnownBattle(mon: DomainPokemon): void {
   const summary = formatEvYield(mon.evYield);
   battleResultSummary.textContent = `Base yield: ${summary || 'No EV yield'}`;
   battleResultSummary.hidden = false;
-  renderParticipantGains(uids, uid => store.previewDefeat(uid, mon)?.applied);
+  battleEvGain.textContent = participantEvSummary(uids, uid => store.previewDefeat(uid, mon)?.applied) || '—';
   battleLogBtn.textContent = 'Log defeat';
   battleLogBtn.disabled = uids.length === 0;
 }
@@ -728,8 +724,8 @@ battleLogBtn.addEventListener('click', () => {
   battleLogBtn.disabled = true;
   const applied = store.logBattleForParticipants(uids, mon);
   const gainFor = (uid: string) => applied.find(r => r.uid === uid)?.applied;
-  renderParticipantGains(applied.map(r => r.uid), gainFor);
   const summary = participantEvSummary(applied.map(r => r.uid), gainFor);
+  battleEvGain.textContent = summary || '—';
   battleComposer.dataset.state = 'logged';
   battleLogBtn.textContent = '✓ Defeat logged';
   battleConfirmState.textContent = `Defeat logged · ${titleCase(mon.name)} · ${summary}`;
@@ -762,24 +758,22 @@ function renderRecentOpponents(): void {
   }
 }
 
-/** "Bulbasaur +1 HP · Charmander (no EVs — maxed)" — `uids`' own names
- * and yields (`applyForUid` supplies the EvMap, already-clamped whether
- * it's a live preview or the actual applied result), so a maxed-out
- * participant reads as unambiguous fact rather than a single count that
- * goes ambiguous the moment one of several selected Pokémon can't gain
- * any more of this stat. Takes `uids` explicitly rather than reading
- * `battleSelected` itself — by the time a `logPartyBattle` result is
- * ready, the sheet may have already closed and reset that selection. */
+/** Show a shared gain when possible and name each participant when gains differ. */
 function participantEvSummary(uids: string[], applyForUid: (uid: string) => EvMap | undefined): string {
+  if (!uids.length) return '';
+  const gains = uids.map(uid => {
+    const applied = applyForUid(uid);
+    return applied ? formatEvYield(applied) || '0 EVs' : 'Unavailable';
+  });
+  if (gains.every(gain => gain === gains[0])) {
+    return gains[0] + (gains.length > 1 ? ' each' : '');
+  }
   const party = store.activeParty;
-  const parts = uids.map((uid) => {
+  return uids.map((uid, index) => {
     const entry = party?.pokemon.find((e) => e.uid === uid);
     const name = entry ? entry.nickname || titleCase(entry.speciesName) : '?';
-    const applied = applyForUid(uid);
-    const yieldText = applied ? formatEvYield(applied) : '';
-    return `${name} ${yieldText || '(no EVs — maxed)'}`;
-  });
-  return parts.join(' · ');
+    return `${name} ${gains[index]}`;
+  }).join(' · ');
 }
 
 /* ------------------------------------------------------------------ */

@@ -23,19 +23,19 @@ export function battleMatchup(mon: DomainPokemon, gen: number, legendsArceus = f
   const types = past && gen <= past[0] ? past[1] : mon.types;
   if (!types?.length || types.some(type => !Object.hasOwn(chart, type))) return null;
 
-  const weaknesses: { name: string; category?: string; multiplier: number }[] = [];
-  const immunities: string[] = [];
+  const attacks: { name: string; category?: string; multiplier: number }[] = [];
   for (const attack of Object.keys(chart)) {
     if (gen < 6 && attack === 'fairy') continue;
     if (gen === 1 && ['dark', 'steel'].includes(attack)) continue;
-    const multiplier = types.reduce((factor, target) => factor * effectiveness(attack, target, gen), 1);
-    if (multiplier === 0) immunities.push(titleCase(attack));
-    if (multiplier > 1) {
-      const category = gen <= 3 ? (specialTypes.has(attack) ? 'special' : 'physical') : undefined;
-      weaknesses.push({ name: titleCase(attack), category, multiplier: legendsArceus && multiplier === 4 ? 2.5 : multiplier });
+    let multiplier = types.reduce((factor, target) => factor * effectiveness(attack, target, gen), 1);
+    if (legendsArceus) {
+      if (multiplier === 4) multiplier = 2.5;
+      if (multiplier === 0.25) multiplier = 0.4;
     }
+    const category = gen <= 3 ? (specialTypes.has(attack) ? 'special' : 'physical') : undefined;
+    attacks.push({ name: titleCase(attack), category, multiplier });
   }
-  weaknesses.sort((a, b) => b.multiplier - a.multiplier);
+  attacks.sort((a, b) => b.multiplier - a.multiplier || a.name.localeCompare(b.name));
   const history = historicalDefenses[mon.id];
   const stats = history && gen <= history.through ? history : undefined;
   const def = stats?.def ?? mon.baseStats?.def;
@@ -47,5 +47,5 @@ export function battleMatchup(mon: DomainPokemon, gen: number, legendsArceus = f
       : 'Favor ' + (def < spd ? 'physical' : 'special') + ' moves at equal effectiveness.';
     advice += ' (Defense ' + def + ' · ' + special + ' ' + spd + ')';
   }
-  return { types, weaknesses, immunities, advice };
+  return { types, attacks, advice };
 }

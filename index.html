@@ -201,13 +201,13 @@
               <b id="battle-matchup-factor"></b>
               <span class="matchup-chevron" aria-hidden="true"></span>
             </summary>
-            <dl><dt>Weak to</dt><dd id="battle-weaknesses"></dd>
-              <dt>Immune to</dt><dd id="battle-immunities"></dd></dl>
+            <ul id="battle-damage-list" role="list" aria-label="Incoming damage by attack type"></ul>
             <p id="battle-attack-advice"></p>
             <small id="battle-matchup-gen"></small>
           </details>
         </div>
         <div slot="sheet-footer" class="battle-composer-actions">
+          <p class="battle-ev-summary"><span>EV gain</span><strong id="battle-ev-gain">—</strong></p>
           <button id="battle-log-btn" class="ds-btn ds-btn--primary" type="button" disabled>Log defeat</button>
         </div>
       </pokemon-search>
