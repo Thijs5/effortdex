@@ -31,6 +31,7 @@ export class NatureDialog extends BaseDialog {
 
   constructor() {
     super('nature-dialog', 'nature-dialog-title');
+    this.$dialog.classList.add('ds-dialog--compact');
 
     const style = document.createElement('style');
     // No width override here — the default 420px from lib/design-system.js's

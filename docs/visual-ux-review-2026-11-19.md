@@ -78,3 +78,12 @@ fully device-validated. A local WebKit run was attempted, but the host lacks its
 required shared libraries; no operating-system packages were changed for this audit.
 The existing Chromium mobile suite and browser walkthroughs provide the repeatable
 local evidence. This review did not include a moderated test with other players.
+
+## Screenshot follow-up
+
+A further side-by-side pass addressed empty-screen separation in short choice
+sheets, mismatched search title typography/gutters, disconnected evolution rows,
+narrow party-form primary actions, and a swap status card that resembled a button.
+[ADR 0037](adr/0037-consistent-sheet-spacing-and-short-choices.md) records the
+changes. Long stat-entry forms retain their keyboard-free steppers and pinned
+confirmation; the compact variant is limited to short choices.

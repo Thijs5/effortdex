@@ -153,6 +153,15 @@ const css = `
       max-height: var(--dialog-vv-height, 100dvh);
       border-radius: 0;
     }
+    /* A single short choice should not separate its field and Save with
+       an empty screen. Longer forms keep the full-height sheet above. */
+    .ds-dialog.ds-dialog--compact {
+      top: auto;
+      bottom: max(0px, calc(100dvh - var(--dialog-vv-top, 0px) - var(--dialog-vv-height, 100dvh)));
+      height: auto;
+      max-height: min(85dvh, var(--dialog-vv-height, 100dvh));
+      border-radius: var(--radius-lg) var(--radius-lg) 0 0;
+    }
   }
 
   /* Desktop (roomy pointer devices): the dialog is one column that grows

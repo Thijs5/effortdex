@@ -660,6 +660,13 @@ html[data-modal-open] body {
   cursor: pointer;
   text-align: center;
 }
+.swap-dialog .empty-state {
+  border: none;
+  background: transparent;
+  padding: 0;
+  margin: var(--space-3) 0;
+  text-align: left;
+}
 .swap-dialog-bench-btn:hover { background: var(--teal-soft); }
 .swap-dialog-list { display: grid; gap: var(--space-2); }
 .swap-dialog-option {
@@ -1592,4 +1599,12 @@ textarea.ds-field { resize: vertical; }
 @media (max-width: 640px) {
   .battle-slot-handle, .roster-card-handle { min-width: 44px; min-height: 44px; margin: 0; }
   .sprite-cache-generation > summary { min-height: 44px; align-content: center; }
+}
+
+/* Consistent form actions: quiet dismissal plus one broad primary action. */
+@media (max-width: 640px) {
+  .party-dialog-actions { flex-wrap: nowrap; }
+  .party-dialog-actions .spacer { display: none; }
+  .party-dialog-actions > .ds-btn--ghost { flex: 0 0 92px; }
+  .party-dialog-actions > .ds-btn--primary { flex: 1; min-width: 0; }
 }

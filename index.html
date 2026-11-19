@@ -495,10 +495,9 @@
         </label>
         <p class="hint">Restricts the battle-log and add-Pok&eacute;mon pickers to species from up to the chosen generation, instead of following the base game's own &mdash; for a ROM hack/mod whose dex doesn't match its base game's real generation.</p>
       </details>
-
+      <button type="button" id="party-delete-btn" class="ds-btn ds-btn--ghost ds-btn--danger" hidden>Delete party</button>
       </div>
       <div class="party-dialog-actions">
-        <button type="button" id="party-delete-btn" class="ds-btn ds-btn--ghost ds-btn--danger" hidden>Delete party</button>
         <span class="spacer"></span>
         <button type="button" id="party-cancel-btn" class="ds-btn ds-btn--ghost">Cancel</button>
         <button type="submit" id="party-submit-btn" class="ds-btn ds-btn--primary">Create party</button>
@@ -547,7 +546,7 @@
        button opens this pre-scoped to the slot being replaced; an empty
        slot opens it with nothing to swap out, just add. Bench list is
        rebuilt fresh each open (roster.ts). -->
-  <dialog id="swap-dialog" class="party-dialog swap-dialog ds-dialog" aria-labelledby="swap-dialog-title">
+  <dialog id="swap-dialog" class="party-dialog swap-dialog ds-dialog ds-dialog--compact" aria-labelledby="swap-dialog-title">
     <header class="ds-dialog-header">
       <h2 id="swap-dialog-title">Bring in a Pok&eacute;mon</h2>
       <button type="button" id="swap-dialog-close" class="ds-dialog-close" aria-label="Close">
