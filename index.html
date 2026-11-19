@@ -182,6 +182,9 @@
            the visible viewport with the defeat confirmation action (ADR 0031). -->
       <pokemon-search id="battle-search" hidden placeholder="Defeated Pokémon…" show-ev-yield sheet-title="Choose defeated Pokémon" force-sheet review-flow review-title="Record a defeat">
         <div slot="sheet-extra" class="battle-sheet-extra" data-state="empty">
+          <div class="battle-team-heading"><span class="battle-sheet-eyebrow">Who battled?</span><span id="battle-selected-count"></span></div>
+          <div id="battle-participants" class="party-slots party-slots--select"></div>
+          <p id="battle-participants-status" class="party-slots-status" hidden></p>
           <div class="battle-opponents">
           <div class="battle-current"><span class="battle-sheet-eyebrow">Opponent</span>
           <button id="battle-choose-opponent-btn" class="battle-opponent-card" type="button" aria-label="Choose defeated Pokémon">
@@ -192,19 +195,14 @@
           </div>
           <p id="battle-confirm-state" class="battle-confirm-state" role="status"></p>
           <p id="battle-lookup-error" hidden role="alert"></p>
-          <div class="battle-team-heading"><span class="battle-sheet-eyebrow">Who battled?</span><span id="battle-selected-count"></span></div>
-          <div id="battle-participants" class="party-slots party-slots--select"></div>
-          <p id="battle-participants-status" class="party-slots-status" hidden></p>
-          <details id="battle-matchup" hidden>
-            <summary>
-              <span class="matchup-lead"><small>Strongest weakness</small><span id="battle-matchup-lead" class="matchup-types"></span></span>
-              <b id="battle-matchup-factor"></b>
-              <span class="matchup-chevron" aria-hidden="true"></span>
-            </summary>
+          <section id="battle-matchup" aria-labelledby="battle-matchup-title" hidden>
+            <header class="matchup-heading">
+              <h3 id="battle-matchup-title">Type matchups</h3>
+              <small id="battle-matchup-gen"></small>
+            </header>
             <ul id="battle-damage-list" role="list" aria-label="Incoming damage by attack type"></ul>
             <p id="battle-attack-advice"></p>
-            <small id="battle-matchup-gen"></small>
-          </details>
+          </section>
         </div>
         <div slot="sheet-footer" class="battle-composer-actions">
           <p class="battle-ev-summary"><span>EV gain</span><strong id="battle-ev-gain">—</strong></p>

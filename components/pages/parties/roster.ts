@@ -266,11 +266,10 @@ function showAddStatus(text: string): void {
 /* multi-participant "Log a battle" sheet.                              */
 /* ------------------------------------------------------------------ */
 
-/** Builds one slot/chip's markup — shared by the battle party bar
- * (faint/heal toggle) and the battle sheet's participant strip
- * (select/lock toggle); `selectable` picks which behavior applies. */
-function renderPartySlot(entry: RosterEntry, selectable: boolean, selected: boolean): HTMLButtonElement {
+/** Shared sprite tile. The participant strip passes a selection state. */
+function renderPartySlot(entry: RosterEntry, selected?: boolean): HTMLButtonElement {
   const sprite = spriteFor(entry);
+  const selectable = selected !== undefined;
   const locked = selectable && entry.fainted;
   const btn = document.createElement('button');
   btn.type = 'button';
@@ -284,15 +283,17 @@ function renderPartySlot(entry: RosterEntry, selectable: boolean, selected: bool
   }
   btn.disabled = locked;
   const displayName = entry.nickname || titleCase(entry.speciesName);
-  btn.title = entry.fainted ? `${displayName} — fainted${selectable ? ', heal it before it can battle' : ' — tap to heal'}` : displayName;
+  btn.title = entry.fainted ? `${displayName} — fainted${selectable ? ', heal it before it can battle' : ''}` : displayName;
   btn.setAttribute('aria-label', btn.title);
   btn.innerHTML = `
     <span class="party-slot-sprite-wrap">
       <img class="party-slot-sprite" src="${sprite.src}" alt="" ${sprite.onerror} />
-      ${entry.fainted ? '<span class="party-slot-faint-badge" aria-hidden="true">&times;</span>' : ''}
+      ${locked ? '<span class="party-slot-faint-badge" aria-hidden="true">&times;</span>' : ''}
       ${selectable && selected ? '<span class="party-slot-check" aria-hidden="true">&#10003;</span>' : ''}
     </span>
-    <span class="party-slot-lvl">Lv${entry.level}</span>
+    ${!selectable && entry.fainted
+      ? '<span class="battle-slot-faint-tag">Fainted</span>'
+      : `<span class="party-slot-lvl">Lv${entry.level}</span>`}
   `;
   return btn;
 }
@@ -323,14 +324,8 @@ document.addEventListener('click', (e) => {
   if (openWrap && !e.composedPath().includes(openWrap)) closeBattleSlotMenu();
 });
 
-/** One filled active-party card — sprite/name/level (or a fainted tag in
- * place of the level), plus a "⋯" menu (Level up / Swap out / Mark
- * fainted-Heal) — consolidated into one menu, rather than one icon
- * button apiece, so a fourth action (Level up) didn't mean a fourth
- * always-visible button competing with sprite/name for the card's
- * limited width. */
+/** The active-party sprite tile opens the action menu; its grip reorders the slot. */
 function renderBattleSlotCard(entry: RosterEntry): HTMLDivElement {
-  const sprite = spriteFor(entry);
   const displayName = entry.nickname || titleCase(entry.speciesName);
   const card = document.createElement('div');
   card.className = 'battle-slot';
@@ -338,32 +333,34 @@ function renderBattleSlotCard(entry: RosterEntry): HTMLDivElement {
   if (entry.fainted) card.classList.add('battle-slot--fainted');
   card.innerHTML = `
     <button type="button" class="battle-slot-handle" aria-label="Reorder ${escapeHtml(displayName)}">&#9776;</button>
-    <span class="battle-slot-sprite-wrap">
-      <img class="battle-slot-sprite" src="${sprite.src}" alt="" ${sprite.onerror} />
-    </span>
-    <span class="battle-slot-body">
-      <span class="battle-slot-name">${escapeHtml(displayName)}</span>
-      ${entry.fainted ? '<span class="battle-slot-faint-tag">Fainted</span>' : `<span class="battle-slot-lvl">Lv${entry.level}</span>`}
-    </span>
-    <span class="battle-slot-menu-wrap">
-      <button type="button" class="battle-slot-menu-btn" aria-label="More actions for ${escapeHtml(displayName)}" aria-haspopup="menu" aria-expanded="false" title="More">
-        <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="6.5" r="1.7"/><circle cx="12" cy="12" r="1.7"/><circle cx="12" cy="17.5" r="1.7"/></svg>
-      </button>
+    <div class="battle-slot-menu-wrap">
       <div class="battle-slot-menu" role="menu" aria-label="More actions for ${escapeHtml(displayName)}" hidden>
         <button class="battle-slot-menu-item" type="button" role="menuitem" data-action="level">Level up</button>
         <button class="battle-slot-menu-item" type="button" role="menuitem" data-action="swap">Swap out</button>
         <button class="battle-slot-menu-item" type="button" role="menuitem" data-action="faint">${entry.fainted ? 'Heal' : 'Mark fainted'}</button>
       </div>
-    </span>
+    </div>
+    <span class="battle-slot-name" title="${escapeHtml(displayName)}">${escapeHtml(displayName)}</span>
   `;
-  const menuBtn = card.querySelector<HTMLButtonElement>('.battle-slot-menu-btn')!;
+  const menuBtn = renderPartySlot(entry);
+  menuBtn.classList.add('battle-slot-menu-btn');
+  menuBtn.setAttribute('aria-label', `More actions for ${displayName}, ${entry.fainted ? 'fainted' : 'level ' + entry.level}`);
+  menuBtn.setAttribute('aria-haspopup', 'menu');
+  menuBtn.setAttribute('aria-expanded', 'false');
   const menu = card.querySelector<HTMLElement>('.battle-slot-menu')!;
+  menu.before(menuBtn);
   menuBtn.addEventListener('click', (e) => {
     e.stopPropagation(); // else the outside-click listener above sees this same click and immediately re-closes it
     const wasOpen = openBattleSlotMenuUid === entry.uid;
     closeBattleSlotMenu();
     if (wasOpen) return;
     menu.hidden = false;
+    menu.style.transform = '';
+    const bounds = menu.getBoundingClientRect();
+    const inset = 8;
+    const shift = Math.max(0, inset - bounds.left) -
+      Math.max(0, bounds.right - document.documentElement.clientWidth + inset);
+    if (shift) menu.style.transform = `translateX(${shift}px)`;
     menuBtn.setAttribute('aria-expanded', 'true');
     openBattleSlotMenuUid = entry.uid;
     if (e.detail === 0) menu.querySelector<HTMLButtonElement>('button')?.focus();
@@ -421,7 +418,8 @@ function renderBattleSlotEmpty(): HTMLButtonElement {
   const btn = document.createElement('button');
   btn.type = 'button';
   btn.className = 'battle-slot battle-slot--empty';
-  btn.textContent = '+ Bring in a Pokémon';
+  btn.setAttribute('aria-label', 'Bring in a Pokémon');
+  btn.innerHTML = '<span aria-hidden="true">+</span><span>Bring in</span>';
   btn.addEventListener('click', () => openSwapDialog(null));
   return btn;
 }
@@ -512,7 +510,7 @@ battleSearch.evModifier = (mon) => {
 // Each confirmation consumes the opponent; recipients stay selected until close.
 let pendingBattle: { mon: DomainPokemon; uids: string[] } | null = null;
 
-const matchupPanel = document.getElementById('battle-matchup') as HTMLDetailsElement;
+const matchupPanel = document.getElementById('battle-matchup')!;
 const opponentTypes = document.getElementById('battle-matchup-types')!;
 
 function renderBattleMatchup(mon: DomainPokemon): void {
@@ -523,14 +521,6 @@ function renderBattleMatchup(mon: DomainPokemon): void {
   if (!matchup) return;
   opponentTypes.replaceChildren(...matchup.types.map(type => createTypeLabel(type)));
   opponentTypes.setAttribute('aria-label', matchup.types.map(titleCase).join(' / '));
-  const highest = matchup.attacks[0]?.multiplier;
-  const strongest = matchup.attacks.filter(attack => attack.multiplier > 1 && attack.multiplier === highest);
-  document.getElementById('battle-matchup-lead')!.replaceChildren(
-    ...(strongest.length ? strongest.map(w => createTypeLabel(w.name)) : ['No type weakness']),
-  );
-  const factor = document.getElementById('battle-matchup-factor')!;
-  factor.hidden = !strongest.length;
-  factor.textContent = strongest.length ? '×' + highest : '';
   document.getElementById('battle-matchup-gen')!.textContent =
     game?.name === 'Legends Arceus' ? game.name : game ? 'Gen ' + game.gen : 'Modern rules';
   const groups = new Map<number, typeof matchup.attacks>();
@@ -541,9 +531,18 @@ function renderBattleMatchup(mon: DomainPokemon): void {
   }
   const rows = Array.from(groups, ([multiplier, attacks]) => {
     const row = document.createElement('li');
-    const value = document.createElement('strong');
+    const disclosure = document.createElement('details');
+    disclosure.open = true;
+    const summary = document.createElement('summary');
+    summary.setAttribute('aria-label', multiplier === 0 ? '×0 damage, immune' : '×' + multiplier + ' damage');
+    const value = document.createElement('span');
     value.textContent = '×' + multiplier;
+    const chevron = document.createElement('span');
+    chevron.className = 'matchup-chevron';
+    chevron.setAttribute('aria-hidden', 'true');
+    summary.append(value, chevron);
     const types = document.createElement('div');
+    types.className = 'matchup-group-content';
     if (multiplier > 1) {
       for (const category of new Set(attacks.map(attack => attack.category))) {
         const group = document.createElement('div');
@@ -560,7 +559,8 @@ function renderBattleMatchup(mon: DomainPokemon): void {
       const names = attacks.map(attack => attack.name).join(', ');
       types.textContent = multiplier === 0 ? 'Immune · ' + names : names;
     }
-    row.append(value, types);
+    disclosure.append(summary, types);
+    row.append(disclosure);
     return row;
   });
   document.getElementById('battle-damage-list')!.replaceChildren(...rows);
@@ -569,7 +569,6 @@ function renderBattleMatchup(mon: DomainPokemon): void {
 
 function clearPendingBattle(): void {
   matchupPanel.hidden = true;
-  matchupPanel.open = false;
   opponentTypes.hidden = true;
   ++battlePickToken;
   pendingBattle = null;
@@ -599,15 +598,14 @@ function renderBattleParticipants(): void {
   if (!party) return;
   const active = activePokemon(party);
   for (const entry of active) {
-    const slot = renderPartySlot(entry, true, battleSelected.has(entry.uid));
+    const slot = renderPartySlot(entry, battleSelected.has(entry.uid));
     if (!entry.fainted) {
       slot.addEventListener('click', () => {
         if (battleSelected.has(entry.uid)) battleSelected.delete(entry.uid);
         else battleSelected.add(entry.uid);
-        const opponent = pendingBattle?.mon;
-        clearPendingBattle();
+        if (pendingBattle) updateBattleRecipients(pendingBattle.mon);
+        else clearPendingBattle();
         renderBattleParticipants();
-        if (opponent) stageKnownBattle(opponent);
       });
     }
     battleParticipants.appendChild(slot);
@@ -684,10 +682,14 @@ async function stageBattlePick(name: string): Promise<void> {
   }
 }
 
-function stageKnownBattle(mon: DomainPokemon): void {
+function updateBattleRecipients(mon: DomainPokemon): void {
   const uids = [...battleSelected];
   pendingBattle = { mon, uids };
-  matchupPanel.open = false;
+  battleEvGain.textContent = participantEvSummary(uids, uid => store.previewDefeat(uid, mon)?.applied) || '—';
+  battleLogBtn.disabled = uids.length === 0;
+}
+
+function stageKnownBattle(mon: DomainPokemon): void {
   renderBattleMatchup(mon);
   battleComposer.dataset.state = 'ready';
   battleOpponentName.textContent = titleCase(mon.name);
@@ -700,9 +702,8 @@ function stageKnownBattle(mon: DomainPokemon): void {
   const summary = formatEvYield(mon.evYield);
   battleResultSummary.textContent = `Base yield: ${summary || 'No EV yield'}`;
   battleResultSummary.hidden = false;
-  battleEvGain.textContent = participantEvSummary(uids, uid => store.previewDefeat(uid, mon)?.applied) || '—';
   battleLogBtn.textContent = 'Log defeat';
-  battleLogBtn.disabled = uids.length === 0;
+  updateBattleRecipients(mon);
 }
 
 battleLogBtn.addEventListener('click', () => {
@@ -974,7 +975,7 @@ function renderRoster(party: Party): void {
           ${pokerusActive ? `<span class="roster-card-pkrs" aria-hidden="true">${POKERUS_ICON_SVG}</span>` : ''}
         </span>
         <div class="roster-card-body">
-          <span class="roster-card-name">${escapeHtml(displayName)}</span>
+          <span class="roster-card-name" title="${escapeHtml(displayName)}">${escapeHtml(displayName)}</span>
           <span class="roster-card-meta">
             Lv. ${entry.level}${natureMeta}
             ${entry.expShare ? `<img class="roster-card-exp-share" src="${EXP_SHARE_SPRITE}" alt="" title="Exp. Share — earns EVs from other battles" ${FALLBACK_ONERROR} />` : ''}

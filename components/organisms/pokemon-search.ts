@@ -323,12 +323,13 @@ export class PokemonSearch extends BaseElement {
     this.shadow.querySelector<HTMLButtonElement>('.sheet-back')!.addEventListener('click', () => this.showReview());
     this.addEventListener('keydown', (e) => {
       if (e.key === 'Tab' && this._sheetOpen && this.hasAttribute('review-flow')) {
+        const focusable = 'button, input, summary, [tabindex]';
         const controls: HTMLElement[] = [];
         for (const node of this.$wrap.querySelectorAll<HTMLElement>('button, input, slot')) {
           if (node instanceof HTMLSlotElement) {
             for (const assigned of node.assignedElements()) {
-              if (assigned.matches('button, input, [tabindex]')) controls.push(assigned as HTMLElement);
-              controls.push(...assigned.querySelectorAll<HTMLElement>('button, input, [tabindex]'));
+              if (assigned.matches(focusable)) controls.push(assigned as HTMLElement);
+              controls.push(...assigned.querySelectorAll<HTMLElement>(focusable));
             }
           } else controls.push(node);
         }

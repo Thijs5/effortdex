@@ -369,12 +369,19 @@ test.describe('Active party and faint tracking', () => {
   });
 
   test('active-party actions fit a phone screen and the battle confirmation stays visible', async ({ page }) => {
-    await page.setViewportSize({ width: 360, height: 640 });
+    await page.setViewportSize({ width: 320, height: 640 });
     await page.goto('/');
     await createParty(page, { name: 'Emerald run', baseGame: 'Emerald' });
     await addPokemon(page, 'Bulbasaur');
     await addPokemon(page, 'Charmander');
-    await battlePartyFaintBtn(page, 'Charmander');
+    const slot = battlePartySlot(page, 'Charmander');
+    await slot.locator('.battle-slot-menu-btn').click();
+    const menu = slot.locator('.battle-slot-menu');
+    const menuBox = await menu.boundingBox();
+    if (!menuBox) throw new Error('Expected the active-party action menu to be visible');
+    expect(menuBox.x).toBeGreaterThanOrEqual(0);
+    expect(menuBox.x + menuBox.width).toBeLessThanOrEqual(320);
+    await menu.getByRole('menuitem', { name: 'Mark fainted' }).click();
     expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
     await logPartyBattle(page, 'Caterpie');
     await expect(page.locator('#battle-log-btn')).toBeInViewport();
@@ -484,13 +491,22 @@ test.describe('Keyboard-free defeat review', () => {
     await recents.last().tap();
     await expect(page.locator('#battle-opponent-name')).toHaveText('Onix');
     await expect(page.locator('#battle-matchup-types type-label')).toHaveText(['Rock', 'Ground']);
-    await expect(page.locator('#battle-matchup-lead type-label')).toHaveText(['Grass', 'Water']);
-    await page.locator('#battle-matchup summary').tap();
     const damage = page.getByRole('list', { name: 'Incoming damage by attack type' });
-    await expect(damage.locator('li > strong')).toHaveText(['×4', '×2', '×1', '×0.5', '×0.25', '×0']);
-    await expect(damage.locator('li').first().locator('type-label')).toHaveText(['Grass', 'Water']);
-    await expect(damage.getByRole('listitem').last()).toContainText('Immune · Electric');
+    await expect(damage.locator('summary')).toHaveText(['×4', '×2', '×1', '×0.5', '×0.25', '×0']);
+    await expect(damage.locator('details[open]')).toHaveCount(6);
+    const highest = damage.locator('details').first();
+    await expect(highest.locator('type-label')).toHaveText(['Grass', 'Water']);
+    await expect(highest.getByText('Grass')).toBeVisible();
+    const immune = damage.getByText('Immune · Electric');
+    await expect(immune).toBeVisible();
     await page.screenshot({ path: info.outputPath('onix-damage-list.png') });
+    await highest.locator('summary').press('Enter');
+    await expect(highest.getByText('Grass')).toBeHidden();
+    await expect(immune).toBeVisible();
+    await page.locator('#battle-participants').getByRole('button', { name: /Charmander/i }).tap();
+    await expect(highest.getByText('Grass')).toBeHidden();
+    await highest.locator('summary').tap();
+    await expect(highest.getByText('Grass')).toBeVisible();
     await page.locator('#battle-search .sheet-close').tap();
     await page.reload();
     await expect(rosterCard(page, 'Bulbasaur').locator('.roster-card-evbar .value')).toHaveText(before || '');
@@ -510,7 +526,7 @@ test.describe('Keyboard-free defeat review', () => {
     await expect(page.locator('#battle-log-btn')).toBeDisabled();
     await expect(search.getByRole('heading', { name: 'Record a defeat' })).toBeFocused();
     await page.keyboard.press('Shift+Tab');
-    await expect(page.locator('#battle-participants button').last()).toBeFocused();
+    await expect(page.locator('#battle-choose-opponent-btn')).toBeFocused();
     await page.keyboard.press('Tab');
     await expect(search.locator('.sheet-close')).toBeFocused();
     await page.locator('#battle-choose-opponent-btn').tap();

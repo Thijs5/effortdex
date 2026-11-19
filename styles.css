@@ -521,30 +521,29 @@ html[data-modal-open] body {
 }
 .heal-btn:hover { background: var(--teal); color: var(--on-teal); }
 
-/* The active-party grid: every slot — filled or empty — gets a real card
-   with room for a name/level and its own quick-action buttons, instead
-   of the tiny tap-only icons this replaced. auto-fill (not a fixed
-   column count) so a wide screen fills its width with more, comfortably
-   sized cards rather than stretching 3 columns into mostly whitespace
-   around still-tiny buttons. */
+/* The active six wrap on narrow screens so action menus stay outside
+   any horizontal scroller. */
 .battle-party-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(min(100%, 240px), 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 100px), 1fr));
   gap: var(--space-2);
 }
 .battle-slot {
-  display: flex;
+  display: grid;
+  grid-template-columns: 44px minmax(0, 1fr);
   align-items: center;
-  gap: var(--space-2);
-  padding: var(--space-3);
+  min-width: 0;
+  padding: var(--space-1);
   border: 1.5px solid var(--line);
-  border-radius: var(--radius-md);
+  border-radius: var(--radius-sm);
   background: var(--surface);
 }
 .battle-slot--fainted { background: var(--lcd-deep); border-style: dashed; opacity: 0.85; }
 .battle-slot--empty {
+  grid-template-columns: minmax(0, 1fr);
+  align-content: center;
+  gap: var(--space-1);
   border-style: dashed;
-  justify-content: center;
   color: var(--ink-soft);
   font-size: var(--font-size-xs);
   font-weight: 600;
@@ -552,35 +551,25 @@ html[data-modal-open] body {
   cursor: pointer;
   text-align: center;
 }
+.battle-slot--empty span:first-child { font-size: var(--font-size-lg); line-height: 1; }
 .battle-slot--empty:hover { border-color: var(--teal); color: var(--teal-strong); }
-.battle-slot-sprite-wrap { position: relative; width: 34px; height: 34px; flex: 0 0 auto; }
-.battle-slot-sprite {
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-  image-rendering: pixelated;
-  filter: drop-shadow(0 2px 2px var(--sprite-drop));
-}
-.battle-slot--fainted .battle-slot-sprite { filter: grayscale(1) opacity(0.55); }
-.battle-slot-body { min-width: 0; flex: 1 1 auto; display: grid; gap: 1px; }
 .battle-slot-name {
-  font-size: var(--font-size-sm);
-  font-weight: 700;
+  grid-column: 1 / -1;
+  text-align: center;
+  font-size: var(--font-size-2xs);
+  font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.battle-slot-lvl { font-family: var(--font-mono); font-size: var(--font-size-2xs); color: var(--ink-soft); }
-.battle-slot-faint-tag { font-size: var(--font-size-2xs); font-weight: 800; color: var(--poke-red-dark); }
+.battle-slot-faint-tag { font-size: var(--font-size-2xs); line-height: 1; color: var(--poke-red-dark); }
 .battle-slot--dragging { opacity: 0.6; box-shadow: var(--shadow-panel); }
 .battle-slot--drop-target { outline: 2px dashed var(--teal); outline-offset: 2px; }
 .battle-slot-handle {
-  flex: 0 0 auto;
+  min-height: 44px;
   border: none;
   background: transparent;
   padding: var(--space-2);
-  margin: calc(var(--space-2) * -1);
-  margin-right: 0;
   font-size: var(--font-size-md);
   line-height: 1;
   color: var(--ink-soft);
@@ -595,22 +584,7 @@ html[data-modal-open] body {
    action. Same look as the header dropdown (.header-menu, above), which
    this mirrors rather than shares: that one is fixed to the header, this
    one is positioned relative to its own card. */
-.battle-slot-menu-wrap { position: relative; flex: 0 0 auto; }
-.battle-slot-menu-btn {
-  width: 44px;
-  height: 44px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 50%;
-  border: 1px solid var(--lcd-line);
-  background: var(--surface);
-  color: var(--ink-soft);
-  cursor: pointer;
-  padding: 0;
-}
-.battle-slot-menu-btn svg { width: 16px; height: 16px; }
-.battle-slot-menu-btn:hover { border-color: var(--teal); color: var(--teal-strong); }
+.battle-slot-menu-wrap { position: relative; min-width: 0; }
 .battle-slot-menu {
   position: absolute;
   top: calc(100% + 6px);
@@ -713,6 +687,24 @@ html[data-modal-open] body {
   cursor: pointer;
 }
 .party-slot:hover { border-color: var(--teal); }
+.battle-slot .battle-slot-menu-btn {
+  width: 100%;
+  min-width: 44px;
+  min-height: 44px;
+  position: relative;
+  background: transparent;
+  border: 1px solid transparent;
+  padding: var(--space-1) 0;
+}
+.battle-slot .battle-slot-menu-btn:hover, .battle-slot .battle-slot-menu-btn[aria-expanded="true"] {
+  border-color: var(--line);
+}
+.battle-slot-menu-btn::after {
+  content: '⋯' / '';
+  position: absolute;
+  inset: 0 var(--space-1) auto auto;
+  color: var(--ink-soft);
+}
 .party-slot--fainted {
   background: var(--lcd-deep);
   border-style: dashed;
@@ -911,7 +903,7 @@ html[data-modal-open] body {
 .roster {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: var(--space-3);
+  gap: var(--space-2);
 }
 
 @media (max-width: 520px) {
@@ -935,7 +927,7 @@ html[data-modal-open] body {
       color-mix(in srgb, var(--type2, var(--type, var(--surface))) 16%, var(--surface)) 100%));
   border: 1px solid var(--line);
   border-radius: var(--radius-md);
-  padding: var(--space-3) var(--space-4);
+  padding: var(--space-1) var(--space-3);
   transition: box-shadow var(--transition-med), transform var(--transition-fast), border-color var(--transition-med);
 }
 .roster-card:hover {
@@ -952,7 +944,8 @@ html[data-modal-open] body {
 .roster-card-link {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
+  gap: var(--space-2);
+  min-height: 44px;
   min-width: 0;
   flex: 1 1 auto;
   text-decoration: none;
@@ -990,8 +983,8 @@ html[data-modal-open] body {
   display: inline-flex;
 }
 .roster-card-sprite {
-  width: 40px;
-  height: 40px;
+  width: 34px;
+  height: 34px;
   image-rendering: pixelated;
   object-fit: contain;
   filter: drop-shadow(0 3px 4px var(--sprite-drop)) drop-shadow(0 1px 1px var(--sprite-drop));
@@ -1004,12 +997,14 @@ html[data-modal-open] body {
   min-width: 0;
   flex: 1 1 auto;
   display: grid;
-  gap: 0.2rem;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: var(--space-1) var(--space-2);
 }
 .roster-card-name {
   font-family: var(--font-display);
   font-weight: 700;
-  font-size: var(--font-size-lg);
+  font-size: var(--font-size-md);
   letter-spacing: -0.01em;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1022,14 +1017,13 @@ html[data-modal-open] body {
   gap: 0.35em;
   font-size: var(--font-size-2xs);
   color: var(--ink-soft);
+  white-space: nowrap;
 }
 .roster-card-nature { text-transform: lowercase; }
 
-/* Sits under the name/meta inside .roster-card-body, spanning the full
-   content column; the count rides just to the right of the bar. */
 .roster-card-evbar {
+  grid-column: 1 / -1;
   width: 100%;
-  margin-top: 0.15rem;
 }
 
 /* Fully trained (at the 510 EV cap): a soft gold halo, subtly pulsing —
@@ -1608,7 +1602,7 @@ textarea.ds-field { resize: vertical; }
   .field-label--checkbox { min-height: 44px; padding-block: var(--space-2); }
 }
 @media (max-width: 640px) {
-  .battle-slot-handle, .roster-card-handle { min-width: 44px; min-height: 44px; margin: 0; }
+  .roster-card-handle { min-width: 44px; min-height: 44px; margin: 0; }
   .sprite-cache-generation > summary { min-height: 44px; align-content: center; }
 }
 
@@ -1621,58 +1615,62 @@ textarea.ds-field { resize: vertical; }
 }
 
 #battle-matchup-types { color: var(--ink-soft); font-size: var(--font-size-sm); }
-.battle-team-heading { margin-top: var(--space-4); }
+.battle-opponents { margin-top: var(--space-2); }
 #battle-matchup {
   margin-top: var(--space-3);
-  padding: 0 var(--space-3);
+  padding: 0 var(--space-3) var(--space-2);
   background: var(--lcd);
   border: 1px solid var(--line);
   border-radius: var(--radius-sm);
   font-size: var(--font-size-sm);
 }
-#battle-matchup summary {
+.matchup-heading {
   display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  padding: var(--space-3) 0;
-  cursor: pointer;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+  padding-block: var(--space-2);
 }
-#battle-matchup summary::-webkit-details-marker { display: none; }
-.matchup-lead { display: grid; gap: .2rem; flex: 1; }
-.matchup-lead small { color: var(--ink-soft); font-weight: 500; }
+.matchup-heading h3 { margin: 0; font-size: inherit; }
 .battle-sheet-extra:is([data-state="ready"], [data-state="logged"], [data-state="loading"]) #battle-opponent-name {
   font-size: var(--font-size-lg);
   line-height: 1.2;
   font-family: var(--font-display);
 }
-#battle-matchup-factor {
-  background: var(--lcd-deep);
-  color: var(--ink);
-  border-radius: var(--radius-sm);
-  padding: .2em .5em;
-  font-family: var(--font-mono);
-}
 .matchup-chevron {
-  width: .55rem; height: .55rem;
+  flex: none;
+  width: .4rem;
+  height: .4rem;
   border: solid var(--ink-soft); border-width: 0 2px 2px 0;
-  transform: rotate(45deg); margin: 0 .2rem .25rem 0;
+  transform: rotate(-45deg);
 }
-#battle-matchup[open] .matchup-chevron { transform: rotate(225deg); margin-bottom: 0; }
-#battle-matchup[open] { padding-bottom: var(--space-3); }
+#battle-damage-list details[open] .matchup-chevron { transform: rotate(45deg); }
 #battle-damage-list {
   list-style: none;
   margin: 0;
   padding: 0;
 }
 #battle-damage-list li {
-  display: grid;
-  grid-template-columns: 4rem minmax(0, 1fr);
-  align-items: baseline;
-  gap: var(--space-2);
-  padding-block: var(--space-2);
   border-top: 1px solid var(--line);
 }
-#battle-damage-list strong { font-family: var(--font-mono); }
+#battle-damage-list details {
+  display: grid;
+  grid-template-columns: 4.4rem minmax(0, 1fr);
+  align-items: center;
+  gap: var(--space-2);
+}
+#battle-damage-list summary {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 44px;
+  padding-inline-end: var(--space-1);
+  font-family: var(--font-mono);
+  font-weight: 700;
+  cursor: pointer;
+}
+#battle-damage-list summary::-webkit-details-marker { display: none; }
+.matchup-group-content { padding-block: var(--space-2); }
 #battle-damage-list .matchup-types { align-items: baseline; }
 #battle-damage-list .matchup-types + .matchup-types { margin-top: var(--space-1); }
 #battle-damage-list small { color: var(--ink-soft); }
