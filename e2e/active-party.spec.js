@@ -1,5 +1,6 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
+import { readFileSync } from 'node:fs';
 import { createParty } from './support/party.js';
 import {
   addPokemon,
@@ -244,7 +245,7 @@ test.describe('Active party and faint tracking', () => {
     await expect(await battlePartyMenuItem(page, 'Bulbasaur', 'Heal')).toBeVisible();
   });
 
-  test('the opponent dropdown shows every selected participant\'s EV gain before picking anything', async ({ page }) => {
+  test('the opponent dropdown shows only the EV yield before picking anything', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
     await addPokemon(page, 'Bulbasaur');
@@ -257,8 +258,8 @@ test.describe('Active party and faint tracking', () => {
     await combobox.fill('Caterpie');
     const option = page.getByRole('option').filter({ hasText: /Caterpie/i }).first();
     const preview = option.locator('.option-ev-yield');
-    await expect(preview).toContainText('Bulbasaur');
-    await expect(preview).toContainText('Charmander');
+    await expect(preview).not.toContainText('Bulbasaur');
+    await expect(preview).not.toContainText('Charmander');
     await expect(preview).toContainText('+1 HP');
     // Still nothing applied — this is a preview, not a commit.
     await expect(rosterCard(page, 'Bulbasaur').locator('.roster-card-evbar .value')).toHaveText('0/510');
@@ -345,13 +346,11 @@ test.describe('Active party and faint tracking', () => {
     await expect(combobox).toBeHidden();
     await expect(page.locator('#battle-participants-status')).toBeVisible();
 
-    // With nobody selected, the dropdown's own EV-yield preview has
-    // nothing to show — it must read blank, never "Capped" (there's
-    // nothing capped; there's just no one selected).
+    // Opponent yield remains visible even when nobody is selected.
     await page.locator('#battle-choose-opponent-btn').click();
     await combobox.fill('Caterpie');
     const option = page.getByRole('option').filter({ hasText: /Caterpie/i }).first();
-    await expect(option.locator('.option-ev-yield')).toBeEmpty();
+    await expect(option.locator('.option-ev-yield')).toContainText('+1 HP');
     await combobox.clear();
 
     // The sheet's own Close (✕) button must still actually close it —
@@ -429,6 +428,49 @@ test.describe('Touch battle confirmation', () => {
 test.describe('Keyboard-free defeat review', () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
 
+  test('recent defeated cards are deduplicated, ordered, and only stage a fresh defeat', async ({ page }, info) => {
+    await mockPokeApi(page);
+    await page.route('**/raw.githubusercontent.com/**/sprites/pokemon/**', async route => {
+      const id = route.request().url().match(/\/(\d+)\.png$/)?.[1];
+      if (id && ['1', '4', '10', '95', '113'].includes(id)) {
+        await route.fulfill({ contentType: 'image/png', body: readFileSync(new URL(`./fixtures/sprites/${id}.png`, import.meta.url)) });
+      } else await route.fallback();
+    });
+    await page.goto('/');
+    await createParty(page, { name: 'Recent defeats', baseGame: 'Emerald' });
+    await addPokemon(page, 'Bulbasaur');
+    await addPokemon(page, 'Charmander');
+    await logPartyBattle(page, 'Caterpie', { select: ['Charmander'] });
+    for (const opponent of ['Onix', 'Chansey', 'Caterpie']) await logPartyBattle(page, opponent);
+    const recents = page.locator('#battle-recent-opponents button');
+    await expect(recents).toHaveText(['Caterpie', 'Chansey', 'Onix']);
+    await expect(page.locator('#battle-participants .party-slot--selected')).toHaveCount(2);
+    await expect(page.locator('#battle-log-btn')).toBeDisabled();
+    for (const width of [390, 320]) {
+      await page.setViewportSize({ width, height: 844 });
+      for (const card of await recents.all()) {
+        const box = await card.boundingBox();
+        expect(box?.width).toBeGreaterThanOrEqual(44);
+        expect(box?.height).toBeGreaterThanOrEqual(44);
+      }
+      await expect.poll(() => page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
+      await page.locator('#battle-search img:visible').evaluateAll(images => Promise.all(images.map(img => (/** @type {HTMLImageElement} */ (img)).decode().catch(() => {}))));
+      await page.screenshot({ path: info.outputPath(`recent-defeats-${width}.png`) });
+    }
+    await page.emulateMedia({ colorScheme: 'dark' });
+    await page.setViewportSize({ width: 390, height: 844 });
+    await page.screenshot({ path: info.outputPath('recent-defeats-dark.png') });
+    const before = await rosterCard(page, 'Bulbasaur').locator('.roster-card-evbar .value').textContent();
+    await recents.first().tap();
+    await expect(page.locator('#battle-opponent-name')).toHaveText('Caterpie');
+    await expect(page.locator('#battle-search').getByRole('combobox')).toBeHidden();
+    await expect(page.locator('#battle-log-btn')).toBeEnabled();
+    await expect(rosterCard(page, 'Bulbasaur').locator('.roster-card-evbar .value')).toHaveText(before || '');
+    await page.locator('#battle-search .sheet-close').tap();
+    await page.reload();
+    await expect(rosterCard(page, 'Bulbasaur').locator('.roster-card-evbar .value')).toHaveText(before || '');
+  });
+
   test('searching and recording are separate, with stable actions and clear success', async ({ page }, info) => {
     await mockPokeApi(page);
     await page.goto('/');
@@ -443,7 +485,7 @@ test.describe('Keyboard-free defeat review', () => {
     await expect(page.locator('#battle-log-btn')).toBeDisabled();
     await expect(search.getByRole('heading', { name: 'Record a defeat' })).toBeFocused();
     await page.keyboard.press('Shift+Tab');
-    await expect(page.locator('#battle-done-btn')).toBeFocused();
+    await expect(page.locator('#battle-participants button').last()).toBeFocused();
     await page.keyboard.press('Tab');
     await expect(search.locator('.sheet-close')).toBeFocused();
     await page.locator('#battle-choose-opponent-btn').tap();
@@ -466,14 +508,25 @@ test.describe('Keyboard-free defeat review', () => {
     await expect(rosterCard(page, 'Bulbasaur').locator('.roster-card-evbar .value')).toHaveText('0/510');
     const before = await page.locator('#battle-log-btn').boundingBox();
     await page.locator('#battle-log-btn').tap();
-    await expect(page.locator('#battle-confirm-state')).toHaveText('✓ Defeat logged');
-    await expect(page.locator('#battle-done-btn')).toHaveText('Done');
+    await expect(page.locator('#battle-confirm-state')).toContainText('✓ Defeat logged');
+    await expect(page.locator('#battle-done-btn')).toHaveCount(0);
+    await expect(page.locator('#battle-log-btn')).toBeDisabled();
+    await expect(page.locator('#battle-opponent-name')).toHaveText('Choose opponent');
+    await expect(page.locator('#battle-participants .party-slot--selected')).toHaveCount(1);
+    // A queued second click is harmless even before the UI can repaint.
+    await page.locator('#battle-log-btn').evaluate(btn => btn.dispatchEvent(new MouseEvent('click', { bubbles: true })));
+    await expect(rosterCard(page, 'Bulbasaur').locator('.roster-card-evbar .value')).toHaveText('1/510');
     const after = await page.locator('#battle-log-btn').boundingBox();
     // The raised button's press/hover animation may translate it 1px.
     expect(Math.abs((after?.y ?? -100) - (before?.y ?? 100))).toBeLessThanOrEqual(2);
     expect(after?.height).toBe(before?.height);
+    await page.locator('#battle-recent-opponents').getByRole('button', { name: 'Choose Caterpie again' }).tap();
+    await expect(page.locator('#battle-opponent-name')).toHaveText('Caterpie');
+    await expect(page.locator('#battle-log-btn')).toBeEnabled();
+    await expect(rosterCard(page, 'Bulbasaur').locator('.roster-card-evbar .value')).toHaveText('1/510');
     await page.locator('#battle-log-btn').tap();
-    await expect(page.locator('#battle-confirm-state')).toContainText('2 times');
+    await expect(page.locator('#battle-log-btn')).toBeDisabled();
+    await page.locator('#battle-recent-opponents').getByRole('button', { name: 'Choose Caterpie again' }).tap();
     await page.locator('#battle-choose-opponent-btn').tap();
     await input.fill('Onix');
     await search.getByRole('button', { name: 'Back to defeat review' }).tap();
@@ -484,7 +537,7 @@ test.describe('Keyboard-free defeat review', () => {
     await expect(page.locator('#battle-log-btn')).toBeFocused();
     await page.keyboard.press('Tab');
     await expect(search.locator('.sheet-close')).toBeFocused();
-    await page.locator('#battle-done-btn').tap();
+    await search.locator('.sheet-close').tap();
     await expect(search).toBeHidden();
     await page.reload();
     await expect(rosterCard(page, 'Bulbasaur').locator('.roster-card-evbar .value')).toHaveText('2/510');

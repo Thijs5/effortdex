@@ -100,10 +100,12 @@ for (const layout of [
     await page.getByRole('option').filter({ hasText: /Caterpie/i }).first().click();
     await expect(page.locator('#battle-result-summary')).toContainText('Ready to log');
     await page.locator('#battle-participants').getByRole('button', { name: /Charmander/i }).click();
-    await expect(page.locator('#battle-result-summary')).toContainText('Charmander');
+    await expect(page.locator('#battle-result-summary')).toContainText('+1 HP');
+    await expect(page.locator('#battle-result-summary')).not.toContainText('Charmander');
     await capture('defeat-ready');
     await page.locator('#battle-log-btn').click();
     await expect(rosterCard(page, 'Charmander').locator('.roster-card-evbar .value')).toHaveText('1/510');
+    await page.locator('#battle-recent-opponents').getByRole('button', { name: 'Choose Caterpie again' }).click();
     await page.locator('#battle-log-btn').click();
     await expect(rosterCard(page, 'Bulbasaur').locator('.roster-card-evbar .value')).toHaveText('2/510');
     await capture('battle-repeat');
