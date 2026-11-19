@@ -523,7 +523,20 @@ function renderBattleMatchup(mon: DomainPokemon): void {
   matchupPanel.hidden = !matchup;
   opponentTypes.hidden = !matchup;
   if (!matchup) return;
-  opponentTypes.textContent = matchup.types.map(titleCase).join(' / ');
+  opponentTypes.replaceChildren(...matchup.types.map((type, index) => {
+    const label = document.createElement('span');
+    label.className = 'opponent-type';
+    label.style.setProperty('--type-hue', TYPE_COLORS[type]);
+    label.textContent = titleCase(type);
+    return index ? [document.createTextNode(' / '), label] : [label];
+  }).flat());
+  const highest = matchup.weaknesses[0]?.multiplier;
+  const strongest = matchup.weaknesses.filter(w => w.multiplier === highest);
+  document.getElementById('battle-matchup-lead')!.textContent =
+    strongest.map(w => w.name).join(', ') || 'No type weakness';
+  const factor = document.getElementById('battle-matchup-factor')!;
+  factor.hidden = !highest;
+  factor.textContent = highest ? '×' + highest : '';
   document.getElementById('battle-matchup-gen')!.textContent = game ? 'Gen ' + game.gen : 'Modern rules';
   const groups = new Map<string, string[]>();
   for (const { name, category, multiplier } of matchup.weaknesses) {

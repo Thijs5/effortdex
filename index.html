@@ -196,10 +196,15 @@
           <p id="battle-participants-status" class="party-slots-status" hidden></p>
           <p id="battle-result-summary" class="battle-result-summary" hidden aria-live="polite"></p>
           <details id="battle-matchup" hidden>
-            <summary>Matchup details <small id="battle-matchup-gen"></small></summary>
+            <summary>
+              <span class="matchup-lead"><small>Strongest weakness</small><strong id="battle-matchup-lead"></strong></span>
+              <b id="battle-matchup-factor"></b>
+              <span class="matchup-chevron" aria-hidden="true"></span>
+            </summary>
             <dl><dt>Weak to</dt><dd id="battle-weaknesses"></dd>
               <dt>Immune to</dt><dd id="battle-immunities"></dd></dl>
             <p id="battle-attack-advice"></p>
+            <small id="battle-matchup-gen"></small>
           </details>
         </div>
         <div slot="sheet-footer" class="battle-composer-actions">
