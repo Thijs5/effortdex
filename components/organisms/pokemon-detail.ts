@@ -354,7 +354,7 @@ export class PokemonDetail extends BaseElement {
             <div class="more-menu" role="menu" aria-label="More" hidden>
               <button class="more-menu-item" type="button" role="menuitem" data-open="ivs">IVs</button>
               <button class="more-menu-item" type="button" role="menuitem" data-open="competitive">Competitive</button>
-              <button class="more-menu-item training-guide-menu-item" type="button" role="menuitem" data-open="training-guide" hidden>Where to train</button>
+              <button class="more-menu-item training-guide-menu-item" type="button" role="menuitem" data-open="training-guide" hidden>Training guide</button>
               <button class="more-menu-item more-menu-item--danger" type="button" role="menuitem" data-action="remove">Remove</button>
             </div>
           </div>
@@ -726,7 +726,7 @@ export class PokemonDetail extends BaseElement {
       this.$sprite.title = '';
     }
     this.$trainingGuideDialog.entry = e;
-    this.$trainingGuideBtn.hidden = !this.$trainingGuideDialog.locations();
+    this.$trainingGuideBtn.hidden = !this.$trainingGuideDialog.locations() && !store.usesStatExpSystem();
     this.$histLog.entry = e;
   }
 

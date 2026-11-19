@@ -1,3 +1,5 @@
+import { moveOptions, trainingPlan } from '../../../molecules/training-plan.ts';
+import { matchGameVersion } from '../../../../lib/game-versions.ts';
 import { store } from '../../../../lib/services.ts';
 import { evTrainingLocations } from '../../../../lib/ev-training-locations.ts';
 import { BaseDialog } from '../../../atoms/base-dialog.ts';
@@ -6,27 +8,7 @@ import type { RosterEntry } from '../../../../lib/store.ts';
 import type { GameTrainingSpots } from '../../../../lib/ev-training-locations.ts';
 import type { EvTrainingGuide } from '../../../molecules/ev-training-guide.ts';
 
-/**
- * <training-guide-dialog> — "Where to train": curated per-stat grinding
- * spots for the active party's own base game (docs/adr/0018), wrapping
- * <ev-training-guide>. Extracted out of pokemon-detail.js alongside
- * nature.js/level.js/items.js/ivs.js/competitive.js (docs/adr/0008's
- * own note that it was still oversized even after item-button-grid.js).
- * Hidden entirely (no menu entry) on a Gen I/II party or an
- * unrecognized base game — see `locations()` below.
- *
- * Set `.entry` to a Store roster entry — kept live on every assignment,
- * same as the app's other extracted dialogs, though the locations shown
- * depend only on the active party's own base game, not the entry
- * itself. Picking a spot fires a bubbling 'spot-pick' event (detail:
- * `{ name }`, same shape as the inner <ev-training-guide>'s own event)
- * and closes this dialog — battle-logging itself stays owned by
- * pokemon-detail.js, which has the api/store wiring for it.
- *
- * Routed under "#/parties/<slug>/<uid>/training-guide" (docs/adr/0023)
- * — still instantiated and owned by pokemon-detail.js's own shadow DOM;
- * the route only decides when `open()`/`close()` get called.
- */
+/** Roster-specific training targets and the active game's curated battle locations. */
 export class TrainingGuideDialog extends BaseDialog {
   _entry: RosterEntry | null = null;
   $guide: EvTrainingGuide;
@@ -38,52 +20,32 @@ export class TrainingGuideDialog extends BaseDialog {
     // No width override here — the default 420px from lib/design-system.js's
     // .ds-dialog already matches what this dialog needs.
     style.textContent = `
-      .help-btn {
-        display: inline-flex; align-items: center; justify-content: center;
-        width: 15px; height: 15px; border-radius: 50%; border: 1px solid var(--lcd-line);
-        background: var(--surface); color: var(--ink-soft);
-        font-size: 10px; font-weight: 700; letter-spacing: 0; text-transform: none;
-        line-height: 1; padding: 0; flex: 0 0 auto; cursor: pointer;
+      .plan-stats { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:8px; margin-block:12px; }
+      .plan-stats svg { display:block; width:100%; max-height:165px; }
+      @media (max-width:380px) {
+        .plan-stats { grid-template-columns:1fr; }
+        .plan-stats table { width:100%; }
       }
-      .help-btn:hover, .help-btn:focus-visible { border-color: var(--teal); color: var(--teal); }
-      .help-note {
-        margin: 0 0 var(--space-3); font-size: var(--font-size-2xs);
-        color: var(--ink-soft); background: var(--lcd);
-        border-radius: var(--radius-sm); padding: var(--space-2) var(--space-3);
-        text-transform: none; letter-spacing: normal;
-      }
+      .plan-stats small { display:block; text-align:center; color:var(--ink-soft); }
+      .plan-stats table { font:inherit; font-variant-numeric:tabular-nums; }
+      .plan-stats td,.plan-stats th { padding:2px 3px; text-align:right; }
+      .plan-stats th:first-child { text-align:left; }
+      select { display:block; width:100%; min-height:44px; margin-block:4px;
+        padding-inline:10px; background:var(--surface); color:var(--ink); border:1px solid var(--lcd-line);
+        border-radius:var(--radius-sm); font:inherit; }
+      .plan { font-size:var(--font-size-xs); }
       .training-guide-attribution { margin: var(--space-3) 0 0; font-size: var(--font-size-2xs); color: var(--ink-soft); }
     `;
     this.shadow.appendChild(style);
 
-    this.$title.innerHTML = `Where to train
-      <button type="button" class="help-btn" aria-expanded="false" aria-label="About this list" title="A short, hand-picked list of good spots to grind each stat's EVs in this game — not an exhaustive list. Tap a Pokémon to log a battle against it.">?</button>`;
+    this.$title.textContent = 'Training guide';
     this.$body.innerHTML = `
-      <ev-training-guide></ev-training-guide>
-      <p class="training-guide-attribution">Locations via Bulbapedia &amp; Marriland's EV training guides</p>
-    `;
-
+      <section class="plan"><h3>Suggested training</h3>
+      <label>Training focus<select></select></label><div class="result" aria-live="polite"></div></section>
+      <section class="spots"><h3>Where to train</h3><ev-training-guide></ev-training-guide>
+      <p class="training-guide-attribution">Locations via Bulbapedia &amp; Marriland's EV training guides</p></section>`;
     this.$guide = this.shadow.querySelector('ev-training-guide')!;
-
-    this.shadow.addEventListener('click', (e) => {
-      const btn = (e.target as HTMLElement).closest<HTMLElement>('.help-btn');
-      if (!btn) return;
-      if (!btn.closest('.ds-dialog-header')) return;
-      // Into the scrolling body (top), not after the header — the header
-      // is its own grid row now, so a sibling there would land in the
-      // body's grid track and break the layout.
-      const existing = this.$body.querySelector('.help-note');
-      if (existing) {
-        existing.remove();
-        btn.setAttribute('aria-expanded', 'false');
-      } else {
-        const note = document.createElement('p');
-        note.className = 'help-note';
-        note.textContent = btn.title;
-        this.$body.prepend(note);
-        btn.setAttribute('aria-expanded', 'true');
-      }
-    });
+    this.$body.querySelector('select')!.addEventListener('change', () => this.renderPlan());
     // Already knows the opponent's name — no need to open a search at
     // all. Closes first so it's not left sitting open behind whatever
     // status line the battle log shows. Not re-dispatched: <ev-training-
@@ -95,14 +57,42 @@ export class TrainingGuideDialog extends BaseDialog {
   }
 
   set entry(e: RosterEntry | null) {
+    const select = this.$body.querySelector('select')!;
+    const gen = matchGameVersion(store.activeParty?.baseGame)?.gen ?? 0;
+    if (e?.uid !== this._entry?.uid || e?.speciesId !== this._entry?.speciesId || select.dataset.gen !== String(gen)) {
+      select.dataset.gen = String(gen);
+      const moves = document.createElement('optgroup');
+      moves.label = gen === 3 ? 'Main damaging move’s type' : 'Main damaging move’s category';
+      moves.append(...moveOptions(gen).map(v => new Option(v, v)));
+      select.replaceChildren(new Option('Suggest from base stats', ''), moves);
+      if (e?.speciesId !== 292) {
+        const roles = document.createElement('optgroup');
+        roles.label = 'Defensive role';
+        roles.append(new Option('Physical wall'), new Option('Special wall'));
+        select.append(roles);
+      }
+    }
     this._entry = e;
     if (!e) return;
     // Curated per-game data (lib/ev-training-locations.js), not a party
     // rule — no override, so read straight off the party's own baseGame
     // rather than through an effective-aids-style helper.
+    this.$body.querySelector('label')!.hidden = store.usesStatExpSystem();
+    this.$body.querySelector<HTMLElement>('.spots')!.hidden = !this.locations() || store.usesStatExpSystem();
+    this.renderPlan();
     this.$guide.spriteGame = store.spriteBaseGame();
     this.$guide.locations = this.locations();
   }
+  private renderPlan(): void {
+    if (!this._entry) return;
+    const result = this.$body.querySelector('.result')!;
+    if (store.usesStatExpSystem()) {
+      result.textContent = 'Battle to build Stat Experience across all stats. Each stat can reach its maximum independently, so you can train them all.';
+      return;
+    }
+    result.innerHTML = trainingPlan(this._entry, this.$body.querySelector('select')!.value);
+  }
+
   get entry(): RosterEntry | null {
     return this._entry;
   }

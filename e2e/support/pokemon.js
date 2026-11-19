@@ -157,7 +157,7 @@ export async function openLevelUpDialog(card) {
  */
 export async function openTrainingGuide(card) {
   await card.getByRole('button', { name: 'More' }).click();
-  await card.getByRole('menuitem', { name: 'Where to train' }).click();
+  await card.getByRole('menuitem', { name: 'Training guide' }).click();
   const dialog = card.locator('dialog.training-guide-dialog');
   await dialog.waitFor({ state: 'visible' });
   return dialog;

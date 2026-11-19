@@ -24,6 +24,10 @@ test.describe('EV-training location guide', () => {
 
     await expect(dialog.locator('ev-training-guide h3.section-title')).toHaveText(['HP', 'ATK', 'DEF', 'SPA', 'SPD', 'SPE']);
     // Emerald's curated HP spot (lib/ev-training-locations.js's RSE set).
+    await dialog.getByRole('combobox').selectOption('Ghost');
+    await expect(dialog.locator('.result')).toContainText('Next, train 252 ATK EVs');
+    await dialog.getByRole('combobox').selectOption('Dark');
+    await expect(dialog.locator('.result')).toContainText('Next, train 252 SPA EVs');
     const hpRow = dialog.locator('[data-id="whismur"]');
     await expect(hpRow).toContainText('Rusturf Tunnel');
     await expect(hpRow).toContainText('+1 HP');
@@ -43,13 +47,30 @@ test.describe('EV-training location guide', () => {
     await expect(card.locator('ev-summary ev-bar[data-key="hp"]').locator('.value')).toHaveText('1/252');
   });
 
-  test('the guide is hidden on a Gen I/II party — Stat Experience makes a per-stat route list meaningless', async ({ page }) => {
+  test('a phone user can choose a move category after the split', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 640 });
+    await page.goto('/');
+    await createParty(page, { name: 'Platinum run', baseGame: 'Platinum' });
+    await addPokemon(page, 'Bulbasaur');
+    const dialog = await openTrainingGuide(await openDetail(page, 'Bulbasaur'));
+    const category = dialog.getByLabel('Training focus');
+    await category.selectOption('Physical');
+    await expect(dialog.locator('.result')).toContainText('Next, train 252 ATK EVs');
+    await category.selectOption('Special');
+    await expect(dialog.locator('.result')).toContainText('Next, train 252 SPA EVs');
+    await category.selectOption('Physical wall');
+    await expect(dialog.locator('.result')).toContainText('Next, train 252 DEF EVs');
+    expect(await dialog.locator('.plan').evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+  });
+
+  test('early games guide all-stat training', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Red Solo Run', baseGame: 'Red' });
     await addPokemon(page, 'Charmander');
     const card = await openDetail(page, 'Charmander');
 
-    await card.getByRole('button', { name: 'More' }).click();
-    await expect(card.locator('.training-guide-menu-item')).toBeHidden();
+    const dialog = await openTrainingGuide(card);
+    await expect(dialog).toContainText('train them all');
+    await expect(dialog.locator('select')).toBeHidden();
   });
 });
