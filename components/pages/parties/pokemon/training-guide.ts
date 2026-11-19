@@ -33,9 +33,23 @@ export class TrainingGuideDialog extends BaseDialog {
     super('training-guide-dialog', 'training-guide-dialog-title');
 
     const style = document.createElement('style');
-    // No width override here — the default 420px from lib/design-system.js's
-    // .ds-dialog already matches what this dialog needs.
     style.textContent = `
+      @media (min-width:641px) {
+        .training-guide-dialog .ds-dialog-header { position:sticky; top:0; z-index:1; background:var(--surface); }
+      }
+      @media (min-width:760px) {
+        dialog.training-guide-dialog { width:min(810px,94vw); max-width:94vw; }
+        .plan { display:grid; grid-template-columns:minmax(0,1.05fr) minmax(0,1fr); column-gap:24px; align-items:start; }
+        .species-card,.projection,.restore,.dex-status { grid-column:1/-1; }
+        .training { grid-column:1; }
+        .reference { grid-column:2; }
+        .species-card { display:grid; grid-template-columns:1fr auto; align-items:center; }
+        .species-card .dex-nav { grid-column:2; grid-row:1; }
+        .species-card .dex-nav h3 { display:none; }
+        .species-card .species-face { grid-column:1; grid-row:1; }
+        .species-card .species-face img { width:80px; }
+      }
+      .training h3 { margin:14px 0 8px; }
       .plan-stats { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:8px; margin-block:12px; }
       .plan-stats svg { display:block; width:100%; max-height:165px; }
       @media (max-width:380px) {
@@ -71,7 +85,15 @@ export class TrainingGuideDialog extends BaseDialog {
       .base-values { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:5px; }
       .base-values span { background:var(--lcd); padding:6px; text-align:center; border-radius:var(--radius-sm); font-variant-numeric:tabular-nums; }
       summary { cursor:pointer; padding-block:10px; font-weight:600; }
-      .plan { font-size:var(--font-size-xs); }
+      .plan { font-size:var(--font-size-xs); line-height:1.4; }
+      .result > strong { display:block; padding:8px 10px; border-left:3px solid var(--teal); background:var(--lcd); }
+      .learnset ul { list-style:none; padding:0; margin:0; }
+      .learnset li { display:grid; grid-template-columns:4.5em 1fr; padding:5px 8px; gap:8px; }
+      .learnset li:nth-child(odd) { background:var(--lcd); }
+      .learnset li span:first-child { font-variant-numeric:tabular-nums; color:var(--ink-soft); }
+      summary { min-height:44px; box-sizing:border-box; }
+      .plan-stats table th,.plan-stats table td { padding-block:4px; }
+      .plan-stats tbody tr:nth-child(odd) { background:var(--lcd); }
       .training-guide-attribution { margin: var(--space-3) 0 0; font-size: var(--font-size-2xs); color: var(--ink-soft); }
     `;
     this.shadow.appendChild(style);
@@ -83,18 +105,19 @@ export class TrainingGuideDialog extends BaseDialog {
       <button type="button" class="next" aria-label="Next Pokédex number">→</button></div>
       <div class="species-face"><img class="dex-sprite" alt=""><div><strong class="dex-name" aria-live="polite"></strong>
       <div class="type-list" aria-label="Pokémon types"></div></div></div></div>
-      <section class="matchups"><h4>Type weaknesses</h4><div class="match-list weaknesses"></div>
+      <p class="projection" hidden></p>
+      <button type="button" class="restore" hidden></button>
+      <div class="dex-status" role="status"></div><section class="training"><h3>Suggested training</h3>
+      <label>Training focus<select></select></label>
+      <details><summary>Which moves are physical or special?</summary><div class="categories"></div></details>
+      <div class="result" aria-live="polite"></div></section>
+      <div class="reference">      <section class="matchups"><h4>Type weaknesses</h4><div class="match-list weaknesses"></div>
       <details class="resistances"><summary>Resistances and immunities</summary><div class="match-list reduced"></div></details></section>
       <p><strong>Base stats</strong></p><p class="base-values"></p>
       <section class="battle-facts"><h4>Battle and training</h4>
       <p class="stab"></p><details><summary>Super-effective targets for same-type attacks</summary><div class="coverage"></div></details><p class="yield"></p><p class="evolution"></p>
       <p class="next-move"></p><details class="learnset" hidden><summary>Level-up moves</summary><ul></ul></details></section>
-      <p class="projection" hidden></p>
-      <button type="button" class="restore" hidden></button>
-      <div class="dex-status" role="status"></div><h3>Suggested training</h3>
-      <label>Training focus<select></select></label>
-      <details><summary>Which moves are physical or special?</summary><div class="categories"></div></details>
-      <div class="result" aria-live="polite"></div></section>
+</div></section>
       <section class="spots"><h3>Where to train</h3><ev-training-guide></ev-training-guide>
       <p class="training-guide-attribution">Locations via Bulbapedia &amp; Marriland's EV training guides</p></section>`;
     this.spriteFallback = wireSpriteFallback(this.$body.querySelector('.dex-sprite')!);
@@ -221,7 +244,11 @@ export class TrainingGuideDialog extends BaseDialog {
       list.hidden = !rows.length;
       list.querySelector('ul')!.replaceChildren(...rows.map(move => {
         const item = document.createElement('li');
-        item.textContent = 'Lv. ' + move.level + ' · ' + titleCase(move.name);
+        const atLevel = document.createElement('span');
+        atLevel.textContent = 'Lv. ' + move.level;
+        const name = document.createElement('span');
+        name.textContent = titleCase(move.name);
+        item.append(atLevel, name);
         return item;
       }));
     }).catch(() => { if (token === this.referenceRequest) nextMove.textContent = 'Level-up moves unavailable.'; });
