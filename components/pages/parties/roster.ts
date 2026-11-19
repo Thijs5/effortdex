@@ -61,7 +61,7 @@ const battleParticipantsStatus = document.getElementById('battle-participants-st
 const battleResultSummary = document.getElementById('battle-result-summary')!;
 const battleLogBtn = document.getElementById('battle-log-btn') as HTMLButtonElement;
 const battleChooseBtn = document.getElementById('battle-choose-opponent-btn') as HTMLButtonElement;
-const battleDoneBtn = document.getElementById('battle-done-btn')!;
+const battleRecents = document.getElementById('battle-recent-opponents')!;
 const battleOpponentName = document.getElementById('battle-opponent-name')!;
 const battleOpponentSprite = document.getElementById('battle-opponent-sprite') as HTMLImageElement;
 const battleOpponentHint = document.getElementById('battle-opponent-hint')!;
@@ -496,22 +496,18 @@ swapDialog.addEventListener('click', (e) => {
 let battleSelected = new Set<string>();
 let battlePickToken = 0;
 
-// The chosen opponent and current participants. Retained after a log
-// for the explicit "Log another" action; cleared on close/party change.
+// Each confirmation consumes the opponent; recipients stay selected until close.
 let pendingBattle: { mon: DomainPokemon; uids: string[] } | null = null;
-let battleLogCount = 0;
 
 function clearPendingBattle(): void {
   ++battlePickToken;
   pendingBattle = null;
-  battleLogCount = 0;
   battleLogBtn.disabled = true;
   battleLogBtn.textContent = 'Log defeat';
-  battleDoneBtn.textContent = 'Cancel';
   battleComposer.dataset.state = 'empty';
   battleConfirmState.textContent = 'Not logged yet';
-  battleOpponentName.textContent = 'Choose a Pokémon';
-  battleOpponentHint.textContent = 'Search or choose a recent opponent →';
+  battleOpponentName.textContent = 'Choose opponent';
+  battleOpponentHint.textContent = 'Search →';
   battleOpponentSprite.hidden = true;
   document.getElementById('battle-opponent-placeholder')!.hidden = false;
   battleResultSummary.hidden = true;
@@ -568,7 +564,6 @@ battleChooseBtn.addEventListener('click', () => {
   if (battleComposer.dataset.state === 'loading') clearPendingBattle();
   battleSearch.focus();
 });
-battleDoneBtn.addEventListener('click', () => battleSearch.shadowRoot?.querySelector<HTMLButtonElement>('.sheet-close')?.click());
 window.addEventListener('hashchange', () => {
   if (!battleSearch.hidden) battleSearch.shadowRoot?.querySelector<HTMLButtonElement>('.sheet-close')?.click();
 });
@@ -578,16 +573,7 @@ battleSearch.addEventListener('sheet-close', () => {
   clearPendingBattle();
   partyLogBattleBtn.focus({ preventScroll: true });
 });
-// Mirrors <pokemon-detail>'s own `evModifier`, but returns a
-// pre-formatted string (every selected participant's own name and
-// yield) rather than one EvMap — with several participants, "would
-// Bulbasaur alone gain X" is the wrong question; this is the same
-// breakdown #battle-result-summary shows once staged, just computed
-// from `previewDefeat` before anything is applied, so it's visible in
-// the dropdown while still picking an opponent, not only after.
-battleSearch.evModifier = (mon) =>
-  participantEvSummary([...battleSelected], (uid) => store.previewDefeat(uid, mon)?.applied);
-
+// Search previews the opponent’s EV yield; recipients remain in the review.
 battleSearch.addEventListener('pokemon-pick', (e) => {
   // Keep the sheet open to confirm the staged battle. Cancelling the
   // pick's default avoids a timed close/reopen race with the Close button.
@@ -597,7 +583,7 @@ battleSearch.addEventListener('pokemon-pick', (e) => {
 });
 
 /** Looks up the picked opponent and stages it as `pendingBattle` — shows
- * the same participant breakdown the dropdown already previewed, and
+ * the opponent’s base EV yield, and
  * arms #battle-log-btn. Nothing is applied to the roster until that
  * button is actually pressed (see its own click handler below). */
 async function stageBattlePick(name: string): Promise<void> {
@@ -631,8 +617,8 @@ function stageKnownBattle(mon: DomainPokemon): void {
   document.getElementById('battle-opponent-placeholder')!.hidden = true;
   battleOpponentFallback.setVersionedSprite(versionedSpriteUrl(store.spriteBaseGame(), mon.id), mon.sprite || FALLBACK_SPRITE);
   battleConfirmState.textContent = 'Not logged yet';
-  const summary = participantEvSummary(uids, (uid) => store.previewDefeat(uid, mon)?.applied);
-  battleResultSummary.textContent = `Ready to log vs ${titleCase(mon.name)} — ${summary || 'Select at least one Pokémon.'}`;
+  const summary = formatEvYield(mon.evYield);
+  battleResultSummary.textContent = `Ready to log vs ${titleCase(mon.name)} — Base yield: ${summary || 'No EV yield'}`;
   battleResultSummary.classList.add('battle-result-summary--pending');
   battleResultSummary.hidden = false;
   battleLogBtn.disabled = uids.length === 0;
@@ -641,16 +627,38 @@ function stageKnownBattle(mon: DomainPokemon): void {
 battleLogBtn.addEventListener('click', () => {
   if (!pendingBattle || !pendingBattle.uids.length) return;
   const { mon, uids } = pendingBattle;
+  // Disarm before the synchronous store change, so queued taps cannot
+  // reuse the same opponent. A recent card stages a fresh confirmation.
+  clearPendingBattle();
   const applied = store.logBattleForParticipants(uids, mon);
   const summary = participantEvSummary(uids, (uid) => applied.find((r) => r.uid === uid)?.applied);
-  ++battleLogCount;
   battleComposer.dataset.state = 'logged';
-  battleConfirmState.textContent = `✓ Defeat logged${battleLogCount > 1 ? ` · ${battleLogCount} times` : ''}`;
-  battleDoneBtn.textContent = 'Done';
-  battleResultSummary.textContent = `Logged ${battleLogCount > 1 ? `battle ${battleLogCount} ` : ''}vs ${titleCase(mon.name)} — ${summary}`;
-  battleResultSummary.classList.remove('battle-result-summary--pending');
-  battleLogBtn.textContent = 'Log again';
+  battleConfirmState.textContent = `✓ Defeat logged · ${titleCase(mon.name)}`;
+  battleResultSummary.textContent = `Logged vs ${titleCase(mon.name)} — ${summary}`;
+  battleResultSummary.hidden = false;
+  battleChooseBtn.focus({ preventScroll: true });
 });
+
+/** Quick selection only: every recent opponent still needs Log defeat. */
+function renderRecentOpponents(): void {
+  // Preserve a focused quick-pick through unrelated store rendering.
+  const focusedName = (document.activeElement as HTMLElement | null)?.dataset.opponent;
+  battleRecents.replaceChildren();
+  const recent = battleSearch.recent.slice(0, 3);
+  document.getElementById('battle-recents-label')!.hidden = recent.length === 0;
+  for (const mon of recent) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'battle-recent-card';
+    button.dataset.opponent = mon.name;
+    button.setAttribute('aria-label', `Choose ${titleCase(mon.name)} again`);
+    button.innerHTML = `<img src="${escapeHtml(mon.sprite || FALLBACK_SPRITE)}" alt="" /><span>${escapeHtml(titleCase(mon.name))}</span>`;
+    wireSpriteFallback(button.querySelector('img')!);
+    button.addEventListener('click', () => { void stageBattlePick(mon.name); });
+    battleRecents.appendChild(button);
+    if (focusedName === mon.name) button.focus({ preventScroll: true });
+  }
+}
 
 /** "Bulbasaur +1 HP · Charmander (no EVs — maxed)" — `uids`' own names
  * and yields (`applyForUid` supplies the EvMap, already-clamped whether
@@ -1032,4 +1040,5 @@ export function render(party: Party): void {
     .sort((a, b) => b.h.timestamp - a.h.timestamp)
     .map(({ h }) => ({ name: h.opponentName, sprite: h.sprite }));
   battleSearch.recent = recentBattles;
+  renderRecentOpponents();
 }

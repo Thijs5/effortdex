@@ -183,10 +183,13 @@
       <pokemon-search id="battle-search" hidden placeholder="Defeated Pokémon…" show-ev-yield sheet-title="Choose defeated Pokémon" force-sheet review-flow review-title="Record a defeat">
         <div slot="sheet-extra" class="battle-sheet-extra" data-state="empty">
           <p class="battle-composer-intro">Record an opponent your team defeated.</p>
+          <div class="battle-opponents">
           <button id="battle-choose-opponent-btn" class="battle-opponent-card" type="button" aria-label="Choose defeated Pokémon">
             <span class="battle-opponent-art"><img id="battle-opponent-sprite" alt="" hidden /><span id="battle-opponent-placeholder" aria-hidden="true">?</span></span>
             <span class="battle-opponent-copy"><span class="battle-sheet-eyebrow">Defeated opponent</span><strong id="battle-opponent-name">Choose a Pokémon</strong><span id="battle-opponent-hint">Search or choose a recent opponent →</span></span>
           </button>
+          <div class="battle-recents"><span class="battle-sheet-eyebrow" id="battle-recents-label" hidden>Recent defeats</span><div id="battle-recent-opponents" role="group" aria-labelledby="battle-recents-label"></div></div>
+          </div>
           <p id="battle-confirm-state" class="battle-confirm-state" role="status">Not logged yet</p>
           <div class="battle-team-heading"><span class="battle-sheet-eyebrow">Who battled?</span><span id="battle-selected-count"></span></div>
           <div id="battle-participants" class="party-slots party-slots--select"></div>
@@ -194,7 +197,6 @@
           <p id="battle-result-summary" class="battle-result-summary" hidden aria-live="polite"></p>
         </div>
         <div slot="sheet-footer" class="battle-composer-actions">
-          <button id="battle-done-btn" class="ds-btn ds-btn--ghost" type="button">Cancel</button>
           <button id="battle-log-btn" class="ds-btn ds-btn--primary" type="button" disabled>Log defeat</button>
         </div>
       </pokemon-search>
