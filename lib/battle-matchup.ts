@@ -5,7 +5,7 @@ import { titleCase } from './utils.ts';
 
 const specialTypes = new Set('fire water grass electric psychic ice dragon dark'.split(' '));
 
-function effectiveness(attack: string, target: string, gen: number): number {
+export function effectiveness(attack: string, target: string, gen: number): number {
   if (gen === 1) {
     if ((attack === 'bug' && target === 'poison') || (attack === 'poison' && target === 'bug')) return 2;
     if (attack === 'ghost' && target === 'psychic') return 0;
