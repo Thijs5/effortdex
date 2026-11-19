@@ -236,12 +236,33 @@ if (vv) {
     if (field.bottom > bounds.bottom - 8) body.scrollTop += field.bottom - bounds.bottom + 8;
     else if (field.top < bounds.top + 8) body.scrollTop -= bounds.top + 8 - field.top;
   };
+  let viewportProbe: ReturnType<typeof setTimeout> | undefined;
+  const measureDialogViewport = () => {
+    const contracted = vv.height < window.innerHeight - 1 || Math.abs(vv.offsetTop) > 1;
+    const top = contracted ? `${vv.offsetTop}px` : '';
+    const height = contracted ? `${vv.height}px` : '';
+    if (rootStyle.getPropertyValue('--dialog-vv-top') !== top ||
+        rootStyle.getPropertyValue('--dialog-vv-height') !== height) {
+      rootStyle.setProperty('--dialog-vv-top', top);
+      rootStyle.setProperty('--dialog-vv-height', height);
+      requestAnimationFrame(revealFocusedField);
+    }
+    // Safari can update the viewport late when the keyboard closes, even
+    // with the field still focused. Recheck while a mobile modal is inset.
+    if (contracted && viewportProbe === undefined &&
+        document.documentElement.hasAttribute('data-modal-open') && window.innerWidth <= 640) {
+      viewportProbe = setTimeout(() => {
+        viewportProbe = undefined;
+        measureDialogViewport();
+      }, 120);
+    }
+  };
   const syncDialogViewport = () => {
-    rootStyle.setProperty('--dialog-vv-top', `${vv.offsetTop}px`);
-    rootStyle.setProperty('--dialog-vv-height', `${vv.height}px`);
+    measureDialogViewport();
     requestAnimationFrame(revealFocusedField);
   };
-  syncDialogViewport();
+  measureDialogViewport();
+  addEventListener('resize', syncDialogViewport);
   vv.addEventListener('resize', syncDialogViewport);
   vv.addEventListener('scroll', syncDialogViewport);
   // iOS can settle the viewport a frame after focus moves in/out of a field.

@@ -73,8 +73,9 @@ export function trainingPlan(entry: RosterEntry, move: string): string {
     : `${move ? 'Your main move uses' : 'Your base stats suggest an attacker using'} <strong>${special ? 'Special Attack' : 'Attack'}</strong>. Pair it with ${fast ? 'Speed to move first' : 'HP to survive more hits'}.`;
   return `<p>${reasoning}</p>
     <strong>${next}</strong> ${needed > room ? 'Reduce EVs above target to finish this spread.' : ''}
-    <div class="plan-stats"><div>${radar(entry.evs, target)}<small>Solid · current &nbsp; Dashed · target</small></div>
-    <table><thead><tr><th>Stat</th><th>Current</th><th>Target</th></tr></thead><tbody>
-    ${STATS.map(({ key, label }) => `<tr><th>${label}</th><td>${Number(entry.evs[key])}</td><td>${target[key]}</td></tr>`).join('')}
-    </tbody></table></div>`;
+    <div class="plan-stats">
+    <table aria-label="Current and target EVs"><thead><tr><th scope="col">Stat</th><th scope="col">Current</th><th scope="col">Target</th></tr></thead><tbody>
+    ${STATS.map(({ key, label }) => `<tr><th scope="row">${label}</th><td>${Number(entry.evs[key])}</td><td>${target[key]}</td></tr>`).join('')}
+    </tbody></table>
+    <div class="ev-chart">${radar(entry.evs, target)}<small>Solid · current &nbsp; Dashed · target</small></div></div>`;
 }

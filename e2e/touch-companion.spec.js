@@ -126,3 +126,39 @@ test('level-up increases stay keyboard-free for all six saved stats', async ({ p
   await ivs.getByLabel('Stat', { exact: true }).selectOption('atk');
   await expect(ivs.getByText('Lv. 11 — 23')).toBeVisible();
 });
+
+test('Level & stats recovers full height after keyboard dismissal without a resize event', async ({ page }, info) => {
+  await page.goto('/');
+  await createParty(page, { name: 'Viewport recovery', baseGame: 'Emerald' });
+  await addPokemon(page, 'Bulbasaur', { level: 10 });
+  const dialog = await openLevelUpDialog(await openDetail(page, 'Bulbasaur'));
+  const level = dialog.getByLabel('New level');
+  await level.fill('12');
+  await page.evaluate(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) throw new Error('Visual viewport is unavailable');
+    Object.defineProperties(viewport, {
+      height: { configurable: true, value: 400 },
+      offsetTop: { configurable: true, value: 24 },
+    });
+    viewport.dispatchEvent(new Event('resize'));
+  });
+  await expect.poll(async () => (await dialog.boundingBox())?.height).toBe(400);
+
+  // Dismiss the keyboard while focus stays in the numeric input. Safari
+  // can update the visual viewport after its last resize/scroll event.
+  await page.evaluate(() => {
+    const viewport = window.visualViewport;
+    if (!viewport) throw new Error('Visual viewport is unavailable');
+    Object.defineProperties(viewport, {
+      height: { configurable: true, value: window.innerHeight },
+      offsetTop: { configurable: true, value: 0 },
+    });
+  });
+  await expect.poll(async () => (await dialog.boundingBox())?.height).toBeCloseTo(844, 0);
+  await expect.poll(async () => (await dialog.boundingBox())?.y).toBeCloseTo(0, 0);
+  await expect(level).toBeFocused();
+  await expect(level).toHaveValue('12');
+  await expect(dialog.getByRole('button', { name: 'Save', exact: true })).toBeInViewport({ ratio: 1 });
+  await page.screenshot({ path: info.outputPath('iphone13-keyboard-dismissed.png') });
+});

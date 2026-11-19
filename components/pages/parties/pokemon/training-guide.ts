@@ -52,12 +52,17 @@ export class TrainingGuideDialog extends BaseDialog {
       .training h3 { margin:14px 0 8px; }
       .plan-stats { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:8px; margin-block:12px; }
       .plan-stats svg { display:block; width:100%; max-height:165px; }
-      @media (max-width:380px) {
-        .plan-stats { grid-template-columns:1fr; }
+      @media (max-width:640px) {
+        .plan-stats { grid-template-columns:minmax(0,1fr); }
         .plan-stats table { width:100%; }
       }
+      @media (min-width:641px) {
+        .plan-stats .ev-chart { grid-column:1; grid-row:1; }
+        .plan-stats table { grid-column:2; grid-row:1; }
+      }
       .plan-stats small { display:block; text-align:center; color:var(--ink-soft); }
-      .plan-stats table { font:inherit; font-variant-numeric:tabular-nums; }
+      .plan-stats table { font:inherit; font-variant-numeric:tabular-nums; border-collapse:collapse; }
+      .plan-stats td { white-space:nowrap; }
       .plan-stats td,.plan-stats th { padding:2px 3px; text-align:right; }
       .plan-stats th:first-child { text-align:left; }
       select { display:block; width:100%; min-height:44px; margin-block:4px;
