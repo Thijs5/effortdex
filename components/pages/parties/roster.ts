@@ -14,7 +14,6 @@ import {
   versionedSpriteOnError,
   NATURES,
   TYPE_COLORS,
-  typeTextColor,
   MAX_ACTIVE_PARTY,
 } from '../../../lib/constants.ts';
 import { titleCase, totalEvs, natureOptionsHtml, escapeHtml, sortedNatures, natureLabel, formatEvYield } from '../../../lib/utils.ts';
@@ -33,6 +32,7 @@ import '../../organisms/pokemon-search.ts';
 import '../../organisms/stat-reading-grid.ts';
 import '../../atoms/ev-bar.ts';
 import '../../atoms/level-input.ts';
+import { createTypeLabel } from '../../atoms/type-label.ts';
 import type { Party, RosterEntry } from '../../../lib/store.ts';
 import type { EvMap } from '../../../lib/constants.ts';
 import type { DomainPokemon } from '../../../lib/pokeapi-client.ts';
@@ -515,28 +515,18 @@ let pendingBattle: { mon: DomainPokemon; uids: string[] } | null = null;
 const matchupPanel = document.getElementById('battle-matchup') as HTMLDetailsElement;
 const opponentTypes = document.getElementById('battle-matchup-types')!;
 
-function battleTypeLabel(name: string): HTMLElement {
-  const type = name.toLowerCase();
-  const label = document.createElement('span');
-  label.className = 'battle-type-label';
-  label.style.setProperty('--type-hue', TYPE_COLORS[type]);
-  label.style.color = typeTextColor(type);
-  label.textContent = titleCase(type);
-  return label;
-}
-
 function renderBattleMatchup(mon: DomainPokemon): void {
   const game = matchGameVersion(store.activeParty?.baseGame);
   const matchup = battleMatchup(mon, game?.gen ?? 9, game?.name === 'Legends Arceus');
   matchupPanel.hidden = !matchup;
   opponentTypes.hidden = !matchup;
   if (!matchup) return;
-  opponentTypes.replaceChildren(...matchup.types.map(battleTypeLabel));
+  opponentTypes.replaceChildren(...matchup.types.map(type => createTypeLabel(type)));
   opponentTypes.setAttribute('aria-label', matchup.types.map(titleCase).join(' / '));
   const highest = matchup.attacks[0]?.multiplier;
   const strongest = matchup.attacks.filter(attack => attack.multiplier > 1 && attack.multiplier === highest);
   document.getElementById('battle-matchup-lead')!.replaceChildren(
-    ...(strongest.length ? strongest.map(w => battleTypeLabel(w.name)) : ['No type weakness']),
+    ...(strongest.length ? strongest.map(w => createTypeLabel(w.name)) : ['No type weakness']),
   );
   const factor = document.getElementById('battle-matchup-factor')!;
   factor.hidden = !strongest.length;
@@ -563,7 +553,7 @@ function renderBattleMatchup(mon: DomainPokemon): void {
           label.textContent = titleCase(category);
           group.append(label);
         }
-        group.append(...attacks.filter(attack => attack.category === category).map(attack => battleTypeLabel(attack.name)));
+        group.append(...attacks.filter(attack => attack.category === category).map(attack => createTypeLabel(attack.name)));
         types.append(group);
       }
     } else {

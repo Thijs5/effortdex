@@ -1,5 +1,5 @@
 import { chart, historicalTypes } from './battle-matchup-data.ts';
-import { effectiveness } from './battle-matchup.ts';
+import { combinedEffectiveness, effectiveness } from './battle-matchup.ts';
 
 export function speciesTypes(id: number, modern: string[], gen: number): string[] {
   const past = historicalTypes[id];
@@ -12,11 +12,11 @@ export function strongAgainst(attack: string, gen: number): string[] {
     effectiveness(attack, defense, gen) > 1);
 }
 
-export function defensiveMatchups(types: string[], gen: number) {
+export function defensiveMatchups(types: string[], gen: number, legendsArceus = false) {
   if (!types.length || types.some(type => !Object.hasOwn(chart, type))) return [];
   return Object.keys(chart)
     .filter(type => (gen >= 6 || type !== 'fairy') && (gen >= 2 || !['dark', 'steel'].includes(type)))
-    .map(type => ({ type, factor: types.reduce((value, defense) => value * effectiveness(type, defense, gen), 1) }))
+    .map(type => ({ type, factor: combinedEffectiveness(type, types, gen, legendsArceus) }))
     .filter(({ factor }) => factor !== 1)
     .sort((a, b) => b.factor - a.factor || a.type.localeCompare(b.type));
 }

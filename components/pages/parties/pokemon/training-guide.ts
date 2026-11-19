@@ -1,4 +1,4 @@
-import { categoryGuide, moveOptions, trainingPlan, specialTypes } from '../../../molecules/training-plan.ts';
+import { categoryGuide, moveOptions, trainingPlan } from '../../../molecules/training-plan.ts';
 import { matchGameVersion } from '../../../../lib/game-versions.ts';
 import type { DomainPokemon } from '../../../../lib/pokeapi-client.ts';
 import { learnsetGroup, type LevelMove } from '../../../../lib/training-reference.ts';
@@ -6,12 +6,14 @@ import { availableSpeciesFor } from '../../../../lib/species-availability.ts';
 import { defensiveMatchups, speciesTypes, strongAgainst } from '../../../../lib/type-matchups.ts';
 import { versionedSpriteUrl, modernSpriteUrl } from '../../../../lib/pokeapi-client.ts';
 import { wireSpriteFallback } from '../../../../lib/sprite-fallback.ts';
-import { STATS, TYPE_COLORS, typeTextColor, typeLabel, FALLBACK_SPRITE } from '../../../../lib/constants.ts';
+import { STATS, TYPE_COLORS, typeLabel, FALLBACK_SPRITE } from '../../../../lib/constants.ts';
 import { titleCase } from '../../../../lib/utils.ts';
-import { gen1SpecialStat } from '../../../../lib/gen1-special-stats.ts';
+import { speciesBaseStats } from '../../../../lib/species-base-stats.ts';
+import { typeBasedMoveCategory, usesTypeBasedMoveCategories } from '../../../../lib/move-category.ts';
 import { api, store } from '../../../../lib/services.ts';
 import { evTrainingLocations } from '../../../../lib/ev-training-locations.ts';
 import { BaseDialog } from '../../../atoms/base-dialog.ts';
+import { createTypeLabel } from '../../../atoms/type-label.ts';
 import '../../../molecules/ev-training-guide.ts';
 import type { RosterEntry } from '../../../../lib/store.ts';
 import type { GameTrainingSpots } from '../../../../lib/ev-training-locations.ts';
@@ -80,9 +82,7 @@ export class TrainingGuideDialog extends BaseDialog {
       .species-face { display:flex; align-items:center; gap:var(--space-3); min-width:0; }
       .species-face img { width:clamp(80px,24vw,108px); height:auto; aspect-ratio:1; object-fit:contain; image-rendering:pixelated; }
       .dex-name { display:block; font-size:1.2rem; overflow-wrap:anywhere; }
-      .type-list,.match-list { display:flex; flex-wrap:wrap; gap:5px; margin-block:6px; }
-      .type-chip { border-radius:var(--radius-pill); padding:3px 8px; font-size:var(--font-size-xs); font-weight:650; }
-      .match-list .type-chip { color:var(--ink); background:var(--surface); border:1px solid var(--lcd-line); border-left:4px solid var(--chip); }
+      .type-list,.match-list { display:flex; flex-wrap:wrap; gap:var(--space-2); margin-block:6px; }
       .battle-facts { border-block:1px solid var(--lcd-line); padding-block:8px; }
       .battle-facts p { margin-block:6px; }
       .battle-facts strong { font-weight:650; }
@@ -120,7 +120,7 @@ export class TrainingGuideDialog extends BaseDialog {
       <details class="resistances"><summary>Resistances and immunities</summary><div class="match-list reduced"></div></details></section>
       <p><strong>Base stats</strong></p><p class="base-values"></p>
       <section class="battle-facts"><h4>Battle and training</h4>
-      <p class="stab"></p><details><summary>Super-effective targets for same-type attacks</summary><div class="coverage"></div></details><p class="yield"></p><p class="evolution"></p>
+      <p class="stab"></p><details><summary>Type coverage for same-type attacks</summary><div class="coverage"></div></details><p class="yield"></p><p class="evolution"></p>
       <p class="next-move"></p><details class="learnset" hidden><summary>Level-up moves</summary><ul></ul></details></section>
 </div></section>
       <section class="spots"><h3>Where to train</h3><ev-training-guide></ev-training-guide>
@@ -155,7 +155,7 @@ export class TrainingGuideDialog extends BaseDialog {
       select.dataset.gen = String(gen);
       this.$body.querySelector('.categories')!.innerHTML = categoryGuide(gen);
       const moves = document.createElement('optgroup');
-      moves.label = gen === 3 ? 'Main damaging move’s type' : 'Main damaging move’s category';
+      moves.label = usesTypeBasedMoveCategories(gen) ? 'Main damaging move’s type' : 'Main damaging move’s category';
       moves.append(...moveOptions(gen).map(v => new Option(v, v)));
       select.replaceChildren(new Option('Suggest from base stats', ''), moves);
       const roles = document.createElement('optgroup');
@@ -168,7 +168,6 @@ export class TrainingGuideDialog extends BaseDialog {
     // Curated per-game data (lib/ev-training-locations.js), not a party
     // rule — no override, so read straight off the party's own baseGame
     // rather than through an effective-aids-style helper.
-    this.$body.querySelector('label')!.hidden = store.usesStatExpSystem();
     this.renderPlan();
     this.$guide.spriteGame = store.spriteBaseGame();
     this.$guide.locations = this.locations();
@@ -273,8 +272,19 @@ export class TrainingGuideDialog extends BaseDialog {
     const mon = this.preview;
     const id = mon?.id ?? entry.speciesId;
     const name = titleCase(mon?.name ?? entry.speciesName);
-    const base = mon?.baseStats ?? entry.baseStats;
-    const merged = store.specialStatMerged();
+    const baseGame = matchGameVersion(store.activeParty?.baseGame);
+    const gen = baseGame?.gen ?? 0;
+    const profile = mon ?? api.peekCached(entry.speciesName);
+    const modernBase = profile?.baseStats ?? entry.baseStats;
+    const base = modernBase ? speciesBaseStats(id, modernBase, gen) : null;
+    const statExp = store.usesStatExpSystem();
+    const effortLevels = baseGame?.name === 'Legends Arceus';
+    const candy = baseGame?.name.startsWith("Let's Go") ?? false;
+    const trainingNote = statExp ? 'Battle to build Stat Experience. Each stat can reach its maximum independently, so you can train them all.'
+      : effortLevels ? 'Use grit items to raise effort levels in the stats your Pokémon relies on.'
+      : candy ? 'Use Candies to raise the stats your Pokémon relies on.'
+      : '';
+    this.$body.querySelector('label')!.hidden = !!trainingNote;
     this.$body.querySelector('.dex-name')!.textContent = (id < 10000 ? '#' + id + ' ' : '') + name;
     const game = store.spriteBaseGame();
     const modern = mon?.sprite || (mon ? modernSpriteUrl(id) : entry.sprite || modernSpriteUrl(id)) || FALLBACK_SPRITE;
@@ -283,76 +293,60 @@ export class TrainingGuideDialog extends BaseDialog {
       this.spriteKey = spriteKey;
       this.spriteFallback.setVersionedSprite(versionedSpriteUrl(game, id), modern);
     }
-    const gen = matchGameVersion(store.activeParty?.baseGame)?.gen ?? 9;
-    const types = speciesTypes(id, (mon ?? api.peekCached(entry.speciesName))?.types ?? [], gen);
-    const profile = mon ?? api.peekCached(entry.speciesName);
-    const damageStat = (type: string) => specialTypes.includes(typeLabel(type)) ? (gen === 1 ? 'Special' : 'Special Attack') : 'Attack';
-    this.$body.querySelector('.stab')!.textContent = !types.length ? '' : gen <= 3
+    const typeGen = gen || 9;
+    const types = speciesTypes(id, profile?.types ?? [], typeGen);
+    const damageStat = (type: string) => typeBasedMoveCategory(type, gen) === 'special'
+      ? (gen === 1 ? 'Special' : 'Special Attack') : 'Attack';
+    this.$body.querySelector('.stab')!.textContent = !types.length ? '' : usesTypeBasedMoveCategories(gen)
       ? 'Same-type bonus · ' + types.map(type => typeLabel(type) + ' attacks use ' + damageStat(type)).join(' · ')
-      : 'Same-type bonus · ' + types.map(typeLabel).join(' and ') + ' attacks. Physical moves use Attack and special moves use Special Attack.';
+      : 'Same-type bonus applies to ' + types.map(typeLabel).join(' and ') + ' moves. Move category usually determines whether Attack or Special Attack applies.';
     this.$body.querySelector('.coverage')!.replaceChildren(...types.map(type => {
       const line = document.createElement('p');
-      const targets = strongAgainst(type, gen);
+      const targets = strongAgainst(type, typeGen);
       line.textContent = typeLabel(type) + ' → ' + (targets.length ? targets.map(typeLabel).join(', ') : 'No single-type targets');
       return line;
     }));
     const yieldText = profile && STATS.filter(s => profile.evYield?.[s.key] > 0).map(s => '+' + profile.evYield[s.key] + ' ' + s.label).join(', ');
-    this.$body.querySelector('.yield')!.textContent = store.usesStatExpSystem()
+    const yieldLine = this.$body.querySelector<HTMLElement>('.yield')!;
+    yieldLine.hidden = effortLevels || candy;
+    yieldLine.textContent = statExp
       ? 'Defeating this species builds Stat Experience across stats.'
       : 'Base EV yield when defeated · ' + (yieldText || 'Unavailable');
     this.loadReference(mon?.name ?? entry.speciesName, entry.level, store.activeParty?.baseGame ?? '');
-    const chip = (type: string, factor?: number) => {
-      const badge = document.createElement('span');
-      badge.className = 'type-chip';
-      const color = TYPE_COLORS[type] ?? 'var(--lcd-line)';
-      badge.style.setProperty('--chip', color);
-      if (factor === undefined) {
-        badge.style.backgroundColor = color;
-        badge.style.color = typeTextColor(type);
-      }
-      badge.textContent = typeLabel(type) + (factor === undefined ? '' : ' ×' + factor);
-      return badge;
-    };
     this.$body.querySelector<HTMLElement>('.species-card')!.style.setProperty('--species-color', TYPE_COLORS[types[0]] ?? 'var(--lcd-line)');
-    this.$body.querySelector('.type-list')!.replaceChildren(...types.map(type => chip(type)));
-    const matchups = defensiveMatchups(types, gen);
+    this.$body.querySelector('.type-list')!.replaceChildren(...types.map(type => createTypeLabel(type)));
+    const matchups = defensiveMatchups(types, typeGen, effortLevels);
     const weak = matchups.filter(m => m.factor > 1);
     const reduced = matchups.filter(m => m.factor < 1);
-    this.$body.querySelector('.weaknesses')!.replaceChildren(...(weak.length ? weak.map(m => chip(m.type, m.factor)) : [types.length ? 'None' : 'Type data unavailable']));
+    this.$body.querySelector('.weaknesses')!.replaceChildren(...(weak.length ? weak.map(m => createTypeLabel(m.type, m.factor)) : [types.length ? 'None' : 'Type data unavailable']));
     this.$body.querySelector<HTMLElement>('.resistances')!.hidden = !reduced.length;
-    this.$body.querySelector('.reduced')!.replaceChildren(...reduced.map(m => chip(m.type, m.factor)));
-    this.$body.querySelector('.base-values')!.replaceChildren(...STATS.filter(s => !merged || s.key !== 'spd').map(({ key, label }) => {
+    this.$body.querySelector('.reduced')!.replaceChildren(...reduced.map(m => createTypeLabel(m.type, m.factor)));
+    this.$body.querySelector('.base-values')!.replaceChildren(...STATS.filter(s => gen !== 1 || s.key !== 'spd').map(({ key, label }) => {
       const stat = document.createElement('span');
-      const special = merged && key === 'spa';
-      stat.textContent = (special ? 'SPC' : label) + ' ' + (base ? special ? gen1SpecialStat(id, base.spa, base.spd) : base[key] : '—');
+      stat.textContent = (gen === 1 && key === 'spa' ? 'SPC' : label) + ' ' + (base?.[key] ?? '—');
       return stat;
     }));
     this.$body.querySelector<HTMLButtonElement>('.prev')!.disabled = this.loading || id === 1;
     this.$body.querySelector<HTMLButtonElement>('.next')!.disabled = this.loading || (id < 10000 && id >= this.dexLimit);
     const projection = this.$body.querySelector<HTMLElement>('.projection')!;
-    projection.hidden = !mon || store.usesStatExpSystem();
+    projection.hidden = !mon || !!trainingNote;
     projection.textContent = 'Preview uses ' + titleCase(entry.speciesName) + '’s current EVs.';
     const restore = this.$body.querySelector<HTMLButtonElement>('.restore')!;
     restore.hidden = !mon;
     restore.textContent = 'Back to ' + titleCase(entry.speciesName);
-    this.$body.querySelector<HTMLElement>('.spots')!.hidden = !!mon || !this.locations() || store.usesStatExpSystem();
+    this.$body.querySelector<HTMLElement>('.spots')!.hidden = !!mon || !this.locations() || !!trainingNote;
     const select = this.$body.querySelector('select')!;
     const roles = select.querySelector<HTMLOptGroupElement>('optgroup[label="Defensive role"]');
     if (roles) roles.disabled = id === 292;
     if (id === 292 && select.value.endsWith(' wall')) select.value = '';
-    const result = this.$body.querySelector('.result')!;
-    if (store.usesStatExpSystem()) {
-      result.textContent = 'Battle to build Stat Experience across all stats. Each stat can reach its maximum independently, so you can train them all.';
-      return;
-    }
-    result.innerHTML = trainingPlan({ ...entry, speciesId: id, baseStats: base }, select.value);
+    this.$body.querySelector('.result')!.innerHTML = trainingPlan({ ...entry, speciesId: id, baseStats: base }, select.value, gen, trainingNote);
   }
 
   get entry(): RosterEntry | null {
     return this._entry;
   }
 
-  /** Whether this game has a curated list at all — pokemon-detail.js uses this to hide its own "Where to train" menu entry. */
+  /** Curated battle locations, when available for this game. */
   locations(): GameTrainingSpots | null {
     return evTrainingLocations(store.activeParty?.baseGame);
   }

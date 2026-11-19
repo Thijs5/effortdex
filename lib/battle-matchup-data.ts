@@ -1,4 +1,4 @@
-// Source: PokeAPI/pokeapi data/v2/csv (type_efficacy, pokemon_types_past, pokemon_stats_past).
+// Source: PokeAPI/pokeapi data/v2/csv (type_efficacy, pokemon_types_past).
 // Each defending type lists weaknesses, resistances and immunities in that order.
 export const chart: Record<string, [string[], string[], string[]]> = {
   normal: [["fighting"], [], ["ghost"]],
@@ -50,32 +50,4 @@ export const historicalTypes: Record<number, [number, string[]]> = {
   10010: [4, ["electric", "ghost"]],
   10011: [4, ["electric", "ghost"]],
   10012: [4, ["electric", "ghost"]],
-};
-export const historicalDefenses: Record<number, { through: number; def?: number; spd?: number }> = {
-  355: { through: 3, def: 90 },
-  356: { through: 3, spd: 130 },
-  25: { through: 5, def: 30, spd: 40 },
-  65: { through: 5, spd: 85 },
-  71: { through: 5, spd: 60 },
-  181: { through: 5, def: 75 },
-  182: { through: 5, def: 85 },
-  189: { through: 5, spd: 85 },
-  295: { through: 5, spd: 63 },
-  398: { through: 5, spd: 50 },
-  407: { through: 5, def: 55 },
-  526: { through: 5, spd: 70 },
-  542: { through: 5, spd: 70 },
-  553: { through: 5, def: 70 },
-  10037: { through: 6, spd: 95 },
-  103: { through: 6, spd: 65 },
-  168: { through: 6, spd: 60 },
-  211: { through: 6, def: 75 },
-  222: { through: 6, def: 85, spd: 85 },
-  313: { through: 6, def: 55, spd: 75 },
-  314: { through: 6, def: 55, spd: 75 },
-  358: { through: 6, def: 70, spd: 80 },
-  199: { through: 7, spd: 110 },
-  681: { through: 7, def: 150, spd: 150 },
-  488: { through: 8, def: 120, spd: 130 },
-  10189: { through: 8, def: 145, spd: 145 },
 };

@@ -1686,14 +1686,6 @@ textarea.ds-field { resize: vertical; }
 #battle-matchup-types:not([hidden]), .matchup-types {
   display: flex;
   flex-wrap: wrap;
-  gap: .25rem;
+  gap: var(--space-1) var(--space-2);
 }
 #battle-matchup-types:not([hidden]) { justify-content: center; }
-.battle-type-label {
-  padding: .12em .45em;
-  border-radius: var(--radius-sm);
-  background: var(--type-hue);
-  font-size: var(--font-size-xs);
-  font-weight: 600;
-  line-height: 1.35;
-}

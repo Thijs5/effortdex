@@ -483,9 +483,12 @@ test.describe('Keyboard-free defeat review', () => {
     await page.screenshot({ path: info.outputPath('recent-defeats-staged-dark.png') });
     await recents.last().tap();
     await expect(page.locator('#battle-opponent-name')).toHaveText('Onix');
+    await expect(page.locator('#battle-matchup-types type-label')).toHaveText(['Rock', 'Ground']);
+    await expect(page.locator('#battle-matchup-lead type-label')).toHaveText(['Grass', 'Water']);
     await page.locator('#battle-matchup summary').tap();
     const damage = page.getByRole('list', { name: 'Incoming damage by attack type' });
     await expect(damage.locator('li > strong')).toHaveText(['×4', '×2', '×1', '×0.5', '×0.25', '×0']);
+    await expect(damage.locator('li').first().locator('type-label')).toHaveText(['Grass', 'Water']);
     await expect(damage.getByRole('listitem').last()).toContainText('Immune · Electric');
     await page.screenshot({ path: info.outputPath('onix-damage-list.png') });
     await page.locator('#battle-search .sheet-close').tap();

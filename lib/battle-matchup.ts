@@ -1,9 +1,8 @@
-import { chart, historicalDefenses, historicalTypes } from './battle-matchup-data.ts';
-import { GEN1_SPECIAL_STAT } from './gen1-special-stats.ts';
+import { chart, historicalTypes } from './battle-matchup-data.ts';
+import { speciesBaseStats } from './species-base-stats.ts';
+import { typeBasedMoveCategory } from './move-category.ts';
 import type { DomainPokemon } from './pokeapi-client.ts';
 import { titleCase } from './utils.ts';
-
-const specialTypes = new Set('fire water grass electric psychic ice dragon dark'.split(' '));
 
 export function effectiveness(attack: string, target: string, gen: number): number {
   if (gen === 1) {
@@ -18,6 +17,13 @@ export function effectiveness(attack: string, target: string, gen: number): numb
   return resist.includes(attack) ? 0.5 : 1;
 }
 
+export function combinedEffectiveness(attack: string, types: string[], gen: number, legendsArceus = false): number {
+  const multiplier = types.reduce((factor, target) => factor * effectiveness(attack, target, gen), 1);
+  if (legendsArceus && multiplier === 4) return 2.5;
+  if (legendsArceus && multiplier === 0.25) return 0.4;
+  return multiplier;
+}
+
 export function battleMatchup(mon: DomainPokemon, gen: number, legendsArceus = false) {
   const past = historicalTypes[mon.id];
   const types = past && gen <= past[0] ? past[1] : mon.types;
@@ -27,19 +33,14 @@ export function battleMatchup(mon: DomainPokemon, gen: number, legendsArceus = f
   for (const attack of Object.keys(chart)) {
     if (gen < 6 && attack === 'fairy') continue;
     if (gen === 1 && ['dark', 'steel'].includes(attack)) continue;
-    let multiplier = types.reduce((factor, target) => factor * effectiveness(attack, target, gen), 1);
-    if (legendsArceus) {
-      if (multiplier === 4) multiplier = 2.5;
-      if (multiplier === 0.25) multiplier = 0.4;
-    }
-    const category = gen <= 3 ? (specialTypes.has(attack) ? 'special' : 'physical') : undefined;
+    const multiplier = combinedEffectiveness(attack, types, gen, legendsArceus);
+    const category = typeBasedMoveCategory(attack, gen);
     attacks.push({ name: titleCase(attack), category, multiplier });
   }
   attacks.sort((a, b) => b.multiplier - a.multiplier || a.name.localeCompare(b.name));
-  const history = historicalDefenses[mon.id];
-  const stats = history && gen <= history.through ? history : undefined;
-  const def = stats?.def ?? mon.baseStats?.def;
-  const spd = gen === 1 ? GEN1_SPECIAL_STAT[mon.id] : stats?.spd ?? mon.baseStats?.spd;
+  const stats = mon.baseStats && speciesBaseStats(mon.id, mon.baseStats, gen);
+  const def = stats?.def;
+  const spd = stats?.spd;
   let advice = '';
   if (def && spd) {
     const special = gen === 1 ? 'Special' : 'Sp. Def';

@@ -1,4 +1,4 @@
-import { POWER_ITEMS, MACHO_BRACE_SPRITE, EXP_SHARE_SPRITE, NATURES, STATS, STAT_LABEL, MACHO_BRACE_MULTIPLIER, FALLBACK_SPRITE, FALLBACK_ONERROR, TYPE_COLORS, typeLabel, typeTextColor } from '../../lib/constants.ts';
+import { POWER_ITEMS, MACHO_BRACE_SPRITE, EXP_SHARE_SPRITE, NATURES, STATS, STAT_LABEL, MACHO_BRACE_MULTIPLIER, FALLBACK_SPRITE, FALLBACK_ONERROR, TYPE_COLORS } from '../../lib/constants.ts';
 import { titleCase, natureEffectHint, dayLabel } from '../../lib/utils.ts';
 import { api, store } from '../../lib/services.ts';
 import { versionedSpriteUrl, versionedSpriteIsOpaque } from '../../lib/pokeapi-client.ts';
@@ -7,6 +7,7 @@ import { BaseElement } from '../base-element.ts';
 import { wireSpriteFallback } from '../../lib/sprite-fallback.ts';
 import { wireDisclosureMenu } from '../../lib/dom.ts';
 import * as router from '../../lib/router.ts';
+import { createTypeLabel } from '../atoms/type-label.ts';
 import '../molecules/ev-summary.ts';
 import './ev-history-log.ts';
 import './pokemon-search.ts';
@@ -37,7 +38,7 @@ export class PokemonDetail extends BaseElement {
   _spriteFallback: ReturnType<typeof wireSpriteFallback>;
   $sprite: HTMLImageElement;
   $spriteFrame: HTMLElement;
-  $typeBadges: HTMLElement;
+  $typeLabels: HTMLElement;
   $speciesNum: HTMLElement;
 
   $nickname: HTMLInputElement;
@@ -62,7 +63,6 @@ export class PokemonDetail extends BaseElement {
   $sheetExpShareNote: HTMLElement;
   $battleStatus: HTMLElement;
   $histLog: import('./ev-history-log.ts').EvHistoryLog;
-  $trainingGuideBtn: HTMLElement;
   $trainingGuideDialog: any;
 
   constructor() {
@@ -121,18 +121,8 @@ export class PokemonDetail extends BaseElement {
           background: color-mix(in srgb, var(--type, var(--surface)) 12%, var(--surface));
           box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--type, var(--line)) 38%, var(--line));
         }
-        /* Type badges sit under the name now (not under the sprite) —
-           readable size, left-aligned with the name. Solid type colour with contrasting label ink; the type hue
-           stays recognizable in both themes. */
-        .type-badges { display: flex; flex-wrap: wrap; gap: 4px; }
-        .type-badges:empty { display: none; }
-        .type-badge {
-          font-size: var(--font-size-2xs); font-weight: 600;
-          letter-spacing: 0.07em; text-transform: uppercase; white-space: nowrap;
-          padding: 2px 8px; border-radius: var(--radius-pill);
-          background: var(--type, var(--ink-soft)); color: var(--type-ink, #fff);
-          box-shadow: inset 0 -1px 0 rgba(0, 0, 0, 0.18);
-        }
+        .type-labels { display: flex; flex-wrap: wrap; gap: var(--space-2); }
+        .type-labels:empty { display: none; }
         .sprite {
           width: 100%; height: 100%; image-rendering: pixelated; object-fit: contain;
         }
@@ -333,7 +323,7 @@ export class PokemonDetail extends BaseElement {
               <span class="species-num"></span>
               <input class="nickname" aria-label="Nickname" />
             </div>
-            <span class="type-badges" aria-hidden="true"></span>
+            <span class="type-labels"></span>
           </div>
             <div class="meta">
               <button class="level-up-btn" type="button" title="Set level">
@@ -354,7 +344,7 @@ export class PokemonDetail extends BaseElement {
             <div class="more-menu" role="menu" aria-label="More" hidden>
               <button class="more-menu-item" type="button" role="menuitem" data-open="ivs">IVs</button>
               <button class="more-menu-item" type="button" role="menuitem" data-open="competitive">Competitive</button>
-              <button class="more-menu-item training-guide-menu-item" type="button" role="menuitem" data-open="training-guide" hidden>Training guide</button>
+              <button class="more-menu-item" type="button" role="menuitem" data-open="training-guide">Training guide</button>
               <button class="more-menu-item more-menu-item--danger" type="button" role="menuitem" data-action="remove">Remove</button>
             </div>
           </div>
@@ -396,7 +386,7 @@ export class PokemonDetail extends BaseElement {
 
     this.$sprite = this.$<HTMLImageElement>('.sprite');
     this.$spriteFrame = this.$<HTMLElement>('.sprite-frame');
-    this.$typeBadges = this.$<HTMLElement>('.type-badges');
+    this.$typeLabels = this.$<HTMLElement>('.type-labels');
     this.$speciesNum = this.$<HTMLElement>('.species-num');
     this.$nickname = this.$<HTMLInputElement>('.nickname');
     this.$levelValue = this.$<HTMLElement>('.level-value');
@@ -425,7 +415,6 @@ export class PokemonDetail extends BaseElement {
     this.$search.evModifier = (mon) => (this._entry ? store.previewDefeat(this._entry.uid, mon)?.applied : undefined);
     this.$battleStatus = this.$<HTMLElement>('.battle-status');
     this.$histLog = this.$<import('./ev-history-log.ts').EvHistoryLog>('ev-history-log');
-    this.$trainingGuideBtn = this.$<HTMLElement>('.training-guide-menu-item');
     this.$trainingGuideDialog = this.$maybe('training-guide-dialog');
 
     this._spriteFallback = wireSpriteFallback(this.$sprite);
@@ -633,18 +622,16 @@ export class PokemonDetail extends BaseElement {
     // halo boxes them instead of hugging a silhouette (see the stylesheet).
     this.$spriteFrame.classList.toggle('sprite-frame--opaque', !!versioned && versionedSpriteIsOpaque(spriteGame));
 
-    // Type badges + whole-page type theming (docs/adr/0028). Types come
+    // Type labels + whole-page type theming (docs/adr/0028). Types come
     // from the api cache (populated when this species was looked up to
-    // add it); unknown → no badges, --type/--meter left at their global
+    // add it); unknown → no labels, --type/--meter left at their global
     // defaults.
     const types = api.peekCached(e.speciesName)?.types ?? [];
     if (!types.length && !this._typeWarmTried.has(e.speciesName)) {
       this._typeWarmTried.add(e.speciesName);
       api.getPokemon(e.speciesName).then(() => this.render()).catch(() => {});
     }
-    this.$typeBadges.innerHTML = types
-      .map((t) => `<span class="type-badge" style="--type:${TYPE_COLORS[t] ?? '#5f5b53'};--type-ink:${typeTextColor(t)}">${typeLabel(t)}</span>`)
-      .join('');
+    this.$typeLabels.replaceChildren(...types.map(type => createTypeLabel(type)));
     const primaryColor = types[0] ? TYPE_COLORS[types[0]] : undefined;
     if (primaryColor) {
       this.dataset.type = types[0];
@@ -726,7 +713,6 @@ export class PokemonDetail extends BaseElement {
       this.$sprite.title = '';
     }
     this.$trainingGuideDialog.entry = e;
-    this.$trainingGuideBtn.hidden = !this.$trainingGuideDialog.locations() && !store.usesStatExpSystem();
     this.$histLog.entry = e;
   }
 

@@ -1,21 +1,22 @@
-import { STATS, STAT_CAP, TOTAL_CAP, type EvMap, type StatKey } from '../../lib/constants.ts';
+import { chart } from '../../lib/battle-matchup-data.ts';
+import { STATS, STAT_CAP, TOTAL_CAP, typeLabel, type EvMap, type StatKey } from '../../lib/constants.ts';
+import { typeBasedMoveCategory, usesTypeBasedMoveCategories } from '../../lib/move-category.ts';
 import type { RosterEntry } from '../../lib/store.ts';
-
-export const specialTypes = ['Dark', 'Dragon', 'Electric', 'Fire', 'Grass', 'Ice', 'Psychic', 'Water'];
-const physicalTypes = ['Bug', 'Fighting', 'Flying', 'Ghost', 'Ground', 'Normal', 'Poison', 'Rock', 'Steel'];
 
 export function categoryGuide(gen: number): string {
   if (!gen) return 'Choose a known base game to see its move category rules.';
-  if (gen >= 4) return '<p>Each damaging move has its own category. Check the physical or special symbol in its move details. For example, Fire Punch is physical and Flamethrower is special.</p>';
-  const physical = physicalTypes.filter(type => gen !== 1 || type !== 'Steel');
-  const special = specialTypes.filter(type => gen !== 1 || type !== 'Dark');
+  if (!usesTypeBasedMoveCategories(gen)) return '<p>Each move has its own category. Fire Punch is physical and uses Attack. Flamethrower is special and uses Special Attack. Both are Fire type.</p>';
+  const types = Object.keys(chart).sort();
+  const physical = types.filter(type => typeBasedMoveCategory(type, gen) === 'physical').map(typeLabel);
+  const special = types.filter(type => typeBasedMoveCategory(type, gen) === 'special').map(typeLabel);
   return `<p>A damaging move’s type determines its category in this game.</p>
     <p><strong>Physical · Attack</strong><br>${physical.join(', ')}</p>
     <p><strong>Special · ${gen === 1 ? 'Special' : 'Special Attack'}</strong><br>${special.join(', ')}</p>`;
 }
 
 export function moveOptions(gen: number): string[] {
-  return gen === 3 ? [...specialTypes, ...physicalTypes].sort() : ['Physical', 'Special'];
+  if (!usesTypeBasedMoveCategories(gen)) return ['Physical', 'Special'];
+  return Object.keys(chart).filter(type => typeBasedMoveCategory(type, gen)).sort().map(typeLabel);
 }
 
 function radar(current: EvMap, target: EvMap): string {
@@ -44,18 +45,41 @@ function radar(current: EvMap, target: EvMap): string {
   </svg>`;
 }
 
-export function trainingPlan(entry: RosterEntry, move: string): string {
-  const base = entry.baseStats;
-  if (!base && !move) return '<p>Choose a move type, move category or defensive role above to get a training target.</p>';
-  const autoWall = !move && base && entry.speciesId !== 292 && base.spe < 80 &&
+function baseStatFocus(base: EvMap, speciesId: number): string {
+  const defensive = speciesId !== 292 && base.spe < 80 &&
     Math.max(base.def, base.spd) > Math.max(base.atk, base.spa);
-  if (autoWall) move = base.def >= base.spd ? 'Physical wall' : 'Special wall';
-  const wall = move === 'Physical wall' || move === 'Special wall';
-  const special = move ? move === 'Special' || specialTypes.includes(move) : base!.spa > base!.atk;
+  if (defensive) return base.def >= base.spd ? 'Physical wall' : 'Special wall';
+  return base.spa > base.atk ? 'Special' : 'Physical';
+}
+
+function baseStatRecommendation(base: EvMap, focus: string, gen: number): string {
+  const special = gen === 1 ? 'Special' : 'Sp. Atk';
+  if (focus === 'Physical wall' || focus === 'Special wall') {
+    const defense = focus === 'Physical wall' ? `Defense ${base.def}` : `Sp. Def ${base.spd}`;
+    return `Base ${defense} is higher than Attack (${base.atk}) and ${special} (${base.spa}).`;
+  }
+  if (base.atk === base.spa) return `Base Attack and ${special} are both ${base.atk}. Either move category can work.`;
+  const [higher, lower] = focus === 'Special'
+    ? [`${special} ${base.spa}`, `Attack ${base.atk}`]
+    : [`Attack ${base.atk}`, `${special} ${base.spa}`];
+  return `Base ${higher} is higher than ${lower}.`;
+}
+
+export function trainingPlan(entry: RosterEntry, move: string, gen: number, trainingNote = ''): string {
+  const base = entry.baseStats;
+  const recommended = base ? baseStatFocus(base, entry.speciesId) : '';
+  if (trainingNote) {
+    const reason = base ? `<p>${baseStatRecommendation(base, recommended, gen)}</p>` : '';
+    return reason + `<p>${trainingNote}</p>`;
+  }
+  if (!base && !move) return '<p>Choose a move type, move category or defensive role above to get a training target.</p>';
+  const focus = move || recommended;
+  const wall = focus === 'Physical wall' || focus === 'Special wall';
+  const special = focus === 'Special' || typeBasedMoveCategory(focus.toLowerCase(), gen) === 'special';
   const offense = special ? 'spa' : 'atk';
   const fast = !base || base.spe >= 80 || entry.speciesId === 292;
   const target: EvMap = { hp: 0, atk: 0, def: 0, spa: 0, spd: 0, spe: 0 };
-  const priority: StatKey = wall ? (move === 'Physical wall' ? 'def' : 'spd') : offense;
+  const priority: StatKey = wall ? (focus === 'Physical wall' ? 'def' : 'spd') : offense;
   target[priority] = STAT_CAP;
   target[wall || !fast ? 'hp' : 'spe'] = STAT_CAP;
   const remainder: StatKey = wall ? (priority === 'def' ? 'spd' : 'def')
@@ -70,8 +94,9 @@ export function trainingPlan(entry: RosterEntry, move: string): string {
     `Next, train ${Math.min(room, target[first.key] - entry.evs[first.key])} ${first.label} EVs.`;
   const reasoning = wall
     ? `Train HP and ${priority === 'def' ? 'Defense' : 'Special Defense'} to survive more ${priority === 'def' ? 'physical' : 'special'} hits.`
-    : `${move ? 'Your main move uses' : 'Your base stats suggest an attacker using'} <strong>${special ? 'Special Attack' : 'Attack'}</strong>. Pair it with ${fast ? 'Speed to move first' : 'HP to survive more hits'}.`;
-  return `<p>${reasoning}</p>
+    : `Train <strong>${special ? 'Special Attack' : 'Attack'}</strong> and ${fast ? 'Speed to move first' : 'HP to survive more hits'}.`;
+  const baseReason = !move && base ? baseStatRecommendation(base, recommended, gen) + ' ' : '';
+  return `<p>${baseReason}${reasoning}</p>
     <strong>${next}</strong> ${needed > room ? 'Reduce EVs above target to finish this spread.' : ''}
     <div class="plan-stats">
     <table aria-label="Current and target EVs"><thead><tr><th scope="col">Stat</th><th scope="col">Current</th><th scope="col">Target</th></tr></thead><tbody>

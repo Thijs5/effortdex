@@ -10,6 +10,7 @@
 import type { EvBar } from './atoms/ev-bar.ts';
 import type { GameBall } from './atoms/game-ball.ts';
 import type { LevelInput } from './atoms/level-input.ts';
+import type { TypeLabel } from './atoms/type-label.ts';
 import type { DsItemButton } from './atoms/ds-item-button.ts';
 import type { ItemButtonGrid } from './atoms/item-button-grid.ts';
 import type { EvSummary } from './molecules/ev-summary.ts';
@@ -34,6 +35,7 @@ declare global {
     'ev-bar': EvBar;
     'game-ball': GameBall;
     'level-input': LevelInput;
+    'type-label': TypeLabel;
     'ds-item-button': DsItemButton;
     'item-button-grid': ItemButtonGrid;
     'ev-summary': EvSummary;

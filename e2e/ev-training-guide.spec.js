@@ -52,8 +52,9 @@ test.describe('EV-training location guide', () => {
     await expect(dialog.locator('.next-move')).toContainText('No level-up moves listed');
     await expect(dialog.locator('.yield')).toContainText('+2 SPA');
     await expect(dialog.locator('.dex-sprite')).toHaveAttribute('src', /\/2\.png$/);
-    await expect(dialog.locator('.type-list .type-chip')).toHaveText(['Grass', 'Poison']);
-    await expect(dialog.locator('.weaknesses .type-chip')).toHaveText(['Fire ×2', 'Flying ×2', 'Ice ×2', 'Psychic ×2']);
+    await expect(card.locator('.type-labels type-label')).toHaveText(['Grass', 'Poison']);
+    await expect(dialog.locator('.type-list type-label')).toHaveText(['Grass', 'Poison']);
+    await expect(dialog.locator('.weaknesses type-label')).toHaveText(['Fire ×2', 'Flying ×2', 'Ice ×2', 'Psychic ×2']);
     await dialog.getByText('Resistances and immunities').click();
     await expect(dialog.locator('.reduced')).toContainText('Grass ×0.25');
     await expect(dialog.locator('.base-values')).toContainText('HP 60');
@@ -82,13 +83,18 @@ test.describe('EV-training location guide', () => {
     await expect(card.locator('ev-summary ev-bar[data-key="hp"]').locator('.value')).toHaveText('1/252');
   });
 
-  test('a phone user can choose a move category after the split', async ({ page }) => {
+  test('HeartGold suggests a focus from base stats and lets a phone user choose either move category', async ({ page }) => {
     await page.setViewportSize({ width: 320, height: 640 });
     await page.goto('/');
-    await createParty(page, { name: 'Platinum run', baseGame: 'Platinum' });
+    await createParty(page, { name: 'HeartGold run', baseGame: 'HeartGold' });
     await addPokemon(page, 'Bulbasaur');
     const dialog = await openTrainingGuide(await openDetail(page, 'Bulbasaur'));
     const category = dialog.getByLabel('Training focus');
+    await expect(category.locator('optgroup').first().locator('option')).toHaveText(['Physical', 'Special']);
+    await expect(dialog.locator('.result')).toContainText('Base Sp. Atk 65 is higher than Attack 49');
+    await expect(dialog.locator('.result')).toContainText('Next, train 252 SPA EVs');
+    await dialog.getByText('Which moves are physical or special?').click();
+    await expect(dialog.locator('.categories')).toContainText('Fire Punch is physical and uses Attack. Flamethrower is special and uses Special Attack.');
     await category.selectOption('Physical');
     await expect(dialog.locator('.result')).toContainText('Next, train 252 ATK EVs');
     await category.selectOption('Special');
@@ -105,7 +111,24 @@ test.describe('EV-training location guide', () => {
     const card = await openDetail(page, 'Charmander');
 
     const dialog = await openTrainingGuide(card);
+    await expect(dialog.locator('.result')).toContainText('Base Attack 52 is higher than Special 50');
     await expect(dialog).toContainText('train them all');
     await expect(dialog.locator('select')).toBeHidden();
   });
+
+  for (const [baseGame, species, method] of [
+    ["Let's Go Pikachu", 'Bulbasaur', 'Use Candies'],
+    ['Legends Arceus', 'Onix', 'raise effort levels'],
+  ]) {
+    test(`${baseGame} has base-stat advice and its own training method`, async ({ page }) => {
+      await page.goto('/');
+      await createParty(page, { name: baseGame, baseGame });
+      await addPokemon(page, species);
+      const dialog = await openTrainingGuide(await openDetail(page, species));
+      await expect(dialog.locator('.result')).toContainText('Base');
+      await expect(dialog.locator('.result')).toContainText(method);
+      await expect(dialog.locator('.yield')).toBeHidden();
+      await expect(dialog.getByRole('table', { name: 'Current and target EVs' })).toHaveCount(0);
+    });
+  }
 });

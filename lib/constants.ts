@@ -228,11 +228,7 @@ export const IV_MAX_LEGACY = 15;
 
 // Elemental type colours — one per PokéAPI type name (lowercase). Tuned
 // to sit legibly on both the light bone ground and the warm-dark ground
-// (docs/adr/0028): a shade cooler and less saturated than the games'
-// own type chips so a roster full of them doesn't shout. The roster
-// shows these as small dots by the name; the detail page uses the
-// primary type as a badge and a whole-page wash. `[]` types (a species
-// cached before types were tracked) render neither.
+// (docs/adr/0028). Used by type labels and the type-tinted surfaces.
 export const TYPE_COLORS: Record<string, string> = {
   normal: '#9a9a86',
   fire: '#e0793b',
@@ -253,15 +249,6 @@ export const TYPE_COLORS: Record<string, string> = {
   steel: '#8fa3b3',
   fairy: '#e08fc0',
 };
-
-/** Preserve type hues while keeping small badge labels readable. */
-export function typeTextColor(type: string): string {
-  const hex = TYPE_COLORS[type] ?? '#5f5b53';
-  const channels = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
-    .map(value => value <= 0.04045 ? value / 12.92 : ((value + 0.055) / 1.055) ** 2.4);
-  const luminance = channels[0] * 0.2126 + channels[1] * 0.7152 + channels[2] * 0.0722;
-  return luminance > 0.179 ? '#000000' : '#ffffff';
-}
 
 /** A type name title-cased for display ("water" -> "Water"). */
 export function typeLabel(type: string): string {
