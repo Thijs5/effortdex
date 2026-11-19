@@ -182,12 +182,11 @@
            the visible viewport with the defeat confirmation action (ADR 0031). -->
       <pokemon-search id="battle-search" hidden placeholder="Defeated Pokémon…" show-ev-yield sheet-title="Choose defeated Pokémon" force-sheet review-flow review-title="Record a defeat">
         <div slot="sheet-extra" class="battle-sheet-extra" data-state="empty">
-          <p class="battle-composer-intro">Record an opponent your team defeated.</p>
           <div class="battle-opponents">
           <div class="battle-current"><span class="battle-sheet-eyebrow">Opponent</span>
           <button id="battle-choose-opponent-btn" class="battle-opponent-card" type="button" aria-label="Choose defeated Pokémon">
             <span class="battle-opponent-art"><img id="battle-opponent-sprite" alt="" hidden /><span id="battle-opponent-placeholder" aria-hidden="true">?</span></span>
-            <span class="battle-opponent-copy"><strong id="battle-opponent-name">Choose a Pokémon</strong><span id="battle-opponent-hint">Search or choose a recent opponent →</span></span>
+            <span class="battle-opponent-copy"><strong id="battle-opponent-name">Choose a Pokémon</strong><span id="battle-matchup-types" hidden></span><span id="battle-opponent-hint">Search or choose a recent opponent →</span></span>
           </button></div>
           <div class="battle-recents"><span class="battle-sheet-eyebrow" id="battle-recents-label">Recent defeats</span><div id="battle-recent-opponents" role="group" aria-labelledby="battle-recents-label"></div></div>
           </div>
@@ -196,13 +195,12 @@
           <div id="battle-participants" class="party-slots party-slots--select"></div>
           <p id="battle-participants-status" class="party-slots-status" hidden></p>
           <p id="battle-result-summary" class="battle-result-summary" hidden aria-live="polite"></p>
-          <section id="battle-matchup" hidden aria-labelledby="battle-matchup-title">
-            <header class="matchup-heading"><h3 id="battle-matchup-title">Battle matchup</h3><span id="battle-matchup-gen"></span></header>
-            <p id="battle-matchup-types"></p>
-            <dl><div><dt>Weak to</dt><dd id="battle-weaknesses"></dd></div>
-              <div><dt>Type immunities</dt><dd id="battle-immunities"></dd></div></dl>
+          <details id="battle-matchup" hidden>
+            <summary>Matchup details <small id="battle-matchup-gen"></small></summary>
+            <dl><dt>Weak to</dt><dd id="battle-weaknesses"></dd>
+              <dt>Immune to</dt><dd id="battle-immunities"></dd></dl>
             <p id="battle-attack-advice"></p>
-          </section>
+          </details>
         </div>
         <div slot="sheet-footer" class="battle-composer-actions">
           <button id="battle-log-btn" class="ds-btn ds-btn--primary" type="button" disabled>Log defeat</button>

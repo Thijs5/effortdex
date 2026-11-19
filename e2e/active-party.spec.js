@@ -267,7 +267,7 @@ test.describe('Active party and faint tracking', () => {
     await option.click();
     // Picking only stages it — still nothing applied until #battle-log-btn.
     await expect(rosterCard(page, 'Bulbasaur').locator('.roster-card-evbar .value')).toHaveText('0/510');
-    await expect(page.locator('#battle-result-summary')).toContainText('Ready to log');
+    await expect(page.locator('#battle-result-summary')).toContainText('Base yield:');
     await page.locator('#battle-log-btn').click();
     await expect(rosterCard(page, 'Bulbasaur').locator('.roster-card-evbar .value')).toHaveText('1/510');
   });
@@ -403,7 +403,7 @@ test.describe('Touch battle confirmation', () => {
     const input = search.getByRole('combobox');
     await page.locator('#battle-choose-opponent-btn').tap();
     await page.getByRole('option').filter({ hasText: /Caterpie/i }).first().tap();
-    await expect(page.locator('#battle-result-summary')).toContainText('Ready to log');
+    await expect(page.locator('#battle-result-summary')).toContainText('Base yield:');
     // Phones can blur the input when dismissing the keyboard without
     // focusing another control (Safari also does not focus tapped buttons).
     await page.clock.install();
@@ -417,7 +417,7 @@ test.describe('Touch battle confirmation', () => {
     await page.locator('#party-log-battle-btn').tap();
     await page.locator('#battle-choose-opponent-btn').tap();
     await page.getByRole('option').filter({ hasText: /Caterpie/i }).first().tap();
-    await expect(page.locator('#battle-result-summary')).toContainText('Ready to log');
+    await expect(page.locator('#battle-result-summary')).toContainText('Base yield:');
     await page.locator('#battle-choose-opponent-btn').press('Escape');
     await expect(search).toBeHidden();
     await page.reload();

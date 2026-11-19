@@ -98,7 +98,7 @@ for (const layout of [
     await expect(page.getByRole('option').filter({ hasText: /Caterpie/i }).first()).toBeVisible();
     await capture('defeat-search');
     await page.getByRole('option').filter({ hasText: /Caterpie/i }).first().click();
-    await expect(page.locator('#battle-result-summary')).toContainText('Ready to log');
+    await expect(page.locator('#battle-result-summary')).toContainText('Base yield:');
     await page.locator('#battle-participants').getByRole('button', { name: /Charmander/i }).click();
     await expect(page.locator('#battle-result-summary')).toContainText('+1 HP');
     await expect(page.locator('#battle-result-summary')).not.toContainText('Charmander');
@@ -141,7 +141,7 @@ test('six long participant names keep search and confirmation visible above a ph
   await page.locator('#battle-choose-opponent-btn').click();
   await input.fill('Caterpie');
   await page.getByRole('option').filter({ hasText: /Caterpie/i }).first().click();
-  await expect(page.locator('#battle-result-summary')).toContainText('Ready to log');
+  await expect(page.locator('#battle-result-summary')).toContainText('Base yield:');
   await page.setViewportSize({ width: 390, height: 260 });
   await expect(input).toBeHidden();
   await expect(page.locator('#battle-log-btn')).toBeInViewport({ ratio: 1 });

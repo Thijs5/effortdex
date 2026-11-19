@@ -23,7 +23,7 @@ export function battleMatchup(mon: DomainPokemon, gen: number, legendsArceus = f
   const types = past && gen <= past[0] ? past[1] : mon.types;
   if (!types?.length || types.some(type => !Object.hasOwn(chart, type))) return null;
 
-  const weaknesses: { name: string; multiplier: number }[] = [];
+  const weaknesses: { name: string; category?: string; multiplier: number }[] = [];
   const immunities: string[] = [];
   for (const attack of Object.keys(chart)) {
     if (gen < 6 && attack === 'fairy') continue;
@@ -31,9 +31,8 @@ export function battleMatchup(mon: DomainPokemon, gen: number, legendsArceus = f
     const multiplier = types.reduce((factor, target) => factor * effectiveness(attack, target, gen), 1);
     if (multiplier === 0) immunities.push(titleCase(attack));
     if (multiplier > 1) {
-      let name = titleCase(attack);
-      if (gen <= 3) name += specialTypes.has(attack) ? ' (special)' : ' (physical)';
-      weaknesses.push({ name, multiplier: legendsArceus && multiplier === 4 ? 2.5 : multiplier });
+      const category = gen <= 3 ? (specialTypes.has(attack) ? 'special' : 'physical') : undefined;
+      weaknesses.push({ name: titleCase(attack), category, multiplier: legendsArceus && multiplier === 4 ? 2.5 : multiplier });
     }
   }
   weaknesses.sort((a, b) => b.multiplier - a.multiplier);

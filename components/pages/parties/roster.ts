@@ -514,49 +514,47 @@ battleSearch.evModifier = (mon) => {
 // Each confirmation consumes the opponent; recipients stay selected until close.
 let pendingBattle: { mon: DomainPokemon; uids: string[] } | null = null;
 
-const matchupPanel = document.getElementById('battle-matchup')!;
+const matchupPanel = document.getElementById('battle-matchup') as HTMLDetailsElement;
+const opponentTypes = document.getElementById('battle-matchup-types')!;
 
 function renderBattleMatchup(mon: DomainPokemon): void {
   const game = matchGameVersion(store.activeParty?.baseGame);
   const matchup = battleMatchup(mon, game?.gen ?? 9, game?.name === 'Legends Arceus');
   matchupPanel.hidden = !matchup;
+  opponentTypes.hidden = !matchup;
   if (!matchup) return;
-  function typeChip(label: string, multiplier?: number): HTMLElement {
-    const chip = document.createElement('span');
-    chip.className = 'matchup-chip';
-    chip.style.setProperty('--type-color', TYPE_COLORS[label.split(' ')[0].toLowerCase()]);
-    chip.textContent = titleCase(label.split(' ')[0]);
-    const category = label.split(' ')[1];
-    if (category) {
-      const detail = document.createElement('small');
-      detail.textContent = category.slice(1, -1);
-      chip.append(detail);
-    }
-    if (multiplier !== undefined) {
-      const value = document.createElement('b');
-      value.textContent = '×' + multiplier;
-      value.classList.toggle('high-multiplier', multiplier > 2);
-      chip.append(value);
-    }
-    return chip;
-  }
+  opponentTypes.textContent = matchup.types.map(titleCase).join(' / ');
   document.getElementById('battle-matchup-gen')!.textContent = game ? 'Gen ' + game.gen : 'Modern rules';
-  document.getElementById('battle-matchup-types')!.replaceChildren(...matchup.types.map(t => typeChip(t)));
-  document.getElementById('battle-weaknesses')!.replaceChildren(...(matchup.weaknesses.length
-    ? matchup.weaknesses.map(w => typeChip(w.name, w.multiplier)) : ['None']));
-  document.getElementById('battle-immunities')!.replaceChildren(...(matchup.immunities.length
-    ? matchup.immunities.map(t => typeChip(t)) : ['None']));
+  const groups = new Map<string, string[]>();
+  for (const { name, category, multiplier } of matchup.weaknesses) {
+    const label = '×' + multiplier + (category ? ' ' + category : '');
+    const names = groups.get(label) ?? [];
+    names.push(name);
+    groups.set(label, names);
+  }
+  const rows = Array.from(groups, ([label, names]) => {
+    const row = document.createElement('div');
+    const value = document.createElement('strong');
+    value.textContent = label;
+    row.append(value, ' · ' + names.join(', '));
+    return row;
+  });
+  document.getElementById('battle-weaknesses')!.replaceChildren(...(rows.length ? rows : ['None']));
+  document.getElementById('battle-immunities')!.textContent = matchup.immunities.join(', ') || 'None';
   document.getElementById('battle-attack-advice')!.textContent = matchup.advice;
 }
 
 function clearPendingBattle(): void {
   matchupPanel.hidden = true;
+  matchupPanel.open = false;
+  opponentTypes.hidden = true;
   ++battlePickToken;
   pendingBattle = null;
   battleLogBtn.disabled = true;
   battleLogBtn.textContent = 'Log defeat';
   battleComposer.dataset.state = 'empty';
   battleConfirmState.textContent = 'Not logged yet';
+  battleChooseBtn.setAttribute('aria-label', 'Choose defeated Pokémon');
   battleOpponentName.textContent = 'Choose opponent';
   battleOpponentHint.textContent = 'Search →';
   battleOpponentSprite.hidden = true;
@@ -612,6 +610,8 @@ partyLogBattleBtn.addEventListener('click', () => {
 });
 battleChooseBtn.addEventListener('click', () => {
   matchupPanel.hidden = true;
+  matchupPanel.open = false;
+  opponentTypes.hidden = true;
   ++battlePickToken;
   if (battleComposer.dataset.state === 'loading') clearPendingBattle();
   battleSearch.focus();
@@ -665,13 +665,14 @@ function stageKnownBattle(mon: DomainPokemon): void {
   renderBattleMatchup(mon);
   battleComposer.dataset.state = 'ready';
   battleOpponentName.textContent = titleCase(mon.name);
-  battleOpponentHint.textContent = 'Tap to change opponent';
+  battleChooseBtn.setAttribute('aria-label', 'Change opponent, ' + titleCase(mon.name) + (opponentTypes.hidden ? '' : ', ' + opponentTypes.textContent));
+  battleOpponentHint.textContent = 'Change opponent';
   battleOpponentSprite.hidden = false;
   document.getElementById('battle-opponent-placeholder')!.hidden = true;
   battleOpponentFallback.setVersionedSprite(versionedSpriteUrl(store.spriteBaseGame(), mon.id), mon.sprite || FALLBACK_SPRITE);
   battleConfirmState.textContent = 'Not logged yet';
   const summary = formatEvYield(mon.evYield);
-  battleResultSummary.textContent = `Ready to log vs ${titleCase(mon.name)} — Base yield: ${summary || 'No EV yield'}`;
+  battleResultSummary.textContent = `Base yield: ${summary || 'No EV yield'}`;
   battleResultSummary.classList.add('battle-result-summary--pending');
   battleResultSummary.hidden = false;
   battleLogBtn.disabled = uids.length === 0;
