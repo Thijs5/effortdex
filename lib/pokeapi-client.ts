@@ -56,7 +56,9 @@ const GENERATION_KEY_PREFIX = 'effortdex:generation:';
 // below. Listed here rather than in MemoCache because these are this
 // client's own vocabulary — MemoCache just stores whatever key it's
 // handed. Keep in sync with the get()/`key =` calls throughout.
+const NATIONAL_DEX_KEY_PREFIX = 'effortdex:national-dex:';
 const CACHE_KEY_PREFIXES = [
+  NATIONAL_DEX_KEY_PREFIX,
   SPECIES_LIST_KEY,
   MON_KEY_PREFIX,
   MON_KEY_PREFIX_V1,
@@ -226,6 +228,18 @@ export class PokeApiClient {
       if (!res.ok) throw new Error(`Unknown Pokémon: "${name}".`);
       const data = await res.json();
       return this._toDomainPokemon(data);
+    });
+  }
+
+  /** Alternate forms have a Pokémon ID outside the National Pokédex sequence. */
+  async nationalDexNumber(name: string, id: number): Promise<number> {
+    if (id < 10000) return id;
+    return this._cache.get(NATIONAL_DEX_KEY_PREFIX + name, async () => {
+      const response = await fetch('https://pokeapi.co/api/v2/pokemon/' + encodeURIComponent(name));
+      if (!response.ok) throw new Error('Could not load this form.');
+      const number = idFromUrl((await response.json()).species.url);
+      if (!number) throw new Error('Missing National Pokédex number.');
+      return number;
     });
   }
 

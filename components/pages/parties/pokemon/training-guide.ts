@@ -1,6 +1,10 @@
 import { categoryGuide, moveOptions, trainingPlan } from '../../../molecules/training-plan.ts';
 import { matchGameVersion } from '../../../../lib/game-versions.ts';
-import { store } from '../../../../lib/services.ts';
+import type { DomainPokemon } from '../../../../lib/pokeapi-client.ts';
+import { STATS } from '../../../../lib/constants.ts';
+import { titleCase } from '../../../../lib/utils.ts';
+import { gen1SpecialStat } from '../../../../lib/gen1-special-stats.ts';
+import { api, store } from '../../../../lib/services.ts';
 import { evTrainingLocations } from '../../../../lib/ev-training-locations.ts';
 import { BaseDialog } from '../../../atoms/base-dialog.ts';
 import '../../../molecules/ev-training-guide.ts';
@@ -12,6 +16,9 @@ import type { EvTrainingGuide } from '../../../molecules/ev-training-guide.ts';
 export class TrainingGuideDialog extends BaseDialog {
   _entry: RosterEntry | null = null;
   $guide: EvTrainingGuide;
+  private preview: DomainPokemon | null = null;
+  private request = 0;
+  private loading = false;
 
   constructor() {
     super('training-guide-dialog', 'training-guide-dialog-title');
@@ -33,6 +40,11 @@ export class TrainingGuideDialog extends BaseDialog {
       select { display:block; width:100%; min-height:44px; margin-block:4px;
         padding-inline:10px; background:var(--surface); color:var(--ink); border:1px solid var(--lcd-line);
         border-radius:var(--radius-sm); font:inherit; }
+      .dex-nav { display:flex; align-items:center; justify-content:space-between; gap:4px; }
+      .dex-nav button,.restore { min-height:44px; min-width:44px; color:var(--ink); background:var(--surface); border:1px solid var(--lcd-line); border-radius:var(--radius-sm); }
+      .dex-nav button:disabled { opacity:.45; }
+      .dex-name { text-align:center; }
+      .base-values { display:flex; flex-wrap:wrap; gap:4px 12px; }
       summary { cursor:pointer; padding-block:10px; font-weight:600; }
       .plan { font-size:var(--font-size-xs); }
       .training-guide-attribution { margin: var(--space-3) 0 0; font-size: var(--font-size-2xs); color: var(--ink-soft); }
@@ -41,12 +53,22 @@ export class TrainingGuideDialog extends BaseDialog {
 
     this.$title.textContent = 'Training guide';
     this.$body.innerHTML = `
-      <section class="plan"><h3>Suggested training</h3>
+      <section class="plan"><h3>Plan by National Pokédex number</h3>
+      <div class="dex-nav"><button type="button" class="prev" aria-label="Previous Pokédex number">←</button>
+      <strong class="dex-name" aria-live="polite"></strong>
+      <button type="button" class="next" aria-label="Next Pokédex number">→</button></div>
+      <p><strong>Base stats</strong></p><p class="base-values"></p>
+      <p class="projection" hidden></p>
+      <button type="button" class="restore" hidden></button>
+      <div class="dex-status" role="status"></div><h3>Suggested training</h3>
       <label>Training focus<select></select></label>
       <details><summary>Which moves are physical or special?</summary><div class="categories"></div></details>
       <div class="result" aria-live="polite"></div></section>
       <section class="spots"><h3>Where to train</h3><ev-training-guide></ev-training-guide>
       <p class="training-guide-attribution">Locations via Bulbapedia &amp; Marriland's EV training guides</p></section>`;
+    this.$body.querySelector('.prev')!.addEventListener('click', () => void this.browse(-1));
+    this.$body.querySelector('.next')!.addEventListener('click', () => void this.browse(1));
+    this.$body.querySelector('.restore')!.addEventListener('click', () => this.resetPreview());
     this.$guide = this.shadow.querySelector('ev-training-guide')!;
     this.$body.querySelector('select')!.addEventListener('change', () => this.renderPlan());
     // Already knows the opponent's name — no need to open a search at
@@ -63,18 +85,20 @@ export class TrainingGuideDialog extends BaseDialog {
     const select = this.$body.querySelector('select')!;
     const gen = matchGameVersion(store.activeParty?.baseGame)?.gen ?? 0;
     if (e?.uid !== this._entry?.uid || e?.speciesId !== this._entry?.speciesId || select.dataset.gen !== String(gen)) {
+      this.preview = null;
+      this.request++;
+      this.loading = false;
+      this.$body.querySelector('.dex-status')!.textContent = '';
       select.dataset.gen = String(gen);
       this.$body.querySelector('.categories')!.innerHTML = categoryGuide(gen);
       const moves = document.createElement('optgroup');
       moves.label = gen === 3 ? 'Main damaging move’s type' : 'Main damaging move’s category';
       moves.append(...moveOptions(gen).map(v => new Option(v, v)));
       select.replaceChildren(new Option('Suggest from base stats', ''), moves);
-      if (e?.speciesId !== 292) {
-        const roles = document.createElement('optgroup');
-        roles.label = 'Defensive role';
-        roles.append(new Option('Physical wall'), new Option('Special wall'));
-        select.append(roles);
-      }
+      const roles = document.createElement('optgroup');
+      roles.label = 'Defensive role';
+      roles.append(new Option('Physical wall'), new Option('Special wall'));
+      select.append(roles);
     }
     this._entry = e;
     if (!e) return;
@@ -82,19 +106,88 @@ export class TrainingGuideDialog extends BaseDialog {
     // rule — no override, so read straight off the party's own baseGame
     // rather than through an effective-aids-style helper.
     this.$body.querySelector('label')!.hidden = store.usesStatExpSystem();
-    this.$body.querySelector<HTMLElement>('.spots')!.hidden = !this.locations() || store.usesStatExpSystem();
     this.renderPlan();
     this.$guide.spriteGame = store.spriteBaseGame();
     this.$guide.locations = this.locations();
   }
+  private resetPreview(): void {
+    this.request++;
+    this.loading = false;
+    this.preview = null;
+    this.$body.querySelector('.dex-status')!.textContent = '';
+    this.renderPlan();
+  }
+
+  _onClose(): void {
+    this.resetPreview();
+  }
+
+  private get dexLimit(): number {
+    const party = store.activeParty;
+    const gen = party?.overrides?.availableGeneration ?? matchGameVersion(party?.baseGame)?.gen;
+    return [0, 151, 251, 386, 493, 649, 721, 809, 905, 1025][gen ?? 9] ?? 1025;
+  }
+
+  private async browse(direction: number): Promise<void> {
+    const entry = this._entry;
+    if (!entry || this.loading) return;
+    const token = ++this.request;
+    const status = this.$body.querySelector('.dex-status')!;
+    this.loading = true;
+    status.textContent = 'Loading species…';
+    this.renderPlan();
+    try {
+      const start = this.preview?.id ?? await api.nationalDexNumber(entry.speciesName, entry.speciesId);
+      const next = start + direction;
+      if (next < 1 || next > this.dexLimit) throw new Error();
+      const mon = await api.getPokemon(String(next));
+      if (token !== this.request) return;
+      this.preview = mon.id === entry.speciesId ? null : mon;
+      status.textContent = '';
+    } catch {
+      if (token === this.request) status.textContent = 'Could not load that Pokédex entry. Try again.';
+    } finally {
+      if (token === this.request) {
+        this.loading = false;
+        this.renderPlan();
+      }
+    }
+  }
+
   private renderPlan(): void {
-    if (!this._entry) return;
+    const entry = this._entry;
+    if (!entry) return;
+    const mon = this.preview;
+    const id = mon?.id ?? entry.speciesId;
+    const name = titleCase(mon?.name ?? entry.speciesName);
+    const base = mon?.baseStats ?? entry.baseStats;
+    const merged = store.specialStatMerged();
+    this.$body.querySelector('.dex-name')!.textContent = (id < 10000 ? '#' + id + ' ' : '') + name;
+    this.$body.querySelector('.base-values')!.replaceChildren(...STATS.filter(s => !merged || s.key !== 'spd').map(({ key, label }) => {
+      const stat = document.createElement('span');
+      const special = merged && key === 'spa';
+      stat.textContent = (special ? 'SPC' : label) + ' ' + (base ? special ? gen1SpecialStat(id, base.spa, base.spd) : base[key] : '—');
+      return stat;
+    }));
+    this.$body.querySelector<HTMLButtonElement>('.prev')!.disabled = this.loading || id === 1;
+    this.$body.querySelector<HTMLButtonElement>('.next')!.disabled = this.loading || (id < 10000 && id >= this.dexLimit);
+    const projection = this.$body.querySelector<HTMLElement>('.projection')!;
+    projection.hidden = !mon || store.usesStatExpSystem();
+    projection.textContent = 'Preview uses ' + titleCase(entry.speciesName) + '’s current EVs.';
+    const restore = this.$body.querySelector<HTMLButtonElement>('.restore')!;
+    restore.hidden = !mon;
+    restore.textContent = 'Back to ' + titleCase(entry.speciesName);
+    this.$body.querySelector<HTMLElement>('.spots')!.hidden = !!mon || !this.locations() || store.usesStatExpSystem();
+    const select = this.$body.querySelector('select')!;
+    const roles = select.querySelector<HTMLOptGroupElement>('optgroup[label="Defensive role"]');
+    if (roles) roles.disabled = id === 292;
+    if (id === 292 && select.value.endsWith(' wall')) select.value = '';
     const result = this.$body.querySelector('.result')!;
     if (store.usesStatExpSystem()) {
       result.textContent = 'Battle to build Stat Experience across all stats. Each stat can reach its maximum independently, so you can train them all.';
       return;
     }
-    result.innerHTML = trainingPlan(this._entry, this.$body.querySelector('select')!.value);
+    result.innerHTML = trainingPlan({ ...entry, speciesId: id, baseStats: base }, select.value);
   }
 
   get entry(): RosterEntry | null {

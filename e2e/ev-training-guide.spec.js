@@ -36,6 +36,27 @@ test.describe('EV-training location guide', () => {
     await expect(hpRow).toContainText('+1 HP');
   });
 
+  test('previewing the next National Dex number uses its base stats and leaves the roster alone', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Planning', baseGame: 'FireRed' });
+    await addPokemon(page, 'Bulbasaur');
+    const card = await openDetail(page, 'Bulbasaur');
+    const dialog = await openTrainingGuide(card);
+    await expect(dialog.getByRole('button', { name: 'Previous Pokédex number' })).toBeDisabled();
+    await dialog.getByRole('button', { name: 'Next Pokédex number' }).click();
+    await expect(dialog.locator('.dex-name')).toHaveText('#2 Ivysaur');
+    await expect(dialog.locator('.base-values')).toContainText('HP 60');
+    await dialog.getByRole('button', { name: 'Next Pokédex number' }).click();
+    await expect(dialog.locator('.dex-status')).toContainText('Try again');
+    await dialog.getByRole('button', { name: 'Back to Bulbasaur' }).click();
+    await expect(dialog.locator('.base-values')).toContainText('HP 45');
+    await dialog.getByRole('button', { name: 'Next Pokédex number' }).click();
+    await expect(dialog.locator('.dex-name')).toHaveText('#2 Ivysaur');
+    await dialog.locator('.training-guide-dialog-close').click();
+    await openTrainingGuide(card);
+    await expect(dialog.locator('.dex-name')).toHaveText('#1 Bulbasaur');
+  });
+
   test('tapping a recommended Pokémon logs a battle against it', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });

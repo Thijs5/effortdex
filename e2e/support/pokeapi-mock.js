@@ -204,7 +204,7 @@ export async function mockPokeApi(page) {
 
   await page.route('**/pokeapi.co/api/v2/pokemon/*', (route) => {
     const slug = decodeURIComponent(route.request().url().split('/').filter(Boolean).pop() ?? '');
-    const species = SPECIES.find((s) => s.name === slug.toLowerCase());
+    const species = SPECIES.find((s) => s.name === slug.toLowerCase() || String(s.id) === slug);
     if (!species) return route.fulfill({ status: 404, body: 'not mocked' });
     route.fulfill({ contentType: 'application/json', body: JSON.stringify(pokemonPayload(species)) });
   });
