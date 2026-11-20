@@ -1354,6 +1354,12 @@ html:not([data-modal-open], :has(dialog[open])):has(#import-view:not([hidden])) 
   color: var(--ink-soft);
   opacity: 0.75;
 }
+.nature-recommendations {
+  margin: var(--space-2) 0 var(--space-3);
+  font-size: var(--font-size-2xs);
+  color: var(--ink-soft);
+  line-height: 1.5;
+}
 textarea.ds-field { resize: vertical; }
 
 /* Summary chevron/typography comes from the shared .ds-disclosure. */

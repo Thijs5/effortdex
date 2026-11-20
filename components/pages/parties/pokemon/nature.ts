@@ -1,6 +1,8 @@
 import { NATURES } from '../../../../lib/constants.ts';
 import { natureEffectHint, natureOptionsHtml } from '../../../../lib/utils.ts';
 import { store } from '../../../../lib/services.ts';
+import { matchGameVersion } from '../../../../lib/game-versions.ts';
+import { updateNatureRecommendations } from '../../../../lib/nature-recommendations.ts';
 import { BaseDialog } from '../../../atoms/base-dialog.ts';
 import type { RosterEntry } from '../../../../lib/store.ts';
 
@@ -27,6 +29,7 @@ export class NatureDialog extends BaseDialog {
   $field: HTMLElement;
   $select: HTMLSelectElement;
   $hint: HTMLElement;
+  $recommendations: HTMLElement;
   $saveBtn: HTMLButtonElement | null;
 
   constructor() {
@@ -50,6 +53,10 @@ export class NatureDialog extends BaseDialog {
         font-size: var(--font-size-2xs); color: var(--ink-soft); text-align: right;
       }
       .nature-hint:empty { display: none; }
+      .nature-recommendations {
+        margin: var(--space-3) 0 0; font-size: var(--font-size-2xs);
+        color: var(--ink-soft); line-height: 1.5;
+      }
       .help-btn {
         display: inline-flex; align-items: center; justify-content: center;
         width: 44px; height: 44px; border-radius: 50%; border: 1px solid var(--lcd-line);
@@ -71,9 +78,10 @@ export class NatureDialog extends BaseDialog {
       <button type="button" class="help-btn" aria-expanded="false" aria-label="What is EV training?" title="EVs (Effort Values) are hidden bonus stat points earned mainly from battling — up to 252 per stat, 510 total. Nature is fixed when a Pokémon is caught or hatched: it boosts one stat by 10% and lowers another. Nature doesn't change EVs, but training the stat your nature already boosts gets the most out of your points.">?</button>`;
     this.$body.innerHTML = `
       <label class="field-inline nature-field" hidden>Nature
-        <select class="nature-select ds-field" aria-label="Nature"></select>
+        <select class="nature-select ds-field" aria-label="Nature" aria-describedby="nature-recommendations"></select>
       </label>
       <p class="nature-hint" aria-live="polite"></p>
+      <p id="nature-recommendations" class="nature-recommendations" aria-live="polite" hidden></p>
     `;
     this.$footer.innerHTML = `<button type="button" class="ds-btn ds-btn--primary nature-dialog-save-btn">Save</button>`;
     this.$footer.hidden = false;
@@ -81,6 +89,7 @@ export class NatureDialog extends BaseDialog {
     this.$field = this.shadow.querySelector<HTMLElement>('.nature-field')!;
     this.$select = this.shadow.querySelector<HTMLSelectElement>('.nature-select')!;
     this.$hint = this.shadow.querySelector<HTMLElement>('.nature-hint')!;
+    this.$recommendations = this.shadow.querySelector<HTMLElement>('.nature-recommendations')!;
     this.$saveBtn = this.shadow.querySelector<HTMLButtonElement>('.nature-dialog-save-btn');
     this.$select.innerHTML = natureOptionsHtml();
 
@@ -136,6 +145,8 @@ export class NatureDialog extends BaseDialog {
     const e = this._entry as RosterEntry;
     this.$select.value = e.nature || '';
     this._renderHint();
+    void updateNatureRecommendations(this.$select, this.$recommendations,
+      store.natureAvailable() ? e.speciesName : null, matchGameVersion(store.activeParty?.baseGame)?.gen ?? 9);
     super.open();
   }
 

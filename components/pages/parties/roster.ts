@@ -18,6 +18,7 @@ import {
 } from '../../../lib/constants.ts';
 import { titleCase, totalEvs, natureOptionsHtml, escapeHtml, sortedNatures, natureLabel, formatEvYield } from '../../../lib/utils.ts';
 import { POKERUS_ICON_SVG } from '../../../lib/icons.ts';
+import { updateNatureRecommendations } from '../../../lib/nature-recommendations.ts';
 import { battleMatchup } from '../../../lib/battle-matchup.ts';
 import { matchGameVersion } from '../../../lib/game-versions.ts';
 import { api, store } from '../../../lib/services.ts';
@@ -129,6 +130,7 @@ const addDialogStatus = document.getElementById('add-pokemon-dialog-status')!;
 const addDialogLevel = document.getElementById('add-pokemon-dialog-level') as import('../../atoms/level-input.ts').LevelInput;
 const addDialogNatureField = document.getElementById('add-pokemon-dialog-nature-field')!;
 const addDialogNature = document.getElementById('add-pokemon-dialog-nature') as HTMLSelectElement;
+const addNatureRecommendations = document.getElementById('add-pokemon-nature-recommendations')!;
 const addDialogStatsGrid = document.getElementById(
   'add-pokemon-dialog-stats-grid'
 ) as import('../../organisms/stat-reading-grid.ts').StatReadingGrid;
@@ -196,6 +198,8 @@ async function openAddPokemonDialog(name: string): Promise<void> {
   addDialogLevel.value = DEFAULT_LEVEL;
   addDialogNature.value = '';
   addDialogNatureField.hidden = !store.natureAvailable();
+  void updateNatureRecommendations(addDialogNature, addNatureRecommendations,
+    store.natureAvailable() ? name : null, matchGameVersion(store.activeParty?.baseGame)?.gen ?? 9);
   addDialogStatsGrid.reset();
   addDialogSubmitBtn.disabled = true;
   addDialog.showModal();
@@ -615,7 +619,7 @@ partyLogBattleBtn.addEventListener('click', () => {
 battleChooseBtn.addEventListener('click', () => {
   ++battlePickToken;
   if (battleComposer.dataset.state === 'loading') clearPendingBattle();
-  battleSearch.focus();
+  battleSearch.showChoices();
 });
 window.addEventListener('hashchange', () => {
   if (!battleSearch.hidden) battleSearch.shadowRoot?.querySelector<HTMLButtonElement>('.sheet-close')?.click();

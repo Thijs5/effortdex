@@ -20,18 +20,19 @@ export class StatReadingGrid extends BaseElement {
     .row { min-height: 53px; display: grid; grid-template-columns: minmax(80px, 1fr) minmax(0, 190px); gap: var(--space-2) var(--space-3); align-items: center; padding-block: var(--space-1); border-bottom: 1px solid var(--line); }
     :host(:not([prior-readings])) .row:last-child { border-bottom: 0; }
     .columns { display: none; }
-    .has-increases .columns, .has-increases .row { grid-template-columns: minmax(64px, .9fr) minmax(44px, 1fr) 140px; column-gap: var(--space-2); }
+    .has-increases .columns, .has-increases .row { grid-template-columns: minmax(0, .9fr) minmax(0, 1fr) minmax(calc(90px + 4 * var(--space-1) + 4ch), 1.6fr); column-gap: var(--space-2); }
     .has-increases .columns { display: grid; padding-bottom: var(--space-2); font-size: var(--font-size-xs); color: var(--ink-soft); }
     .has-increases .columns span:last-child { text-align: center; }
     .reading-cell { min-width: 0; }
     .reading-text { height: 44px; display: flex; flex-direction: column; justify-content: center; font-variant-numeric: tabular-nums; }
     .reading-current { font-size: var(--font-size-input); line-height: 22px; }
     .reading-origin { font-size: var(--font-size-xs); line-height: 18px; color: var(--ink-soft); }
-    .stat-label { font-size: var(--font-size-sm); font-weight: 600; }
+    .stat-label { font-size: var(--font-size-sm); font-weight: 600; overflow-wrap: anywhere; }
     .previous { display: block; margin-top: 2px; color: var(--ink-soft); font-size: var(--font-size-xs); font-weight: 400; }
     .controls { display: flex; align-items: center; gap: var(--space-1); min-width: 0; }
-    .value, .delta { min-width: 0; width: 100%; min-height: 44px; text-align: center; font-variant-numeric: tabular-nums; padding: var(--space-2); }
-    .delta { min-width: 44px; }
+    /* Outrank the shared .ds-field padding: step buttons leave a narrow
+       input, which needs its content width for the full numeric value. */
+    input.value, input.delta { min-width: 0; width: 100%; min-height: 44px; text-align: center; font-variant-numeric: tabular-nums; padding: var(--space-2) var(--space-1); }
     .row[data-changed=true] .value, .row[data-changed=true] .delta { border-color: var(--teal); }
     .step { flex: 0 0 44px; min-height: 44px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink-soft); font: inherit; cursor: pointer; touch-action: manipulation; }
     .row[data-changed=true] .reading-current { color: var(--teal); }

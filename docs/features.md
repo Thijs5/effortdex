@@ -42,7 +42,10 @@ From a party's roster page, a `<pokemon-search>` autocomplete (backed by
 `PokeApiClient.getAllSpecies()`, fuzzy-matched client-side) opens an
 add-Pokémon `<dialog>`: sprite preview, a level field, and — only on a
 Gen III+ party — a nature picker, since natures didn't exist before
-Generation III. A collapsed **"Its stats"** disclosure holds an optional
+Generation III. The nature dropdown stars picks from Smogon's published
+sets for the species and party's generation, with a note that the best
+choice depends on moves and role. Missing or unavailable recommendations
+never block adding a Pokémon. A collapsed **"Its stats"** disclosure holds an optional
 `<stat-reading-grid>` (the same six-stat component the Level popup uses,
 Special merged on a Gen I party): any value read off the in-game summary
 screen is logged as a stat reading at the add level via
@@ -168,7 +171,8 @@ written to the store until Save is pressed, so closing a dialog any other
 way (✕, Escape, backdrop click) discards the pending edit.
 
 - **Nature dialog** — pick/change nature; previews the resulting stat
-  hints (↑/↓ on the affected stats) before Save.
+  hints (↑/↓ on the affected stats) before Save, with the same starred
+  Smogon nature recommendations as the add dialog.
 - **Items dialog** — the training-aids hub: the current training item
   (Macho Brace or a Power item, whichever the party's generation
   supports), Exp. Share, Pokérus, and three feed grids — **Vitamins**,

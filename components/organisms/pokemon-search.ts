@@ -158,6 +158,9 @@ export class PokemonSearch extends BaseElement {
         .wrap.sheet:not(.reviewing) .recent-grid:not([hidden]) {
           display: grid;
           grid-template-columns: repeat(auto-fill, minmax(min(100%, 9rem), 1fr));
+          /* Keep cards tall enough for names and asynchronously loaded
+             EV yields; overflow belongs to the scrolling list. */
+          grid-auto-rows: max-content;
           align-content: start;
           gap: var(--space-2);
           padding: var(--space-2) var(--space-3);
@@ -779,6 +782,12 @@ export class PokemonSearch extends BaseElement {
   // sheet on mobile with recents already showing) without the user
   // needing an extra tap on the input itself.
   focus(): void {
+    if (this.hasAttribute('review-flow')) this.showChoices();
+    this.$input.focus();
+  }
+
+  /** Open the opponent picker without summoning the software keyboard. */
+  showChoices(): void {
     if (this.hasAttribute('review-flow')) {
       this.$wrap.classList.remove('reviewing');
       this.$wrap.classList.add('choosing');
@@ -786,7 +795,11 @@ export class PokemonSearch extends BaseElement {
       this.$sheetTitle.textContent = this.getAttribute('sheet-title') || 'Choose opponent';
       this.$wrap.setAttribute('aria-label', this.$sheetTitle.textContent);
     }
-    this.$input.focus();
+    this._ensureSpecies();
+    if (!this._sheetOpen) this._openSheet();
+    if (!this.$input.value.trim()) this._showRecentOrHide();
+    this.$sheetTitle.setAttribute('tabindex', '-1');
+    this.$sheetTitle.focus({ preventScroll: true });
   }
 
   /** Keyboard-free review view for a caller with an explicit confirm action. */

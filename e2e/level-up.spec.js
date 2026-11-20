@@ -23,6 +23,40 @@ test.describe('Level popup', () => {
     await mockPokeApi(page);
   });
 
+  test('stat inputs fit multi-digit values on narrow screens with enlarged text', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Readable stat increases', baseGame: 'Emerald' });
+    await addPokemon(page, 'Bulbasaur', { level: 10, stats: { ATK: 45 } });
+    const dialog = await openLevelUpDialog(await openDetail(page, 'Bulbasaur'));
+    const grid = dialog.locator('stat-reading-grid');
+    for (const fontSize of [16, 22]) {
+      await page.evaluate(size => { document.documentElement.style.fontSize = `${size}px`; }, fontSize);
+      for (const width of [320, 390]) {
+        await page.setViewportSize({ width, height: 844 });
+        const increase = grid.getByLabel(/ATK adjustment/);
+        await increase.fill('12');
+        /** @param {import('@playwright/test').Locator} input */
+        const assertFits = async (input) => {
+          await expect.poll(() => input.evaluate(el => {
+            const style = getComputedStyle(el);
+            const canvas = document.createElement('canvas');
+            const context = canvas.getContext('2d');
+            if (!context) return false;
+            context.font = style.font;
+            return context.measureText((/** @type {HTMLInputElement} */ (el)).value).width <= el.clientWidth - parseFloat(style.paddingLeft) - parseFloat(style.paddingRight);
+          })).toBe(true);
+        };
+        await assertFits(increase);
+        await grid.getByRole('button', { name: 'Current stats', exact: true }).click();
+        const total = grid.getByLabel('ATK reading');
+        await total.fill('123');
+        await assertFits(total);
+        await grid.getByRole('button', { name: 'Increases (+)', exact: true }).click();
+        await expect.poll(() => grid.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+      }
+    }
+  });
+
   test('opens prefilled to the next level, with stats already visible', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
