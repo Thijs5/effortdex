@@ -196,6 +196,9 @@ function chainNode(species) {
  * @param {import('@playwright/test').Page} page
  */
 export async function mockPokeApi(page) {
+  await page.route('**/pokeapi.co/api/v2/move/*', route => route.fulfill({ json: {
+    type: { name: 'grass' }, damage_class: { name: 'physical' }, past_values: [],
+  } }));
   await page.route('**/pokeapi.co/api/v2/pokemon?**', (route) =>
     route.fulfill({
       contentType: 'application/json',

@@ -7,7 +7,7 @@ import { defensiveMatchups, speciesTypes, strongAgainst } from '../../../../lib/
 import { versionedSpriteUrl, modernSpriteUrl } from '../../../../lib/pokeapi-client.ts';
 import { wireSpriteFallback } from '../../../../lib/sprite-fallback.ts';
 import { STATS, TYPE_COLORS, typeLabel, FALLBACK_SPRITE } from '../../../../lib/constants.ts';
-import { titleCase } from '../../../../lib/utils.ts';
+import { titleCase, emptyEvs } from '../../../../lib/utils.ts';
 import { speciesBaseStats } from '../../../../lib/species-base-stats.ts';
 import { typeBasedMoveCategory, usesTypeBasedMoveCategories } from '../../../../lib/move-category.ts';
 import { api, store } from '../../../../lib/services.ts';
@@ -19,9 +19,11 @@ import type { RosterEntry } from '../../../../lib/store.ts';
 import type { GameTrainingSpots } from '../../../../lib/ev-training-locations.ts';
 import type { EvTrainingGuide } from '../../../molecules/ev-training-guide.ts';
 
+type TrainingSubject = Pick<RosterEntry, 'speciesName' | 'speciesId' | 'sprite' | 'baseStats' | 'evs' | 'level'> & { uid?: string };
+
 /** Roster-specific training targets and the active game's curated battle locations. */
 export class TrainingGuideDialog extends BaseDialog {
-  _entry: RosterEntry | null = null;
+  _entry: TrainingSubject | null = null;
   $guide: EvTrainingGuide;
   private preview: DomainPokemon | null = null;
   private request = 0;
@@ -50,7 +52,7 @@ export class TrainingGuideDialog extends BaseDialog {
       .plan { display:grid; gap:var(--space-4); font-size:var(--font-size-xs); line-height:1.5; }
       .plan > *, .training, .reference { min-width:0; }
       .section-title { margin:0 0 var(--space-3); font-size:var(--font-size-2xs); font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-soft); }
-      .training,.reference-panel { padding:var(--space-4); border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--surface); }
+      .reference-panel + .reference-panel { padding-top:var(--space-4); border-top:1px solid var(--line); }
       .reference { display:grid; gap:var(--space-4); }
       .training label { display:grid; gap:var(--space-2); color:var(--ink-soft); }
       .training select { min-width:0; }
@@ -108,6 +110,12 @@ export class TrainingGuideDialog extends BaseDialog {
       .learnset ul { list-style:none; padding:0; margin:0; }
       .learnset li { display:grid; grid-template-columns:4.5em minmax(0,1fr); padding:var(--space-2); gap:var(--space-2); border-top:1px solid var(--lcd-line); }
       .learnset li span:first-child { font-variant-numeric:tabular-nums; color:var(--ink-soft); }
+      .move-label { display:inline-flex; align-items:center; flex-wrap:wrap; gap:var(--space-2); min-width:0; }
+      .move-name { overflow-wrap:anywhere; color:var(--ink); }
+      .move-type { color:var(--ink-soft); font-size:var(--font-size-2xs); }
+      .category-legend { grid-column:1/-1; display:flex; flex-wrap:wrap; gap:var(--space-3); margin:0; font-size:var(--font-size-2xs); color:var(--ink-soft); }
+      .category-legend > span { display:inline-flex; align-items:center; gap:var(--space-2); }
+      .category-legend img { width:32px; height:14px; image-rendering:pixelated; }
       .projection,.dex-status { margin:0; color:var(--ink-soft); }
       .dex-status:empty { display:none; }
       .spots { margin-top:var(--space-5); padding-top:var(--space-4); border-top:1px solid var(--line); }
@@ -122,6 +130,7 @@ export class TrainingGuideDialog extends BaseDialog {
       <div class="type-list" aria-label="Pokémon types"></div></div></div>
       <div class="dex-nav" role="group" aria-label="National Pokédex"><button type="button" class="prev" aria-label="Previous Pokédex number">←</button>
       <button type="button" class="next" aria-label="Next Pokédex number">→</button></div></div>
+      <p class="category-legend" hidden><span><img src="icons/move-physical.png" alt="">Physical · Attack</span><span><img src="icons/move-special.png" alt="">Special · Sp. Atk</span></p>
       <p class="projection" hidden></p>
       <button type="button" class="restore" hidden></button>
       <div class="dex-status" role="status"></div><section class="training"><h3 class="section-title">Suggested training</h3>
@@ -130,8 +139,7 @@ export class TrainingGuideDialog extends BaseDialog {
       <div class="result" aria-live="polite"></div></section>
       <div class="reference"><section class="reference-panel matchups">
       <div class="matchup-heading"><h3 class="section-title">Type matchups</h3><small class="matchup-rules"></small></div>
-      <h4 class="matchup-subtitle">Weaknesses</h4><ul class="damage-list weaknesses" aria-label="Incoming damage from weaknesses"></ul>
-      <details class="resistances ds-disclosure"><summary>Resistances and immunities</summary><ul class="damage-list reduced" aria-label="Reduced incoming damage"></ul></details></section>
+      <ul class="damage-list" aria-label="Incoming damage by attack type"></ul></section>
       <section class="reference-panel"><h3 class="section-title">Base stats</h3><div class="base-values"></div></section>
       <section class="reference-panel battle-facts"><h3 class="section-title">Battle and training</h3>
       <p class="stab"></p><details class="ds-disclosure"><summary>Type coverage for same-type attacks</summary><div class="coverage"></div></details><p class="yield"></p><p class="evolution"></p>
@@ -148,6 +156,10 @@ export class TrainingGuideDialog extends BaseDialog {
     this.$body.querySelector('.restore')!.addEventListener('click', () => this.resetPreview());
     this.$guide = this.shadow.querySelector('ev-training-guide')!;
     this.$body.querySelector('select')!.addEventListener('change', () => this.renderPlan());
+    this.$body.querySelector('.learnset')!.addEventListener('toggle', event => {
+      const list = event.currentTarget as HTMLDetailsElement;
+      if (list.open) this.loadMoveTypes(list);
+    });
     // Already knows the opponent's name — no need to open a search at
     // all. Closes first so it's not left sitting open behind whatever
     // status line the battle log shows. Not re-dispatched: <ev-training-
@@ -155,10 +167,13 @@ export class TrainingGuideDialog extends BaseDialog {
     // true }`, so it reaches pokemon-detail.js's listener on this
     // element by bubbling straight through on its own — re-dispatching
     // it here would fire that listener a second time.
-    this.$guide.addEventListener('spot-pick', () => this.close());
+    this.$guide.addEventListener('spot-pick', event => {
+      if (!this._entry?.uid) event.stopPropagation();
+      else this.close();
+    });
   }
 
-  set entry(e: RosterEntry | null) {
+  set entry(e: TrainingSubject | null) {
     const select = this.$body.querySelector('select')!;
     const gen = matchGameVersion(store.activeParty?.baseGame)?.gen ?? 0;
     if (e?.uid !== this._entry?.uid || e?.speciesId !== this._entry?.speciesId || select.dataset.gen !== String(gen)) {
@@ -184,7 +199,14 @@ export class TrainingGuideDialog extends BaseDialog {
     // rather than through an effective-aids-style helper.
     this.renderPlan();
     this.$guide.spriteGame = store.spriteBaseGame();
+    this.$guide.readOnly = !e.uid;
     this.$guide.locations = this.locations();
+  }
+
+  /** A species-only plan is view data; it never creates a roster entry. */
+  set species(mon: DomainPokemon) {
+    this.entry = { speciesName: mon.name, speciesId: mon.id, sprite: mon.sprite,
+      baseStats: mon.baseStats, evs: emptyEvs(), level: 1 };
   }
   private resetPreview(): void {
     this.request++;
@@ -256,17 +278,20 @@ export class TrainingGuideDialog extends BaseDialog {
       if (token !== this.referenceRequest) return;
       const upcoming = rows.filter(move => move.level > level);
       const first = upcoming[0];
-      nextMove.textContent = first
-        ? 'Next at Lv. ' + first.level + ' · ' + upcoming.filter(m => m.level === first.level).map(m => titleCase(m.name)).join(', ')
-        : rows.length ? 'No further level-up moves after Lv. ' + level + '.' : 'No level-up moves listed for this game.';
+      if (first) {
+        nextMove.replaceChildren(`Next at Lv. ${first.level} · `);
+        for (const [index, move] of upcoming.filter(m => m.level === first.level).entries()) {
+          if (index) nextMove.append(', ');
+          nextMove.append(this.moveLabel(move.name));
+        }
+        this.loadMoveTypes(nextMove);
+      } else nextMove.textContent = rows.length ? 'No further level-up moves after Lv. ' + level + '.' : 'No level-up moves listed for this game.';
       list.hidden = !rows.length;
       list.querySelector('ul')!.replaceChildren(...rows.map(move => {
         const item = document.createElement('li');
         const atLevel = document.createElement('span');
         atLevel.textContent = 'Lv. ' + move.level;
-        const name = document.createElement('span');
-        name.textContent = titleCase(move.name);
-        item.append(atLevel, name);
+        item.append(atLevel, this.moveLabel(move.name));
         return item;
       }));
     }).catch(() => { if (token === this.referenceRequest) nextMove.textContent = 'Level-up moves unavailable.'; });
@@ -280,6 +305,41 @@ export class TrainingGuideDialog extends BaseDialog {
     }).catch(() => { if (token === this.referenceRequest) evolution.textContent = 'Evolution data unavailable.'; });
   }
 
+  private moveLabel(name: string): HTMLElement {
+    const label = document.createElement('span');
+    label.className = 'move-label';
+    const text = document.createElement('span');
+    text.className = 'move-name';
+    text.textContent = titleCase(name);
+    const type = document.createElement('span');
+    type.className = 'move-type';
+    type.dataset.move = name;
+    label.append(text, ' ', type);
+    return label;
+  }
+
+  private loadMoveTypes(container: Element): void {
+    const token = this.referenceRequest;
+    const game = store.activeParty?.baseGame ?? '';
+    const group = learnsetGroup(game);
+    const gen = matchGameVersion(game)?.gen ?? 0;
+    if (!group) return;
+    for (const slot of container.querySelectorAll<HTMLElement>('.move-type[data-move]:not([data-loading])')) {
+      slot.dataset.loading = 'true';
+      void api.getMoveDetails(slot.dataset.move!, group).then(move => {
+        if (token !== this.referenceRequest || !slot.isConnected) return;
+        const label = createTypeLabel(move.type, undefined, gen);
+        const category = move.category === 'status' ? 'status' : typeBasedMoveCategory(move.type, gen) ?? move.category;
+        label.setAttribute('category', category);
+        slot.replaceChildren(label);
+      }).catch(() => {
+        if (token !== this.referenceRequest || !slot.isConnected) return;
+        slot.textContent = 'Type unavailable';
+        delete slot.dataset.loading;
+      });
+    }
+  }
+
   private renderPlan(): void {
     const entry = this._entry;
     if (!entry) return;
@@ -288,6 +348,7 @@ export class TrainingGuideDialog extends BaseDialog {
     const name = titleCase(mon?.name ?? entry.speciesName);
     const baseGame = matchGameVersion(store.activeParty?.baseGame);
     const gen = baseGame?.gen ?? 0;
+    this.$body.querySelector<HTMLElement>('.category-legend')!.hidden = !usesTypeBasedMoveCategories(gen);
     const profile = mon ?? api.peekCached(entry.speciesName);
     const modernBase = profile?.baseStats ?? entry.baseStats;
     const base = modernBase ? speciesBaseStats(id, modernBase, gen) : null;
@@ -320,10 +381,10 @@ export class TrainingGuideDialog extends BaseDialog {
       const targets = strongAgainst(type, typeGen);
       const heading = document.createElement('span');
       heading.className = 'coverage-label';
-      heading.append(createTypeLabel(type), ' attacks are strong against');
+      heading.append(createTypeLabel(type, undefined, gen), ' attacks are strong against');
       const labels = document.createElement('div');
       labels.className = 'matchup-types';
-      labels.append(...(targets.length ? targets.map(target => createTypeLabel(target)) : ['No single-type targets']));
+      labels.append(...(targets.length ? targets.map(target => createTypeLabel(target, undefined, gen)) : ['No single-type targets']));
       line.append(heading, labels);
       return line;
     }));
@@ -335,14 +396,10 @@ export class TrainingGuideDialog extends BaseDialog {
       : 'Base EV yield when defeated · ' + (yieldText || 'Unavailable');
     this.loadReference(mon?.name ?? entry.speciesName, entry.level, store.activeParty?.baseGame ?? '');
     this.$body.querySelector<HTMLElement>('.species-card')!.style.setProperty('--species-color', TYPE_COLORS[types[0]] ?? 'var(--lcd-line)');
-    this.$body.querySelector('.type-list')!.replaceChildren(...types.map(type => createTypeLabel(type)));
-    const matchups = defensiveMatchups(types, typeGen, effortLevels);
-    const weak = matchups.filter(m => m.factor > 1);
-    const reduced = matchups.filter(m => m.factor < 1);
+    this.$body.querySelector('.type-list')!.replaceChildren(...types.map(type => createTypeLabel(type, undefined, gen)));
+    const matchups = defensiveMatchups(types, typeGen, effortLevels, true);
     this.$body.querySelector('.matchup-rules')!.textContent = effortLevels ? 'Legends Arceus' : gen ? `Gen ${gen}` : 'Modern rules';
-    this.renderDamageList('.weaknesses', weak, types.length ? 'None' : 'Type data unavailable');
-    this.$body.querySelector<HTMLElement>('.resistances')!.hidden = !reduced.length;
-    this.renderDamageList('.reduced', reduced);
+    this.renderDamageList('.damage-list', matchups, 'Type data unavailable');
     this.$body.querySelector('.base-values')!.replaceChildren(...STATS.filter(s => gen !== 1 || s.key !== 'spd').map(({ key, label }) => {
       const stat = document.createElement('span');
       stat.className = 'base-stat-row';
@@ -354,12 +411,12 @@ export class TrainingGuideDialog extends BaseDialog {
     this.$body.querySelector<HTMLButtonElement>('.prev')!.disabled = this.loading || id === 1;
     this.$body.querySelector<HTMLButtonElement>('.next')!.disabled = this.loading || (id < 10000 && id >= this.dexLimit);
     const projection = this.$body.querySelector<HTMLElement>('.projection')!;
-    projection.hidden = !mon || !!trainingNote;
-    projection.textContent = 'Preview uses ' + titleCase(entry.speciesName) + '’s current EVs.';
+    projection.hidden = (!mon && !!entry.uid) || !!trainingNote;
+    projection.textContent = entry.uid ? 'Preview uses ' + titleCase(entry.speciesName) + '’s current EVs.' : 'Species preview · training targets start from zero EVs.';
     const restore = this.$body.querySelector<HTMLButtonElement>('.restore')!;
     restore.hidden = !mon;
     restore.textContent = 'Back to ' + titleCase(entry.speciesName);
-    this.$body.querySelector<HTMLElement>('.spots')!.hidden = !!mon || !this.locations() || !!trainingNote;
+    this.$body.querySelector<HTMLElement>('.spots')!.hidden = (!!mon && !!entry.uid) || !this.locations() || !!trainingNote;
     const select = this.$body.querySelector('select')!;
     const roles = select.querySelector<HTMLOptGroupElement>('optgroup[label="Defensive role"]');
     if (roles) roles.disabled = id === 292;
@@ -389,7 +446,7 @@ export class TrainingGuideDialog extends BaseDialog {
       summary.append(multiplier, chevron);
       const labels = document.createElement('div');
       labels.className = 'matchup-types';
-      labels.append(...types.map(type => createTypeLabel(type)));
+      labels.append(...types.map(type => createTypeLabel(type, undefined, matchGameVersion(store.activeParty?.baseGame)?.gen)));
       disclosure.append(summary, labels);
       row.append(disclosure);
       return row;
@@ -403,7 +460,7 @@ export class TrainingGuideDialog extends BaseDialog {
     list.replaceChildren(...rows);
   }
 
-  get entry(): RosterEntry | null {
+  get entry(): TrainingSubject | null {
     return this._entry;
   }
 

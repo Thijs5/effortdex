@@ -263,6 +263,17 @@ test('getEvolutionOptions returns only the direct next stages', async () => {
   assert.deepEqual(await client.getEvolutionOptions('eevee'), ['vaporeon', 'jolteon']);
 });
 
+test('move details are cached across games while historical types are resolved separately', async () => {
+  routes.push({ match: '/move/bite', handler: () => respond({
+    type: { name: 'dark' }, damage_class: { name: 'physical' },
+    past_values: [{ type: { name: 'normal' }, version_group: { name: 'gold-silver' } }],
+  }) });
+  const client = new PokeApiClient();
+  assert.equal((await client.getMoveDetails('bite', 'red-blue')).type, 'normal');
+  assert.equal((await client.getMoveDetails('bite', 'firered-leafgreen')).type, 'dark');
+  assert.equal(fetchCalls.length, 1);
+});
+
 test('sibling species share one evolution-chain fetch (keyed by chain URL)', async () => {
   routes.push({ match: '/pokemon-species/', handler: () => respond({ evolution_chain: { url: 'https://pokeapi.co/api/v2/evolution-chain/67/' } }) });
   routes.push({ match: '/evolution-chain/67', handler: () => respond(CHAIN) });

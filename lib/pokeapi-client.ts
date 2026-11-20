@@ -9,7 +9,7 @@
 // key (two components asking for the same species at once share one
 // fetch instead of racing two).
 
-import { levelMoves, type LevelMove } from './training-reference.ts';
+import { levelMoves, moveProfile, type LevelMove, type MoveData, type MoveProfile } from './training-reference.ts';
 import { emptyEvs } from './utils.ts';
 import { evolutionMethods } from './evolution-methods.ts';
 import { MemoCache, NotFoundError } from './memo-cache.ts';
@@ -61,7 +61,9 @@ const GENERATION_KEY_PREFIX = 'effortdex:generation:';
 // handed. Keep in sync with the get()/`key =` calls throughout.
 const NATIONAL_DEX_KEY_PREFIX = 'effortdex:national-dex:';
 const LEARNSET_KEY_PREFIX = 'effortdex:learnset:';
+const MOVE_KEY_PREFIX = 'effortdex:move:';
 const CACHE_KEY_PREFIXES = [
+  MOVE_KEY_PREFIX,
   LEARNSET_KEY_PREFIX,
   NATIONAL_DEX_KEY_PREFIX,
   SPECIES_LIST_KEY,
@@ -242,6 +244,15 @@ export class PokeApiClient {
       if (!response.ok) throw new Error('Could not load level-up moves.');
       return levelMoves((await response.json()).moves ?? [], group);
     });
+  }
+
+  async getMoveDetails(name: string, group: string): Promise<MoveProfile> {
+    const data: MoveData = await this._cache.get(MOVE_KEY_PREFIX + name, async () => {
+      const response = await fetch('https://pokeapi.co/api/v2/move/' + encodeURIComponent(name));
+      if (!response.ok) throw new Error('Could not load move details.');
+      return response.json();
+    });
+    return moveProfile(data, group);
   }
 
   /** Alternate forms have a Pokémon ID outside the National Pokédex sequence. */

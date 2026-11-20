@@ -16,6 +16,23 @@ export function learnsetGroup(game: string): string | undefined {
 }
 
 export interface LevelMove { name: string; level: number }
+export interface MoveProfile { type: string; category: 'physical' | 'special' | 'status' }
+export interface MoveData {
+  type: { name: string };
+  damage_class: { name: MoveProfile['category'] };
+  past_values?: { type: { name: string } | null; version_group: { name: string } }[];
+}
+
+/** past_values names the first group using the new values (e.g. Bite
+ * became Dark in Gold/Silver); the old type applies before that group. */
+export function moveProfile(data: MoveData, group: string): MoveProfile {
+  const index = groups.findIndex(([name]) => name === group);
+  const older = (data.past_values ?? []).filter(row => row.type && index >= 0 &&
+    groups.findIndex(([name]) => name === row.version_group.name) > index)
+    .sort((a, b) => groups.findIndex(([name]) => name === a.version_group.name) -
+      groups.findIndex(([name]) => name === b.version_group.name))[0];
+  return { type: older?.type?.name ?? data.type.name, category: data.damage_class.name };
+}
 interface MoveRecord {
   move: { name: string };
   version_group_details: { version_group: { name: string }; move_learn_method: { name: string }; level_learned_at: number }[];

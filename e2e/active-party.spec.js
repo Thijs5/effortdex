@@ -1,5 +1,6 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
+import { assertStableOpponentCards } from './support/opponent-layout.js';
 import { readFileSync } from 'node:fs';
 import { createParty } from './support/party.js';
 import {
@@ -335,7 +336,8 @@ test.describe('Active party and faint tracking', () => {
     await expect(page.locator('#battle-participants').getByRole('button', { name: /Bulbasaur/i })).toHaveClass(/party-slot--selected/);
   });
 
-  test('deselecting a participant, and the sheet\'s own Close button, both work reliably', async ({ page }) => {
+  test('deselecting a participant, and the sheet\'s own Close button, both work reliably', async ({ page }, info) => {
+    await page.setViewportSize({ width: 390, height: 844 });
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
     await addPokemon(page, 'Bulbasaur');
@@ -345,12 +347,23 @@ test.describe('Active party and faint tracking', () => {
     const search = page.locator('#battle-search');
     const combobox = search.getByRole('combobox', { name: 'Defeated Pokémon…' });
     await expect(combobox).toBeHidden();
+    await expect(page.locator('.battle-recents')).toBeHidden();
+    const [opponents, current] = await Promise.all([
+      page.locator('.battle-opponents').boundingBox(),
+      page.locator('#battle-choose-opponent-btn').boundingBox(),
+    ]);
+    expect(current?.width).toBe(opponents?.width);
+    await page.screenshot({ path: info.outputPath('empty-recents.png') });
     // Bulbasaur (the lead) starts selected — tapping it off must not
     // close the sheet (the underlying bug was a focus-blur race).
     await page.locator('#battle-participants').getByRole('button', { name: /Bulbasaur/i }).click();
     await expect(search).not.toHaveAttribute('hidden');
     await expect(combobox).toBeHidden();
-    await expect(page.locator('#battle-participants-status')).toBeVisible();
+    await expect(page.getByText('Select at least one Pokémon first.', { exact: true })).toHaveCount(0);
+    await expect(page.locator('#battle-selected-count')).toHaveCount(0);
+    await expect(page.locator('#battle-log-btn')).toBeDisabled();
+    expect(await page.locator('#battle-choose-opponent-btn').boundingBox()).toEqual(current);
+    await page.screenshot({ path: info.outputPath('no-participants.png') });
 
     // Opponent yield remains visible even when nobody is selected.
     await page.locator('#battle-choose-opponent-btn').click();
@@ -442,29 +455,7 @@ test.describe('Keyboard-free defeat review', () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
 
   test('selecting a recent opponent keeps the review header, team and footer still', async ({ page }) => {
-    await mockPokeApi(page);
-    await page.goto('/');
-    await createParty(page, { name: 'Stable opponent selection', baseGame: 'Emerald' });
-    await addPokemon(page, 'Bulbasaur');
-    await logPartyBattle(page, 'Caterpie');
-    await page.evaluate(() => document.fonts.ready);
-    const layout = async () => Promise.all([
-      page.locator('#battle-search .sheet-header').boundingBox(),
-      page.locator('#battle-participants').boundingBox(),
-      page.locator('#battle-search .battle-composer-actions').boundingBox(),
-      page.locator('#battle-log-btn').boundingBox(),
-    ]);
-    for (const width of [390, 320]) {
-      await page.setViewportSize({ width, height: 844 });
-      await page.locator('#battle-search .sheet-close').tap();
-      await page.locator('#party-log-battle-btn').tap();
-      const before = await layout();
-      await page.locator('#battle-recent-opponents').getByRole('button', { name: 'Choose Caterpie again' }).tap();
-      await expect(page.locator('#battle-opponent-name')).toHaveText('Caterpie');
-      await expect(page.locator('#battle-log-btn')).toBeEnabled();
-      await expect(page.locator('#battle-log-btn')).toHaveCSS('transform', 'none');
-      expect(await layout()).toEqual(before);
-    }
+    await assertStableOpponentCards(page);
   });
 
   test('recent defeated cards are deduplicated, ordered, and only stage a fresh defeat', async ({ page }, info) => {
@@ -521,10 +512,7 @@ test.describe('Keyboard-free defeat review', () => {
     await expect(rosterCard(page, 'Bulbasaur').locator('.roster-card-evbar .value')).toHaveText(before || '');
     await expect(recents.first()).toBeVisible();
     const firstRecent = await recents.first().boundingBox();
-    expect(firstRecent?.y).toBeCloseTo(recentPosition?.y || 0, 0);
-    const lastRecent = await recents.last().boundingBox();
-    const opponent = await page.locator('#battle-choose-opponent-btn').boundingBox();
-    expect((lastRecent?.y || 0) + (lastRecent?.height || 0)).toBeCloseTo((opponent?.y || 0) + (opponent?.height || 0), 0);
+    expect(firstRecent).toEqual(recentPosition);
     await recents.nth(1).tap();
     await expect(page.locator('#battle-opponent-name')).toHaveText('Ivysaur');
     await page.screenshot({ path: info.outputPath('recent-defeats-staged-dark.png') });

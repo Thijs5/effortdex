@@ -15,6 +15,34 @@ test.describe('EV-training location guide', () => {
     await mockPokeApi(page);
   });
 
+  test('the party training guide browses species without adding any Pokémon', async ({ page }, info) => {
+    await page.setViewportSize({ width: 320, height: 844 });
+    await page.route('**/sprites/pokemon/**/1.png', route => route.fulfill({
+      path: new URL('./fixtures/sprites/1.png', import.meta.url).pathname, contentType: 'image/png',
+    }));
+    await page.goto('/');
+    await createParty(page, { name: 'Browse without catching', baseGame: 'FireRed' });
+    await page.getByRole('button', { name: 'Training guide', exact: true }).click();
+    const search = page.locator('#guide-search');
+    await search.getByRole('combobox').fill('Bulbasaur');
+    await search.getByRole('option').filter({ hasText: 'Bulbasaur' }).click();
+    const guide = page.locator('#species-training-guide dialog');
+    await expect(guide).toBeVisible();
+    await expect(guide.locator('.dex-name')).toHaveText('#1 Bulbasaur');
+    await expect(guide.locator('.projection')).toContainText('zero EVs');
+    await expect(guide.locator('ev-training-guide .spot-list li')).toHaveCount(6);
+    await expect(guide.locator('ev-training-guide button')).toHaveCount(0);
+    await page.screenshot({ path: info.outputPath('standalone-guide.png') });
+    await guide.getByRole('button', { name: 'Next Pokédex number' }).click();
+    await expect(guide.locator('.dex-name')).toHaveText('#2 Ivysaur');
+    await guide.getByRole('button', { name: 'Close', exact: true }).click();
+    await expect(page.locator('#roster .roster-card')).toHaveCount(0);
+    await expect(page.locator('#party-training-guide-btn')).toBeFocused();
+    await page.reload();
+    await expect(page.locator('#empty-state')).toBeVisible();
+    await expect(page.locator('#roster .roster-card')).toHaveCount(0);
+  });
+
   test('a Gen III+ party sees curated EV-training spots for its own game, one section per stat', async ({ page }) => {
     await page.goto('/');
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
@@ -43,7 +71,11 @@ test.describe('EV-training location guide', () => {
     const card = await openDetail(page, 'Bulbasaur');
     const dialog = await openTrainingGuide(card);
     await expect(dialog.locator('.evolution')).toContainText('Ivysaur');
-    await expect(dialog.locator('.next-move')).toHaveText('Next at Lv. 10 · Vine Whip');
+    await expect(dialog.locator('.next-move')).toContainText('Next at Lv. 10 · Vine Whip');
+    await expect(dialog.locator('.next-move type-label')).toHaveText('Grass');
+    await expect(dialog.locator('.next-move type-label .category')).toHaveAttribute('src', 'icons/move-special.png');
+    await dialog.locator('.learnset > summary').click();
+    await expect(dialog.locator('.learnset li type-label')).toHaveText(['Grass']);
     await expect(dialog.locator('.stab')).toContainText('Poison attacks use Attack');
     await expect(dialog.locator('.yield')).toContainText('+1 SPA');
     await expect(dialog.getByRole('button', { name: 'Previous Pokédex number' })).toBeDisabled();
@@ -54,15 +86,16 @@ test.describe('EV-training location guide', () => {
     await expect(dialog.locator('.dex-sprite')).toHaveAttribute('src', /\/2\.png$/);
     await expect(card.locator('.type-labels type-label')).toHaveText(['Grass', 'Poison']);
     await expect(dialog.locator('.type-list type-label')).toHaveText(['Grass', 'Poison']);
-    await expect(dialog.locator('.weaknesses summary')).toHaveText(['×2']);
-    await expect(dialog.locator('.weaknesses type-label')).toHaveText(['Fire', 'Flying', 'Ice', 'Psychic']);
-    await dialog.locator('.weaknesses summary').click();
-    await expect(dialog.locator('.weaknesses type-label').first()).toBeHidden();
-    await dialog.locator('.weaknesses summary').click();
-    await expect(dialog.locator('.weaknesses type-label').first()).toBeVisible();
-    await dialog.getByText('Resistances and immunities').click();
-    await expect(dialog.locator('.reduced summary')).toHaveText(['×0.5', '×0.25']);
-    await expect(dialog.locator('.reduced details').filter({ has: page.locator('summary[aria-label="×0.25 damage"]') }).locator('type-label')).toHaveText(['Grass']);
+    const damage = dialog.getByRole('list', { name: 'Incoming damage by attack type' });
+    await expect(damage.locator('summary')).toHaveText(['×2', '×1', '×0.5', '×0.25']);
+    await expect(damage.locator('type-label')).toHaveCount(17);
+    const weak = damage.locator('details').filter({ has: page.locator('summary[aria-label="×2 damage"]') });
+    await expect(weak.locator('type-label')).toHaveText(['Fire', 'Flying', 'Ice', 'Psychic']);
+    await weak.locator('summary').click();
+    await expect(weak.locator('type-label').first()).toBeHidden();
+    await weak.locator('summary').click();
+    await expect(weak.locator('type-label').first()).toBeVisible();
+    await expect(damage.locator('details').filter({ has: page.locator('summary[aria-label="×0.25 damage"]') }).locator('type-label')).toHaveText(['Grass']);
     await expect(dialog.locator('.base-values')).toContainText('HP 60');
     await dialog.getByRole('button', { name: 'Next Pokédex number' }).click();
     await expect(dialog.locator('.dex-status')).toContainText('Try again');

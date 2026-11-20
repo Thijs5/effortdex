@@ -73,6 +73,9 @@ const SHELL_PATHS = [
   'icons/icon-512-maskable.png',
   'icons/apple-touch-icon.png',
   'icons/brand-mark.svg',
+  'icons/move-physical.png',
+  'icons/move-special.png',
+  'icons/move-status.png',
 ];
 const SHELL_URLS = SHELL_PATHS.map((p) => new URL(p, self.location).toString());
 

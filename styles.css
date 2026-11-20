@@ -1552,6 +1552,7 @@ textarea.ds-field { resize: vertical; }
 /* ADR 0031: search-only typing and a separate keyboard-free defeat review. */
 .battle-opponents { display: flex; align-items: stretch; gap: var(--space-3); min-width: 0; }
 .battle-current { flex: 0 1 144px; min-width: 0; display: flex; flex-direction: column; }
+.battle-opponents:has(.battle-recents[hidden]) .battle-current { flex: 1; }
 .battle-opponents > div > .battle-sheet-eyebrow { display: block; margin: 0 0 var(--space-2); font-size: var(--font-size-2xs); line-height: 18px; white-space: nowrap; }
 .battle-opponent-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-1); flex: 1; width: 100%; min-height: 156px; min-width: 0; padding: var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--lcd); color: var(--ink); text-align: center; cursor: pointer; }
 .battle-opponent-card:hover { border-color: var(--teal); }
@@ -1559,9 +1560,8 @@ textarea.ds-field { resize: vertical; }
 .battle-opponent-art img { width: 64px; height: 64px; image-rendering: pixelated; object-fit: contain; }
 .battle-opponent-copy { display: grid; gap: var(--space-1); min-width: 0; }
 #battle-opponent-name { font-family: var(--font-display); font-size: var(--font-size-sm); overflow-wrap: anywhere; }
-.battle-recents { flex: 1; min-width: 144px; display: flex; flex-direction: column; }
+.battle-recents { flex: 1; min-width: 144px; display: flex; flex-direction: column; align-self: flex-start; }
 #battle-recent-opponents { flex: 1; min-height: 156px; grid-auto-rows: minmax(76px, 1fr); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-1); }
-.battle-recents-empty { grid-column: 1 / -1; margin: 0; color: var(--ink-soft); font-size: var(--font-size-xs); line-height: 1.5; }
 .battle-recent-card { display: grid; justify-items: center; align-content: center; gap: var(--space-1); min-width: 0; min-height: 76px; padding: var(--space-1); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; }
 .battle-recent-card:hover { border-color: var(--teal); }
 .battle-recent-card img { width: 40px; height: 40px; object-fit: contain; image-rendering: pixelated; }
@@ -1579,7 +1579,6 @@ textarea.ds-field { resize: vertical; }
 #battle-lookup-error { margin: var(--space-2) 0 0; font-size: var(--font-size-sm); }
 .battle-team-heading { display: flex; align-items: center; justify-content: space-between; gap: var(--space-2); }
 .battle-team-heading .battle-sheet-eyebrow { margin: 0; }
-#battle-selected-count { font-size: var(--font-size-xs); color: var(--ink-soft); }
 .battle-composer-actions { display: grid; grid-template-columns: minmax(0, 1fr); gap: var(--space-2); }
 .battle-ev-summary {
   display: grid;

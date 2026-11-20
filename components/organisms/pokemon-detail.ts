@@ -633,7 +633,7 @@ export class PokemonDetail extends BaseElement {
       this._typeWarmTried.add(e.speciesName);
       api.getPokemon(e.speciesName).then(() => this.render()).catch(() => {});
     }
-    this.$typeLabels.replaceChildren(...types.map(type => createTypeLabel(type)));
+    this.$typeLabels.replaceChildren(...types.map(type => createTypeLabel(type, undefined, matchGameVersion(store.activeParty?.baseGame)?.gen)));
     const primaryColor = types[0] ? TYPE_COLORS[types[0]] : undefined;
     if (primaryColor) {
       this.dataset.type = types[0];

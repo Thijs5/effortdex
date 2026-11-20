@@ -115,6 +115,7 @@
     <main id="party-view" class="party-view" hidden>
       <div class="view-nav">
         <a id="back-to-parties" class="back-link" href="#/parties">&larr; All parties</a>
+        <button id="party-training-guide-btn" class="ds-btn ds-btn--ghost" type="button">Training guide</button>
       </div>
 
       <div class="party-identity-row">
@@ -177,14 +178,16 @@
            shows; picking a species opens #add-pokemon-dialog for level /
            nature / stats (roster.ts). -->
       <pokemon-search id="add-search" hidden placeholder="Search a species&hellip;" sheet-title="Add a Pok&eacute;mon" force-sheet></pokemon-search>
+      <pokemon-search id="guide-search" hidden placeholder="Search a species&hellip;" sheet-title="Training guide" force-sheet></pokemon-search>
+      <training-guide-dialog id="species-training-guide"></training-guide-dialog>
+      <p id="training-guide-status" class="status-line" aria-live="polite" hidden></p>
 
       <!-- Search and confirmation are separate views: typing never shares
            the visible viewport with the defeat confirmation action (ADR 0031). -->
       <pokemon-search id="battle-search" hidden placeholder="Defeated Pokémon…" show-ev-yield sheet-title="Choose defeated Pokémon" force-sheet review-flow review-title="Record a defeat">
         <div slot="sheet-extra" class="battle-sheet-extra" data-state="empty">
-          <div class="battle-team-heading"><span class="battle-sheet-eyebrow">Who battled?</span><span id="battle-selected-count"></span></div>
+          <div class="battle-team-heading"><span class="battle-sheet-eyebrow">Who battled?</span></div>
           <div id="battle-participants" class="party-slots party-slots--select"></div>
-          <p id="battle-participants-status" class="party-slots-status" hidden></p>
           <div class="battle-opponents">
           <div class="battle-current"><span class="battle-sheet-eyebrow">Opponent</span>
           <button id="battle-choose-opponent-btn" class="battle-opponent-card" type="button" aria-label="Choose defeated Pokémon">

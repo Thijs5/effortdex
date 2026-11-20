@@ -4,10 +4,12 @@ import { readFileSync } from 'node:fs';
 import { createParty } from './support/party.js';
 import { addPokemon, openDetail, openNatureDialog, openLevelUpDialog } from './support/pokemon.js';
 import { mockPokeApi } from './support/pokeapi-mock.js';
+import { mockSmogon } from './support/smogon-mock.js';
 
 test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
 test.beforeEach(async ({ page }) => {
   await mockPokeApi(page);
+  await mockSmogon(page);
   await page.route('**/raw.githubusercontent.com/**/sprites/pokemon/**', async route => {
     const id = route.request().url().match(/\/(\d+)\.png$/)?.[1];
     if (id && ['1', '2', '3'].includes(id)) {
@@ -22,12 +24,17 @@ test('the compact nature sheet keeps its choice and confirmation together, with 
   await addPokemon(page, 'Bulbasaur');
   const card = await openDetail(page, 'Bulbasaur');
   let dialog = await openNatureDialog(card);
+  await expect(dialog.locator('.nature-recommendations')).toContainText('Smogon picks');
   const bounds = await dialog.boundingBox();
   expect(bounds?.height).toBeLessThan(400);
   expect((bounds?.y || 0) + (bounds?.height || 0)).toBeCloseTo(844, 0);
   const select = await dialog.getByLabel('Nature', { exact: true }).boundingBox();
   const save = await dialog.getByRole('button', { name: 'Save', exact: true }).boundingBox();
-  expect((save?.y || 0) - ((select?.y || 0) + (select?.height || 0))).toBeLessThan(40);
+  const recommendations = await dialog.locator('.nature-recommendations').boundingBox();
+  const contentEnd = Math.max((select?.y || 0) + (select?.height || 0),
+    (recommendations?.y || 0) + (recommendations?.height || 0));
+  expect(save?.y).toBeGreaterThanOrEqual(contentEnd);
+  expect((save?.y || 0) - contentEnd).toBeLessThan(40);
   await dialog.getByLabel('Nature', { exact: true }).selectOption('adamant');
   await dialog.getByRole('button', { name: 'Close', exact: true }).tap();
   dialog = await openNatureDialog(card);

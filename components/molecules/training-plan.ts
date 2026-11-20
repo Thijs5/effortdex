@@ -8,7 +8,7 @@ export function categoryGuide(gen: number): string {
   if (!usesTypeBasedMoveCategories(gen)) return '<p>Each move has its own category. Fire Punch is physical and uses Attack. Flamethrower is special and uses Special Attack. Both are Fire type.</p>';
   const types = Object.keys(chart).sort();
   const labels = (category: string) => types.filter(type => typeBasedMoveCategory(type, gen) === category)
-    .map(type => `<type-label type="${type}"></type-label>`).join('');
+    .map(type => `<type-label type="${type}" generation="${gen}"></type-label>`).join('');
   return `<p>A damaging move’s type determines its category in this game.</p>
     <p><strong>Physical · Attack</strong><span class="category-types">${labels('physical')}</span></p>
     <p><strong>Special · ${gen === 1 ? 'Special' : 'Special Attack'}</strong><span class="category-types">${labels('special')}</span></p>`;
@@ -65,7 +65,7 @@ function baseStatRecommendation(base: EvMap, focus: string, gen: number): string
   return `Base ${higher} is higher than ${lower}.`;
 }
 
-export function trainingPlan(entry: RosterEntry, move: string, gen: number, trainingNote = ''): string {
+export function trainingPlan(entry: Pick<RosterEntry, 'baseStats' | 'speciesId' | 'evs'>, move: string, gen: number, trainingNote = ''): string {
   const base = entry.baseStats;
   const recommended = base ? baseStatFocus(base, entry.speciesId) : '';
   if (trainingNote) {

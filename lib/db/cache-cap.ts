@@ -23,6 +23,7 @@ const CAPS: Record<string, number> = {
   evochain: 1500,
   evolutions: 1500,
   generation: 30,
+  move: 1500,
 };
 
 /**

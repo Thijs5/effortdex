@@ -25,12 +25,18 @@ export class EvTrainingGuide extends BaseElement {
           margin: 0 0 var(--space-2); font-size: var(--font-size-2xs);
           letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-soft);
         }
+        .spot-list { list-style:none; padding:0; margin:0; }
+        .spot-list li { display:flex; align-items:center; gap:var(--space-3); padding:var(--space-3) 0; border-bottom:1px solid var(--lcd-line); }
+        .spot-list img { width:28px; height:28px; object-fit:contain; image-rendering:pixelated; }
+        .spot-list strong { display:block; font-size:var(--font-size-xs); }
+        .spot-list small { color:var(--ink-soft); font-size:var(--font-size-2xs); }
       </style>
       <div class="sections"></div>
     `;
 
   _locations: GameTrainingSpots | null = null;
   _spriteGame = '';
+  private _readOnly = false;
   $sections: HTMLElement;
 
   constructor() {
@@ -51,6 +57,8 @@ export class EvTrainingGuide extends BaseElement {
     this.render();
   }
 
+  set readOnly(value: boolean) { this._readOnly = value; this.render(); }
+
   protected render(): void {
     this.$sections.innerHTML = '';
     if (!this._locations) return;
@@ -61,6 +69,27 @@ export class EvTrainingGuide extends BaseElement {
       const heading = document.createElement('h3');
       heading.className = 'section-title';
       heading.textContent = label;
+      if (this._readOnly) {
+        const list = document.createElement('ul');
+        list.className = 'spot-list';
+        for (const spot of spots) {
+          const row = document.createElement('li');
+          const sprite = document.createElement('img');
+          sprite.src = versionedSpriteUrl(this._spriteGame, spot.speciesId) || modernSpriteUrl(spot.speciesId) || FALLBACK_SPRITE;
+          sprite.alt = '';
+          const copy = document.createElement('div');
+          const name = document.createElement('strong');
+          name.textContent = titleCase(spot.species);
+          const detail = document.createElement('small');
+          detail.textContent = `${spot.location} · +${spot.amount} ${label}${spot.note ? ` · ${spot.note}` : ''}`;
+          copy.append(name, detail);
+          row.append(sprite, copy);
+          list.append(row);
+        }
+        section.append(heading, list);
+        this.$sections.append(section);
+        continue;
+      }
       const grid = document.createElement('item-button-grid');
       grid.setAttribute('columns', '1');
       grid.items = spots.map((spot) => {

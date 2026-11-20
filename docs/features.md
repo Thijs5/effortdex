@@ -259,6 +259,18 @@ vary by game; Legends Arceus alternatives are labeled explicitly.
 
 Covered by `e2e/evolution.spec.js`.
 
+## Training guide and species reference
+
+The party's Training guide button searches species without adding them to the
+roster. Species-only plans start from zero EVs and show training locations as
+informational rows. Roster-specific guides retain saved progress and their
+battle-logging actions. Upcoming moves and the full learnset include type and
+category markers, with historical move types resolved for the game's version
+group. The damage list includes every available attack type, including ×1.
+Gen I–III type labels explain physical/special behavior using the existing
+Pokémon Showdown icons, bundled for offline use. See
+[`docs/specs/training-guide.md`](specs/training-guide.md).
+
 ## Transfer & Import (moving a roster between devices)
 
 Since everything lives in `localStorage`, moving data to another device

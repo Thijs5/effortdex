@@ -51,6 +51,11 @@ separate Sp. Atk/Sp. Def, since that split didn't happen until Gen II.
 - **Where to train**: a short, curated list of good spots to grind each
   stat's EVs in the party's own game (Gen III onward), with one tap to
   log a battle against a recommended Pokémon.
+- **Training guide & Pokédex**: open Training guide from a party to look
+  up a species without adding it. Browse training targets, all incoming
+  type matchups, evolution methods and learned moves with type markers.
+  Type labels show the existing physical/special icons for Gen I–III;
+  species-only training locations are informational rather than battle actions.
 - **IVs**: record a roster Pokémon's Individual Values alongside its EVs.
 - **Competitive data**: pull up Smogon's competitive sets/analysis for a
   species right from its detail page.
@@ -161,6 +166,19 @@ Effortdex does, or run it with:
 ```sh
 npm run test:e2e
 ```
+
+The iPhone 13 WebKit regression is opt-in because its native dependencies
+are not installed on every development machine:
+
+```sh
+EFFORTDEX_WEBKIT=1 npx playwright test e2e/opponent-layout-webkit.spec.js
+```
+
+Run it in an environment with Playwright's WebKit dependencies, such as
+the matching Playwright Docker image. Screenshots go to `test-results/`.
+See [AGENTS.md](AGENTS.md) for the work queue and screenshot review process,
+and [ADR 0040](docs/adr/0040-mobile-first-flat-layouts-and-design-review.md)
+for the mobile-first design principles.
 
 See [`docs/adr/0007`](docs/adr/0007-e2e-testing-strategy.md) for why it's
 organized this way — Gen I/II's Stat Experience system has its own spec

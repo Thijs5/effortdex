@@ -12,11 +12,11 @@ export function strongAgainst(attack: string, gen: number): string[] {
     effectiveness(attack, defense, gen) > 1);
 }
 
-export function defensiveMatchups(types: string[], gen: number, legendsArceus = false) {
+export function defensiveMatchups(types: string[], gen: number, legendsArceus = false, includeNeutral = false) {
   if (!types.length || types.some(type => !Object.hasOwn(chart, type))) return [];
   return Object.keys(chart)
     .filter(type => (gen >= 6 || type !== 'fairy') && (gen >= 2 || !['dark', 'steel'].includes(type)))
     .map(type => ({ type, factor: combinedEffectiveness(type, types, gen, legendsArceus) }))
-    .filter(({ factor }) => factor !== 1)
+    .filter(({ factor }) => includeNeutral || factor !== 1)
     .sort((a, b) => b.factor - a.factor || a.type.localeCompare(b.type));
 }

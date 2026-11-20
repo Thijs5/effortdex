@@ -33,6 +33,7 @@ import '../../organisms/pokemon-search.ts';
 import '../../organisms/stat-reading-grid.ts';
 import '../../atoms/ev-bar.ts';
 import '../../atoms/level-input.ts';
+import './pokemon/training-guide.ts';
 import { createTypeLabel } from '../../atoms/type-label.ts';
 import type { Party, RosterEntry } from '../../../lib/store.ts';
 import type { EvMap } from '../../../lib/constants.ts';
@@ -61,7 +62,6 @@ const battlePartyStatus = document.getElementById('battle-party-status')!;
 const partyLogBattleBtn = document.getElementById('party-log-battle-btn')!;
 const battleSearch = document.getElementById('battle-search') as import('../../organisms/pokemon-search.ts').PokemonSearch;
 const battleParticipants = document.getElementById('battle-participants')!;
-const battleParticipantsStatus = document.getElementById('battle-participants-status')!;
 const battleResultSummary = document.getElementById('battle-result-summary')!;
 const battleEvGain = document.getElementById('battle-ev-gain')!;
 const battleLogBtn = document.getElementById('battle-log-btn') as HTMLButtonElement;
@@ -168,6 +168,44 @@ editPartyBtn.addEventListener('click', () => {
 /* ------------------------------------------------------------------ */
 
 const partyAddBtn = document.getElementById('party-add-btn')!;
+const trainingGuideBtn = document.getElementById('party-training-guide-btn')!;
+const guideSearch = document.getElementById('guide-search') as import('../../organisms/pokemon-search.ts').PokemonSearch;
+const speciesGuide = document.getElementById('species-training-guide') as import('./pokemon/training-guide.ts').TrainingGuideDialog;
+const guideStatus = document.getElementById('training-guide-status')!;
+let guideRequest = 0;
+trainingGuideBtn.addEventListener('click', () => {
+  const token = ++guideRequest;
+  guideStatus.hidden = true;
+  guideSearch.hidden = false;
+  guideSearch.focus();
+  void availableSpeciesFor(store.activeParty, api).then(allowed => {
+    if (token === guideRequest) guideSearch.allowedSpecies = allowed;
+  }).catch(() => {});
+});
+guideSearch.addEventListener('sheet-close', () => { guideSearch.hidden = true; });
+guideSearch.addEventListener('pokemon-pick', async event => {
+  const token = ++guideRequest;
+  const partyId = store.activeParty?.id;
+  guideStatus.hidden = false;
+  guideStatus.textContent = 'Loading training guide…';
+  try {
+    const mon = await api.getPokemon((event as CustomEvent).detail.name);
+    if (token !== guideRequest || partyId !== store.activeParty?.id || view.hidden) return;
+    guideStatus.hidden = true;
+    speciesGuide.species = mon;
+    speciesGuide.open();
+  } catch {
+    if (token === guideRequest) guideStatus.textContent = 'Could not load that Pokémon. Open the training guide to try again.';
+  }
+});
+speciesGuide.addEventListener('close', () => trainingGuideBtn.focus({ preventScroll: true }));
+window.addEventListener('hashchange', () => {
+  ++guideRequest;
+  guideSearch.blur();
+  guideSearch.shadowRoot?.querySelector<HTMLButtonElement>('.sheet-close')?.click();
+  speciesGuide.close();
+  guideStatus.hidden = true;
+});
 
 let pendingAddMon: import('../../../lib/pokeapi-client.ts').DomainPokemon | null = null;
 
@@ -520,7 +558,7 @@ function renderBattleMatchup(mon: DomainPokemon): void {
   matchupPanel.hidden = !matchup;
   opponentTypes.hidden = !matchup;
   if (!matchup) return;
-  opponentTypes.replaceChildren(...matchup.types.map(type => createTypeLabel(type)));
+  opponentTypes.replaceChildren(...matchup.types.map(type => createTypeLabel(type, undefined, game?.gen)));
   opponentTypes.setAttribute('aria-label', matchup.types.map(titleCase).join(' / '));
   document.getElementById('battle-matchup-gen')!.textContent =
     game?.name === 'Legends Arceus' ? game.name : game ? 'Gen ' + game.gen : 'Modern rules';
@@ -544,7 +582,7 @@ function renderBattleMatchup(mon: DomainPokemon): void {
     summary.append(value, chevron);
     const types = document.createElement('div');
     types.className = 'matchup-group-content matchup-types';
-    types.append(...attacks.map(attack => createTypeLabel(attack.name)));
+    types.append(...attacks.map(attack => createTypeLabel(attack.name, undefined, game?.gen)));
     disclosure.append(summary, types);
     row.append(disclosure);
     return row;
@@ -597,9 +635,6 @@ function renderBattleParticipants(): void {
     battleParticipants.appendChild(slot);
     if (entry.uid === focusedUid) slot.focus();
   }
-  battleParticipantsStatus.hidden = battleSelected.size > 0;
-  battleParticipantsStatus.textContent = 'Select at least one Pokémon first.';
-  document.getElementById('battle-selected-count')!.textContent = `${battleSelected.size} selected`;
 }
 
 partyLogBattleBtn.addEventListener('click', () => {
@@ -714,12 +749,7 @@ function renderRecentOpponents(): void {
   const focusedName = (document.activeElement as HTMLElement | null)?.dataset.opponent;
   battleRecents.replaceChildren();
   const recent = battleSearch.recent.slice(0, 4);
-  if (!recent.length) {
-    const empty = document.createElement('p');
-    empty.className = 'battle-recents-empty';
-    empty.textContent = 'Your last defeated Pokémon appear here.';
-    battleRecents.appendChild(empty);
-  }
+  battleRecents.closest<HTMLElement>('.battle-recents')!.hidden = !recent.length;
   for (const mon of recent) {
     const button = document.createElement('button');
     button.type = 'button';

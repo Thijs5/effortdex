@@ -1,0 +1,30 @@
+# Agent instructions
+
+## Work queue
+
+- Keep a visible, ordered queue when new requests arrive during work. Finish the current task, then take queued tasks in order. Switch immediately only when the user explicitly asks for it.
+- Apply clarifications and corrections to the current task as they arrive. Preserve the other queued requests through interruptions and restarts.
+- Existing authorization persists, including authorization to deploy. Check what actually completed after an interruption before repeating a mutation.
+- Inspect the working tree before editing. Preserve unrelated changes and coordinate ownership when another agent is editing the same files.
+
+## Feature workflow
+
+1. Read relevant decisions in `docs/adr/` before changing a feature. In particular, follow the shared design system, phone review, touch interaction, and mobile-first layout ADRs.
+2. Update the feature's existing spec in `docs/specs/`. Create a short spec for a new feature or a substantial behavior change. State observable behavior, layout, relevant empty/loading/error states, and acceptance checks; keep small fixes proportionate. Resolve routine design choices using existing patterns and the user's goal.
+3. Implement the smallest coherent change using the reuse-first rules below. Add or update tests for meaningful regression risks: domain logic with unit tests and user flows/layout behavior with Playwright. Do not add tests that simply restate CSS declarations or implementation details. For a bug, verify that the regression check detects the original failure when practical.
+4. Run focused checks first. Exercise the actual flow through its changed states, not only the initial render. Where affected, verify confirmation/cancellation, repeated actions, navigation/reopen, reload persistence, offline/error recovery, and absence of new console/runtime errors. Use isolated test data; preserve the user's browser data.
+5. For visual changes, capture relevant changed states using Playwright's `info.outputPath()` under `test-results/`. Inspect the images, compare equivalent controls/flows elsewhere in the app, and record what was checked in the spec. Check light and dark themes; start at iPhone 13's 390 × 844 CSS pixels, then narrower widths, larger text, desktop, and keyboard-constrained states when relevant. Use runtime geometry assertions for clipping, overlap or layout stability risks; screenshots alone do not prove behavior.
+6. Review behavior, visual consistency, accessibility, and usability against the acceptance checks. Record material findings, their causes, and how recurrence is prevented. Fix in-scope findings, rerun affected checks, and inspect changed screenshots again. Repeat until acceptance checks pass and no known material in-scope findings remain. If verification is blocked, report the specific gap and its impact; do not claim a clean pass. Queue optional polish and unrelated improvements instead of extending the loop indefinitely.
+7. Before completing a feature batch, run `npm test`, `npm run typecheck`, `npm run build`, and the full Playwright suite. Reuse completed checks when nothing affecting them has changed. Documentation-only changes need link/content and diff checks, not the application suites. Update user-facing documentation and the component reference when applicable; add/refine an ADR for lasting design decisions. Report the outcome, checks actually run, and remaining limitations. Separate pre-existing failures from regressions without silently ignoring either.
+
+Headless tests and screenshot inspection are routine verification and do not need separate permission. These tests do not drive the user's desktop windows. WebKit coverage is opt-in with `EFFORTDEX_WEBKIT=1`; run it where the browser's dependencies are available, including the Playwright Docker image. Distinguish emulation from native iPhone/PWA testing.
+
+## UI consistency and review
+
+- Reuse `tokens.css`, `lib/design-system.ts`, `BaseElement`, `BaseDialog`, and existing atoms/molecules before introducing styling. Keep shared type displays in `type-label`; preserve game-specific mechanics.
+- Before creating a shared component or variant, identify the concrete gap and why existing pieces cannot cover it. Avoid parallel button, field, badge, dialog, type-label or spacing systems. Do not copy shared markup/CSS or reach into another component's shadow root from application code to restyle it. Keep genuinely feature-specific layout local; extract shared pieces for real common contracts, not speculative reuse. Document changed shared inputs/events/states and usage examples in the same change.
+- Follow [ADR 0040](docs/adr/0040-mobile-first-flat-layouts-and-design-review.md): mobile is the primary target; avoid unnecessary nested cards, borders, headings, dialogs, and disclosure layers.
+- Inspect alignment, text baselines, icon/control centering, touch targets, hover/focus/pressed states, available width, wrapping, clipping, padding, gaps, borders, scrolling, empty states, and transitions between states. Record passes as well as findings.
+- When an inconsistency appears, find why the implementations could diverge. Prefer a shared component, then a shared token/helper, then a runtime/layout test. Use an instruction only when code cannot reasonably enforce the rule.
+- Search for other occurrences of the same pattern and remove superseded implementations where appropriate. Include fixes within the authorized feature scope; describe and queue broader changes instead of silently expanding the task.
+- Prefer spacing and typographic hierarchy to extra boxes. Keep the main action clear, preserve accessible names and focus behavior, and prevent routine state changes from moving neighboring controls.
