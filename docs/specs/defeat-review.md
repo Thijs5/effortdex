@@ -47,3 +47,26 @@ keyboard or installed-PWA behavior.
 
 Final batch validation: 385 unit tests and all 185 E2E tests passed, including
 the opt-in WebKit regression in the Playwright container. Typecheck and build passed.
+
+## Touch-release feedback — 2026-11-20
+
+User reported lingering apparent active/focus states. Reproduced in iPhone 13
+WebKit: a tapped recent opponent retained its hover border (rgb(47,125,107))
+instead of the normal border (rgb(230,226,218)). Chromium touch emulation did not
+reproduce it. The new behavioral regression failed against the original CSS.
+
+Hover decoration on opponent/recent/participant controls and shared button/item
+primitives now requires a fine pointer with hover support. Search-option hover
+is separate from keyboard-active selection. Suppress native tap-color overlays
+on shared buttons/options; keep transient pressed feedback, aria-pressed recipient
+selection and :focus-visible unchanged. This shared-button remedy also affects
+secondary controls elsewhere, so the full app suite is required.
+
+Focused Chromium mouse/touch and WebKit tests pass: release clears the border,
+unselected recipients return to normal, actual selection persists, mouse hover
+works and clears on leaving, and keyboard focus stays visible even on a touch
+viewport. Native physical iPhone/PWA behavior is not directly tested here.
+
+Touch-feedback batch validation: 389 unit tests, 207 end-to-end tests including
+WebKit, typecheck and build passed. Existing geometry/confirmation tests remain
+covered alongside the new pointer/keyboard checks.

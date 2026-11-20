@@ -105,7 +105,8 @@ export class PokemonSearch extends BaseElement {
           text-transform: capitalize;
           cursor: pointer;
         }
-        li.option.active, li.option:hover { background: var(--lcd); }
+        li.option.active { background: var(--lcd); }
+        @media (hover: hover) and (pointer: fine) { li.option:hover { background: var(--lcd); } }
         .option-num {
           flex: 0 0 auto;
           font-family: var(--font-mono);

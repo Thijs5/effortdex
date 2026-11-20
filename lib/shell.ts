@@ -145,7 +145,6 @@ function applyTheme(theme: string): void {
     const selected = choice.dataset.themeChoice === theme;
     choice.setAttribute('aria-checked', String(selected));
     choice.tabIndex = selected ? 0 : -1;
-    choice.classList.toggle('ds-item-btn--active', selected);
   }
   updateBrowserTheme();
 }
@@ -153,7 +152,11 @@ function applyTheme(theme: string): void {
 applyTheme(localStorage.getItem(THEME_KEY) || 'auto');
 systemTheme.addEventListener('change', updateBrowserTheme);
 for (const choice of themeChoices) {
-  choice.addEventListener('click', () => { applyTheme(choice.dataset.themeChoice as string); headerMenu.close(); });
+  choice.addEventListener('click', event => {
+    applyTheme(choice.dataset.themeChoice as string);
+    // Radio arrow/assistive activation stays in the group for comparison.
+    if ((event as MouseEvent).detail > 0) headerMenu.close();
+  });
 }
 
 /* Power LED in the header: a router-style network activity indicator

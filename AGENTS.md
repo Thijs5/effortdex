@@ -29,3 +29,16 @@ Headless tests and screenshot inspection are routine verification and do not nee
 - Search for other occurrences of the same pattern and remove superseded implementations where appropriate. Include fixes within the authorized feature scope; describe and queue broader changes instead of silently expanding the task.
 - Prefer spacing and typographic hierarchy to extra boxes. Keep the main action clear, preserve accessible names and focus behavior, and prevent routine state changes from moving neighboring controls.
 - Walk through the user's task: is the next action clear, does feedback explain the result, are mistakes recoverable, and is information available when needed without redundant steps? Check keyboard use, focus after transitions, readable labels, and meanings conveyed beyond color. Record observed usability problems separately from subjective polish; do not claim user validation from tests or screenshots alone.
+
+## Critical UI/UX review
+
+Follow [ADR 0044](docs/adr/0044-critical-ui-ux-review.md). Passing tests and using
+shared tokens do not establish usability or visual consistency.
+
+- Review the whole interaction: entry control → open state → decision → result → dismissal/back. Check trigger/panel side, motion/origin, context, action wording, feedback and focus together; do not review only an isolated screenshot.
+- Name the existing component **and real caller** used for comparison. Reuse the visual meaning as well as the code: a current navigation destination does not automatically inherit a selected item card's color, border or fill. Avoid decorative accent stripes and extra cards without a task-specific reason.
+- Compare equivalent text-start edges and spacing, including title, rows, descriptions and section labels. Account for nested component padding and adopted stylesheet precedence. Keep intentional control-internal padding; do not flatten every inset indiscriminately.
+- Inspect resting/current/selected, hover, keyboard focus, touch release and disabled states separately where relevant. Move the pointer away for resting screenshots. Distinguish persisted selection from sticky hover/tap highlighting; keep keyboard focus visible.
+- Challenge realistic content and context: empty/populated data, long labels, duplicate/conflicting names, switching party/game, and navigation from another screen. Check that the primary next action and current scope remain clear on the first phone viewport.
+- Record material findings with reproduction/evidence, observed behavior, inferred user impact, priority, cause, remedy and recurrence prevention. Separate preferences from defects. Add runtime assertions for repeatable relationships such as panel edge versus trigger and aligned text gutters; verify the original state would fail when practical.
+- State concrete checks and unresolved findings. Never substitute “screenshots reviewed”, “uses the design system” or a test count for a critical assessment. Do not claim native-device or user validation from emulation. Preserve review evidence for material findings and queue remaining work explicitly.

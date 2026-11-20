@@ -21,6 +21,7 @@ for (const [width, height, theme] of [[390,844,'light'], [390,844,'dark'], [320,
     await expect(drawer.getByRole('button', { name: /Training guide/ })).toBeDisabled();
     await expect(drawer.locator('#drawer-context')).toContainText('Choose or create');
     await expect(drawer.getByRole('link', { name: 'Parties', exact: true })).toHaveAttribute('aria-current', 'page');
+    await page.screenshot({ path:info.outputPath('drawer-parties.png'), animations:'disabled' });
     await page.keyboard.press('Escape');
     await expect(menu).toBeFocused();
     await expect(menu).toHaveAttribute('aria-expanded', 'false');
@@ -31,6 +32,10 @@ for (const [width, height, theme] of [[390,844,'light'], [390,844,'dark'], [320,
     expect(await page.locator('.party-identity-row').boundingBox()).toEqual(contentBefore);
     await expect(drawer.locator('#drawer-party')).toHaveAttribute('aria-current', 'page');
     await expect(drawer.locator('#drawer-context')).toContainText('FireRed');
+    const textEdges = await drawer.locator('h2, .drawer-copy, #drawer-context, #theme-group-label').evaluateAll(els => els.filter(el => el.getBoundingClientRect().width > 0).map(el => el.getBoundingClientRect().left));
+    expect(Math.max(...textEdges) - Math.min(...textEdges)).toBeLessThanOrEqual(1);
+    await expect(drawer.locator('[aria-current="page"] .drawer-current')).toBeVisible();
+    await expect(drawer.locator('#drawer-party-name')).toHaveText('My FireRed adventure');
     await drawer.locator('h2').hover();
     await page.screenshot({ path: info.outputPath('drawer-resting.png'), animations:'disabled' });
     await drawer.getByRole('button', { name: 'Settings', exact: true }).hover();
@@ -43,6 +48,8 @@ for (const [width, height, theme] of [[390,844,'light'], [390,844,'dark'], [320,
     await page.reload();
     await menu.click();
     await expect(drawer.getByRole('button', { name: 'Settings', exact: true })).toHaveAttribute('aria-current', 'page');
+    await drawer.locator('h2').hover();
+    await page.screenshot({ path:info.outputPath('drawer-settings.png'), animations:'disabled' });
     await drawer.getByRole('button', { name: /Training guide/ }).click();
     const search = page.locator('#guide-search');
     await expect(search.getByRole('combobox', { name: 'Search a species…' })).toBeVisible();
@@ -82,6 +89,9 @@ test('drawer keyboard stays contained and sticky Menu remains available after sc
   await drawer.getByRole('radio', { name:'Dark', exact:true }).focus();
   await page.keyboard.press('ArrowRight');
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
+  await expect(drawer.getByRole('radio', { name:'Light', exact:true })).toBeFocused();
+  await expect(drawer).toBeVisible();
+  await page.keyboard.press('Escape');
   await expect(menu).toBeFocused();
 });
 
@@ -104,4 +114,14 @@ test('large text and a short phone keep drawer controls reachable', async ({ pag
   await page.screenshot({ path:info.outputPath('drawer-large-text.png') });
   await theme.click();
   await expect(drawer).not.toBeVisible();
+});
+
+
+test('a party named Settings remains distinct from the Settings destination', async ({ page }) => {
+  await page.goto('/');
+  await createParty(page, { name:'Settings', baseGame:'FireRed' });
+  await page.getByRole('button', { name:'Menu', exact:true }).click();
+  const drawer = page.getByRole('dialog', { name:'Navigation' });
+  await expect(drawer.getByRole('link', { name:'Current party Settings', exact:true })).toBeVisible();
+  await expect(drawer.getByRole('button', { name:'Settings', exact:true })).toBeVisible();
 });

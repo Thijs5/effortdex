@@ -16,5 +16,6 @@ paths, with one sticky app header and the existing page action bars below it.
 
 The drawer opens on the right, matching the right-hand Menu trigger. Review
 trigger and panel together, including opening side and the exposed backdrop.
-Use shared icon and selected-choice styling instead of drawer-specific glyphs
-or selection underlines.
+Use shared SVG icons. Per ADR 0044, navigation uses normal ink, stronger
+text and a small current-page checkmark, without a filled pill or accent stripe.
+The title, row labels, descriptions and Theme label share one text gutter.

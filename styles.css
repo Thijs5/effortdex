@@ -218,28 +218,32 @@ html:not([data-modal-open], :has(dialog[open])):has(#import-view:not([hidden])) 
   .view-nav > .ds-btn { transition: none; }
 }
 
-/* Shell drawer: shared dialog chrome with a side-anchored footprint. */
+/* Shell drawer: one text gutter; current location is not a selected card. */
 dialog.app-drawer {
+  --drawer-gutter: var(--space-4);
   position:fixed; inset:0 0 0 auto; margin:0; width:min(320px, calc(100vw - 36px));
-  max-width:none; height:100dvh; max-height:100dvh; border:0;
-  border-left:1px solid var(--line); border-radius:0; padding:0;
+  max-width:none; height:100dvh; max-height:100dvh; border:0; border-radius:0; padding:0;
   background:var(--surface); color:var(--ink);
 }
 dialog.app-drawer[open] { display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:auto minmax(0,1fr); overflow:hidden; }
-dialog.app-drawer .dialog-body { min-width:0; overflow-y:auto; padding-bottom:calc(var(--space-5) + env(safe-area-inset-bottom, 0px)); }
+dialog.app-drawer .ds-dialog-header { padding-inline:var(--drawer-gutter); }
+dialog.app-drawer .dialog-body { min-width:0; overflow-y:auto; padding:var(--space-3) 0 calc(var(--space-5) + env(safe-area-inset-bottom, 0px)); }
 .drawer-links { display:grid; gap:var(--space-1); }
-.drawer-links .ds-btn { justify-content:flex-start; text-align:left; white-space:normal; min-height:48px; text-decoration:none; color:var(--ink); }
-.drawer-links .ds-btn[aria-current="page"] { background:var(--teal-soft); color:var(--teal-strong); box-shadow:inset 3px 0 var(--teal); font-weight:700; }
+.drawer-links .ds-btn { display:flex; align-items:center; gap:var(--space-3); padding:var(--space-3) var(--drawer-gutter); justify-content:flex-start; text-align:left; white-space:normal; min-height:48px; border-radius:0; text-decoration:none; color:var(--ink); }
+.drawer-links .ds-btn[aria-current="page"] { font-weight:700; }
+.drawer-current { width:16px; height:16px; flex:none; margin-left:auto; visibility:hidden; }
+[aria-current="page"] > .drawer-current { visibility:visible; }
+.drawer-links .ds-btn:focus-visible { outline-offset:-3px; }
 .drawer-links .ds-btn[hidden] { display:none; }
-#drawer-guide { display:flex; flex-direction:column; align-items:flex-start; gap:var(--space-1); }
+.drawer-copy { min-width:0; display:grid; gap:var(--space-1); overflow-wrap:anywhere; }
 .drawer-secondary { color:var(--ink-soft); font-size:var(--font-size-2xs); font-weight:400; }
-#drawer-context { margin:0 var(--space-4) var(--space-2); font-size:var(--font-size-2xs); overflow-wrap:anywhere; }
-.drawer-theme { margin-top:var(--space-4); padding-top:var(--space-4); border-top:1px solid var(--line); }
+#drawer-context { margin:0 var(--drawer-gutter) var(--space-2); font-size:var(--font-size-2xs); overflow-wrap:anywhere; }
+.drawer-theme { margin:var(--space-4) var(--drawer-gutter) 0; padding-top:var(--space-4); border-top:1px solid var(--line); }
 .header-menu-label { margin:0 0 var(--space-2); font-size:var(--font-size-2xs); color:var(--ink-soft); }
 .drawer-theme [role="radiogroup"] { display:flex; flex-wrap:wrap; gap:var(--space-1); }
-.header-menu-item { width:auto; flex:1; display:flex; align-items:center; justify-content:center; gap:var(--space-2); min-height:44px; padding:var(--space-2); }
+.drawer-theme .header-menu-item { font-size:var(--font-size-sm); width:auto; flex:1; display:flex; align-items:center; justify-content:center; gap:var(--space-2); min-height:44px; padding:var(--space-2); }
 .header-menu-item svg { width:16px; height:16px; flex:none; }
-
+.header-menu-item[aria-checked="true"] { background:var(--lcd); border-color:var(--ink-soft); color:var(--ink); font-weight:700; }
 
 /* ---------- shared bits ---------- */
 .roster-panel-head {
@@ -659,7 +663,7 @@ dialog.app-drawer .dialog-body { min-width:0; overflow-y:auto; padding-bottom:ca
   background: var(--surface);
   cursor: pointer;
 }
-.party-slot:hover { border-color: var(--teal); }
+@media (hover: hover) and (pointer: fine) { .party-slot:hover { border-color: var(--teal); } }
 .battle-slot .battle-slot-menu-btn {
   width: 100%;
   min-width: 44px;
@@ -1518,7 +1522,7 @@ textarea.ds-field { resize: vertical; }
 .battle-opponents:has(.battle-recents[hidden]) .battle-current { flex: 1; }
 .battle-opponents > div > .battle-sheet-eyebrow { display: block; margin: 0 0 var(--space-2); font-size: var(--font-size-2xs); line-height: 18px; white-space: nowrap; }
 .battle-opponent-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-1); flex: none; width: 100%; height: var(--opponent-height); min-width: 0; padding: var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--lcd); color: var(--ink); text-align: center; cursor: pointer; }
-.battle-opponent-card:hover { border-color: var(--teal); }
+@media (hover: hover) and (pointer: fine) { .battle-opponent-card:hover { border-color: var(--teal); } }
 .battle-opponent-art { width: 64px; height: 64px; display: grid; place-items: center; font-size: 28px; color: var(--ink-soft); }
 .battle-opponent-art img { width: 64px; height: 64px; image-rendering: pixelated; object-fit: contain; }
 .battle-opponent-copy { display: grid; gap: var(--space-1); min-width: 0; }
@@ -1526,7 +1530,8 @@ textarea.ds-field { resize: vertical; }
 .battle-recents { flex: 1; min-width: 144px; display: flex; flex-direction: column; align-self: flex-start; }
 #battle-recent-opponents { height: var(--opponent-height); grid-auto-rows: minmax(0, 1fr); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-1); }
 .battle-recent-card { display: grid; justify-items: center; align-content: center; gap: var(--space-1); min-width: 0; min-height: 76px; padding: var(--space-1); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; }
-.battle-recent-card:hover { border-color: var(--teal); }
+@media (hover: hover) and (pointer: fine) { .battle-recent-card:hover { border-color: var(--teal); } }
+.battle-opponent-card:active, .battle-recent-card:active { border-color:var(--ink-soft); }
 .battle-recent-card img { width: 40px; height: 40px; object-fit: contain; image-rendering: pixelated; }
 .battle-recent-card span { width: 100%; overflow: hidden; text-overflow: ellipsis; font-size: var(--font-size-2xs); }
 #battle-opponent-hint, #battle-result-summary { font-size: var(--font-size-xs); color: var(--ink-soft); }

@@ -15,7 +15,7 @@ export function initializeNavigation(openGuide: () => void): void {
     const route = router.currentRoute();
     partyLink.hidden = !party;
     partyLink.href = router.partyPath(party?.slug);
-    partyLink.textContent = party?.name ?? 'Current party';
+    partyLink.querySelector('#drawer-party-name')!.textContent = party?.name ?? '';
     guide.disabled = !party;
     context.textContent = party ? `Game: ${party.baseGame || 'Not selected'}` : 'Choose or create a party to browse its game’s Pokémon.';
     for (const item of drawer.querySelectorAll<HTMLElement>('[data-destination]')) {
@@ -72,7 +72,9 @@ export function initializeNavigation(openGuide: () => void): void {
     if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(key)) return;
     event.preventDefault();
     const step = ['ArrowLeft', 'ArrowUp'].includes(key) ? -1 : 1;
-    radios[(radios.indexOf(document.activeElement as HTMLElement) + step + radios.length) % radios.length].click();
+    const next = radios[(radios.indexOf(document.activeElement as HTMLElement) + step + radios.length) % radios.length];
+    next.focus();
+    next.click();
   });
   const header = document.querySelector<HTMLElement>('.app-header')!;
   new ResizeObserver(() => document.documentElement.style.setProperty('--app-header-height', `${header.getBoundingClientRect().height}px`)).observe(header);

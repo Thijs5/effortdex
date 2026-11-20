@@ -73,25 +73,25 @@
       <header class="ds-dialog-header"><h2 id="navigation-title" tabindex="-1">Navigation</h2><button class="ds-dialog-close" type="button" aria-label="Close navigation"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M6 6l12 12M18 6 6 18"/></svg></button></header>
       <div class="dialog-body">
         <nav aria-label="Main navigation" class="drawer-links">
-          <a class="ds-btn ds-btn--plain" href="#/parties" data-destination="parties">Parties</a>
-          <a id="drawer-party" class="ds-btn ds-btn--plain" href="#/parties" data-destination="party">Current party</a>
-          <button id="drawer-guide" class="ds-btn ds-btn--plain" type="button">Training guide <span class="drawer-secondary">Pokédex &amp; training reference</span></button>
+          <a class="ds-btn ds-btn--plain" href="#/parties" data-destination="parties"><span class="drawer-copy">Parties</span><svg class="drawer-current" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg></a>
+          <a id="drawer-party" class="ds-btn ds-btn--plain" href="#/parties" data-destination="party"><span class="drawer-copy">Current party<span id="drawer-party-name" class="drawer-secondary"></span></span><svg class="drawer-current" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg></a>
+          <button id="drawer-guide" class="ds-btn ds-btn--plain" type="button"><span class="drawer-copy">Training guide<span class="drawer-secondary">Pokédex &amp; training reference</span></span></button>
           <p id="drawer-context" class="hint"></p>
-          <button id="drawer-transfer" class="ds-btn ds-btn--plain" type="button" data-destination="transfer">Transfer</button>
-          <button id="settings-btn" class="ds-btn ds-btn--plain" type="button" data-destination="settings">Settings</button>
+          <button id="drawer-transfer" class="ds-btn ds-btn--plain" type="button" data-destination="transfer"><span class="drawer-copy">Transfer</span><svg class="drawer-current" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg></button>
+          <button id="settings-btn" class="ds-btn ds-btn--plain" type="button" data-destination="settings"><span class="drawer-copy">Settings</span><svg class="drawer-current" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m5 12 4 4L19 6"/></svg></button>
         </nav>
         <div class="drawer-theme">
           <p class="header-menu-label" id="theme-group-label">Theme</p>
           <div role="radiogroup" aria-labelledby="theme-group-label">
-            <button class="header-menu-item ds-item-btn" type="button" role="radio" aria-checked="false" data-theme-choice="auto">
+            <button class="header-menu-item ds-btn ds-btn--ghost" type="button" role="radio" aria-checked="false" data-theme-choice="auto">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"/></svg>
               <span>Auto</span>
             </button>
-            <button class="header-menu-item ds-item-btn" type="button" role="radio" aria-checked="false" data-theme-choice="dark">
+            <button class="header-menu-item ds-btn ds-btn--ghost" type="button" role="radio" aria-checked="false" data-theme-choice="dark">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
               <span>Dark</span>
             </button>
-            <button class="header-menu-item ds-item-btn" type="button" role="radio" aria-checked="false" data-theme-choice="light">
+            <button class="header-menu-item ds-btn ds-btn--ghost" type="button" role="radio" aria-checked="false" data-theme-choice="light">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
               <span>Light</span>
             </button>

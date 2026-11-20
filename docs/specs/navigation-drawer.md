@@ -13,7 +13,8 @@ color. Show current-party/game context; disable party/guide actions when no part
 exists and explain choosing a party. No fabricated global game setting.
 
 Opening does not shift or shrink the page at any width. Close after choosing a
-destination or theme, with Close, Escape or backdrop. Restore focus to Menu on
+destination or pointer-selected theme. Keyboard theme changes stay in the radio
+group; Close, Escape or backdrop dismiss the drawer. Restore focus to Menu on
 dismissal. Support Tab containment, keyboard destination activation, existing
 theme persistence, back/forward and reload. Preserve current utility return links
 and saved party data. Drawer always starts closed. The global header remains
@@ -82,3 +83,29 @@ The new geometry assertions would fail the original left-anchored panel.
 
 Corrective batch validation: 389 unit tests, 203 full-suite Playwright tests
 (including WebKit right-edge checks), typecheck and production build passed.
+
+
+## Critical review after user feedback
+
+Supersedes the filled teal active-state decisions above. Sidebar navigation now
+uses normal ink, weight and a trailing checkmark; no active pill/stripe or panel
+accent edge. One `--drawer-gutter` governs title, destination labels, descriptions,
+game context and Theme label. Full-width rows own their horizontal inset; the
+body does not add another copy. Theme controls use neutral shared ghost buttons.
+Their local layout selector must outrank the adopted shared button sheet so its
+padding/size do not silently drift at 320px.
+
+The current-party link keeps a fixed “Current party” label and a separate name,
+so a party named Settings cannot impersonate the Settings destination. Theme
+arrow navigation changes selection/focus inside the group; Escape dismisses it.
+Pointer theme selection retains the existing close-after-pick behavior.
+
+Critical review and retained screenshots: [sidebar review](../reviews/2026-11-20-sidebar.md).
+ADR 0044 and AGENTS.md now require task/trigger context, semantic state review,
+actual comparison callers, state-separated screenshots and measured text edges.
+Focused checks cover aligned text gutters, name collisions, one visible current
+indicator, keyboard-radio continuity and existing navigation/size behavior.
+
+Latest batch: 389 unit tests, 207 end-to-end tests (including WebKit), typecheck
+and build passed. The review report records the remaining out-of-scope app
+recommendations instead of claiming the whole application is free of UI issues.

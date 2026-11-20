@@ -11,6 +11,8 @@ const css = `
   *, *::before, *::after { box-sizing: border-box; }
   [hidden] { display: none !important; }
 
+  button, .ds-btn, [role="option"] { -webkit-tap-highlight-color: transparent; }
+
   .ds-field {
     width: 100%;
     padding: var(--space-3) var(--space-4);
@@ -37,14 +39,14 @@ const css = `
   .ds-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
   .ds-btn--solid { background: var(--teal); color: var(--on-teal); }
-  .ds-btn--solid:hover:not(:disabled) { background: var(--teal-strong); }
+  @media (hover: hover) and (pointer: fine) { .ds-btn--solid:hover:not(:disabled) { background: var(--teal-strong); } }
 
   .ds-btn--outline {
     background: var(--surface);
     border: 1px solid var(--lcd-line);
     color: var(--teal);
   }
-  .ds-btn--outline:hover:not(:disabled) { background: var(--teal-soft); }
+  @media (hover: hover) and (pointer: fine) { .ds-btn--outline:hover:not(:disabled) { background: var(--teal-soft); } }
 
   .ds-btn--sm { padding: var(--space-2) var(--space-3); font-size: var(--font-size-2xs); min-height: 30px; }
 
@@ -60,7 +62,7 @@ const css = `
     font-size: var(--font-size-md);
     transition: transform var(--transition-fast), box-shadow var(--transition-fast), opacity var(--transition-fast);
   }
-  .ds-btn--primary:not(:disabled):hover { transform: translateY(-1px); }
+  @media (hover: hover) and (pointer: fine) { .ds-btn--primary:not(:disabled):hover { transform: translateY(-1px); } }
   .ds-btn--primary:not(:disabled):active { transform: translateY(1px); box-shadow: 0 1px 0 var(--accent-dark); }
 
   .ds-btn--ghost {
@@ -71,9 +73,10 @@ const css = `
     font-size: var(--font-size-md);
   }
   .ds-btn--plain { background: transparent; color: var(--ink-soft); }
-  .ds-btn--plain:hover:not(:disabled),
-  .ds-btn--ghost:hover:not(:disabled) { background: var(--lcd); color: var(--ink); }
-  .ds-btn--danger:hover:not(:disabled) { background: var(--danger-soft); color: var(--poke-red); border-color: var(--poke-red); }
+  @media (hover: hover) and (pointer: fine) {
+    .ds-btn--plain:hover:not(:disabled), .ds-btn--ghost:hover:not(:disabled) { background: var(--lcd); color: var(--ink); }
+  }
+  @media (hover: hover) and (pointer: fine) { .ds-btn--danger:hover:not(:disabled) { background: var(--danger-soft); color: var(--poke-red); border-color: var(--poke-red); } }
 
   @media (max-width: 640px) {
     .ds-btn, .ds-field { min-height: 44px; }
@@ -245,7 +248,7 @@ const css = `
     color: var(--ink-soft);
     cursor: pointer;
   }
-  .ds-dialog-close:hover { background: var(--lcd); color: var(--ink); }
+  @media (hover: hover) and (pointer: fine) { .ds-dialog-close:hover { background: var(--lcd); color: var(--ink); } }
   .ds-dialog-close svg { width: 16px; height: 16px; }
 
   /* <details> disclosure with the ▸/▾ marker, shared by the party
@@ -282,7 +285,7 @@ const css = `
     touch-action: manipulation;
     transition: background var(--transition-fast), border-color var(--transition-fast);
   }
-  .ds-item-btn:hover { border-color: var(--teal); }
+  @media (hover: hover) and (pointer: fine) { .ds-item-btn:hover { border-color: var(--teal); } }
   .ds-item-btn--active { background: var(--teal-soft); border-color: var(--teal); color: var(--teal-strong); }
   .ds-item-icon { width: 22px; height: 22px; object-fit: contain; image-rendering: pixelated; flex: 0 0 auto; }
   .ds-item-btn-text { display: grid; gap: 0.1em; min-width: 0; }

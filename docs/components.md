@@ -179,5 +179,11 @@ Relevant decisions: [tokens](adr/0003-design-tokens-system.md),
 App navigation composes shared light-DOM dialog chrome and plain buttons in
 `index.html`, with routing/focus in `lib/app-navigation.ts`. Page callbacks are
 supplied by `app.ts`; it is shell-specific rather than a general drawer API.
-The panel opens on the right beside Menu. Theme radios compose `ds-item-btn`
-and its selected modifier, matching existing choice controls.
+The panel opens on the right beside Menu. Navigation uses flat `ds-btn--plain`
+rows and a current-page checkmark. Theme radios use neutral `ds-btn--ghost`
+controls; the current choice uses the existing neutral surface/text tokens.
+
+Shared button/item hover decoration requires `(hover: hover) and (pointer: fine)`.
+Touch release must not resemble persisted selection; native tap-color overlays
+are suppressed on shared buttons/options, while keyboard `:focus-visible` and
+semantic pressed/selected state remain available.
