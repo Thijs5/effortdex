@@ -28,7 +28,7 @@ test.describe('Adding a Pokémon', () => {
     await createParty(page, { name: 'Emerald Nuzlocke', baseGame: 'Emerald' });
     await pickSpecies(page, 'Bulbasaur');
     await expect(page.locator('dialog#add-pokemon-dialog').getByLabel('Nature')).toBeVisible();
-    await page.getByRole('button', { name: 'Cancel' }).click();
+    await page.locator('#add-pokemon-dialog').getByRole('button', { name: 'Close', exact: true }).click();
 
     await page.getByRole('link', { name: '← All parties' }).click();
     await createParty(page, { name: 'Red Solo Run', baseGame: 'Red' });

@@ -1,5 +1,7 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
+import { readFileSync } from 'node:fs';
+import { gzipSync } from 'node:zlib';
 import { createParty } from './support/party.js';
 import { addPokemon, rosterRow } from './support/pokemon.js';
 import { mockPokeApi } from './support/pokeapi-mock.js';
@@ -12,6 +14,46 @@ import { mockPokeApi } from './support/pokeapi-mock.js';
 // means — two independent localStorage stores.
 
 test.describe('Transfer', () => {
+  test('a large file stays off the URL and its final row can be selected on a phone', async ({ page }) => {
+    await page.setViewportSize({ width: 320, height: 640 });
+    const { parties: [party] } = JSON.parse(readFileSync(new URL('../test/fixtures/roster-blob-multi-party.json', import.meta.url), 'utf8'));
+    const entry = party.pokemon[0];
+    const pokemon = Array.from({ length: 240 }, (_, i) => ({
+      ...entry,
+      uid: `transfer-pokemon-${i}`,
+      nickname: `Partner ${i + 1}`,
+      events: [
+        entry.events[0],
+        ...Array.from({ length: 60 }, (_, j) => ({ ...entry.events[1], id: `battle-${i}-${j}` })),
+      ],
+    }));
+    const payload = gzipSync(JSON.stringify([{ ...party, pokemon }])).toString('base64url');
+
+    await page.goto('/#/transfer/import');
+    const importView = page.locator('#import-view');
+    await importView.locator('input[type=file]').setInputFiles({
+      name: 'large-transfer.txt',
+      mimeType: 'text/plain',
+      buffer: Buffer.from(`1:${payload}`),
+    });
+    const all = importView.getByRole('checkbox', { name: /Select all Pokémon/ });
+    const submit = importView.getByRole('button', { name: 'Import selected (240)' });
+    await expect(submit).toBeEnabled();
+    await expect(submit).toBeInViewport({ ratio: 1 });
+    await expect(page).toHaveURL(/#\/transfer\/import$/);
+    await all.uncheck();
+    await expect(importView.getByRole('button', { name: 'Import selected (0)' })).toBeDisabled();
+    const last = importView.getByRole('checkbox', { name: /Partner 240/ });
+    await last.scrollIntoViewIfNeeded();
+    await last.check();
+    await expect(last).toBeInViewport({ ratio: 1 });
+    await expect(all).toHaveJSProperty('indeterminate', true);
+    await importView.getByRole('button', { name: 'Import selected (1)' }).click();
+    await page.getByRole('link', { name: /HeartGold Overhaul/ }).click();
+    await expect(rosterRow(page, 'Partner 240')).toBeVisible();
+    await expect(page.locator('.roster-card')).toHaveCount(1);
+  });
+
   test('a transfer link opens on a second device and imports the party and its Pokémon', async ({ page, browser }) => {
     // The import flow itself (below, on `otherPage`) makes no PokéAPI
     // calls — only the first device's add does — so only this page

@@ -7,6 +7,15 @@ import { pickBaseGame } from './support/party.js';
 // service worker. This exercises the first-visit gap directly instead
 // of inheriting the normal suite's forced caching-off localhost mode.
 test.use({ serviceWorkers: 'block' });
+test.beforeEach(async ({ page }, info) => {
+  const sourceOrigin = String(info.project.use.baseURL || 'http://localhost:5173');
+  await page.route('https://effortdex.test/**', async (route) => {
+    const url = route.request().url().replace('https://effortdex.test', sourceOrigin.replace(/\/$/, ''));
+    const response = await route.fetch({ url });
+    await route.fulfill({ response });
+  });
+  await mockPokeApi(page);
+});
 test.afterEach(async ({ page }) => {
   // Finish secure-origin proxy handlers before the test context closes;
   // a reload can still have a version check in flight after the assertions.
@@ -15,13 +24,6 @@ test.afterEach(async ({ page }) => {
 for (const cacheSprites of [true, false]) {
   test(`party creation ${cacheSprites ? 'caches sprites without a worker' : 'honours an unchecked sprite checkbox'}`, async ({ page }, info) => {
     test.setTimeout(60000);
-    const sourceOrigin = String(info.project.use.baseURL || 'http://localhost:5173');
-    await page.route('https://effortdex.test/**', async (route) => {
-      const url = route.request().url().replace('https://effortdex.test', sourceOrigin.replace(/\/$/, ''));
-      const response = await route.fetch({ url });
-      await route.fulfill({ response });
-    });
-    await mockPokeApi(page);
     /** @type {string[]} */
     const versionedRequests = [];
     page.on('request', (request) => {
@@ -66,3 +68,33 @@ for (const cacheSprites of [true, false]) {
     }
   });
 }
+
+test('manual caching reports saved sprites while a download is still in progress', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 700 });
+  await page.route('**/pokeapi.co/api/v2/generation/1', route => route.fulfill({
+    json: { pokemon_species: [
+      { name: 'bulbasaur', url: 'https://pokeapi.co/api/v2/pokemon-species/1/' },
+      { name: 'charmander', url: 'https://pokeapi.co/api/v2/pokemon-species/4/' },
+    ] },
+  }));
+  let resumeDownload = () => {};
+  const secondSprite = new Promise(resolve => { resumeDownload = () => resolve(undefined); });
+  await page.route('**/generation-i/red-blue/4.png', async route => {
+    await secondSprite;
+    await route.fallback();
+  });
+
+  await page.goto('https://effortdex.test/#/settings/cache');
+  await page.getByText('Generation I', { exact: true }).click();
+  const row = page.locator('.sprite-cache-row', { hasText: 'Red & Blue' });
+  const count = row.locator('[data-count]');
+  try {
+    await row.getByRole('button', { name: 'Cache', exact: true }).click();
+    await expect(row.getByRole('button', { name: 'Caching… 1/2' })).toBeDisabled();
+    await expect(count).toHaveText('1 / 2 sprites cached');
+  } finally {
+    resumeDownload();
+  }
+  await expect(row.getByRole('button', { name: 'Cache', exact: true })).toBeEnabled();
+  await expect(count).toHaveText(/2 \/ 2 sprites cached/);
+});

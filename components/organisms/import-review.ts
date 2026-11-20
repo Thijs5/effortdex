@@ -1,10 +1,9 @@
 import { BaseElement } from '../base-element.ts';
 import { store } from '../../lib/services.ts';
-import { decodeTransferPayload } from '../../lib/transfer.ts';
 import * as router from '../../lib/router.ts';
 import { titleCase, totalEvs, escapeHtml } from '../../lib/utils.ts';
 import { FALLBACK_SPRITE, FALLBACK_ONERROR } from '../../lib/constants.ts';
-import type { ExportedParty } from '../../lib/store.ts';
+import type { ImportRequest, ImportResponse } from '../../import-worker.ts';
 
 const PROMPT_MESSAGE = 'Paste a transfer link, or choose a saved transfer file.';
 
@@ -34,8 +33,11 @@ export class ImportReview extends BaseElement {
         .paste-row input { flex: 1; min-width: 0; }
         .divider { display: flex; align-items: center; gap: var(--space-3); margin: var(--space-4) 0; color: var(--ink-soft); font-size: var(--font-size-2xs); text-transform: uppercase; letter-spacing: 0.08em; }
         .divider::before, .divider::after { content: ''; flex: 1; height: 1px; background: var(--lcd-line); }
-        .file-picker input[type="file"] { display: none; }
+        .file-picker input[type="file"] { position: absolute; width: 1px; height: 1px; clip-path: inset(50%); }
+        .file-picker input:focus-visible + label { outline: 3px solid var(--teal); outline-offset: 2px; }
+        .file-picker label { display: inline-flex; align-items: center; min-height: 44px; }
         .status { margin: var(--space-3) 0 0; font-size: var(--font-size-2xs); color: var(--ink-soft); }
+        .ds-btn, .ds-pill-badge { white-space: nowrap; }
 
         .party-group {
           padding-bottom: var(--space-4);
@@ -48,13 +50,14 @@ export class ImportReview extends BaseElement {
           border-bottom: none;
         }
         .party-header {
-          display: flex;
-          align-items: flex-start;
-          justify-content: space-between;
-          gap: var(--space-3);
+          display: grid;
+          grid-template-columns: auto minmax(0, 1fr) auto;
+          align-items: center;
+          gap: var(--space-2);
           margin-bottom: var(--space-3);
+          padding-inline-end: var(--space-3);
         }
-        .party-name { margin: 0; font-family: var(--font-display); font-size: var(--font-size-lg); display: inline-flex; gap: var(--space-2); align-items: center; }
+        .party-name { margin: 0; font-family: var(--font-display); font-size: var(--font-size-lg); overflow-wrap: anywhere; }
         .party-meta {
           margin: var(--space-1) 0 0;
           font-size: var(--font-size-2xs);
@@ -64,6 +67,12 @@ export class ImportReview extends BaseElement {
           color: var(--ink-soft);
         }
         .rows { display: grid; gap: var(--space-2); }
+        .row { gap: var(--space-2); }
+        .row, .row input { scroll-margin-block-end: calc(44px + 2 * var(--space-3) + env(safe-area-inset-bottom, 0px)); }
+        .row:has(input:checked) { border-color: var(--teal); }
+        .row:has(input:focus-visible) { outline: 3px solid var(--teal); outline-offset: 2px; }
+        .selection { display: grid; place-items: center; min-width: 44px; min-height: 44px; cursor: pointer; }
+        input[type="checkbox"] { width: 1rem; height: 1rem; margin: 0; accent-color: var(--teal); cursor: pointer; }
         .row-sprite {
           width: 28px;
           height: 28px;
@@ -72,24 +81,24 @@ export class ImportReview extends BaseElement {
           flex: 0 0 auto;
         }
         .row-text { display: grid; gap: 0.15em; min-width: 0; flex: 1; }
-        .row-name { font-weight: 600; }
-        .row-detail { display: flex; align-items: center; gap: var(--space-2); font-size: var(--font-size-2xs); color: var(--ink-soft); }
-        .badge-new { background: var(--gold-soft); }
+        .row-name { color: var(--ink); font-size: var(--font-size-sm); overflow-wrap: anywhere; }
+        .row-detail { font-size: var(--font-size-2xs); color: var(--ink-soft); }
+        .badge-current { background: var(--lcd); color: var(--ink-soft); }
 
         .footer {
           position: sticky;
           bottom: 0;
-          padding-top: var(--space-4);
-          margin-top: calc(-1 * var(--space-2));
+          padding-block: var(--space-3) calc(var(--space-3) + env(safe-area-inset-bottom, 0px));
+          margin-top: var(--space-4);
           background: var(--paper-panel);
           border-top: 1px solid var(--line);
         }
         .footer[hidden] { display: none; }
-        .footer-inner { padding-top: var(--space-3); }
+        .footer .ds-btn { width: 100%; min-height: 44px; }
       </style>
 
       <div class="intake">
-        <p class="intake-message"></p>
+        <p class="intake-message" role="status"></p>
         <form class="paste-row">
           <input class="ds-field" type="text" placeholder="Paste a transfer link here" aria-label="Transfer link" />
           <button type="button" class="ds-btn ds-btn--outline" data-action="paste">Paste</button>
@@ -97,17 +106,15 @@ export class ImportReview extends BaseElement {
         </form>
         <div class="divider">or</div>
         <div class="file-picker">
-          <label class="ds-btn ds-btn--outline" for="transfer-file-input">Choose a transfer file&hellip;</label>
           <input id="transfer-file-input" type="file" accept=".txt,text/plain" />
+          <label class="ds-btn ds-btn--outline" for="transfer-file-input">Choose a transfer file&hellip;</label>
         </div>
         <p class="status" aria-live="polite"></p>
       </div>
 
       <div class="parties"></div>
       <div class="footer" hidden>
-        <div class="footer-inner">
-          <button type="button" class="ds-btn ds-btn--primary" data-action="import" disabled>Import selected (0)</button>
-        </div>
+        <button type="button" class="ds-btn ds-btn--primary" data-action="import" disabled>Import selected (0)</button>
       </div>
     `;
 
@@ -121,10 +128,10 @@ export class ImportReview extends BaseElement {
   $parties: HTMLElement;
   $footer: HTMLElement;
   $importBtn: HTMLButtonElement;
-  _parties: ExportedParty[] | null = null; // decoded payload (Store#exportPayload shape)
   _preview: ImportPreview | null = null; // Store#previewImport output
   _selected = new Set<string>();
-  _loadedPayload: string | null = null;
+  _routePayload: string | null | undefined;
+  _worker: Worker | null = null;
 
   constructor() {
     super();
@@ -150,14 +157,10 @@ export class ImportReview extends BaseElement {
     this._showIntake(PROMPT_MESSAGE);
   }
 
-  // The URL is the single source of truth for what's loaded: pasting a
-  // link/payload or picking a file navigates to #/transfer/import/<payload>
-  // rather than loading it in place, so the address bar always matches
-  // what's on screen (shareable, bookmarkable, survives a refresh).
-  // app.js's route-change handler is what actually calls `_load` below,
-  // via the `payload` setter.
+  // Shared links are bookmarkable. Local files stay in this review session.
   set payload(str: string | null | undefined) {
-    if (str === this._loadedPayload) return; // already showing this exact payload
+    if (str === this._routePayload) return;
+    this._routePayload = str;
     if (str) this._load(str);
     else this._showIntake(PROMPT_MESSAGE);
   }
@@ -189,20 +192,20 @@ export class ImportReview extends BaseElement {
     router.navigateToPath(router.importPath(payload));
   }
 
-  async _loadFromFile(): Promise<void> {
+  _loadFromFile(): void {
     const file = this.$fileInput.files?.[0];
     this.$fileInput.value = ''; // let picking the same file again re-fire 'change'
-    if (!file) return;
-    const payload = (await file.text()).trim();
-    router.navigateToPath(router.importPath(payload));
+    if (file) this._load(file);
   }
 
   _showIntake(message: string, isError = false): void {
-    this._parties = null;
+    this._worker?.terminate();
+    this._worker = null;
     this._preview = null;
-    this._selected = new Set();
-    this._loadedPayload = null;
+    this._selected.clear();
+    this.$parties.replaceChildren();
     this.$parties.hidden = true;
+    this.$parties.inert = false;
     this.$footer.hidden = true;
     this.$intake.hidden = false;
     this.$intakeMessage.textContent = message;
@@ -210,19 +213,39 @@ export class ImportReview extends BaseElement {
     this.$status.textContent = '';
   }
 
-  async _load(str: string): Promise<void> {
+  _load(source: File | string): void {
     this._showIntake('Reading transfer data…');
+    const fail = () => this._showIntake('Could not read this transfer. Try opening the file or link again.', true);
 
     try {
-      this._parties = await decodeTransferPayload(str);
+      const worker = new Worker(new URL('import-worker.js', document.baseURI), { type: 'module' });
+      this._worker = worker;
+      worker.onmessage = ({ data }: MessageEvent<ImportResponse>) => {
+        if (this._worker !== worker) return;
+        if (data.type === 'preview') this._showPreview(data.parties);
+        else if (data.type === 'apply') {
+          store.applyImport(data.parties, new Set(data.selected));
+          router.navigateHome();
+        } else fail();
+      };
+      worker.onerror = () => { if (this._worker === worker) fail(); };
+      worker.onmessageerror = () => { if (this._worker === worker) fail(); };
+      const locals = store.state.parties.map(party => ({
+        id: party.id,
+        pokemon: party.pokemon.map(entry => ({
+          uid: entry.uid,
+          events: entry.events.map(({ id }) => ({ id })),
+        })),
+      }));
+      worker.postMessage({ type: 'preview', source, locals } satisfies ImportRequest);
     } catch {
-      this._showIntake('That link or file is invalid or corrupted. Try again, or ask for a fresh one.', true);
-      return;
+      fail();
     }
-    this._loadedPayload = str;
+  }
 
-    this._preview = store.previewImport(this._parties);
-    for (const party of this._preview) {
+  _showPreview(preview: ImportPreview): void {
+    this._preview = preview;
+    for (const party of preview) {
       for (const mon of party.pokemon) {
         if (mon.isNew || mon.newEventCount > 0) this._selected.add(mon.uid);
       }
@@ -241,66 +264,77 @@ export class ImportReview extends BaseElement {
       const group = document.createElement('div');
       group.className = 'party-group';
 
-      const allUids = party.pokemon.map((m) => m.uid);
-      const allSelected = allUids.length > 0 && allUids.every((uid) => this._selected.has(uid));
-
       group.innerHTML = `
         <div class="party-header">
+          <label class="selection">
+            <input type="checkbox" data-select-all aria-label="Select all Pokémon in ${escapeHtml(party.name)}" />
+          </label>
           <div>
-            <h3 class="party-name">${escapeHtml(party.name)}${party.isNew ? ' <span class="ds-pill-badge badge-new">New party</span>' : ''}</h3>
+            <h3 class="party-name">${escapeHtml(party.name)}</h3>
             ${party.baseGame ? `<p class="party-meta">${escapeHtml(party.baseGame)}</p>` : ''}
           </div>
-          <button type="button" class="ds-btn ds-btn--sm ds-btn--outline" data-select-all>
-            ${allSelected ? 'Deselect all' : 'Select all'}
-          </button>
+          ${party.isNew ? '<span class="ds-pill-badge">New party</span>' : ''}
         </div>
         <div class="rows"></div>
       `;
 
       const rows = group.querySelector('.rows')!;
-      for (const mon of party.pokemon) {
+      rows.innerHTML = party.pokemon.map(mon => {
         const p = mon.preview;
         const displayName = p.nickname || titleCase(p.speciesName);
         const badgeText = mon.isNew ? 'New' : mon.newEventCount > 0 ? `+${mon.newEventCount} events` : 'Up to date';
-        const badgeClass = mon.isNew || mon.newEventCount > 0 ? 'ds-pill-badge badge-new' : 'ds-pill-badge';
-        const selected = this._selected.has(mon.uid);
-
-        const row = document.createElement('button');
-        row.type = 'button';
-        row.className = 'ds-item-btn';
-        if (selected) row.classList.add('ds-item-btn--active');
-        row.setAttribute('aria-pressed', String(selected));
-        row.innerHTML = `
-          <img class="row-sprite" src="${p.sprite || FALLBACK_SPRITE}" alt="" ${FALLBACK_ONERROR} />
-          <div class="row-text">
+        const badgeClass = mon.isNew || mon.newEventCount > 0 ? 'ds-pill-badge' : 'ds-pill-badge badge-current';
+        return `<label class="row ds-item-btn">
+          <input type="checkbox" value="${escapeHtml(mon.uid)}" ${this._selected.has(mon.uid) ? 'checked' : ''} />
+          <img class="row-sprite" src="${escapeHtml(p.sprite || FALLBACK_SPRITE)}" alt="" loading="lazy" ${FALLBACK_ONERROR} />
+          <span class="row-text">
             <span class="row-name">${escapeHtml(displayName)}</span>
-            <span class="row-detail">Lv. ${p.level} &middot; ${totalEvs(p.evs)} EVs &middot; <span class="${badgeClass}">${badgeText}</span></span>
-          </div>
-        `;
-        row.addEventListener('click', () => {
-          if (this._selected.has(mon.uid)) this._selected.delete(mon.uid);
-          else this._selected.add(mon.uid);
-          this.render();
-        });
-        rows.appendChild(row);
-      }
+            <span class="row-detail">Lv. ${p.level} &middot; ${totalEvs(p.evs)} EVs</span>
+          </span>
+          <span class="${badgeClass}">${badgeText}</span>
+        </label>`;
+      }).join('');
 
-      group.querySelector('[data-select-all]')!.addEventListener('click', () => {
-        if (allSelected) for (const uid of allUids) this._selected.delete(uid);
-        else for (const uid of allUids) this._selected.add(uid);
-        this.render();
+      const selectAll = group.querySelector<HTMLInputElement>('[data-select-all]')!;
+      const checkboxes = [...rows.querySelectorAll<HTMLInputElement>('input')];
+      const syncGroup = () => {
+        const checkedCount = checkboxes.filter(input => input.checked).length;
+        selectAll.disabled = checkboxes.length === 0;
+        selectAll.checked = checkedCount > 0 && checkedCount === checkboxes.length;
+        selectAll.indeterminate = checkedCount > 0 && !selectAll.checked;
+      };
+      const updateSelection = (input: HTMLInputElement) => {
+        if (input.checked) this._selected.add(input.value);
+        else this._selected.delete(input.value);
+      };
+      group.addEventListener('change', ({ target }) => {
+        if (!(target instanceof HTMLInputElement)) return;
+        if (target === selectAll) {
+          for (const input of checkboxes) {
+            input.checked = selectAll.checked;
+            updateSelection(input);
+          }
+        } else updateSelection(target);
+        syncGroup();
+        this._updateImportAction();
       });
-
+      syncGroup();
       this.$parties.appendChild(group);
     }
+    this._updateImportAction();
+  }
+
+  _updateImportAction(): void {
     this.$importBtn.disabled = this._selected.size === 0;
     this.$importBtn.textContent = `Import selected (${this._selected.size})`;
   }
 
   _doImport(): void {
-    if (!this._parties || this._selected.size === 0) return;
-    store.applyImport(this._parties, this._selected);
-    router.navigateHome();
+    if (!this._worker || this.$importBtn.disabled) return;
+    this.$importBtn.disabled = true;
+    this.$importBtn.textContent = 'Importing…';
+    this.$parties.inert = true;
+    this._worker.postMessage({ type: 'apply', selected: [...this._selected] } satisfies ImportRequest);
   }
 }
 customElements.define('import-review', ImportReview);

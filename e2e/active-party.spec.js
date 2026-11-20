@@ -42,6 +42,16 @@ test.describe('Active party and faint tracking', () => {
     // The grid always shows exactly 6 cells — filled + open.
     await expect(page.locator('#battle-party-slots').locator(':scope > *')).toHaveCount(6);
     await expect(battlePartyEmptySlots(page)).toHaveCount(0);
+    for (const width of [320, 390]) {
+      await page.setViewportSize({ width, height: 640 });
+      await page.locator('#party-log-battle-btn').click();
+      const participants = page.locator('#battle-participants .party-slot');
+      await expect(participants).toHaveCount(6);
+      for (const participant of await participants.all()) {
+        await expect(participant).toBeInViewport({ ratio: 1 });
+      }
+      await page.locator('#battle-search .sheet-close').click();
+    }
 
     // A 7th joins the roster (the whole box) but not the active six.
     await addPokemon(page, 'Mewtwo');
@@ -484,7 +494,11 @@ test.describe('Keyboard-free defeat review', () => {
     await expect(page.locator('#battle-log-btn')).toBeEnabled();
     await expect(rosterCard(page, 'Bulbasaur').locator('.roster-card-evbar .value')).toHaveText(before || '');
     await expect(recents.first()).toBeVisible();
-    expect(await recents.first().boundingBox()).toEqual(recentPosition);
+    const firstRecent = await recents.first().boundingBox();
+    expect(firstRecent?.y).toBeCloseTo(recentPosition?.y || 0, 0);
+    const lastRecent = await recents.last().boundingBox();
+    const opponent = await page.locator('#battle-choose-opponent-btn').boundingBox();
+    expect((lastRecent?.y || 0) + (lastRecent?.height || 0)).toBeCloseTo((opponent?.y || 0) + (opponent?.height || 0), 0);
     await recents.nth(1).tap();
     await expect(page.locator('#battle-opponent-name')).toHaveText('Ivysaur');
     await page.screenshot({ path: info.outputPath('recent-defeats-staged-dark.png') });
@@ -497,7 +511,8 @@ test.describe('Keyboard-free defeat review', () => {
     const highest = damage.locator('details').first();
     await expect(highest.locator('type-label')).toHaveText(['Grass', 'Water']);
     await expect(highest.getByText('Grass')).toBeVisible();
-    const immune = damage.getByText('Immune · Electric');
+    const immune = damage.locator('details').filter({ has: page.locator('summary[aria-label="×0 damage, immune"]') }).locator('type-label');
+    await expect(immune).toHaveText('Electric');
     await expect(immune).toBeVisible();
     await page.screenshot({ path: info.outputPath('onix-damage-list.png') });
     await highest.locator('summary').press('Enter');
@@ -560,16 +575,17 @@ test.describe('Keyboard-free defeat review', () => {
       return box ? 844 - box.y - box.height : Infinity;
     }).toBeLessThan(70);
     const before = await page.locator('#battle-log-btn').boundingBox();
-    const stableElements = ['#battle-choose-opponent-btn', '#battle-participants', '#battle-matchup'];
-    const beforeContent = await Promise.all(stableElements.map(selector => page.locator(selector).boundingBox()));
+    const participantStrip = page.locator('#battle-participants');
+    const beforeParticipants = await participantStrip.boundingBox();
     await page.locator('#battle-log-btn').tap();
     await expect(page.locator('#battle-confirm-state')).toContainText('Defeat logged');
     await expect(page.locator('#battle-log-btn')).toContainText('Defeat logged');
     await expect(page.locator('#battle-done-btn')).toHaveCount(0);
     await expect(page.locator('#battle-log-btn')).toBeDisabled();
-    await expect(page.locator('#battle-opponent-name')).toHaveText('Caterpie');
+    await expect(page.locator('#battle-opponent-name')).toHaveText('Choose opponent');
+    await expect(page.locator('#battle-matchup')).toBeHidden();
     await expect(page.locator('#battle-ev-gain')).toHaveText('+1 HP');
-    expect(await Promise.all(stableElements.map(selector => page.locator(selector).boundingBox()))).toEqual(beforeContent);
+    expect(await participantStrip.boundingBox()).toEqual(beforeParticipants);
     await expect(page.locator('#battle-participants .party-slot--selected')).toHaveCount(1);
     // A queued second click is harmless even before the UI can repaint.
     await page.locator('#battle-log-btn').evaluate(btn => btn.dispatchEvent(new MouseEvent('click', { bubbles: true })));

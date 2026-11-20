@@ -62,6 +62,7 @@ const SHELL_PATHS = [
   '.',
   'index.html',
   'app.js',
+  'import-worker.js',
   'styles.css',
   'tokens.css',
   'manifest.webmanifest',
@@ -125,8 +126,8 @@ self.addEventListener('fetch', (event) => {
   // browsing or by lib/prefetch-service.js warming ahead of them.
   if (isSpriteRequest(url)) {
     event.respondWith(
-      caches.open(SPRITE_CACHE_NAME).then(async (cache) => {
-        const cached = await cache.match(request);
+      caches.open(SPRITE_CACHE_NAME).catch(() => null).then(async (cache) => {
+        const cached = await cache?.match(request).catch(() => undefined);
         if (cached) return cached;
         const response = await fetch(request);
         // Sprite <img> tags and lib/prefetch-service.js both request these
@@ -143,15 +144,13 @@ self.addEventListener('fetch', (event) => {
         // gets cached as junk instead of skipped — harmless for display,
         // since the <img> onerror chain still falls back to the modern/
         // placeholder sprite when that junk fails to decode.
-        if (response.ok || response.type === 'opaque') {
-          await cache.put(request, response.clone());
-          // Doesn't block the response (respondWith already has what it
-          // needs), but still needs event.waitUntil: without it, the
-          // browser is free to consider this worker idle and terminate
-          // it the moment respondWith's promise settles, killing this
-          // trim mid-flight and letting SPRITE_CACHE_MAX_ENTRIES go
-          // unenforced.
-          event.waitUntil(trimSpriteCache(cache));
+        if (cache && (response.ok || response.type === 'opaque')) {
+          try {
+            await cache.put(request, response.clone());
+            event.waitUntil(trimSpriteCache(cache).catch(() => {}));
+          } catch {
+            // Storage can be full or unavailable. Still display the fetched image.
+          }
         }
         return response;
       })

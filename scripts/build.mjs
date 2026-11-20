@@ -20,10 +20,8 @@ async function main() {
   await rm(outDir, { recursive: true, force: true });
   await mkdir(outDir, { recursive: true });
 
-  // `bundle: true`, single entry point: esbuild inlines the whole
-  // import graph (lib/, components/) into one dist/app.js, so prod no
-  // longer makes a per-module request for every file the app is made
-  // of. `sourcemap: true` (a real .map file, referenced via a trailing
+  // Bundle the app and its import worker as separate entry points.
+  // `sourcemap: true` (a real .map file, referenced via a trailing
   // `//# sourceMappingURL=` comment, not inlined) is deliberate for a
   // fully open-source app with nothing to hide in its minified output —
   // a live bug report is debuggable against original file/line numbers
@@ -31,7 +29,7 @@ async function main() {
   // only fetch a .map when DevTools is actually open, so this costs
   // ordinary visitors nothing.
   await build({
-    entryPoints: [path.join(root, 'app.ts')],
+    entryPoints: [path.join(root, 'app.ts'), path.join(root, 'import-worker.ts')],
     outdir: outDir,
     outbase: root,
     bundle: true,

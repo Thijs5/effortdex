@@ -40,6 +40,9 @@ html[data-modal-open] body {
   overflow: hidden;
 }
 
+/* Keep the import footer sticky to the viewport rather than the body. */
+html:not([data-modal-open], :has(dialog[open])):has(#import-view:not([hidden])) body { overflow-x: clip; }
+
 /* No "device" frame any more (docs/adr/0028 revision): the app fills the
    window edge to edge. The header and footer run full-bleed bands; each
    view keeps its own readable max-width and centres itself. */
@@ -165,7 +168,7 @@ html[data-modal-open] body {
    scrolls past it — the only chrome that stays put. Holds the back link
    on the left and the view's single primary action on the right, so that
    action is always reachable. Used by the picker (title + New party), the
-   party view (← All parties + Add a Pokémon) and the Pokémon detail view
+   party view (← All parties) and the Pokémon detail view
    (← Roster + Log a battle). Full-bleeds to the viewport edges like the
    app header and footer bands — not just to the view's own max-width
    column — via the same width:100vw break-out those use, with the same
@@ -283,8 +286,9 @@ html[data-modal-open] body {
   align-items: center;
   justify-content: space-between;
   gap: var(--space-3);
-  margin-bottom: var(--space-1);
+  margin-bottom: var(--space-2);
 }
+.roster-panel-head .ds-btn { flex: none; min-height: 44px; padding-inline: var(--space-3); font-size: var(--font-size-sm); white-space: nowrap; }
 .panel h2,
 .roster-panel-head > h2 {
   font-family: var(--font-display);
@@ -452,7 +456,7 @@ html[data-modal-open] body {
 /* Party identity + Edit, below the nav bar. */
 .party-identity-row {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: var(--space-3) var(--space-4);
   margin-bottom: var(--space-4);
 }
@@ -467,6 +471,7 @@ html[data-modal-open] body {
   font-family: var(--font-display);
   font-size: clamp(1.3rem, 3vw, 1.7rem);
   margin: 0;
+  overflow-wrap: anywhere;
 }
 .party-identity .hint {
   margin: var(--space-1) 0 0;
@@ -475,18 +480,14 @@ html[data-modal-open] body {
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
-.party-identity-row #edit-party-btn { flex: 0 0 auto; }
+.party-identity-row #edit-party-btn { flex: 0 0 auto; white-space: nowrap; }
 
 /* ---------- active party bar (docs/adr/0029) ---------- */
 /* The current in-game six (Party.activeUids) — status display and the
    faint/heal toggle, pinned just under the party identity row. Plain
    state, not history: nothing here writes to <ev-history-log>. */
 .battle-party {
-  margin-bottom: var(--space-4);
-  padding: var(--space-3);
-  background: var(--lcd);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
+  margin-bottom: var(--space-5);
 }
 .battle-party-head {
   display: flex;
@@ -504,6 +505,7 @@ html[data-modal-open] body {
   color: var(--ink-soft);
 }
 .battle-party-head-actions { display: flex; flex-wrap: wrap; align-items: center; gap: var(--space-2); }
+.battle-party-head-actions .ds-btn { white-space: nowrap; }
 .heal-btn {
   min-height: 44px;
   display: inline-flex;
@@ -525,12 +527,16 @@ html[data-modal-open] body {
    any horizontal scroller. */
 .battle-party-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 100px), 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: var(--space-2);
+}
+@media (min-width: 720px) {
+  .battle-party-grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
 }
 .battle-slot {
   display: grid;
-  grid-template-columns: 44px minmax(0, 1fr);
+  position: relative;
+  grid-template-columns: minmax(0, 1fr);
   align-items: center;
   min-width: 0;
   padding: var(--space-1);
@@ -554,7 +560,7 @@ html[data-modal-open] body {
 .battle-slot--empty span:first-child { font-size: var(--font-size-lg); line-height: 1; }
 .battle-slot--empty:hover { border-color: var(--teal); color: var(--teal-strong); }
 .battle-slot-name {
-  grid-column: 1 / -1;
+  max-width: 100%;
   text-align: center;
   font-size: var(--font-size-2xs);
   font-weight: 600;
@@ -566,6 +572,10 @@ html[data-modal-open] body {
 .battle-slot--dragging { opacity: 0.6; box-shadow: var(--shadow-panel); }
 .battle-slot--drop-target { outline: 2px dashed var(--teal); outline-offset: 2px; }
 .battle-slot-handle {
+  position: absolute;
+  z-index: 1;
+  inset: 0 auto auto 0;
+  min-width: 36px;
   min-height: 44px;
   border: none;
   background: transparent;
@@ -584,7 +594,7 @@ html[data-modal-open] body {
    action. Same look as the header dropdown (.header-menu, above), which
    this mirrors rather than shares: that one is fixed to the header, this
    one is positioned relative to its own card. */
-.battle-slot-menu-wrap { position: relative; min-width: 0; }
+.battle-slot-menu-wrap { min-width: 0; }
 .battle-slot-menu {
   position: absolute;
   top: calc(100% + 6px);
@@ -694,7 +704,7 @@ html[data-modal-open] body {
   position: relative;
   background: transparent;
   border: 1px solid transparent;
-  padding: var(--space-1) 0;
+  padding: var(--space-4) var(--space-1) var(--space-1);
 }
 .battle-slot .battle-slot-menu-btn:hover, .battle-slot .battle-slot-menu-btn[aria-expanded="true"] {
   border-color: var(--line);
@@ -702,7 +712,10 @@ html[data-modal-open] body {
 .battle-slot-menu-btn::after {
   content: '⋯' / '';
   position: absolute;
-  inset: 0 var(--space-1) auto auto;
+  inset: calc(-1 * var(--space-1)) var(--space-2) auto auto;
+  display: grid;
+  height: 44px;
+  place-items: center;
   color: var(--ink-soft);
 }
 .party-slot--fainted {
@@ -749,8 +762,11 @@ html[data-modal-open] body {
 /* The battle sheet's participant strip: same slot, plus a selectable
    ring for "will battle" and a locked/dashed look for a fainted mon
    that can't be picked. */
-.party-slots--select { display: flex; overflow-x: auto; padding: var(--space-2) 0; }
-.party-slots--select .party-slot { border-width: 2px; flex: 0 0 56px; }
+.party-slots--select { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: var(--space-1); padding: var(--space-2) 0; }
+.party-slots--select .party-slot { border-width: 2px; min-width: 0; }
+@media (max-width: 360px) {
+  .party-slots--select { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+}
 .party-slots--select .party-slot--selected {
   border-color: var(--accent);
   background: color-mix(in srgb, var(--accent) 8%, var(--surface));
@@ -803,11 +819,7 @@ html[data-modal-open] body {
   gap: var(--space-3);
   margin-bottom: var(--space-3);
 }
-.roster-toolbar #roster-search { flex: 1 1 auto; }
-
-@media (max-width: 520px) {
-  .roster-toolbar { flex-direction: column; align-items: stretch; }
-}
+.roster-toolbar #roster-search { flex: 1 1 auto; min-width: 0; }
 
 /* Same box model as .ds-field (padding/border/font-size) so this button
    matches the search input and sort <select> exactly, height included —
@@ -1477,6 +1489,7 @@ textarea.ds-field { resize: vertical; }
   box-shadow: 0 -4px 8px -4px rgba(23, 26, 19, 0.15);
 }
 .party-dialog-actions .spacer { flex: 1; }
+#add-pokemon-dialog-submit-btn { width: 100%; }
 
 /* ---------- footer ---------- */
 /* Full-bleed band like the header; content aligned to the same 1180px
@@ -1540,7 +1553,7 @@ textarea.ds-field { resize: vertical; }
 .battle-opponent-copy { display: grid; gap: var(--space-1); min-width: 0; }
 #battle-opponent-name { font-family: var(--font-display); font-size: var(--font-size-sm); overflow-wrap: anywhere; }
 .battle-recents { flex: 1; min-width: 144px; display: flex; flex-direction: column; }
-#battle-recent-opponents { min-height: 156px; grid-auto-rows: 76px; align-content: start; display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-1); }
+#battle-recent-opponents { flex: 1; min-height: 156px; grid-auto-rows: minmax(76px, 1fr); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-1); }
 .battle-recents-empty { grid-column: 1 / -1; margin: 0; color: var(--ink-soft); font-size: var(--font-size-xs); line-height: 1.5; }
 .battle-recent-card { display: grid; justify-items: center; align-content: center; gap: var(--space-1); min-width: 0; min-height: 76px; padding: var(--space-1); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; }
 .battle-recent-card:hover { border-color: var(--teal); }
@@ -1608,13 +1621,12 @@ textarea.ds-field { resize: vertical; }
 
 /* Consistent form actions: quiet dismissal plus one broad primary action. */
 @media (max-width: 640px) {
-  :is(#party-form, #add-pokemon-form) > .party-dialog-actions { flex-wrap: nowrap; }
-  :is(#party-form, #add-pokemon-form) > .party-dialog-actions .spacer { display: none; }
-  :is(#party-form, #add-pokemon-form) > .party-dialog-actions > .ds-btn--ghost { flex: 0 0 92px; }
-  :is(#party-form, #add-pokemon-form) > .party-dialog-actions > .ds-btn--primary { flex: 1; min-width: 0; }
+  #party-form > .party-dialog-actions { flex-wrap: nowrap; }
+  #party-form > .party-dialog-actions .spacer { display: none; }
+  #party-form > .party-dialog-actions > .ds-btn--ghost { flex: 0 0 92px; }
+  #party-form > .party-dialog-actions > .ds-btn--primary { flex: 1; min-width: 0; }
 }
 
-#battle-matchup-types { color: var(--ink-soft); font-size: var(--font-size-sm); }
 .battle-opponents { margin-top: var(--space-2); }
 #battle-matchup {
   margin-top: var(--space-3);
@@ -1631,8 +1643,8 @@ textarea.ds-field { resize: vertical; }
   gap: var(--space-2);
   padding-block: var(--space-2);
 }
-.matchup-heading h3 { margin: 0; font-size: inherit; }
-.battle-sheet-extra:is([data-state="ready"], [data-state="logged"], [data-state="loading"]) #battle-opponent-name {
+.matchup-heading h3 { margin: 0; }
+.battle-sheet-extra[data-state="ready"] #battle-opponent-name {
   font-size: var(--font-size-lg);
   line-height: 1.2;
   font-family: var(--font-display);
@@ -1671,9 +1683,6 @@ textarea.ds-field { resize: vertical; }
 }
 #battle-damage-list summary::-webkit-details-marker { display: none; }
 .matchup-group-content { padding-block: var(--space-2); }
-#battle-damage-list .matchup-types { align-items: baseline; }
-#battle-damage-list .matchup-types + .matchup-types { margin-top: var(--space-1); }
-#battle-damage-list small { color: var(--ink-soft); }
 #battle-attack-advice {
   border-top: 1px solid var(--line);
   margin: 0 0 var(--space-2);

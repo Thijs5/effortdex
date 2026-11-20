@@ -343,6 +343,7 @@ test('prefetchGame() also warms evolution chains for every species it caches spr
   const api = fakeApi({ generations: { 1: [{ name: 'bulbasaur', id: 1 }] } });
   const svc = service({ api });
   await svc.prefetchGame('Red');
+  await waitUntil(() => svc.pendingCount === 0, 'background evolution lookups to finish');
 
   assert.deepEqual(api.evolutionChainCalls, ['bulbasaur']);
 });
@@ -351,6 +352,7 @@ test('prefetchGeneration() also warms evolution chains for that generation', asy
   const api = fakeApi({ generations: { 4: [{ name: 'turtwig', id: 387 }] } });
   const svc = service({ api });
   await svc.prefetchGeneration(4);
+  await waitUntil(() => svc.pendingCount === 0, 'background evolution lookups to finish');
 
   assert.deepEqual(api.evolutionChainCalls, ['turtwig']);
 });
@@ -405,7 +407,7 @@ test('prefetchGame() resolves once every one of its own species has settled', as
   const svc = service({ api, concurrency: 1 });
   await svc.prefetchGame('Red');
   assert.equal(api.calls.length, 3);
-  assert.equal(svc.pendingCount, 0);
+  await waitUntil(() => svc.pendingCount === 0, 'background evolution lookups to finish');
 });
 
 test('two concurrent prefetchGame() calls for the same title share one fetch per species, not two', async () => {
@@ -507,6 +509,7 @@ test('prefetchGame() does NOT route through withoutTracking — manual work stay
   const spy = withoutTrackingSpy();
   const svc = service({ api, withoutTracking: spy.fn });
   await svc.prefetchGame('Red');
+  await waitUntil(() => svc.pendingCount === 0, 'background evolution lookups to finish');
 
   // The sprite work itself stays visible (unwrapped) — but the
   // evolution-chain warming it also triggers alongside is always
@@ -538,6 +541,7 @@ test('prefetchGeneration() also does not route through withoutTracking', async (
   const spy = withoutTrackingSpy();
   const svc = service({ api, withoutTracking: spy.fn });
   await svc.prefetchGeneration(1);
+  await waitUntil(() => svc.pendingCount === 0, 'background evolution lookups to finish');
 
   // Same as prefetchGame() above: the sprite work stays visible, but its
   // evolution-chain warming is always silent.
@@ -816,15 +820,15 @@ test('pauses cleanly if the connection drops mid-queue, and resumes on reconnect
   const done = svc.prefetchGame('Red');
   // Let it run until it stalls on the offline check: 'a' fetched, b/c/d
   // still queued and not being drained.
-  await waitUntil(() => api.calls.length === 1 && svc.pendingCount === 3, 'the run to stall offline');
+  await waitUntil(() => api.calls.length === 1 && svc.pendingCount === 7, 'the run to stall offline');
   assert.deepEqual(api.calls, ['a']); // stopped before b/c/d
-  assert.equal(svc.pendingCount, 3); // b, c, d are still queued, not lost
+  assert.deepEqual(api.evolutionChainCalls, []); // sprites went ahead of the background work
 
   online = true;
   reconnect();
   await done; // prefetchGame's own promise only resolves once b/c/d finish too
   assert.deepEqual(api.calls, ['a', 'b', 'c', 'd']);
-  assert.equal(svc.pendingCount, 0);
+  await waitUntil(() => svc.pendingCount === 0, 'background evolution lookups to finish');
 });
 
 test('prefetch persists image responses directly before any worker controls the page and caps its cache', async (t) => {
@@ -840,7 +844,8 @@ test('prefetch persists image responses directly before any worker controls the 
   }) };
   globalThis.fetch = async () => new Response('sprite bytes');
   const svc = service({ api: fakeApi({ generations: { 1: [{ name: 'bulbasaur', id: 1 }] } }) });
-  await svc.prefetchGame('Red');
+  const result = await svc.prefetchGame('Red');
+  assert.deepEqual(result, { done: 1, total: 1, cached: 1 });
   assert.equal(writes.length, 1);
   assert.ok(writes[0].request.url.endsWith('/versions/generation-i/red-blue/1.png'));
   assert.equal(writes[0].request.mode, 'no-cors');
@@ -854,6 +859,7 @@ test('an HTTP error response is never saved as a prefetched sprite', async (t) =
   let writes = 0;
   globalThis.caches = { open: async () => ({ match: async () => undefined, put: async () => { ++writes; } }) };
   globalThis.fetch = async () => new Response('not found', { status: 404 });
-  await service({ api: fakeApi({ generations: { 1: [{ name: 'bulbasaur', id: 1 }] } }) }).prefetchGame('Red');
+  const result = await service({ api: fakeApi({ generations: { 1: [{ name: 'bulbasaur', id: 1 }] } }) }).prefetchGame('Red');
+  assert.deepEqual(result, { done: 1, total: 1, cached: 0 });
   assert.equal(writes, 0);
 });

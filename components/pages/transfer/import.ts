@@ -20,3 +20,7 @@ export function render(payload: string | null): void {
   syncBackLink();
   importReview.payload = payload;
 }
+
+export function reset(): void {
+  importReview.payload = undefined;
+}

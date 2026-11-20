@@ -488,7 +488,7 @@ export function projectEntry(entry: PersistedEntry): RosterEntry {
       console.error('effortdex: skipping roster event with unknown kind', ev?.kind);
       continue;
     }
-    history.unshift(handler(acc, ev));
+    history.push(handler(acc, ev));
   }
 
   return Object.assign(entry, acc.identity, {
@@ -497,8 +497,39 @@ export function projectEntry(entry: PersistedEntry): RosterEntry {
     pokerus: acc.pokerus,
     expShare: acc.expShare,
     evolutions: acc.evolutions,
-    history,
+    history: history.reverse(),
   }) as RosterEntry;
+}
+
+type ImportLocalParty = {
+  id: string;
+  pokemon: { uid: string; events: readonly Pick<RosterEvent, 'id'>[] }[];
+};
+
+export function previewRosterImport(importedParties: ExportedParty[], localParties: readonly ImportLocalParty[]) {
+  const locals = new Map(localParties.map(party => [party.id, party]));
+  return importedParties.map(party => {
+    const localParty = locals.get(party.id);
+    const localEntries = new Map(localParty?.pokemon.map(entry => [entry.uid, entry]));
+    return {
+      id: party.id,
+      name: party.name,
+      description: party.description,
+      baseGame: party.baseGame,
+      isNew: !localParty,
+      pokemon: party.pokemon.map(entry => {
+        const localEntry = localEntries.get(entry.uid);
+        const localIds = new Set(localEntry?.events.map(event => event.id));
+        const { nickname, speciesName, sprite, level, evs } = projectEntry({ ...entry });
+        return {
+          uid: entry.uid,
+          isNew: !localEntry,
+          newEventCount: entry.events.filter(event => !localIds.has(event.id)).length,
+          preview: { nickname, speciesName, sprite, level, evs },
+        };
+      }),
+    };
+  });
 }
 
 // The subset of an entry that is source data. Everything else on the
@@ -2083,27 +2114,7 @@ export class Store extends EventTarget {
    * level, species) computed on a throwaway clone.
    */
   previewImport(importedParties: ExportedParty[]) {
-    return importedParties.map((party) => {
-      const localParty = this.state.parties.find((p) => p.id === party.id);
-      return {
-        id: party.id,
-        name: party.name,
-        description: party.description,
-        baseGame: party.baseGame,
-        isNew: !localParty,
-        pokemon: party.pokemon.map((entry) => {
-          const localEntry = localParty?.pokemon.find((e) => e.uid === entry.uid);
-          const localIds = new Set((localEntry?.events ?? []).map((e) => e.id));
-          const newEventCount = entry.events.filter((e) => !localIds.has(e.id)).length;
-          return {
-            uid: entry.uid,
-            isNew: !localEntry,
-            newEventCount,
-            preview: projectEntry(structuredClone(entry)),
-          };
-        }),
-      };
-    });
+    return previewRosterImport(importedParties, this.state.parties);
   }
 
   /**
@@ -2146,10 +2157,13 @@ export class Store extends EventTarget {
         newLocalParties.set(localParty.id, Array.isArray(party.activeUids) ? party.activeUids : undefined);
       }
 
+      const localEntries = new Map(localParty.pokemon.map(entry => [entry.uid, entry]));
       for (const entry of selectedPokemon) {
-        const localEntry = localParty.pokemon.find((e) => e.uid === entry.uid);
+        const localEntry = localEntries.get(entry.uid);
         if (!localEntry) {
-          localParty.pokemon.push(projectEntry(structuredClone(entry)));
+          const added = projectEntry(structuredClone(entry));
+          localParty.pokemon.push(added);
+          localEntries.set(added.uid, added);
           continue;
         }
         const byId = new Map(localEntry.events.map((e) => [e.id, e] as [string, RosterEvent]));

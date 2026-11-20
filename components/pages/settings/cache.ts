@@ -13,6 +13,7 @@ import { GAME_VERSIONS, GEN_ROMAN } from '../../../lib/game-versions.ts';
 import { spriteGroupKey } from '../../../lib/pokeapi-client.ts';
 import { api, prefetchService } from '../../../lib/services.ts';
 import { SPRITE_CACHE_NAME } from '../../../lib/sprite-cache.ts';
+import type { PrefetchProgress } from '../../../lib/prefetch-service.ts';
 import { clearAppCache, estimateCacheSize } from '../../../lib/version-check.ts';
 import { isCachingDisabled, setCachingDisabled } from '../../../lib/dev-cache.ts';
 import {
@@ -122,7 +123,7 @@ async function inspectCache(urls: string[]): Promise<{ cached: number; bytes: nu
     const cache = await caches.open(SPRITE_CACHE_NAME);
     const responses = await Promise.all(urls.map((u) => cache.match(u)));
     const hits = responses.filter(Boolean) as Response[];
-    const sizes = await Promise.all(hits.map((r) => r.blob().then((b) => b.size)));
+    const sizes = await Promise.all(hits.filter(r => r.type !== 'opaque').map(r => r.blob().then(b => b.size, () => 0)));
     return { cached: hits.length, bytes: sizes.reduce((a, b) => a + b, 0) };
   } catch {
     return { cached: 0, bytes: 0 }; // Cache Storage can throw in some private-browsing contexts even when the API exists
@@ -141,14 +142,13 @@ async function clearUrls(urls: string[]): Promise<void> {
 
 function formatCountLine(cached: number, total: number, bytes: number): string {
   const base = `${cached} / ${total} sprites cached`;
-  return cached > 0 ? `${base} (${formatBytes(bytes)})` : base;
+  return bytes > 0 ? `${base} (${formatBytes(bytes)})` : base;
 }
 
 type RowResult = { cached: number; total: number; bytes: number };
 
 function buildRow(
   row: { groupKey: string; games: string[] },
-  gen: number,
   onCachingChange: (active: boolean) => void
 ): { el: HTMLElement; primaryGame: string; refresh: () => Promise<RowResult | null> } {
   const primaryGame = row.games[0]; // any title in the group resolves to the same URLs
@@ -181,6 +181,8 @@ function buildRow(
     cacheBtn.title = 'Caching is disabled — see "Developer: disable caching" below';
   }
 
+  let cachingInFlight = false;
+  let cacheMessage = '';
   async function refresh(): Promise<RowResult | null> {
     if (!hasCacheStorage()) {
       countEl.textContent = "Cache Storage isn't available in this browser";
@@ -192,7 +194,7 @@ function buildRow(
       return null;
     }
     const { cached, bytes } = await inspectCache(urls);
-    countEl.textContent = formatCountLine(cached, urls.length, bytes);
+    if (!cachingInFlight) countEl.textContent = cacheMessage || formatCountLine(cached, urls.length, bytes);
     return { cached, total: urls.length, bytes };
   }
 
@@ -204,7 +206,6 @@ function buildRow(
   // If the connection drops mid-fetch, prefetchGame/prefetchGeneration's
   // returned promise only resolves once back online — surface *why* it's
   // stuck instead of leaving the button frozen on a stale count.
-  let cachingInFlight = false;
   window.addEventListener('offline', () => {
     if (cachingInFlight) cacheBtn.textContent = 'Paused — waiting for connection…';
   });
@@ -213,33 +214,36 @@ function buildRow(
   });
 
   cacheBtn.addEventListener('click', async () => {
+    cacheMessage = '';
     setDisabled(true);
     cachingInFlight = true;
     onCachingChange(true);
     cacheBtn.textContent = 'Caching…';
     try {
-      const urls = await prefetchService.spriteUrlsForGame(primaryGame);
-      if (urls.length) {
-        cacheBtn.textContent = `Caching… 0/${urls.length}`;
-        countEl.textContent = `0 / ${urls.length} sprites cached`;
-      }
-      const onCacheProgress = ({ done, total }: { done: number; total: number }) => {
+      const onCacheProgress = ({ done, total, cached }: PrefetchProgress) => {
+        if (!total) return;
         cacheBtn.textContent = `Caching… ${done}/${total}`;
-        countEl.textContent = `${done} / ${total} sprites cached`;
+        countEl.textContent = formatCountLine(cached, total, 0);
       };
-      if (isDefault) await prefetchService.prefetchGeneration(gen, onCacheProgress);
-      else await prefetchService.prefetchGame(primaryGame, onCacheProgress);
-      notifyCacheDone('Effortdex', { body: `${joinNames(row.games)} sprites are cached.` });
+      const result = await prefetchService.prefetchGame(primaryGame, onCacheProgress);
+      if (!result && !navigator.onLine) cacheMessage = 'Queued for the next online visit';
+      else if (result?.total && result.cached === result.total) {
+        notifyCacheDone('Effortdex', { body: `${joinNames(row.games)} sprites are cached.` });
+      } else if (result?.total && !result.cached) cacheMessage = 'Could not cache sprites. Try again.';
+      else if (!result?.total) cacheMessage = 'Could not load the species list. Try again.';
+    } catch {
+      cacheMessage = 'Could not cache sprites. Try again.';
     } finally {
       cachingInFlight = false;
+      if (cacheMessage) countEl.textContent = cacheMessage;
       cacheBtn.textContent = 'Cache';
       setDisabled(false);
       onCachingChange(false);
     }
-    await refresh();
   });
 
   clearBtn.addEventListener('click', async () => {
+    cacheMessage = '';
     setDisabled(true);
     try {
       const urls = await prefetchService.spriteUrlsForGame(primaryGame);
@@ -295,7 +299,7 @@ function buildGeneration(gen: number): { details: HTMLDetailsElement; refreshSum
     }
   }
 
-  const rows = rowsForGeneration(gen).map((row) => buildRow(row, gen, onCachingChange));
+  const rows = rowsForGeneration(gen).map((row) => buildRow(row, onCachingChange));
   for (const { el } of rows) body.appendChild(el);
   details.appendChild(body);
 
@@ -312,7 +316,7 @@ function buildGeneration(gen: number): { details: HTMLDetailsElement; refreshSum
     const total = valid.reduce((sum, r) => sum + r.total, 0);
     const bytes = valid.reduce((sum, r) => sum + r.bytes, 0);
     const fraction = cached === 0 ? 'Not cached' : cached === total ? 'Fully cached' : `${cached}/${total} cached`;
-    summaryStatus.textContent = cached > 0 ? `${fraction} · ${formatBytes(bytes)}` : fraction;
+    summaryStatus.textContent = bytes > 0 ? `${fraction} · ${formatBytes(bytes)}` : fraction;
     summaryStatus.dataset.state = cached === total ? 'full' : '';
   }
 
@@ -327,10 +331,12 @@ function buildGeneration(gen: number): { details: HTMLDetailsElement; refreshSum
     onCachingChange(true);
     cacheAllBtn.textContent = 'Caching…';
     try {
-      await prefetchService.prefetchGeneration(gen, ({ done, total }: { done: number; total: number }) => {
-        cacheAllBtn.textContent = `Caching… ${done}/${total}`;
+      const result = await prefetchService.prefetchGeneration(gen, ({ done, total }) => {
+        if (total) cacheAllBtn.textContent = `Caching… ${done}/${total}`;
       });
-      notifyCacheDone('Effortdex', { body: `${genLabel}'s sprites are cached.` });
+      if (result?.total && result.cached === result.total) {
+        notifyCacheDone('Effortdex', { body: `${genLabel}'s sprites are cached.` });
+      }
     } finally {
       cacheAllInFlight = false;
       cacheAllBtn.textContent = cacheAllLabel;

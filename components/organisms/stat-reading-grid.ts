@@ -18,6 +18,7 @@ export class StatReadingGrid extends BaseElement {
     .mode button { flex: 1; min-height: 44px; border: 1px solid var(--line); border-radius: var(--radius-sm); background: var(--surface); color: var(--ink-soft); font: inherit; font-size: var(--font-size-sm); cursor: pointer; }
     .mode button[aria-pressed=true] { background: var(--lcd); color: var(--ink); border-color: var(--teal); font-weight: 700; }
     .row { min-height: 53px; display: grid; grid-template-columns: minmax(80px, 1fr) minmax(0, 190px); gap: var(--space-2) var(--space-3); align-items: center; padding-block: var(--space-1); border-bottom: 1px solid var(--line); }
+    :host(:not([prior-readings])) .row:last-child { border-bottom: 0; }
     .columns { display: none; }
     .has-increases .columns, .has-increases .row { grid-template-columns: minmax(64px, .9fr) minmax(44px, 1fr) 140px; column-gap: var(--space-2); }
     .has-increases .columns { display: grid; padding-bottom: var(--space-2); font-size: var(--font-size-xs); color: var(--ink-soft); }
@@ -151,7 +152,8 @@ export class StatReadingGrid extends BaseElement {
   protected render(): void {
     const carried = new Map([...this.$fields.querySelectorAll<HTMLInputElement>('input.value')].map(i => [i.dataset.stat, i.value]));
     const merged = store.specialStatMerged();
-    const events = this.hasAttribute('prior-readings') ? this._entry?.events ?? [] : [];
+    const showPrior = this.hasAttribute('prior-readings');
+    const events = showPrior ? this._entry?.events ?? [] : [];
     const rows = STATS.filter(s => !(merged && s.key === 'spd')).map(s => ({ ...s,
       last: events.filter((e): e is StatReadingEvent => e.kind === 'stat-reading' && e.statKey === s.key).at(-1),
     }));
@@ -168,7 +170,7 @@ export class StatReadingGrid extends BaseElement {
       const accessibleLabel = merged && key === 'spa' ? 'Special' : label;
       const value = carried.get(key) ?? (last ? String(last.observedStat) : '');
       const increases = last && this._mode === 'increases';
-      const valueInput = `<input id="value-${key}" type="${increases ? 'hidden' : 'text'}" inputmode="numeric" enterkeyhint="next" class="value ds-field" data-stat="${key}" data-prefill="${last?.observedStat ?? ''}" ${last ? `data-last="${last.observedStat}"` : ''} value="${escapeHtml(value)}" placeholder="Skip" aria-label="${accessibleLabel} reading" aria-describedby="error-${key}" />`;
+      const valueInput = `<input id="value-${key}" type="${increases ? 'hidden' : 'text'}" inputmode="numeric" enterkeyhint="next" class="value ds-field" data-stat="${key}" data-prefill="${last?.observedStat ?? ''}" ${last ? `data-last="${last.observedStat}"` : ''} value="${escapeHtml(value)}" ${showPrior ? 'placeholder="Skip"' : ''} aria-label="${accessibleLabel} reading" aria-describedby="error-${key}" />`;
       return `<div class="row" data-stat="${key}">
         <label class="stat-label" for="${increases ? 'delta' : 'value'}-${key}">${displayLabel}${!increaseMode && last ? `<span class="previous">Last ${last.observedStat} · Lv. ${last.level}</span>` : ''}</label>
         ${increaseMode ? `<div class="reading-cell">${last ? `<span class="reading-text" data-level="${last.level}"><strong class="reading-current"></strong><span class="reading-origin"></span></span>` : valueInput}</div>` : ''}

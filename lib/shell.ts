@@ -312,11 +312,15 @@ if ('serviceWorker' in navigator && !cachingDisabled) {
   // failure of anything that reads this result.
   if (navigator.storage?.persist) navigator.storage.persist();
 
-  // The worker calls skipWaiting()/clients.claim() on activate, so once a
-  // pushed update takes control of this tab, reload to pick up the new
-  // shell instead of leaving the user on stale JS until their next visit.
+  // Reload for an update to the controlling worker. On first install the
+  // page already loaded from the network, so keep any active work running.
+  let hadController = Boolean(navigator.serviceWorker.controller);
   let refreshing = false;
   navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (!hadController) {
+      hadController = Boolean(navigator.serviceWorker.controller);
+      return;
+    }
     if (refreshing) return;
     refreshing = true;
     window.location.reload();

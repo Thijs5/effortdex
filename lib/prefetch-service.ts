@@ -98,8 +98,9 @@ interface QueueTask {
   resolveUrl?: (mon: DomainPokemon) => string | null;
   url?: string;
   warm?: () => Promise<any>;
-  onSettled: Set<() => void>;
+  onSettled: Set<(cached: boolean) => void>;
   silent: boolean;
+  foreground: boolean;
 }
 
 interface EnqueueItem {
@@ -107,8 +108,14 @@ interface EnqueueItem {
   resolveUrl?: (mon: any) => string | null;
   url?: string;
   warm?: () => Promise<any>;
-  onSettled?: () => void;
+  onSettled?: (cached: boolean) => void;
   silent?: boolean;
+}
+
+export interface PrefetchProgress {
+  done: number;
+  total: number;
+  cached: number;
 }
 
 interface PrefetchDeps {
@@ -277,7 +284,7 @@ export class PrefetchService extends EventTarget {
    * species, so the offline gap this ADR 0011 addendum closes applies to
    * a manually-cached game exactly as much as to the automatic scan.
    */
-  async prefetchGame(gameName: string, onProgress?: (progress: { done: number; total: number }) => void): Promise<void> {
+  async prefetchGame(gameName: string, onProgress?: (progress: PrefetchProgress) => void): Promise<PrefetchProgress | undefined> {
     if (this._isCachingDisabled()) return;
     const match = matchGameVersion(gameName);
     if (!match) return;
@@ -286,15 +293,17 @@ export class PrefetchService extends EventTarget {
     if (!this._isOnline()) return; // intent stays recorded — resumeInterrupted() retries on a later, online load
     try {
       const species = await this._speciesForGameGen(match.gen);
-      this._enqueueEvolutionChains(species);
-      await this._enqueueAndWait(
+      const sprites = this._enqueueAndWait(
         gameName,
         species.map(({ name }) => ({
           name,
           resolveUrl: (mon: DomainPokemon) => versionedSpriteUrl(gameName, mon.id) || mon.sprite,
         })),
         onProgress,
+        true,
       );
+      this._enqueueEvolutionChains(species);
+      return await sprites;
     } finally {
       this._removeResumeIntent(intent);
     }
@@ -316,22 +325,24 @@ export class PrefetchService extends EventTarget {
    * Also enqueues evolution-chain warming for the same species, same as
    * `prefetchGame` — see that method's own note.
    */
-  async prefetchGeneration(gen: number, onProgress?: (progress: { done: number; total: number }) => void): Promise<void> {
+  async prefetchGeneration(gen: number, onProgress?: (progress: PrefetchProgress) => void): Promise<PrefetchProgress | undefined> {
     if (this._isCachingDisabled()) return;
     const intent: ResumeIntent = { kind: 'generation', target: gen };
     this._addResumeIntent(intent);
     if (!this._isOnline()) return;
     try {
       const species = await this._speciesForGen(gen);
-      this._enqueueEvolutionChains(species);
-      await this._enqueueAndWait(
+      const sprites = this._enqueueAndWait(
         'auto',
         species.map(({ name }) => ({
           name,
           resolveUrl: (mon: DomainPokemon) => mon.sprite,
         })),
         onProgress,
+        true,
       );
+      this._enqueueEvolutionChains(species);
+      return await sprites;
     } finally {
       this._removeResumeIntent(intent);
     }
@@ -499,20 +510,26 @@ export class PrefetchService extends EventTarget {
   private _enqueueAndWait(
     sourceTag: string,
     items: EnqueueItem[],
-    onProgress?: (progress: { done: number; total: number }) => void,
-  ): Promise<void> {
+    onProgress?: (progress: PrefetchProgress) => void,
+    foreground = false,
+  ): Promise<PrefetchProgress> {
     const total = items.length;
-    if (!total) return Promise.resolve();
+    onProgress?.({ done: 0, total, cached: 0 });
+    if (!total) return Promise.resolve({ done: 0, total, cached: 0 });
     return new Promise((resolve) => {
       let done = 0;
-      const onSettled = () => {
+      let cached = 0;
+      const onSettled = (hit: boolean) => {
         done++;
-        onProgress?.({ done, total });
-        if (done >= total) resolve(undefined);
+        if (hit) cached++;
+        const progress = { done, total, cached };
+        onProgress?.(progress);
+        if (done >= total) resolve(progress);
       };
       this._enqueue(
         sourceTag,
         items.map((item) => ({ ...item, onSettled })),
+        foreground,
       );
     });
   }
@@ -565,12 +582,13 @@ export class PrefetchService extends EventTarget {
    * and just adds this caller's own `onSettled` to it, so every caller
    * still gets notified once, on the one real fetch.
    */
-  private _enqueue(sourceTag: string, items: EnqueueItem[]): void {
+  private _enqueue(sourceTag: string, items: EnqueueItem[], foreground: boolean): void {
     for (const item of items) {
       const key = `${sourceTag}:${item.name}`;
       const existing = this._pending.get(key);
       if (existing) {
         if (item.onSettled) existing.onSettled.add(item.onSettled);
+        if (foreground) existing.foreground = true;
         continue;
       }
       const task: QueueTask = {
@@ -581,11 +599,13 @@ export class PrefetchService extends EventTarget {
         warm: item.warm,
         onSettled: new Set(item.onSettled ? [item.onSettled] : []),
         silent: item.silent ?? false,
+        foreground,
       };
       this._pending.set(key, task);
       this._queue.push(task);
       this._queueTotal++;
     }
+    if (foreground) this._queue.sort((a, b) => Number(b.foreground) - Number(a.foreground));
     this._processQueue();
   }
 
@@ -638,6 +658,7 @@ export class PrefetchService extends EventTarget {
 
   private async _runTask(task: QueueTask): Promise<void> {
     let failed = false;
+    let cached = false;
     try {
       const passthrough = <T>(fn: () => Promise<T>): Promise<T> => fn();
       const run: <T>(fn: () => Promise<T>) => Promise<T> = task.silent ? this._withoutTracking : passthrough;
@@ -664,7 +685,8 @@ export class PrefetchService extends EventTarget {
         // "Cache" after an interrupted run (a page refresh mid-fetch has
         // no way to resume otherwise — the queue lives only in memory)
         // cheap: only the genuinely-missing sprites get re-fetched.
-        if (url && !(await this._isAlreadyCached(url))) {
+        if (url) cached = await this._isAlreadyCached(url);
+        if (url && !cached) {
           const fetchUrl = url;
           // no-cors so this warm-fetch lands the same *opaque* Response in
           // sw.js's sprite cache that a real sprite <img> now produces
@@ -679,7 +701,13 @@ export class PrefetchService extends EventTarget {
             // ourselves, before reporting this task as complete.
             if (typeof caches !== 'undefined') {
               const cache = await caches.open(SPRITE_CACHE_NAME);
-              await cache.put(new Request(fetchUrl, { mode: 'no-cors' }), response.clone());
+              // A controlling service worker may already have stored the response.
+              if (await cache.match(fetchUrl)) {
+                cached = true;
+                return;
+              }
+              await cache.put(new Request(fetchUrl, { mode: 'no-cors' }), response);
+              cached = true;
               const keys = await cache.keys();
               await Promise.all(keys.slice(0, Math.max(0, keys.length - SPRITE_CACHE_MAX_ENTRIES)).map((key) => cache.delete(key)));
             }
@@ -700,7 +728,7 @@ export class PrefetchService extends EventTarget {
       this._pending.delete(task.key);
       this._queueDone++;
       this.dispatchEvent(new CustomEvent('progress', { detail: { done: this._queueDone, total: this._queueTotal } }));
-      for (const cb of task.onSettled) cb();
+      for (const cb of task.onSettled) cb(cached);
     }
   }
 

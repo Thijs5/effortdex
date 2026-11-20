@@ -135,7 +135,6 @@ const addDialogStatsGrid = document.getElementById(
 const addDialogSubmitBtn = document.getElementById('add-pokemon-dialog-submit-btn') as HTMLButtonElement;
 addDialogLevel.addEventListener('next-input', () => addDialogStatsGrid.focusFirst());
 addDialogStatsGrid.addEventListener('stats-complete', () => addDialogSubmitBtn.focus());
-const addDialogCancelBtn = document.getElementById('add-pokemon-dialog-cancel-btn')!;
 
 // Populated once — the nature list doesn't depend on species or game version.
 addDialogNature.innerHTML = natureOptionsHtml();
@@ -216,8 +215,6 @@ async function openAddPokemonDialog(name: string): Promise<void> {
     addDialogStatus.textContent = (err instanceof Error && err.message) || 'Could not look up that Pokémon.';
   }
 }
-
-addDialogCancelBtn.addEventListener('click', () => addDialog.close());
 
 // A native <dialog> doesn't close on a backdrop click by default.
 addDialog.addEventListener('click', (e) => {
@@ -542,23 +539,8 @@ function renderBattleMatchup(mon: DomainPokemon): void {
     chevron.setAttribute('aria-hidden', 'true');
     summary.append(value, chevron);
     const types = document.createElement('div');
-    types.className = 'matchup-group-content';
-    if (multiplier > 1) {
-      for (const category of new Set(attacks.map(attack => attack.category))) {
-        const group = document.createElement('div');
-        group.className = 'matchup-types';
-        if (category) {
-          const label = document.createElement('small');
-          label.textContent = titleCase(category);
-          group.append(label);
-        }
-        group.append(...attacks.filter(attack => attack.category === category).map(attack => createTypeLabel(attack.name)));
-        types.append(group);
-      }
-    } else {
-      const names = attacks.map(attack => attack.name).join(', ');
-      types.textContent = multiplier === 0 ? 'Immune · ' + names : names;
-    }
+    types.className = 'matchup-group-content matchup-types';
+    types.append(...attacks.map(attack => createTypeLabel(attack.name)));
     disclosure.append(summary, types);
     row.append(disclosure);
     return row;
@@ -711,8 +693,7 @@ battleLogBtn.addEventListener('click', () => {
   const { mon, uids } = pendingBattle;
   // Disarm before the synchronous store change, so queued taps cannot
   // reuse the same opponent. A recent card stages a fresh confirmation.
-  pendingBattle = null;
-  battleLogBtn.disabled = true;
+  clearPendingBattle();
   const applied = store.logBattleForParticipants(uids, mon);
   const gainFor = (uid: string) => applied.find(r => r.uid === uid)?.applied;
   const summary = participantEvSummary(applied.map(r => r.uid), gainFor);

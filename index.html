@@ -115,7 +115,6 @@
     <main id="party-view" class="party-view" hidden>
       <div class="view-nav">
         <a id="back-to-parties" class="back-link" href="#/parties">&larr; All parties</a>
-        <button id="party-add-btn" class="ds-btn ds-btn--ghost" type="button">&plus; Add a Pok&eacute;mon</button>
       </div>
 
       <div class="party-identity-row">
@@ -142,7 +141,7 @@
           <span id="battle-party-heading" class="battle-party-title">Active party</span>
           <div class="battle-party-head-actions">
             <button type="button" id="heal-party-btn" class="heal-btn" hidden>&#10021; Heal at Pok&eacute;center</button>
-            <button id="party-log-battle-btn" class="ds-btn ds-btn--primary ds-btn--sm" type="button">&plus; Log a battle</button>
+            <button id="party-log-battle-btn" class="ds-btn ds-btn--primary" type="button">&plus; Log a battle</button>
           </div>
         </div>
         <!-- Always exactly MAX_ACTIVE_PARTY cells (roster.ts): a filled
@@ -157,6 +156,7 @@
       <section class="roster-panel" aria-labelledby="roster-heading">
         <div class="roster-panel-head">
           <h2 id="roster-heading">My Pok&eacute;mon</h2>
+          <button id="party-add-btn" class="ds-btn ds-btn--ghost" type="button">&plus; Add a Pok&eacute;mon</button>
         </div>
         <p id="empty-state" class="empty-state">
           No Pok&eacute;mon added yet &mdash; tap &ldquo;Add a Pok&eacute;mon&rdquo; above to start tracking EVs.
@@ -197,7 +197,7 @@
           <p id="battle-lookup-error" hidden role="alert"></p>
           <section id="battle-matchup" aria-labelledby="battle-matchup-title" hidden>
             <header class="matchup-heading">
-              <h3 id="battle-matchup-title">Type matchups</h3>
+              <h3 class="battle-sheet-eyebrow" id="battle-matchup-title">Type matchups</h3>
               <small id="battle-matchup-gen"></small>
             </header>
             <ul id="battle-damage-list" role="list" aria-label="Incoming damage by attack type"></ul>
@@ -544,8 +544,6 @@
       </div>
       </div>
       <div class="party-dialog-actions">
-        <span class="spacer"></span>
-        <button type="button" id="add-pokemon-dialog-cancel-btn" class="ds-btn ds-btn--ghost">Cancel</button>
         <button type="submit" id="add-pokemon-dialog-submit-btn" class="ds-btn ds-btn--primary" disabled>Add!</button>
       </div>
     </form>

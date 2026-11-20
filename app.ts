@@ -40,8 +40,9 @@ function showView(view: HTMLElement): void {
 
 function render(): void {
   const { page, partySlug, pokemonUid, payload, dialog, pokemonDialog } = router.currentRoute();
-  // Cleared here, set again below only for the two in-party views.
+  // The detail page restores the party name as context.
   setHeaderContext(null);
+  if (page !== 'import') importPage.reset();
 
   if (page === 'settings') {
     partyDialog.closeIfOpen();
@@ -116,7 +117,6 @@ function render(): void {
   }
 
   pokemon.closeDialogsIfOpen();
-  setHeaderContext(party.name);
   showView(roster.view);
   roster.render(party);
   if (dialog === 'edit-party') partyDialog.openEditDialog(party);
