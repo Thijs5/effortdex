@@ -13,3 +13,8 @@ or new global game preference is introduced. Frequent actions remain on-page.
 Keep route dispatch in app.ts and guide behavior in the roster page; shell
 navigation must not import page internals. Retain hash routes and utility return
 paths, with one sticky app header and the existing page action bars below it.
+
+The drawer opens on the right, matching the right-hand Menu trigger. Review
+trigger and panel together, including opening side and the exposed backdrop.
+Use shared icon and selected-choice styling instead of drawer-specific glyphs
+or selection underlines.

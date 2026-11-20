@@ -11,7 +11,13 @@ for (const [width, height, theme] of [[390,844,'light'], [390,844,'dark'], [320,
     await page.goto('/');
     const menu = page.getByRole('button', { name: 'Menu', exact: true });
     const drawer = page.getByRole('dialog', { name: 'Navigation', exact: true });
+    const trigger = await menu.boundingBox();
+    if (!trigger) throw new Error('Menu must be visible');
     await menu.click();
+    const panel = await drawer.boundingBox();
+    if (!panel) throw new Error('Drawer must be visible');
+    expect(trigger.x).toBeGreaterThan(Number(width) / 2);
+    expect(panel.x + panel.width).toBe(Number(width));
     await expect(drawer.getByRole('button', { name: /Training guide/ })).toBeDisabled();
     await expect(drawer.locator('#drawer-context')).toContainText('Choose or create');
     await expect(drawer.getByRole('link', { name: 'Parties', exact: true })).toHaveAttribute('aria-current', 'page');
@@ -19,11 +25,14 @@ for (const [width, height, theme] of [[390,844,'light'], [390,844,'dark'], [320,
     await expect(menu).toBeFocused();
     await expect(menu).toHaveAttribute('aria-expanded', 'false');
     await createParty(page, { name: 'My FireRed adventure', baseGame: 'FireRed' });
+    await expect(page.locator('.party-identity-row')).toBeVisible();
     const contentBefore = await page.locator('.party-identity-row').boundingBox();
     await menu.click();
     expect(await page.locator('.party-identity-row').boundingBox()).toEqual(contentBefore);
     await expect(drawer.locator('#drawer-party')).toHaveAttribute('aria-current', 'page');
     await expect(drawer.locator('#drawer-context')).toContainText('FireRed');
+    await drawer.locator('h2').hover();
+    await page.screenshot({ path: info.outputPath('drawer-resting.png'), animations:'disabled' });
     await drawer.getByRole('button', { name: 'Settings', exact: true }).hover();
     expect(await drawer.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
     for (const box of await drawer.locator('nav .ds-btn:visible').evaluateAll(els => els.map(el => el.getBoundingClientRect().height))) expect(box).toBeGreaterThanOrEqual(44);
@@ -49,7 +58,7 @@ for (const [width, height, theme] of [[390,844,'light'], [390,844,'dark'], [320,
     await page.goBack();
     await expect(page).toHaveURL(/#\/transfer/);
     await menu.click();
-    await page.mouse.click(Number(width)-5, Number(height)/2);
+    await page.mouse.click(5, Number(height)/2);
     await expect(drawer).not.toBeVisible();
     await expect(menu).toBeFocused();
   });

@@ -145,6 +145,7 @@ function applyTheme(theme: string): void {
     const selected = choice.dataset.themeChoice === theme;
     choice.setAttribute('aria-checked', String(selected));
     choice.tabIndex = selected ? 0 : -1;
+    choice.classList.toggle('ds-item-btn--active', selected);
   }
   updateBrowserTheme();
 }

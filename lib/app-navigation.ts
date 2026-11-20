@@ -17,7 +17,7 @@ export function initializeNavigation(openGuide: () => void): void {
     partyLink.href = router.partyPath(party?.slug);
     partyLink.textContent = party?.name ?? 'Current party';
     guide.disabled = !party;
-    context.textContent = party ? `${party.name} · ${party.baseGame || 'No game selected'}` : 'Choose or create a party to browse its game’s Pokémon.';
+    context.textContent = party ? `Game: ${party.baseGame || 'Not selected'}` : 'Choose or create a party to browse its game’s Pokémon.';
     for (const item of drawer.querySelectorAll<HTMLElement>('[data-destination]')) {
       const destination = item.dataset.destination;
       const active = destination === 'settings' ? ['settings', 'cache'].includes(route.page ?? '')

@@ -13,6 +13,9 @@ test('iPhone drawer supports touch navigation without shifting content', async (
     await page.getByRole('button', { name:'Menu', exact:true }).tap();
     const drawer = page.getByRole('dialog', { name:'Navigation', exact:true });
     await expect(drawer).toBeVisible();
+    const panel = await drawer.boundingBox();
+    if (!panel) throw new Error('Drawer must be visible');
+    expect(panel.x + panel.width).toBe(width);
     expect(await page.locator('.party-identity-row').boundingBox()).toEqual(before);
     await page.screenshot({ path:info.outputPath(`drawer-${width}.png`) });
     await drawer.getByRole('button', { name:/Training guide/ }).tap();

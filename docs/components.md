@@ -179,3 +179,5 @@ Relevant decisions: [tokens](adr/0003-design-tokens-system.md),
 App navigation composes shared light-DOM dialog chrome and plain buttons in
 `index.html`, with routing/focus in `lib/app-navigation.ts`. Page callbacks are
 supplied by `app.ts`; it is shell-specific rather than a general drawer API.
+The panel opens on the right beside Menu. Theme radios compose `ds-item-btn`
+and its selected modifier, matching existing choice controls.
