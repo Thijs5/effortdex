@@ -11,6 +11,7 @@
 
 import { levelMoves, type LevelMove } from './training-reference.ts';
 import { emptyEvs } from './utils.ts';
+import { evolutionMethods } from './evolution-methods.ts';
 import { MemoCache, NotFoundError } from './memo-cache.ts';
 import type { CacheBackend } from './memo-cache.ts';
 import type { EvMap, StatKey } from './constants.ts';
@@ -38,6 +39,7 @@ export interface EvolutionNode {
   depth: number;
   parent: string | null;
   minLevel: number | null;
+  methods: string[];
 }
 
 const SPECIES_LIST_KEY = 'effortdex:species-list';
@@ -267,7 +269,7 @@ export class PokeApiClient {
 
   /**
    * The whole evolution family `name` belongs to, flattened into
-   * `{ name, depth, parent, minLevel }` nodes (root has `parent: null`,
+   * `{ name, depth, parent, minLevel, methods }` nodes (root has `parent: null`,
    * `minLevel: null`). Branching families (e.g. Eevee) put every
    * branch's members at their own depth with the branch point as
    * `parent` — so "is this node one evolution step from that one" is a
@@ -275,6 +277,7 @@ export class PokeApiClient {
    * correct even past the branch point. `minLevel` is the level-up
    * requirement for evolving *into* that node, when it evolves that way
    * (null for root, and for evolutions triggered by trade/item/etc.).
+   * `methods` preserves every alternative and its combined requirements.
    */
   async getEvolutionChain(name: string): Promise<EvolutionNode[]> {
     const species = await this._getSpecies(name);
@@ -289,7 +292,8 @@ export class PokeApiClient {
       name: node.species.name,
       depth: parent ? parent.depth + 1 : 0,
       parent: parent?.name ?? null,
-      minLevel: node.evolution_details?.[0]?.min_level ?? null,
+      minLevel: parent ? node.evolution_details?.[0]?.min_level ?? null : null,
+      methods: parent ? evolutionMethods(node.evolution_details ?? []) : [],
     };
     nodes.push(entry);
     for (const child of node.evolves_to) this._flattenChain(child, entry, nodes);

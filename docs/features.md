@@ -250,6 +250,13 @@ store when the parent dialog's Save calls its `commit()` — evolving and
 then closing without Save leaves the Pokémon's species unchanged. EVs
 carry over across an evolution either direction.
 
+Each evolved stage lists its requirements, including stones, trading,
+trade-held-item combinations, friendship, time of day, moves, locations,
+and other conditions reported by PokéAPI. Conditions within a method are
+combined; alternative methods are separated by “or.” The same requirements
+appear in the training reference's next-evolution summary. Methods can
+vary by game; Legends Arceus alternatives are labeled explicitly.
+
 Covered by `e2e/evolution.spec.js`.
 
 ## Transfer & Import (moving a roster between devices)

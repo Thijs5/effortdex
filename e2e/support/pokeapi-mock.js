@@ -172,9 +172,12 @@ function speciesPayload(species) {
 /** @param {MockSpecies} species @returns {any} */
 function chainNode(species) {
   const evolvesTo = SPECIES.find((s) => s.name === species.evolvesTo);
+  const parent = SPECIES.find(s => s.evolvesTo === species.name);
   return {
     species: { name: species.name },
-    evolution_details: species.minLevel ? [{ min_level: species.minLevel }] : [],
+    evolution_details: parent?.minLevel
+      ? [{ trigger: { name: 'level-up' }, min_level: parent.minLevel }]
+      : [],
     evolves_to: evolvesTo ? [chainNode(evolvesTo)] : [],
   };
 }

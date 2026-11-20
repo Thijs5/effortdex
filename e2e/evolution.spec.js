@@ -1,7 +1,7 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 import { createParty } from './support/party.js';
-import { addPokemon, rosterRow, openDetail, openItemDialog, openLevelUpDialog } from './support/pokemon.js';
+import { addPokemon, rosterRow, openDetail, openItemDialog, openLevelUpDialog, openTrainingGuide } from './support/pokemon.js';
 import { mockPokeApi } from './support/pokeapi-mock.js';
 
 // Evolving a roster Pokémon carries its EVs, nickname, training aids and
@@ -17,6 +17,36 @@ import { mockPokeApi } from './support/pokeapi-mock.js';
 test.describe('Evolution', () => {
   test.beforeEach(async ({ page }) => {
     await mockPokeApi(page);
+  });
+
+  test('non-level requirements and alternatives appear in evolution and training references', async ({ page }) => {
+    await page.route('**/pokeapi.co/api/v2/evolution-chain/95/', route => route.fulfill({ json: {
+      chain: { species: { name: 'onix' }, evolution_details: [], evolves_to: [{
+        species: { name: 'steelix' }, evolves_to: [], evolution_details: [
+          { trigger: { name: 'trade' }, held_item: { name: 'metal-coat' } },
+          { trigger: { name: 'use-item' }, item: { name: 'metal-coat' }, version_group: { name: 'legends-arceus' } },
+        ],
+      }] },
+    } }));
+    await page.route('**/pokeapi.co/api/v2/generation/2', route => route.fulfill({ json: {
+      pokemon_species: [{ name: 'steelix', url: 'https://pokeapi.co/api/v2/pokemon-species/208/' }],
+    } }));
+    await page.goto('/');
+    await createParty(page, { name: 'Evolution methods', baseGame: 'Emerald' });
+    await addPokemon(page, 'Onix');
+    const card = await openDetail(page, 'Onix');
+    const dialog = await openLevelUpDialog(card);
+    const method = dialog.locator('.evo-method');
+    await expect(method).toHaveText('Trade + holding Metal Coat or Use Metal Coat (Legends Arceus)');
+    for (const width of [390, 320]) {
+      await page.setViewportSize({ width, height: 844 });
+      await page.evaluate(() => { document.documentElement.style.fontSize = '22px'; });
+      await expect.poll(() => method.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+      await expect.poll(() => dialog.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+    }
+    await dialog.getByRole('button', { name: 'Close', exact: true }).click();
+    const training = await openTrainingGuide(card);
+    await expect(training.locator('.evolution')).toContainText('Steelix (Trade + holding Metal Coat or Use Metal Coat (Legends Arceus))');
   });
 
   test('evolving a roster Pokémon updates its species while keeping its EVs', async ({ page }) => {

@@ -40,12 +40,15 @@ export class EvolutionChain extends BaseElement {
         .evo-note { margin: 0; font-size: var(--font-size-2xs); color: var(--ink-soft); }
         .evo-chain { display: grid; grid-template-columns: repeat(var(--evo-stages, 1), minmax(0, 1fr)); align-items: start; gap: var(--space-1); min-width: 0; }
         .evo-stage { display: flex; flex-direction: column; gap: var(--space-2); min-width: 0; }
+        .evo-node { display: grid; gap: var(--space-1); min-width: 0; }
+        .evo-method { color: var(--ink-soft); font-size: var(--font-size-2xs); line-height: 1.5; text-align: center; overflow-wrap: anywhere; }
         .evo-link { display: grid; grid-template-columns: auto minmax(0, 1fr); align-items: start; gap: var(--space-1); min-width: 0; }
         .evo-arrow { color: var(--ink-soft); font-size: var(--font-size-md); align-self: start; padding-top: 28px; }
         .evolve-status { margin: 0; font-size: var(--font-size-2xs); color: var(--teal); min-height: 1em; }
       </style>
       <p class="evo-note" hidden></p>
       <div class="evo-chain"></div>
+      <p class="evo-note">Evolution methods can vary by game.</p>
       <p class="evolve-status" aria-live="polite"></p>
     `;
 
@@ -206,10 +209,8 @@ export class EvolutionChain extends BaseElement {
     this.$chain.innerHTML = html;
   }
 
-  // Same sprite + name (+ a lighter line underneath) template as the
-  // training item and vitamin buttons. The lighter line is the level
-  // requirement for evolving into that node, when it evolves by
-  // level-up — root forms and trade/item/friendship evolutions have none.
+  // Keep requirements outside disabled buttons so every stage's method
+  // remains readable, including combined conditions and alternatives.
   _nodeHtml(
     node: EvolutionNode,
     currentName: string,
@@ -219,19 +220,20 @@ export class EvolutionChain extends BaseElement {
   ): string {
     const label = titleCase(node.name);
     const sprite = spriteByName.get(node.name) || FALLBACK_SPRITE;
-    const boost = node.minLevel ? `Lv. ${node.minLevel}` : '';
-    const attrs = `compact icon="${escapeHtml(sprite)}" label="${escapeHtml(label)}" boost="${escapeHtml(boost)}"`;
+    const attrs = `compact icon="${escapeHtml(sprite)}" label="${escapeHtml(label)}"`;
+    const method = node.parent ? node.methods.join(' or ') || 'Evolution requirements unavailable' : '';
+    const wrap = (button: string) => `<span class="evo-node">${button}${method ? `<span class="evo-method">${escapeHtml(method)}</span>` : ''}</span>`;
 
     if (node.name === currentName) {
-      return `<ds-item-button ${attrs} class="evo-current-btn" active disabled title="Current form"></ds-item-button>`;
+      return wrap(`<ds-item-button ${attrs} class="evo-current-btn" active disabled title="Current form"></ds-item-button>`);
     }
     if (node.name === prevName) {
-      return `<ds-item-button ${attrs} data-action="undo" data-name="${escapeHtml(node.name)}" title="Undo evolution — revert to ${label}"></ds-item-button>`;
+      return wrap(`<ds-item-button ${attrs} data-action="undo" data-name="${escapeHtml(node.name)}" title="Undo evolution — revert to ${label}"></ds-item-button>`);
     }
     if (nextNames.has(node.name)) {
-      return `<ds-item-button ${attrs} data-action="evolve" data-name="${escapeHtml(node.name)}" title="Evolve into ${label}"></ds-item-button>`;
+      return wrap(`<ds-item-button ${attrs} data-action="evolve" data-name="${escapeHtml(node.name)}" title="Evolve into ${label}"></ds-item-button>`);
     }
-    return `<ds-item-button ${attrs} disabled title="${label} — not directly reachable from here"></ds-item-button>`;
+    return wrap(`<ds-item-button ${attrs} disabled title="${label} — not directly reachable from here"></ds-item-button>`);
   }
 }
 customElements.define('evolution-chain', EvolutionChain);

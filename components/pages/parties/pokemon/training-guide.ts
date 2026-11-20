@@ -261,7 +261,7 @@ export class TrainingGuideDialog extends BaseDialog {
       if (token !== this.referenceRequest) return;
       const next = chain.filter(node => node.parent === name && (!allowed || allowed.has(node.name)));
       evolution.textContent = next.length ? 'Next evolution · ' + next.map(node =>
-        titleCase(node.name) + (node.minLevel ? ' (Lv. ' + node.minLevel + '+)' : '')).join(', ')
+        titleCase(node.name) + (node.methods.length ? ' (' + node.methods.join(' or ') + ')' : '')).join(', ')
         : 'No further evolution listed for this game.';
     }).catch(() => { if (token === this.referenceRequest) evolution.textContent = 'Evolution data unavailable.'; });
   }

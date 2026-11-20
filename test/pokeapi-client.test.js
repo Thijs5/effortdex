@@ -229,7 +229,7 @@ const CHAIN = {
     evolves_to: [
       {
         species: { name: 'vaporeon' },
-        evolution_details: [{ min_level: null }],
+        evolution_details: [{ trigger: { name: 'use-item' }, item: { name: 'water-stone' }, min_level: null }],
         evolves_to: [],
       },
       {
@@ -249,10 +249,10 @@ test('getEvolutionChain flattens branching families with parent links and min le
   const client = new PokeApiClient();
   const nodes = await client.getEvolutionChain('eevee');
   assert.deepEqual(nodes, [
-    { name: 'eevee', depth: 0, parent: null, minLevel: null },
-    { name: 'vaporeon', depth: 1, parent: 'eevee', minLevel: null },
-    { name: 'jolteon', depth: 1, parent: 'eevee', minLevel: 25 },
-    { name: 'megajolteon', depth: 2, parent: 'jolteon', minLevel: 50 },
+    { name: 'eevee', depth: 0, parent: null, minLevel: null, methods: [] },
+    { name: 'vaporeon', depth: 1, parent: 'eevee', minLevel: null, methods: ['Use Water Stone'] },
+    { name: 'jolteon', depth: 1, parent: 'eevee', minLevel: 25, methods: ['Lv. 25'] },
+    { name: 'megajolteon', depth: 2, parent: 'jolteon', minLevel: 50, methods: ['Lv. 50'] },
   ]);
 });
 
