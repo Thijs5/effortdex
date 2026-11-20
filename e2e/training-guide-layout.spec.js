@@ -26,6 +26,12 @@ for (const { layout, width, height } of [
     await expect(dialog.locator('.result > strong')).toBeInViewport({ ratio: 1 });
     await page.screenshot({ path: info.outputPath('training-plan.png') });
 
+    await dialog.locator('.resistances > summary').click();
+    await dialog.locator('.matchups').evaluate(el => el.scrollIntoView({ block: 'center' }));
+    await expect(dialog.locator('.weaknesses summary')).toHaveText(['×2']);
+    await expect.poll(() => dialog.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+    await page.screenshot({ path: info.outputPath('type-matchups.png') });
+
     if (width <= 640) {
       const table = dialog.getByRole('table', { name: 'Current and target EVs' });
       const chart = dialog.locator('.ev-chart');

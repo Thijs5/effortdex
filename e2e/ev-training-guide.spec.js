@@ -54,9 +54,15 @@ test.describe('EV-training location guide', () => {
     await expect(dialog.locator('.dex-sprite')).toHaveAttribute('src', /\/2\.png$/);
     await expect(card.locator('.type-labels type-label')).toHaveText(['Grass', 'Poison']);
     await expect(dialog.locator('.type-list type-label')).toHaveText(['Grass', 'Poison']);
-    await expect(dialog.locator('.weaknesses type-label')).toHaveText(['Fire ×2', 'Flying ×2', 'Ice ×2', 'Psychic ×2']);
+    await expect(dialog.locator('.weaknesses summary')).toHaveText(['×2']);
+    await expect(dialog.locator('.weaknesses type-label')).toHaveText(['Fire', 'Flying', 'Ice', 'Psychic']);
+    await dialog.locator('.weaknesses summary').click();
+    await expect(dialog.locator('.weaknesses type-label').first()).toBeHidden();
+    await dialog.locator('.weaknesses summary').click();
+    await expect(dialog.locator('.weaknesses type-label').first()).toBeVisible();
     await dialog.getByText('Resistances and immunities').click();
-    await expect(dialog.locator('.reduced')).toContainText('Grass ×0.25');
+    await expect(dialog.locator('.reduced summary')).toHaveText(['×0.5', '×0.25']);
+    await expect(dialog.locator('.reduced details').filter({ has: page.locator('summary[aria-label="×0.25 damage"]') }).locator('type-label')).toHaveText(['Grass']);
     await expect(dialog.locator('.base-values')).toContainText('HP 60');
     await dialog.getByRole('button', { name: 'Next Pokédex number' }).click();
     await expect(dialog.locator('.dex-status')).toContainText('Try again');

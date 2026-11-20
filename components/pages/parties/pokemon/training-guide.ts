@@ -41,17 +41,21 @@ export class TrainingGuideDialog extends BaseDialog {
       }
       @media (min-width:760px) {
         dialog.training-guide-dialog { width:min(810px,94vw); max-width:94vw; }
-        .plan { display:grid; grid-template-columns:minmax(0,1.05fr) minmax(0,1fr); column-gap:24px; align-items:start; }
+        .plan { grid-template-columns:minmax(0,1.05fr) minmax(0,1fr); align-items:start; }
         .species-card,.projection,.restore,.dex-status { grid-column:1/-1; }
         .training { grid-column:1; }
         .reference { grid-column:2; }
-        .species-card { display:grid; grid-template-columns:1fr auto; align-items:center; }
-        .species-card .dex-nav { grid-column:2; grid-row:1; }
-        .species-card .dex-nav h3 { display:none; }
-        .species-card .species-face { grid-column:1; grid-row:1; }
-        .species-card .species-face img { width:80px; }
+        .species-card .dex-nav { flex-direction:row; }
       }
-      .training h3 { margin:14px 0 8px; }
+      .plan { display:grid; gap:var(--space-4); font-size:var(--font-size-xs); line-height:1.5; }
+      .plan > *, .training, .reference { min-width:0; }
+      .section-title { margin:0 0 var(--space-3); font-size:var(--font-size-2xs); font-weight:700; letter-spacing:.06em; text-transform:uppercase; color:var(--ink-soft); }
+      .training,.reference-panel { padding:var(--space-4); border:1px solid var(--line); border-radius:var(--radius-sm); background:var(--surface); }
+      .reference { display:grid; gap:var(--space-4); }
+      .training label { display:grid; gap:var(--space-2); color:var(--ink-soft); }
+      .training select { min-width:0; }
+      .categories p { margin:var(--space-2) 0 var(--space-3); }
+      .category-types { display:flex; flex-wrap:wrap; gap:var(--space-2) var(--space-3); margin-top:var(--space-2); }
       .plan-stats { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:8px; margin-block:12px; }
       .plan-stats svg { display:block; width:100%; max-height:165px; }
       @media (max-width:640px) {
@@ -65,40 +69,48 @@ export class TrainingGuideDialog extends BaseDialog {
       .plan-stats small { display:block; text-align:center; color:var(--ink-soft); }
       .plan-stats table { font:inherit; font-variant-numeric:tabular-nums; border-collapse:collapse; }
       .plan-stats td { white-space:nowrap; }
-      .plan-stats td,.plan-stats th { padding:2px 3px; text-align:right; }
+      .plan-stats td,.plan-stats th { padding:var(--space-2); text-align:right; border-bottom:1px solid var(--lcd-line); }
+      .plan-stats thead { color:var(--ink-soft); font-size:var(--font-size-2xs); }
       .plan-stats th:first-child { text-align:left; }
-      select { display:block; width:100%; min-height:44px; margin-block:4px;
-        padding-inline:10px; background:var(--surface); color:var(--ink); border:1px solid var(--lcd-line);
-        border-radius:var(--radius-sm); font:inherit; }
-      .dex-nav { display:flex; align-items:center; justify-content:space-between; gap:4px; }
+      .dex-nav { display:flex; flex-direction:column; align-items:center; gap:var(--space-1); }
       .dex-nav button,.restore { min-height:44px; min-width:44px; color:var(--ink); background:var(--surface); border:1px solid var(--lcd-line); border-radius:var(--radius-sm); }
       .dex-nav button:disabled { opacity:.45; }
-      .species-card { padding:var(--space-3); border-radius:var(--radius-sm); border:1px solid var(--lcd-line);
-        background:linear-gradient(120deg,color-mix(in srgb,var(--species-color) 17%,var(--surface)),var(--surface)); }
-      .dex-nav { justify-content:flex-start; }
+      .species-card { display:grid; grid-template-columns:minmax(0,1fr) auto; align-items:center; gap:var(--space-2); padding:var(--space-3); border-radius:var(--radius-md); border:1px solid var(--lcd-line);
+        background:linear-gradient(120deg,color-mix(in srgb,var(--species-color) 10%,var(--surface)),var(--surface)); }
       .dex-nav button { flex:none; }
-      .dex-nav .prev { margin-left:auto; }
-      .dex-nav h3,.plan h4 { margin:0; font-size:var(--font-size-xs); }
-      .species-face { display:flex; align-items:center; gap:var(--space-3); min-width:0; }
-      .species-face img { width:clamp(80px,24vw,108px); height:auto; aspect-ratio:1; object-fit:contain; image-rendering:pixelated; }
-      .dex-name { display:block; font-size:1.2rem; overflow-wrap:anywhere; }
-      .type-list,.match-list { display:flex; flex-wrap:wrap; gap:var(--space-2); margin-block:6px; }
-      .battle-facts { border-block:1px solid var(--lcd-line); padding-block:8px; }
-      .battle-facts p { margin-block:6px; }
+      .species-face { display:grid; grid-template-columns:64px minmax(0,1fr); align-items:center; gap:var(--space-3); min-width:0; }
+      .species-face img { width:64px; height:64px; object-fit:contain; image-rendering:pixelated; }
+      .dex-name { display:block; font-family:var(--font-display); font-size:var(--font-size-lg); overflow-wrap:anywhere; }
+      .type-list { display:flex; flex-wrap:wrap; gap:var(--space-2); margin-top:var(--space-2); }
+      .battle-facts p { margin-block:var(--space-3); }
       .battle-facts strong { font-weight:650; }
-      .matchups { margin-top:var(--space-3); }
-      .base-values { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:5px; }
-      .base-values span { background:var(--lcd); padding:6px; text-align:center; border-radius:var(--radius-sm); font-variant-numeric:tabular-nums; }
-      summary { cursor:pointer; padding-block:10px; font-weight:600; }
-      .plan { font-size:var(--font-size-xs); line-height:1.4; }
-      .result > strong { display:block; padding:8px 10px; border-left:3px solid var(--teal); background:var(--lcd); }
+      .base-values { display:grid; margin:0; }
+      .base-stat-row { display:flex; justify-content:space-between; gap:var(--space-3); padding:var(--space-2) 0; border-bottom:1px solid var(--lcd-line); color:var(--ink-soft); }
+      .base-stat-row:last-child { border-bottom:0; }
+      .base-stat-row strong { font-family:var(--font-mono); font-weight:500; color:var(--ink); }
+      .matchup-heading { display:flex; align-items:baseline; justify-content:space-between; gap:var(--space-2); }
+      .matchup-heading small { color:var(--ink-soft); }
+      .matchup-subtitle { font-size:var(--font-size-xs); margin:0 0 var(--space-2); }
+      .damage-list { list-style:none; margin:0; padding:0; }
+      .damage-list > li { border-top:1px solid var(--lcd-line); }
+      .damage-list details { display:grid; grid-template-columns:4.4rem minmax(0,1fr); gap:var(--space-2); align-items:center; }
+      .damage-list summary { display:flex; align-items:center; justify-content:space-between; gap:var(--space-2); font-family:var(--font-mono); padding-right:var(--space-1); list-style:none; }
+      .damage-list summary::-webkit-details-marker { display:none; }
+      .matchup-chevron { width:.4rem; height:.4rem; flex:none; border:solid var(--ink-soft); border-width:0 2px 2px 0; transform:rotate(-45deg); }
+      .damage-list details[open] .matchup-chevron { transform:rotate(45deg); }
+      .matchup-types { display:flex; flex-wrap:wrap; gap:var(--space-2) var(--space-3); padding-block:var(--space-2); }
+      .matchup-empty { color:var(--ink-soft); padding-block:var(--space-2); }
+      .coverage-row { display:grid; gap:var(--space-2); padding-block:var(--space-3); border-top:1px solid var(--lcd-line); }
+      .coverage-label { display:flex; align-items:center; gap:var(--space-2); color:var(--ink-soft); }
+      summary { cursor:pointer; min-height:44px; padding-block:var(--space-3); font-weight:600; }
+      .result > strong { display:block; padding:var(--space-3); border-left:3px solid var(--teal); border-radius:0 var(--radius-sm) var(--radius-sm) 0; background:var(--lcd); }
+      .result p { margin-block:var(--space-3); }
       .learnset ul { list-style:none; padding:0; margin:0; }
-      .learnset li { display:grid; grid-template-columns:4.5em 1fr; padding:5px 8px; gap:8px; }
-      .learnset li:nth-child(odd) { background:var(--lcd); }
+      .learnset li { display:grid; grid-template-columns:4.5em minmax(0,1fr); padding:var(--space-2); gap:var(--space-2); border-top:1px solid var(--lcd-line); }
       .learnset li span:first-child { font-variant-numeric:tabular-nums; color:var(--ink-soft); }
-      summary { min-height:44px; box-sizing:border-box; }
-      .plan-stats table th,.plan-stats table td { padding-block:4px; }
-      .plan-stats tbody tr:nth-child(odd) { background:var(--lcd); }
+      .projection,.dex-status { margin:0; color:var(--ink-soft); }
+      .dex-status:empty { display:none; }
+      .spots { margin-top:var(--space-5); padding-top:var(--space-4); border-top:1px solid var(--line); }
       .training-guide-attribution { margin: var(--space-3) 0 0; font-size: var(--font-size-2xs); color: var(--ink-soft); }
     `;
     this.shadow.appendChild(style);
@@ -106,24 +118,26 @@ export class TrainingGuideDialog extends BaseDialog {
     this.$title.textContent = 'Training guide';
     this.$body.innerHTML = `
       <section class="plan"><div class="species-card">
-      <div class="dex-nav"><h3>National Pokédex</h3><button type="button" class="prev" aria-label="Previous Pokédex number">←</button>
-      <button type="button" class="next" aria-label="Next Pokédex number">→</button></div>
       <div class="species-face"><img class="dex-sprite" alt=""><div><strong class="dex-name" aria-live="polite"></strong>
-      <div class="type-list" aria-label="Pokémon types"></div></div></div></div>
+      <div class="type-list" aria-label="Pokémon types"></div></div></div>
+      <div class="dex-nav" role="group" aria-label="National Pokédex"><button type="button" class="prev" aria-label="Previous Pokédex number">←</button>
+      <button type="button" class="next" aria-label="Next Pokédex number">→</button></div></div>
       <p class="projection" hidden></p>
       <button type="button" class="restore" hidden></button>
-      <div class="dex-status" role="status"></div><section class="training"><h3>Suggested training</h3>
-      <label>Training focus<select></select></label>
-      <details><summary>Which moves are physical or special?</summary><div class="categories"></div></details>
+      <div class="dex-status" role="status"></div><section class="training"><h3 class="section-title">Suggested training</h3>
+      <label>Training focus<select class="ds-field"></select></label>
+      <details class="ds-disclosure"><summary>Which moves are physical or special?</summary><div class="categories"></div></details>
       <div class="result" aria-live="polite"></div></section>
-      <div class="reference">      <section class="matchups"><h4>Type weaknesses</h4><div class="match-list weaknesses"></div>
-      <details class="resistances"><summary>Resistances and immunities</summary><div class="match-list reduced"></div></details></section>
-      <p><strong>Base stats</strong></p><p class="base-values"></p>
-      <section class="battle-facts"><h4>Battle and training</h4>
-      <p class="stab"></p><details><summary>Type coverage for same-type attacks</summary><div class="coverage"></div></details><p class="yield"></p><p class="evolution"></p>
-      <p class="next-move"></p><details class="learnset" hidden><summary>Level-up moves</summary><ul></ul></details></section>
+      <div class="reference"><section class="reference-panel matchups">
+      <div class="matchup-heading"><h3 class="section-title">Type matchups</h3><small class="matchup-rules"></small></div>
+      <h4 class="matchup-subtitle">Weaknesses</h4><ul class="damage-list weaknesses" aria-label="Incoming damage from weaknesses"></ul>
+      <details class="resistances ds-disclosure"><summary>Resistances and immunities</summary><ul class="damage-list reduced" aria-label="Reduced incoming damage"></ul></details></section>
+      <section class="reference-panel"><h3 class="section-title">Base stats</h3><div class="base-values"></div></section>
+      <section class="reference-panel battle-facts"><h3 class="section-title">Battle and training</h3>
+      <p class="stab"></p><details class="ds-disclosure"><summary>Type coverage for same-type attacks</summary><div class="coverage"></div></details><p class="yield"></p><p class="evolution"></p>
+      <p class="next-move"></p><details class="learnset ds-disclosure" hidden><summary>Level-up moves</summary><ul></ul></details></section>
 </div></section>
-      <section class="spots"><h3>Where to train</h3><ev-training-guide></ev-training-guide>
+      <section class="spots"><h3 class="section-title">Where to train</h3><ev-training-guide></ev-training-guide>
       <p class="training-guide-attribution">Locations via Bulbapedia &amp; Marriland's EV training guides</p></section>`;
     this.spriteFallback = wireSpriteFallback(this.$body.querySelector('.dex-sprite')!);
     this.$body.addEventListener('keydown', event => {
@@ -301,9 +315,16 @@ export class TrainingGuideDialog extends BaseDialog {
       ? 'Same-type bonus · ' + types.map(type => typeLabel(type) + ' attacks use ' + damageStat(type)).join(' · ')
       : 'Same-type bonus applies to ' + types.map(typeLabel).join(' and ') + ' moves. Move category usually determines whether Attack or Special Attack applies.';
     this.$body.querySelector('.coverage')!.replaceChildren(...types.map(type => {
-      const line = document.createElement('p');
+      const line = document.createElement('div');
+      line.className = 'coverage-row';
       const targets = strongAgainst(type, typeGen);
-      line.textContent = typeLabel(type) + ' → ' + (targets.length ? targets.map(typeLabel).join(', ') : 'No single-type targets');
+      const heading = document.createElement('span');
+      heading.className = 'coverage-label';
+      heading.append(createTypeLabel(type), ' attacks are strong against');
+      const labels = document.createElement('div');
+      labels.className = 'matchup-types';
+      labels.append(...(targets.length ? targets.map(target => createTypeLabel(target)) : ['No single-type targets']));
+      line.append(heading, labels);
       return line;
     }));
     const yieldText = profile && STATS.filter(s => profile.evYield?.[s.key] > 0).map(s => '+' + profile.evYield[s.key] + ' ' + s.label).join(', ');
@@ -318,12 +339,16 @@ export class TrainingGuideDialog extends BaseDialog {
     const matchups = defensiveMatchups(types, typeGen, effortLevels);
     const weak = matchups.filter(m => m.factor > 1);
     const reduced = matchups.filter(m => m.factor < 1);
-    this.$body.querySelector('.weaknesses')!.replaceChildren(...(weak.length ? weak.map(m => createTypeLabel(m.type, m.factor)) : [types.length ? 'None' : 'Type data unavailable']));
+    this.$body.querySelector('.matchup-rules')!.textContent = effortLevels ? 'Legends Arceus' : gen ? `Gen ${gen}` : 'Modern rules';
+    this.renderDamageList('.weaknesses', weak, types.length ? 'None' : 'Type data unavailable');
     this.$body.querySelector<HTMLElement>('.resistances')!.hidden = !reduced.length;
-    this.$body.querySelector('.reduced')!.replaceChildren(...reduced.map(m => createTypeLabel(m.type, m.factor)));
+    this.renderDamageList('.reduced', reduced);
     this.$body.querySelector('.base-values')!.replaceChildren(...STATS.filter(s => gen !== 1 || s.key !== 'spd').map(({ key, label }) => {
       const stat = document.createElement('span');
-      stat.textContent = (gen === 1 && key === 'spa' ? 'SPC' : label) + ' ' + (base?.[key] ?? '—');
+      stat.className = 'base-stat-row';
+      const value = document.createElement('strong');
+      value.textContent = String(base?.[key] ?? '—');
+      stat.append((gen === 1 && key === 'spa' ? 'SPC' : label) + ' ', value);
       return stat;
     }));
     this.$body.querySelector<HTMLButtonElement>('.prev')!.disabled = this.loading || id === 1;
@@ -340,6 +365,42 @@ export class TrainingGuideDialog extends BaseDialog {
     if (roles) roles.disabled = id === 292;
     if (id === 292 && select.value.endsWith(' wall')) select.value = '';
     this.$body.querySelector('.result')!.innerHTML = trainingPlan({ ...entry, speciesId: id, baseStats: base }, select.value, gen, trainingNote);
+  }
+
+  private renderDamageList(selector: string, matches: { type: string; factor: number }[], empty = ''): void {
+    const list = this.$body.querySelector(selector)!;
+    const groups = new Map<number, string[]>();
+    for (const match of matches) {
+      const group = groups.get(match.factor) ?? [];
+      group.push(match.type);
+      groups.set(match.factor, group);
+    }
+    const rows = [...groups].map(([factor, types]) => {
+      const row = document.createElement('li');
+      const disclosure = document.createElement('details');
+      disclosure.open = true;
+      const summary = document.createElement('summary');
+      summary.setAttribute('aria-label', factor === 0 ? '×0 damage, immune' : `×${factor} damage`);
+      const multiplier = document.createElement('span');
+      multiplier.textContent = `×${factor}`;
+      const chevron = document.createElement('span');
+      chevron.className = 'matchup-chevron';
+      chevron.setAttribute('aria-hidden', 'true');
+      summary.append(multiplier, chevron);
+      const labels = document.createElement('div');
+      labels.className = 'matchup-types';
+      labels.append(...types.map(type => createTypeLabel(type)));
+      disclosure.append(summary, labels);
+      row.append(disclosure);
+      return row;
+    });
+    if (!rows.length && empty) {
+      const row = document.createElement('li');
+      row.className = 'matchup-empty';
+      row.textContent = empty;
+      rows.push(row);
+    }
+    list.replaceChildren(...rows);
   }
 
   get entry(): RosterEntry | null {

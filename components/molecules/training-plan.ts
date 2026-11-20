@@ -7,11 +7,11 @@ export function categoryGuide(gen: number): string {
   if (!gen) return 'Choose a known base game to see its move category rules.';
   if (!usesTypeBasedMoveCategories(gen)) return '<p>Each move has its own category. Fire Punch is physical and uses Attack. Flamethrower is special and uses Special Attack. Both are Fire type.</p>';
   const types = Object.keys(chart).sort();
-  const physical = types.filter(type => typeBasedMoveCategory(type, gen) === 'physical').map(typeLabel);
-  const special = types.filter(type => typeBasedMoveCategory(type, gen) === 'special').map(typeLabel);
+  const labels = (category: string) => types.filter(type => typeBasedMoveCategory(type, gen) === category)
+    .map(type => `<type-label type="${type}"></type-label>`).join('');
   return `<p>A damaging move’s type determines its category in this game.</p>
-    <p><strong>Physical · Attack</strong><br>${physical.join(', ')}</p>
-    <p><strong>Special · ${gen === 1 ? 'Special' : 'Special Attack'}</strong><br>${special.join(', ')}</p>`;
+    <p><strong>Physical · Attack</strong><span class="category-types">${labels('physical')}</span></p>
+    <p><strong>Special · ${gen === 1 ? 'Special' : 'Special Attack'}</strong><span class="category-types">${labels('special')}</span></p>`;
 }
 
 export function moveOptions(gen: number): string[] {
