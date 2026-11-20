@@ -12,6 +12,7 @@ import { store, prefetchService } from './lib/services.ts';
 import { attachDesignSystem } from './lib/design-system.ts';
 import { wireDialogCloseButtons } from './lib/dom.ts';
 import * as router from './lib/router.ts';
+import { initializeNavigation } from './lib/app-navigation.ts';
 import { setHeaderContext } from './lib/shell.ts';
 import './lib/app-version.ts';
 import * as parties from './components/pages/parties/parties.ts';
@@ -124,6 +125,7 @@ function render(): void {
 }
 
 router.onRouteChange(render);
+initializeNavigation(roster.openSpeciesGuide);
 // A route change means a new page — start it at the top, the way a real
 // navigation would. Wired to route changes only, not store 'change'
 // (that's data edits — scrolling to the top mid-edit would be jarring);

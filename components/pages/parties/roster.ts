@@ -202,7 +202,7 @@ function configureGuideBrowser(reset = false): void {
     : (a, b) => compareInGameRanks(game, a, b, guideSort.value === 'weakest' ? 'weakest' : 'strongest');
 }
 guideSort.addEventListener('change', () => configureGuideBrowser());
-trainingGuideBtn.addEventListener('click', () => {
+export function openSpeciesGuide(): void {
   const token = ++guideRequest;
   guideStatus.hidden = true;
   configureGuideBrowser(true);
@@ -212,7 +212,8 @@ trainingGuideBtn.addEventListener('click', () => {
   void availableSpeciesFor(store.activeParty, api).then(allowed => {
     if (token === guideRequest) guideSearch.allowedSpecies = allowed;
   }).catch(() => {});
-});
+}
+trainingGuideBtn.addEventListener('click', openSpeciesGuide);
 guideSearch.addEventListener('sheet-close', () => {
   guideSearch.hidden = true;
   trainingGuideBtn.focus({ preventScroll: true });

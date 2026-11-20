@@ -51,6 +51,9 @@ separate Sp. Atk/Sp. Def, since that split didn't happen until Gen II.
 - **Where to train**: a short, curated list of good spots to grind each
   stat's EVs in the party's own game (Gen III onward), with one tap to
   log a battle against a recommended Pokémon.
+- **Navigation**: Menu opens a dismissible sidebar for Parties, the current party,
+  Training guide/Pokédex, Transfer and Settings, with theme choices below.
+  The header remains available while scrolling; frequent actions stay on-page.
 - **Training guide & Pokédex**: open Training guide from a party to look
   up a species without adding it. Browse training targets, all incoming
   type matchups, evolution methods and learned moves with type markers.
@@ -211,7 +214,8 @@ history linear and resolve conflicts at rebase time, not merge time.
   source of truth and EVs/level/identity are pure folds over it; see
   [`docs/adr/0006`](docs/adr/0006-event-sourced-roster-entries.md)),
   `pokeapi-client.ts` (the only module that talks to PokéAPI),
-  `shell.ts` (app-wide chrome: header menu, theme switching, the power
+  `app-navigation.ts` (global drawer navigation),
+  `shell.ts` (app-wide chrome: theme switching, the power
   LED, offline app-shell/service-worker registration — runs once,
   regardless of route; see
   [`docs/adr/0008`](docs/adr/0008-page-level-module-boundaries.md)),

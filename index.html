@@ -67,31 +67,41 @@
         <span id="header-party-name" class="app-header-context" hidden></span>
       </div>
       <div class="bezel-menu">
-        <button id="menu-btn" class="bezel-btn bezel-btn--menu" type="button" aria-haspopup="true" aria-expanded="false">Menu</button>
-        <div id="header-menu" class="header-menu" role="menu" aria-label="App menu" hidden>
-          <button id="settings-btn" class="header-menu-item" type="button" role="menuitem">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-            <span>Settings</span>
-          </button>
-          <div class="header-menu-sep" role="separator"></div>
+        <button id="menu-btn" class="bezel-btn bezel-btn--menu" type="button" aria-haspopup="dialog" aria-controls="app-navigation" aria-expanded="false"><span aria-hidden="true">☰</span> <span>Menu</span></button>
+
+      </div>
+    </header>
+
+    <dialog id="app-navigation" class="ds-dialog app-drawer" aria-labelledby="navigation-title">
+      <header class="ds-dialog-header"><h2 id="navigation-title" tabindex="-1">Navigation</h2><button class="ds-dialog-close" type="button" aria-label="Close navigation">×</button></header>
+      <div class="dialog-body">
+        <nav aria-label="Main navigation" class="drawer-links">
+          <a class="ds-btn ds-btn--plain" href="#/parties" data-destination="parties">Parties</a>
+          <a id="drawer-party" class="ds-btn ds-btn--plain" href="#/parties" data-destination="party">Current party</a>
+          <button id="drawer-guide" class="ds-btn ds-btn--plain" type="button">Training guide <span class="drawer-secondary">Pokédex &amp; training reference</span></button>
+          <p id="drawer-context" class="hint"></p>
+          <button id="drawer-transfer" class="ds-btn ds-btn--plain" type="button" data-destination="transfer">Transfer</button>
+          <button id="settings-btn" class="ds-btn ds-btn--plain" type="button" data-destination="settings">Settings</button>
+        </nav>
+        <div class="drawer-theme">
           <p class="header-menu-label" id="theme-group-label">Theme</p>
-          <div role="group" aria-labelledby="theme-group-label">
-            <button class="header-menu-item" type="button" role="menuitemradio" aria-checked="false" data-theme-choice="auto">
+          <div role="radiogroup" aria-labelledby="theme-group-label">
+            <button class="header-menu-item ds-btn ds-btn--plain" type="button" role="radio" aria-checked="false" data-theme-choice="auto">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3a9 9 0 0 1 0 18z" fill="currentColor" stroke="none"/></svg>
               <span>Auto</span>
             </button>
-            <button class="header-menu-item" type="button" role="menuitemradio" aria-checked="false" data-theme-choice="dark">
+            <button class="header-menu-item ds-btn ds-btn--plain" type="button" role="radio" aria-checked="false" data-theme-choice="dark">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg>
               <span>Dark</span>
             </button>
-            <button class="header-menu-item" type="button" role="menuitemradio" aria-checked="false" data-theme-choice="light">
+            <button class="header-menu-item ds-btn ds-btn--plain" type="button" role="radio" aria-checked="false" data-theme-choice="light">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
               <span>Light</span>
             </button>
           </div>
         </div>
       </div>
-    </header>
+    </dialog>
 
     <!-- "/parties" — choose which party (save file / playthrough) to open -->
     <main id="picker-view" class="picker">

@@ -1,5 +1,5 @@
-// App-wide chrome: the header's bezel menu (Settings link + theme
-// choices), the online/offline power LED, and offline app-shell (service
+// App-wide chrome: theme choices in the navigation drawer, the
+// online/offline power LED, and offline app-shell (service
 // worker) registration. None of this is tied to any one route — it runs
 // once, regardless of page — so it doesn't belong in any page module.
 // App-version display and update polling is a separate concern (see
@@ -8,7 +8,7 @@
 // wiring.
 
 import * as router from './router.ts';
-import { interceptLinkClick, requireElementById, requireQuery, wireDisclosureMenu } from './dom.ts';
+import { interceptLinkClick, requireElementById, requireQuery } from './dom.ts';
 import { getAppVersion } from './app-version.ts';
 import { SCHEMA_VERSION } from './schema-version.ts';
 import { summarizeState, readPreMigrationBackup } from './store.ts';
@@ -110,26 +110,14 @@ document.addEventListener('visibilitychange', () => {
 setInterval(checkpoint, 60_000);
 
 /* ------------------------------------------------------------------ */
-/* Header menu — one bezel button opening Settings + theme choices.    */
+/* Theme choices in the global navigation drawer.                     */
 /* Theme: "Auto" clears the data-theme attribute so CSS falls back to  */
 /* prefers-color-scheme; index.html re-applies a saved choice before   */
 /* first paint. The storage key predates the Effortdex rename and is   */
 /* kept as-is so existing users don't lose their choice.               */
 /* ------------------------------------------------------------------ */
 
-const menuBtn = requireElementById('menu-btn');
-const headerMenu = requireElementById('header-menu');
-const settingsBtn = requireElementById('settings-btn');
-const bezelMenu = requireQuery('.bezel-menu');
-
-const setMenuOpen = wireDisclosureMenu({ button: menuBtn, menu: headerMenu, itemSelector: '.header-menu-item', boundary: bezelMenu });
-
-// Any item click performs its action (own listener) and closes the menu.
-headerMenu.addEventListener('click', (e) => {
-  if ((e.target as Element | null)?.closest('.header-menu-item')) setMenuOpen(false);
-});
-
-settingsBtn.addEventListener('click', () => router.navigateToSettings());
+const headerMenu = requireElementById('app-navigation') as HTMLDialogElement;
 
 const THEME_KEY = 'effortdex:theme';
 const themeChoices = [...headerMenu.querySelectorAll('[data-theme-choice]')].map((el) => el as HTMLElement);
@@ -154,7 +142,9 @@ function applyTheme(theme: string): void {
     localStorage.setItem(THEME_KEY, theme);
   }
   for (const choice of themeChoices) {
-    choice.setAttribute('aria-checked', String(choice.dataset.themeChoice === theme));
+    const selected = choice.dataset.themeChoice === theme;
+    choice.setAttribute('aria-checked', String(selected));
+    choice.tabIndex = selected ? 0 : -1;
   }
   updateBrowserTheme();
 }
@@ -162,7 +152,7 @@ function applyTheme(theme: string): void {
 applyTheme(localStorage.getItem(THEME_KEY) || 'auto');
 systemTheme.addEventListener('change', updateBrowserTheme);
 for (const choice of themeChoices) {
-  choice.addEventListener('click', () => applyTheme(choice.dataset.themeChoice as string));
+  choice.addEventListener('click', () => { applyTheme(choice.dataset.themeChoice as string); headerMenu.close(); });
 }
 
 /* Power LED in the header: a router-style network activity indicator

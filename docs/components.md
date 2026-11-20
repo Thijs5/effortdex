@@ -50,6 +50,7 @@ custom element just to look like other buttons.
 | Main page action | `ds-btn ds-btn--primary` | Raised accent action, used for page-level primary actions. |
 | Filled action in a form/dialog | `ds-btn ds-btn--solid` | Filled teal action; follow the closest existing flow. |
 | Secondary action | `ds-btn ds-btn--outline` or `ds-btn ds-btn--ghost` | Choose the established variant for the context rather than inventing another. |
+| Flat navigation/action row | `ds-btn ds-btn--plain` | Borderless secondary control with the shared hover/focus treatment; keep semantic links for destinations. |
 | Destructive action | Add `ds-btn--danger` to an appropriate button variant | Destructive hover treatment; retain a clear action label and existing confirmation behavior. |
 | Compact button | Add `ds-btn--sm` | Small desktop control; mobile rules retain the shared 44px minimum height. |
 | Text input or select | `ds-field` | Shared sizing, color, border and focus treatment. Associate a label; set input type/constraints for the actual data. |
@@ -174,3 +175,7 @@ Relevant decisions: [tokens](adr/0003-design-tokens-system.md),
 [sheet choices](adr/0037-consistent-sheet-spacing-and-short-choices.md),
 [phone review](adr/0039-iphone-13-default-mobile-review.md),
 [flat mobile layouts](adr/0040-mobile-first-flat-layouts-and-design-review.md).
+
+App navigation composes shared light-DOM dialog chrome and plain buttons in
+`index.html`, with routing/focus in `lib/app-navigation.ts`. Page callbacks are
+supplied by `app.ts`; it is shell-specific rather than a general drawer API.

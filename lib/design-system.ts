@@ -70,6 +70,8 @@ const css = `
     min-height: 34px;
     font-size: var(--font-size-md);
   }
+  .ds-btn--plain { background: transparent; color: var(--ink-soft); }
+  .ds-btn--plain:hover:not(:disabled),
   .ds-btn--ghost:hover:not(:disabled) { background: var(--lcd); color: var(--ink); }
   .ds-btn--danger:hover:not(:disabled) { background: var(--danger-soft); color: var(--poke-red); border-color: var(--poke-red); }
 

@@ -69,9 +69,9 @@ html:not([data-modal-open], :has(dialog[open])):has(#import-view:not([hidden])) 
 /* ---------- top app header ---------- */
 /* A slim wordmark bar — the app's identity, the active party's name, and
    the Menu. Full-bleed band; its content aligns to the same 1180px column
-   the views use. Scrolls away with the page — only the per-view action
-   bar (.view-nav) stays pinned. */
+   the views use. Stays available above the per-view action bar. */
 .app-header {
+  position:sticky; top:0; z-index:40;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -164,8 +164,7 @@ html:not([data-modal-open], :has(dialog[open])):has(#import-view:not([hidden])) 
 .bezel-btn--menu:hover { border-color: var(--ink-soft); color: var(--ink); }
 
 /* ---------- per-view fixed nav bar ---------- */
-/* A solid band that pins to the top of the viewport once the app header
-   scrolls past it — the only chrome that stays put. Holds the back link
+/* A solid action band that pins below the app header. Holds the back link
    on the left and the view's single primary action on the right, so that
    action is always reachable. Used by the picker (title + New party), the
    party view (← All parties) and the Pokémon detail view
@@ -177,7 +176,7 @@ html:not([data-modal-open], :has(dialog[open])):has(#import-view:not([hidden])) 
    column's actual left/right edge instead of sitting inside it. */
 .view-nav {
   position: sticky;
-  top: 0;
+  top: var(--app-header-height, 69px);
   z-index: 10;
   display: flex;
   align-items: center;
@@ -219,66 +218,28 @@ html:not([data-modal-open], :has(dialog[open])):has(#import-view:not([hidden])) 
   .view-nav > .ds-btn { transition: none; }
 }
 
-/* ---------- header dropdown menu ---------- */
-.header-menu {
-  position: absolute;
-  top: calc(100% + 10px);
-  right: 0;
-  z-index: 50;
-  min-width: 180px;
-  display: grid;
-  gap: 2px;
-  padding: var(--space-2);
-  background: var(--surface);
-  color: var(--ink);
-  border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  box-shadow: var(--shadow-suggestions);
+/* Shell drawer: shared dialog chrome with a side-anchored footprint. */
+dialog.app-drawer {
+  position:fixed; inset:0 auto 0 0; margin:0; width:min(320px, calc(100vw - 36px));
+  max-width:none; height:100dvh; max-height:100dvh; border:0;
+  border-right:1px solid var(--line); border-radius:0; padding:0;
+  background:var(--surface); color:var(--ink);
 }
-.header-menu[hidden] { display: none; }
-
-.header-menu-item {
-  display: flex;
-  align-items: center;
-  gap: var(--space-3);
-  width: 100%;
-  padding: var(--space-2) var(--space-3);
-  border: none;
-  border-radius: var(--radius-sm);
-  background: transparent;
-  text-align: left;
-  font-size: var(--font-size-md);
-  cursor: pointer;
-}
-.header-menu-item:hover { background: var(--lcd); }
-.header-menu-item svg {
-  flex: 0 0 auto;
-  width: 16px;
-  height: 16px;
-  color: var(--ink-soft);
-}
-.header-menu-item[aria-checked='true'] {
-  background: var(--teal-soft);
-  font-weight: 600;
-}
-.header-menu-item[aria-checked='true'] svg { color: var(--teal); }
-
-.header-menu-sep {
-  height: 1px;
-  margin: var(--space-2) 0;
-  background: var(--line);
-}
-.header-menu-label {
-  margin: 0 var(--space-3) var(--space-1);
-  font-size: var(--font-size-2xs);
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--ink-soft);
-}
-.header-menu [role='group'] {
-  display: grid;
-  gap: 2px;
-}
+dialog.app-drawer[open] { display:grid; grid-template-columns:minmax(0,1fr); grid-template-rows:auto minmax(0,1fr); overflow:hidden; }
+dialog.app-drawer .dialog-body { min-width:0; overflow-y:auto; padding-bottom:calc(var(--space-5) + env(safe-area-inset-bottom, 0px)); }
+.drawer-links { display:grid; gap:var(--space-1); }
+.drawer-links .ds-btn { justify-content:flex-start; text-align:left; white-space:normal; min-height:48px; text-decoration:none; }
+.drawer-links .ds-btn[aria-current="page"] { background:var(--lcd); box-shadow:inset 3px 0 var(--teal); font-weight:700; }
+.drawer-links .ds-btn[hidden] { display:none; }
+#drawer-guide { display:flex; flex-direction:column; align-items:flex-start; gap:var(--space-1); }
+.drawer-secondary { color:var(--ink-soft); font-size:var(--font-size-2xs); font-weight:400; }
+#drawer-context { margin:var(--space-1) var(--space-3) var(--space-4); font-size:var(--font-size-2xs); overflow-wrap:anywhere; }
+.drawer-theme { margin-top:var(--space-5); padding-top:var(--space-4); border-top:1px solid var(--line); }
+.header-menu-label { margin:0 0 var(--space-2); font-size:var(--font-size-2xs); color:var(--ink-soft); }
+.drawer-theme [role="radiogroup"] { display:flex; flex-wrap:wrap; gap:var(--space-1); }
+.header-menu-item { flex:1; display:flex; align-items:center; justify-content:center; gap:var(--space-2); min-height:44px; padding:var(--space-2); }
+.header-menu-item svg { width:16px; height:16px; flex:none; }
+.header-menu-item[aria-checked="true"] { background:var(--lcd); box-shadow:inset 0 -2px var(--teal); }
 
 /* ---------- shared bits ---------- */
 .roster-panel-head {
@@ -1130,7 +1091,7 @@ html:not([data-modal-open], :has(dialog[open])):has(#import-view:not([hidden])) 
    minus a primary action there's nothing to put in. */
 .settings-view > .back-link {
   position: sticky;
-  top: 0;
+  top: var(--app-header-height, 69px);
   z-index: 10;
   display: block;
   width: 100vw;
@@ -1619,7 +1580,7 @@ textarea.ds-field { resize: vertical; }
 /* Companion-use audit: touch targets stay stable while content scrolls. */
 @media (max-width: 640px) {
   .device.is-scrolled .view-nav > .ds-btn--primary { min-height: 44px; }
-  .header-menu-item { min-height: 44px; }
+
   .field-label--checkbox { min-height: 44px; padding-block: var(--space-2); }
 }
 @media (max-width: 640px) {

@@ -64,7 +64,7 @@ test.describe('Transfer', () => {
     await addPokemon(page, 'Bulbasaur', { level: 12 });
 
     await page.getByRole('button', { name: 'Menu' }).click();
-    await page.getByRole('menuitem', { name: 'Settings' }).click();
+    await page.getByRole('button', { name: 'Settings' }).click();
     await page.getByRole('button', { name: 'Transfer to another device' }).click();
     await page.getByRole('button', { name: 'Export' }).click();
 

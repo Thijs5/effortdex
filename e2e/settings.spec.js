@@ -11,22 +11,22 @@ test.describe('Settings', () => {
     await page.goto('/');
     await page.getByRole('button', { name: 'Menu' }).click();
 
-    await page.getByRole('menuitemradio', { name: 'Dark' }).click();
+    await page.getByRole('radio', { name: 'Dark' }).click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
 
     await page.getByRole('button', { name: 'Menu' }).click();
-    await page.getByRole('menuitemradio', { name: 'Light' }).click();
+    await page.getByRole('radio', { name: 'Light' }).click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'light');
 
     await page.getByRole('button', { name: 'Menu' }).click();
-    await page.getByRole('menuitemradio', { name: 'Auto' }).click();
+    await page.getByRole('radio', { name: 'Auto' }).click();
     await expect(page.locator('html')).not.toHaveAttribute('data-theme', /.+/);
   });
 
   test('the theme choice persists across a reload', async ({ page }) => {
     await page.goto('/');
     await page.getByRole('button', { name: 'Menu' }).click();
-    await page.getByRole('menuitemradio', { name: 'Dark' }).click();
+    await page.getByRole('radio', { name: 'Dark' }).click();
 
     await page.reload();
 
@@ -36,7 +36,7 @@ test.describe('Settings', () => {
   test('the Settings page shows the app version and a link to storage management', async ({ page }) => {
     await page.goto('/');
     await page.getByRole('button', { name: 'Menu' }).click();
-    await page.getByRole('menuitem', { name: 'Settings' }).click();
+    await page.getByRole('button', { name: 'Settings' }).click();
 
     await expect(page.locator('#settings-version')).toHaveText(/^v\d+\.\d+\.\d+$/);
     // The actual "Clear cache" control lives on /settings/cache now
@@ -48,7 +48,7 @@ test.describe('Settings', () => {
   test('Settings is reachable without any party existing yet', async ({ page }) => {
     await page.goto('/');
     await page.getByRole('button', { name: 'Menu' }).click();
-    await page.getByRole('menuitem', { name: 'Settings' }).click();
+    await page.getByRole('button', { name: 'Settings' }).click();
 
     await expect(page.getByRole('heading', { name: 'Settings' })).toBeVisible();
   });
@@ -58,7 +58,7 @@ test('dark surfaces are neutral and browser chrome follows manual and automatic 
   await page.emulateMedia({ colorScheme: 'light' });
   await page.goto('/');
   await page.getByRole('button', { name: 'Menu' }).click();
-  await page.getByRole('menuitemradio', { name: 'Dark' }).click();
+  await page.getByRole('radio', { name: 'Dark' }).click();
   const read = () => page.evaluate(() => ({
     surface: getComputedStyle(document.documentElement).getPropertyValue('--surface').trim(),
     tint: getComputedStyle(document.documentElement).getPropertyValue('--page-type-tint').trim(),
@@ -68,7 +68,7 @@ test('dark surfaces are neutral and browser chrome follows manual and automatic 
     if (mode === 'automatic') {
       await page.emulateMedia({ colorScheme: 'dark' });
       await page.getByRole('button', { name: 'Menu' }).click();
-      await page.getByRole('menuitemradio', { name: 'Auto' }).click();
+      await page.getByRole('radio', { name: 'Auto' }).click();
     }
     const palette = await read();
     const channels = palette.surface.slice(1).match(/../g)?.map((v) => parseInt(v, 16)) ?? [];
@@ -79,7 +79,7 @@ test('dark surfaces are neutral and browser chrome follows manual and automatic 
     expect(palette.chrome.every((colour) => colour === palette.surface)).toBe(true);
   }
   await page.getByRole('button', { name: 'Menu' }).click();
-  await page.getByRole('menuitemradio', { name: 'Light' }).click();
+  await page.getByRole('radio', { name: 'Light' }).click();
   const light = await read();
   expect(light.chrome.every((colour) => colour === light.surface)).toBe(true);
   await expect(page.locator('.brand-mark img')).toBeVisible();

@@ -58,7 +58,7 @@ async function mockGenerationOne(page) {
 async function openSpriteCacheManager(page) {
   await page.goto('/');
   await page.getByRole('button', { name: 'Menu' }).click();
-  await page.getByRole('menuitem', { name: 'Settings' }).click();
+  await page.getByRole('button', { name: 'Settings' }).click();
   await page.getByRole('button', { name: 'Manage storage' }).click();
 }
 
@@ -72,7 +72,7 @@ test.describe('Sprite cache manager', () => {
     // Wait for app initialization before seeding: startup cleanup for
     // disabled caching can otherwise delete the synthetic entry.
     await page.getByRole('button', { name: 'Menu' }).click();
-    await page.getByRole('menuitem', { name: 'Settings' }).click();
+    await page.getByRole('button', { name: 'Settings' }).click();
     await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
     await page.evaluate(async () => {
       const cache = await caches.open('e2e-synthetic-cache');
@@ -167,7 +167,7 @@ test.describe('Sprite cache manager', () => {
     await page.goto('/');
     // Seed after startup cleanup for disabled caching has run.
     await page.getByRole('button', { name: 'Menu' }).click();
-    await page.getByRole('menuitem', { name: 'Settings' }).click();
+    await page.getByRole('button', { name: 'Settings' }).click();
     await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
     // Seed exactly Red & Blue's two sprites directly into Cache Storage —
     // simulating what a real service worker would have written, since
@@ -198,7 +198,7 @@ test.describe('Sprite cache manager', () => {
     await page.goto('/');
     // Seed after startup cleanup for disabled caching has run.
     await page.getByRole('button', { name: 'Menu' }).click();
-    await page.getByRole('menuitem', { name: 'Settings' }).click();
+    await page.getByRole('button', { name: 'Settings' }).click();
     await expect(page.getByRole('heading', { name: 'Settings', exact: true })).toBeVisible();
     await page.evaluate(async (cacheName) => {
       const cache = await caches.open(cacheName);
@@ -298,7 +298,7 @@ test.describe('Sprite cache manager', () => {
     // Round-trips through a fresh visit to the page, reflecting the
     // stored preference back rather than only the moment it was set.
     await page.getByRole('button', { name: 'Menu' }).click();
-    await page.getByRole('menuitem', { name: 'Settings' }).click();
+    await page.getByRole('button', { name: 'Settings' }).click();
     await page.getByRole('button', { name: 'Manage storage' }).click();
     await expect(page.getByRole('checkbox', { name: 'Notify me when caching finishes' })).toBeChecked();
 
