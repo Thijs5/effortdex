@@ -65,6 +65,10 @@ const SHELL_PATHS = [
   'import-worker.js',
   'styles.css',
   'tokens.css',
+  'components/index.html',
+  'components/catalog.js',
+  'components/catalog.css',
+  'docs/components.md',
   'manifest.webmanifest',
   'version.json',
   'icons/icon-192.png',
@@ -164,8 +168,16 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return; // let PokéAPI data reads etc. hit the network directly
 
   if (request.mode === 'navigate') {
+    const catalogPath = new URL('components/', self.location).pathname;
+    if (url.pathname === catalogPath.slice(0, -1)) {
+      url.pathname = catalogPath;
+      event.respondWith(Response.redirect(url.toString(), 308));
+      return;
+    }
+    const fallback = url.pathname === catalogPath || url.pathname === `${catalogPath}index.html`
+      ? 'components/index.html' : 'index.html';
     event.respondWith(
-      fetch(request).catch(() => caches.match(new URL('index.html', self.location).toString()))
+      fetch(request).catch(() => caches.match(new URL(fallback, self.location).toString()))
     );
     return;
   }

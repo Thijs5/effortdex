@@ -9,7 +9,7 @@
 
 ## Feature workflow
 
-1. Read relevant decisions in `docs/adr/` before changing a feature. In particular, follow the shared design system, phone review, touch interaction, and mobile-first layout ADRs.
+1. Read relevant decisions in `docs/adr/`, the feature's existing spec/tests, and the [component library](docs/components.md). For a bug, reproduce the reported state before fixing it where possible; otherwise record why reproduction was unavailable. Identify the user task, expected result, and likely regression risks.
 2. Update the feature's existing spec in `docs/specs/`. Create a short spec for a new feature or a substantial behavior change. State observable behavior, layout, relevant empty/loading/error states, and acceptance checks; keep small fixes proportionate. Resolve routine design choices using existing patterns and the user's goal.
 3. Implement the smallest coherent change using the reuse-first rules below. Add or update tests for meaningful regression risks: domain logic with unit tests and user flows/layout behavior with Playwright. Do not add tests that simply restate CSS declarations or implementation details. For a bug, verify that the regression check detects the original failure when practical.
 4. Run focused checks first. Exercise the actual flow through its changed states, not only the initial render. Where affected, verify confirmation/cancellation, repeated actions, navigation/reopen, reload persistence, offline/error recovery, and absence of new console/runtime errors. Use isolated test data; preserve the user's browser data.
@@ -21,10 +21,11 @@ Headless tests and screenshot inspection are routine verification and do not nee
 
 ## UI consistency and review
 
-- Reuse `tokens.css`, `lib/design-system.ts`, `BaseElement`, `BaseDialog`, and existing atoms/molecules before introducing styling. Keep shared type displays in `type-label`; preserve game-specific mechanics.
+- Consult [docs/components.md](docs/components.md) and the live `/components/` catalog before implementing or restyling UI. Follow **reuse → compose → extend → create**, inspecting the source and a real caller first. Reuse `tokens.css`, `lib/design-system.ts`, `BaseElement`, `BaseDialog`, and existing atoms/molecules. Keep shared type displays in `type-label`; preserve game-specific mechanics.
 - Before creating a shared component or variant, identify the concrete gap and why existing pieces cannot cover it. Avoid parallel button, field, badge, dialog, type-label or spacing systems. Do not copy shared markup/CSS or reach into another component's shadow root from application code to restyle it. Keep genuinely feature-specific layout local; extract shared pieces for real common contracts, not speculative reuse. Document changed shared inputs/events/states and usage examples in the same change.
 - Follow [ADR 0040](docs/adr/0040-mobile-first-flat-layouts-and-design-review.md): mobile is the primary target; avoid unnecessary nested cards, borders, headings, dialogs, and disclosure layers.
 - Inspect alignment, text baselines, icon/control centering, touch targets, hover/focus/pressed states, available width, wrapping, clipping, padding, gaps, borders, scrolling, empty states, and transitions between states. Record passes as well as findings.
 - When an inconsistency appears, find why the implementations could diverge. Prefer a shared component, then a shared token/helper, then a runtime/layout test. Use an instruction only when code cannot reasonably enforce the rule.
 - Search for other occurrences of the same pattern and remove superseded implementations where appropriate. Include fixes within the authorized feature scope; describe and queue broader changes instead of silently expanding the task.
 - Prefer spacing and typographic hierarchy to extra boxes. Keep the main action clear, preserve accessible names and focus behavior, and prevent routine state changes from moving neighboring controls.
+- Walk through the user's task: is the next action clear, does feedback explain the result, are mistakes recoverable, and is information available when needed without redundant steps? Check keyboard use, focus after transitions, readable labels, and meanings conveyed beyond color. Record observed usability problems separately from subjective polish; do not claim user validation from tests or screenshots alone.

@@ -101,6 +101,10 @@ keeps working exactly the same, offline included.
 
 ## Technical details
 
+For UI work, start with the [component library](docs/components.md): shared
+controls, styling primitives, usage examples, and the reuse-first workflow.
+Browse the live examples at `/components` on the development server or deployed site.
+
 Built with native Web Components and TypeScript: no framework, no
 bundler in the loop for local development. The source is `.ts`, so a
 small dev-time transform is needed (`scripts/dev-server.mjs` — see

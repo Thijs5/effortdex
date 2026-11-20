@@ -114,7 +114,7 @@ if (liveReload) {
 // --- request handling --------------------------------------------
 async function resolveFile(urlPath) {
   const clean = decodeURIComponent(urlPath.split('?')[0]);
-  const rel = clean === '/' ? 'index.html' : clean.replace(/^\/+/, '');
+  const rel = clean === '/' ? 'index.html' : clean === '/components/' ? 'components/index.html' : clean.replace(/^\/+/, '');
   const abs = path.join(root, rel);
   if (!abs.startsWith(root)) return null; // path-traversal guard
   if (await isFile(abs)) return abs;
@@ -137,6 +137,12 @@ async function isFile(p) {
 const server = createServer(async (req, res) => {
   try {
     const url = req.url || '/';
+
+    if (url.split('?')[0] === '/components') {
+      res.writeHead(308, { Location: `/components/${url.includes('?') ? url.slice(url.indexOf('?')) : ''}` });
+      res.end();
+      return;
+    }
 
     if (url.startsWith('/__livereload')) {
       res.writeHead(200, {

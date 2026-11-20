@@ -29,7 +29,7 @@ async function main() {
   // only fetch a .map when DevTools is actually open, so this costs
   // ordinary visitors nothing.
   await build({
-    entryPoints: [path.join(root, 'app.ts'), path.join(root, 'import-worker.ts')],
+    entryPoints: [path.join(root, 'app.ts'), path.join(root, 'import-worker.ts'), path.join(root, 'components/catalog.ts')],
     outdir: outDir,
     outbase: root,
     bundle: true,
@@ -42,7 +42,7 @@ async function main() {
   });
 
   await build({
-    entryPoints: [path.join(root, 'styles.css'), path.join(root, 'tokens.css')],
+    entryPoints: [path.join(root, 'styles.css'), path.join(root, 'tokens.css'), path.join(root, 'components/catalog.css')],
     outdir: outDir,
     outbase: root,
     minify: true,
@@ -57,6 +57,9 @@ async function main() {
   // runs on this exact copy before this script sees it.
   const passthroughFiles = ['index.html', 'sw.js', 'manifest.webmanifest', 'version.json'];
   await Promise.all(passthroughFiles.map((f) => cp(path.join(root, f), path.join(outDir, f))));
+  await cp(path.join(root, 'components/index.html'), path.join(outDir, 'components/index.html'));
+  await mkdir(path.join(outDir, 'docs'), { recursive: true });
+  await cp(path.join(root, 'docs/components.md'), path.join(outDir, 'docs/components.md'));
   await cp(path.join(root, 'icons'), path.join(outDir, 'icons'), { recursive: true });
 
   console.log(`Built to ${path.relative(root, outDir)}/`);

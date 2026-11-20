@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <base href="../" />
+  <title>Component library · Effortdex</title>
+  <link rel="icon" href="icons/brand-mark.svg" type="image/svg+xml" />
+  <link rel="stylesheet" href="tokens.css" />
+  <link rel="stylesheet" href="components/catalog.css" />
+</head>
+<body>
+  <a class="skip" href="components/#main">Skip to components</a>
+  <header class="catalog-header">
+    <a href="./">← Effortdex</a>
+    <label>Preview theme <select id="theme" class="ds-field"><option value="light">Light</option><option value="dark">Dark</option></select></label>
+  </header>
+  <main id="main">
+    <p class="eyebrow">Effortdex / Design system</p>
+    <h1>Component library</h1>
+    <p class="intro">One visual language, across every flow. These live examples use the same components and styles as the application.</p>
+    <p>Reuse → compose → extend → create. Start with an existing pattern; add a shared component only for a concrete gap.</p>
+    <nav aria-label="Component sections">
+      <a href="components/#foundations">Foundations</a><a href="components/#controls">Controls</a><a href="components/#pokemon">Pokémon</a><a href="components/#dialogs">Dialogs</a><a href="components/#compositions">Feature compositions</a>
+    </nav>
+    <noscript>Enable JavaScript to see the live component examples.</noscript>
+    <div id="examples"></div>
+    <footer><a href="docs/components.md">Full component contracts and contribution guide (Markdown)</a><p>Review changes in both themes and in their actual feature flow. A preview is a reference, not a substitute for behavior and usability checks.</p></footer>
+  </main>
+  <script type="module" src="components/catalog.js"></script>
+</body>
+</html>
