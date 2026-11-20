@@ -21,6 +21,31 @@ export function recommendedNatures(sets: Record<string, unknown>, species: strin
 }
 
 const requests = new WeakMap<HTMLSelectElement, object>();
+const badgeRequests = new WeakMap<HTMLElement, object>();
+
+/** Mark a recorded nature using the same generation-specific picks as the selector. */
+export async function updateNatureRecommendationBadge(
+  element: HTMLElement, species: string, nature: string | null, gen: number,
+): Promise<void> {
+  const request = {};
+  badgeRequests.set(element, request);
+  element.querySelector('.nature-recommendation-star')?.remove();
+  if (!nature) return;
+  try {
+    const sets = await smogon.getSets(gen);
+    if (badgeRequests.get(element) !== request || !element.isConnected) return;
+    if (!recommendedNatures(sets, species).includes(nature)) return;
+    const star = document.createElement('span');
+    star.className = 'nature-recommendation-star';
+    star.textContent = ' ⭐';
+    star.setAttribute('role', 'img');
+    star.setAttribute('aria-label', `Recommended nature (Smogon, Gen ${gen})`);
+    star.title = `Recommended nature in Smogon Gen ${gen} sets. Best depends on moves and role.`;
+    element.append(star);
+  } catch {
+    // Missing competitive data never interferes with the Pokémon card.
+  }
+}
 
 /** Refresh stars without replacing options or overwriting a user's selection. */
 export async function updateNatureRecommendations(

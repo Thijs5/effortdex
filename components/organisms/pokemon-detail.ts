@@ -1,5 +1,7 @@
 import { POWER_ITEMS, MACHO_BRACE_SPRITE, EXP_SHARE_SPRITE, NATURES, STATS, STAT_LABEL, MACHO_BRACE_MULTIPLIER, FALLBACK_SPRITE, FALLBACK_ONERROR, TYPE_COLORS } from '../../lib/constants.ts';
 import { titleCase, natureEffectHint, dayLabel } from '../../lib/utils.ts';
+import { updateNatureRecommendationBadge } from '../../lib/nature-recommendations.ts';
+import { matchGameVersion } from '../../lib/game-versions.ts';
 import { api, store } from '../../lib/services.ts';
 import { versionedSpriteUrl, versionedSpriteIsOpaque } from '../../lib/pokeapi-client.ts';
 import { availableSpeciesFor } from '../../lib/species-availability.ts';
@@ -660,6 +662,8 @@ export class PokemonDetail extends BaseElement {
     this.$levelDialog.entry = e;
     const nature = natureAvailable ? NATURES.find((n) => n.id === e.nature) ?? null : null;
     this._renderNatureBadge(nature, natureAvailable);
+    void updateNatureRecommendationBadge(this.$natureBtn, e.speciesName,
+      nature?.id ?? null, matchGameVersion(store.activeParty?.baseGame)?.gen ?? 9);
     this._renderItemBadge(e);
     // Only relevant while this Pokémon actually holds an Exp. Share.
     this.$sheetExpShareNote.hidden = !e.expShare;

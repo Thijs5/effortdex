@@ -18,7 +18,7 @@ import {
 } from '../../../lib/constants.ts';
 import { titleCase, totalEvs, natureOptionsHtml, escapeHtml, sortedNatures, natureLabel, formatEvYield } from '../../../lib/utils.ts';
 import { POKERUS_ICON_SVG } from '../../../lib/icons.ts';
-import { updateNatureRecommendations } from '../../../lib/nature-recommendations.ts';
+import { updateNatureRecommendations, updateNatureRecommendationBadge } from '../../../lib/nature-recommendations.ts';
 import { battleMatchup } from '../../../lib/battle-matchup.ts';
 import { matchGameVersion } from '../../../lib/game-versions.ts';
 import { api, store } from '../../../lib/services.ts';
@@ -987,6 +987,9 @@ function renderRoster(party: Party): void {
       });
     }
     roster.appendChild(row);
+    const natureLabel = row.querySelector<HTMLElement>('.roster-card-nature');
+    if (natureLabel) void updateNatureRecommendationBadge(natureLabel, entry.speciesName,
+      entry.nature, matchGameVersion(party.baseGame)?.gen ?? 9);
   }
 
   warmMissingTypes(entries.map((e) => e.speciesName));

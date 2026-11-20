@@ -1,7 +1,7 @@
 // @ts-check
 import { test, expect } from '@playwright/test';
 import { createParty } from './support/party.js';
-import { addPokemon, pickSpecies, openDetail, openNatureDialog } from './support/pokemon.js';
+import { addPokemon, pickSpecies, openDetail, openNatureDialog, rosterCard } from './support/pokemon.js';
 import { mockPokeApi } from './support/pokeapi-mock.js';
 import { mockSmogon } from './support/smogon-mock.js';
 
@@ -56,6 +56,31 @@ test.describe('Nature', () => {
     await expect(add.locator('.nature-recommendations')).toContainText('No published nature recommendations');
     await expect(add.getByLabel('Nature').locator('option').filter({ hasText: /^⭐/ })).toHaveCount(0);
     await add.getByRole('button', { name: 'Add!', exact: true }).click();
+  });
+
+  test('cards star a recommended recorded nature and update after changing it', async ({ page }) => {
+    await page.goto('/');
+    await createParty(page, { name: 'Nature stars', baseGame: 'Emerald' });
+    await addPokemon(page, 'Bulbasaur', { nature: 'modest' });
+    await addPokemon(page, 'Onix', { nature: 'adamant' });
+    await addPokemon(page, 'Charmander');
+    const star = rosterCard(page, 'Bulbasaur').getByRole('img', { name: 'Recommended nature (Smogon, Gen 3)' });
+    await expect(star).toBeVisible();
+    await expect(rosterCard(page, 'Bulbasaur').locator('.roster-card-nature')).toHaveText('modest ⭐');
+    await expect(rosterCard(page, 'Onix').locator('.nature-recommendation-star')).toHaveCount(0);
+    await expect(rosterCard(page, 'Charmander').locator('.nature-recommendation-star')).toHaveCount(0);
+    const detail = await openDetail(page, 'Bulbasaur');
+    await expect(detail.locator('.nature-btn .nature-recommendation-star')).toBeVisible();
+    const dialog = await openNatureDialog(detail);
+    await dialog.getByLabel('Nature').selectOption('adamant');
+    await dialog.getByRole('button', { name: 'Save', exact: true }).click();
+    await expect(detail.locator('.nature-btn')).toHaveText('Adamant');
+    await expect(detail.locator('.nature-btn .nature-recommendation-star')).toHaveCount(0);
+    await page.locator('#back-to-roster').click();
+    await expect(rosterCard(page, 'Bulbasaur').locator('.roster-card-nature')).toHaveText('adamant');
+    await expect(star).toHaveCount(0);
+    await page.reload();
+    await expect(rosterCard(page, 'Bulbasaur').locator('.nature-recommendation-star')).toHaveCount(0);
   });
 
   test('an unavailable lookup does not block adding', async ({ page }) => {

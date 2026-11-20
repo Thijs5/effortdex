@@ -45,7 +45,9 @@ Gen III+ party — a nature picker, since natures didn't exist before
 Generation III. The nature dropdown stars picks from Smogon's published
 sets for the species and party's generation, with a note that the best
 choice depends on moves and role. Missing or unavailable recommendations
-never block adding a Pokémon. A collapsed **"Its stats"** disclosure holds an optional
+never block adding a Pokémon. Roster cards and the detail screen show a
+star beside a recorded nature that matches one of these recommendations.
+A collapsed **"Its stats"** disclosure holds an optional
 `<stat-reading-grid>` (the same six-stat component the Level popup uses,
 Special merged on a Gen I party): any value read off the in-game summary
 screen is logged as a stat reading at the add level via
