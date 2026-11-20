@@ -20,28 +20,40 @@ export function recommendedNatures(sets: Record<string, unknown>, species: strin
   return NATURES.filter(n => found.has(n.id)).map(n => n.id).sort();
 }
 
+/** A conservative inference: reverse the stat tradeoff of a published pick.
+ * Exclude natures recommended by another set, and neutral natures. */
+export function poorFitNatures(recommended: string[]): string[] {
+  const picks = NATURES.filter(n => recommended.includes(n.id) && n.boost && n.hinder);
+  return NATURES.filter(n => !recommended.includes(n.id) && picks.some(pick =>
+    n.boost === pick.hinder && n.hinder === pick.boost)).map(n => n.id).sort();
+}
+
 const requests = new WeakMap<HTMLSelectElement, object>();
 const badgeRequests = new WeakMap<HTMLElement, object>();
 
-/** Mark a recorded nature using the same generation-specific picks as the selector. */
+/** Mark recommended picks and inferred poor fits consistently with the selector. */
 export async function updateNatureRecommendationBadge(
   element: HTMLElement, species: string, nature: string | null, gen: number,
 ): Promise<void> {
   const request = {};
   badgeRequests.set(element, request);
-  element.querySelector('.nature-recommendation-star')?.remove();
+  element.querySelectorAll('.nature-recommendation-star, .nature-poor-fit-warning').forEach(marker => marker.remove());
   if (!nature) return;
   try {
     const sets = await smogon.getSets(gen);
     if (badgeRequests.get(element) !== request || !element.isConnected) return;
-    if (!recommendedNatures(sets, species).includes(nature)) return;
-    const star = document.createElement('span');
-    star.className = 'nature-recommendation-star';
-    star.textContent = ' ⭐';
-    star.setAttribute('role', 'img');
-    star.setAttribute('aria-label', `Recommended nature (Smogon, Gen ${gen})`);
-    star.title = `Recommended nature in Smogon Gen ${gen} sets. Best depends on moves and role.`;
-    element.append(star);
+    const picks = recommendedNatures(sets, species);
+    const recommended = picks.includes(nature);
+    if (!recommended && !poorFitNatures(picks).includes(nature)) return;
+    const marker = document.createElement('span');
+    marker.className = recommended ? 'nature-recommendation-star' : 'nature-poor-fit-warning';
+    marker.textContent = recommended ? ' ⭐' : ' ⚠';
+    marker.setAttribute('role', 'img');
+    marker.setAttribute('aria-label', `${recommended ? 'Recommended nature' : 'Poor fit for recommended sets'} (Smogon, Gen ${gen})`);
+    marker.title = recommended
+      ? `Recommended nature in Smogon Gen ${gen} sets. Best depends on moves and role.`
+      : `Reverses the stat effects of a recommended Gen ${gen} nature. Can still suit a different build.`;
+    element.append(marker);
   } catch {
     // Missing competitive data never interferes with the Pokémon card.
   }
@@ -53,7 +65,7 @@ export async function updateNatureRecommendations(
 ): Promise<void> {
   const request = {};
   requests.set(select, request);
-  for (const option of select.options) option.textContent = option.textContent?.replace(/^⭐ /, '') ?? '';
+  for (const option of select.options) option.textContent = option.textContent?.replace(/^(?:⭐|⚠) /, '') ?? '';
   hint.hidden = !species;
   hint.textContent = species ? 'Looking up recommended natures…' : '';
   if (!species) return;
@@ -61,13 +73,19 @@ export async function updateNatureRecommendations(
     const sets = await smogon.getSets(gen);
     if (requests.get(select) !== request) return;
     const ids = recommendedNatures(sets, species);
+    const poorFits = poorFitNatures(ids);
     for (const option of select.options) {
       if (ids.includes(option.value)) option.textContent = `⭐ ${option.textContent}`;
+      else if (poorFits.includes(option.value)) option.textContent = `⚠ ${option.textContent}`;
     }
     const labels = ids.map(id => NATURES.find(n => n.id === id)!.label);
     hint.textContent = labels.length
       ? `⭐ Smogon picks (Gen ${gen}): ${labels.join(', ')}. Best depends on moves and role.`
       : `No published nature recommendations for this Pokémon in Gen ${gen}.`;
+    if (poorFits.length) {
+      const poorLabels = poorFits.map(id => NATURES.find(n => n.id === id)!.label);
+      hint.textContent += ` ⚠ Poor fits: ${poorLabels.join(', ')}. These reverse the stat effects of the starred picks; a different build may suit them.`;
+    }
   } catch {
     if (requests.get(select) === request) hint.textContent = 'Could not load nature recommendations. You can still choose any nature.';
   }

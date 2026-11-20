@@ -801,7 +801,8 @@ html:not([data-modal-open], :has(dialog[open])):has(#import-view:not([hidden])) 
   font-weight: 700;
 }
 .battle-sheet-extra .party-slots-status { margin-top: var(--space-2); color: var(--ink-soft); }
-#battle-log-btn { width: 100%; }
+/* Enabling the confirmation after a pick must not animate its position. */
+#battle-log-btn { width: 100%; transform: none; }
 
 .empty-state {
   font-size: var(--font-size-md);

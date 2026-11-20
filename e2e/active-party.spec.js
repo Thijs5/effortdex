@@ -441,6 +441,32 @@ test.describe('Touch battle confirmation', () => {
 test.describe('Keyboard-free defeat review', () => {
   test.use({ hasTouch: true, isMobile: true, viewport: { width: 390, height: 844 } });
 
+  test('selecting a recent opponent keeps the review header, team and footer still', async ({ page }) => {
+    await mockPokeApi(page);
+    await page.goto('/');
+    await createParty(page, { name: 'Stable opponent selection', baseGame: 'Emerald' });
+    await addPokemon(page, 'Bulbasaur');
+    await logPartyBattle(page, 'Caterpie');
+    await page.evaluate(() => document.fonts.ready);
+    const layout = async () => Promise.all([
+      page.locator('#battle-search .sheet-header').boundingBox(),
+      page.locator('#battle-participants').boundingBox(),
+      page.locator('#battle-search .battle-composer-actions').boundingBox(),
+      page.locator('#battle-log-btn').boundingBox(),
+    ]);
+    for (const width of [390, 320]) {
+      await page.setViewportSize({ width, height: 844 });
+      await page.locator('#battle-search .sheet-close').tap();
+      await page.locator('#party-log-battle-btn').tap();
+      const before = await layout();
+      await page.locator('#battle-recent-opponents').getByRole('button', { name: 'Choose Caterpie again' }).tap();
+      await expect(page.locator('#battle-opponent-name')).toHaveText('Caterpie');
+      await expect(page.locator('#battle-log-btn')).toBeEnabled();
+      await expect(page.locator('#battle-log-btn')).toHaveCSS('transform', 'none');
+      expect(await layout()).toEqual(before);
+    }
+  });
+
   test('recent defeated cards are deduplicated, ordered, and only stage a fresh defeat', async ({ page }, info) => {
     await mockPokeApi(page);
     await page.route('**/raw.githubusercontent.com/**/sprites/pokemon/**', async route => {

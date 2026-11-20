@@ -47,6 +47,10 @@ sets for the species and party's generation, with a note that the best
 choice depends on moves and role. Missing or unavailable recommendations
 never block adding a Pokémon. Roster cards and the detail screen show a
 star beside a recorded nature that matches one of these recommendations.
+Selectors also list ⚠ poor fits: natures that reverse a recommended
+nature's stat effects, unless another published set recommends them.
+Cards show the same warning for a recorded poor fit. These are inferred
+tradeoffs for those sets, not universal rankings for every build.
 A collapsed **"Its stats"** disclosure holds an optional
 `<stat-reading-grid>` (the same six-stat component the Level popup uses,
 Special merged on a Gen I party): any value read off the in-game summary

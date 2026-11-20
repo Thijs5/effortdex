@@ -32,10 +32,13 @@ test.describe('Nature', () => {
     const select = add.getByLabel('Nature');
     await select.selectOption('adamant');
     releaseSets();
-    await expect(add.locator('.nature-recommendations')).toHaveText('⭐ Smogon picks (Gen 3): Modest, Timid. Best depends on moves and role.');
+    await expect(add.locator('.nature-recommendations')).toHaveText('⭐ Smogon picks (Gen 3): Modest, Timid. Best depends on moves and role. ⚠ Poor fits: Adamant, Brave. These reverse the stat effects of the starred picks; a different build may suit them.');
     await expect(select).toHaveValue('adamant');
     await expect(select.locator('option').filter({ hasText: /^⭐/ })).toHaveText([
       '⭐ Modest (+SPA, -ATK)', '⭐ Timid (+SPE, -ATK)',
+    ]);
+    await expect(select.locator('option').filter({ hasText: /^⚠/ })).toHaveText([
+      '⚠ Adamant (+ATK, -SPA)', '⚠ Brave (+ATK, -SPE)',
     ]);
     await add.getByRole('button', { name: 'Add!', exact: true }).click();
     const detail = await openDetail(page, 'Bulbasaur');
@@ -43,6 +46,7 @@ test.describe('Nature', () => {
     await expect(nature.locator('.nature-recommendations')).toContainText('Modest, Timid');
     await expect(nature.getByLabel('Nature')).toHaveValue('adamant');
     await expect(nature.getByLabel('Nature').locator('option[value="modest"]')).toHaveText('⭐ Modest (+SPA, -ATK)');
+    await expect(nature.getByLabel('Nature').locator('option[value="adamant"]')).toHaveText('⚠ Adamant (+ATK, -SPA)');
   });
 
   test('switching species clears recommendations', async ({ page }) => {
@@ -74,13 +78,28 @@ test.describe('Nature', () => {
     const dialog = await openNatureDialog(detail);
     await dialog.getByLabel('Nature').selectOption('adamant');
     await dialog.getByRole('button', { name: 'Save', exact: true }).click();
-    await expect(detail.locator('.nature-btn')).toHaveText('Adamant');
+    await expect(detail.locator('.nature-btn')).toHaveText('Adamant ⚠');
     await expect(detail.locator('.nature-btn .nature-recommendation-star')).toHaveCount(0);
+    await expect(detail.locator('.nature-btn').getByRole('img', { name: /Poor fit for recommended sets/ })).toBeVisible();
     await page.locator('#back-to-roster').click();
-    await expect(rosterCard(page, 'Bulbasaur').locator('.roster-card-nature')).toHaveText('adamant');
+    await expect(rosterCard(page, 'Bulbasaur').locator('.roster-card-nature')).toHaveText('adamant ⚠');
     await expect(star).toHaveCount(0);
     await page.reload();
     await expect(rosterCard(page, 'Bulbasaur').locator('.nature-recommendation-star')).toHaveCount(0);
+    await expect(rosterCard(page, 'Bulbasaur').locator('.nature-poor-fit-warning')).toBeVisible();
+  });
+
+  test('a nature recommended for another role is not marked poor, and neutral natures stay unmarked', async ({ page }) => {
+    await page.route('**/pkmn.github.io/smogon/data/sets/gen3.json', route => route.fulfill({ json: {
+      Bulbasaur: { lc: { Special: { nature: 'Modest' }, Physical: { nature: 'Adamant' }, Neutral: { nature: 'Quirky' } } },
+    } }));
+    await page.goto('/');
+    await createParty(page, { name: 'Different nature roles', baseGame: 'Emerald' });
+    await pickSpecies(page, 'Bulbasaur');
+    const select = page.locator('#add-pokemon-dialog-nature');
+    await expect(select.locator('option[value="adamant"]')).toHaveText('⭐ Adamant (+ATK, -SPA)');
+    await expect(select.locator('option').filter({ hasText: /^⚠/ })).toHaveCount(0);
+    await expect(select.locator('option[value="hardy"]')).toHaveText('Hardy (neutral)');
   });
 
   test('an unavailable lookup does not block adding', async ({ page }) => {
@@ -121,6 +140,6 @@ test.describe('Nature', () => {
     await dialog2.getByLabel('Nature').selectOption('adamant');
     await dialog2.getByRole('button', { name: 'Save' }).click();
 
-    await expect(card.getByRole('button', { name: 'Adamant', exact: true })).toBeVisible();
+    await expect(card.getByRole('button', { name: /^Adamant/ })).toBeVisible();
   });
 });
