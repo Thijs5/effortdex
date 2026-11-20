@@ -12,6 +12,7 @@ import { speciesBaseStats } from '../../../../lib/species-base-stats.ts';
 import { typeBasedMoveCategory, usesTypeBasedMoveCategories } from '../../../../lib/move-category.ts';
 import { api, store } from '../../../../lib/services.ts';
 import { evTrainingLocations } from '../../../../lib/ev-training-locations.ts';
+import { inGameGuide, inGameRank } from '../../../../lib/ingame-tiers.ts';
 import { BaseDialog } from '../../../atoms/base-dialog.ts';
 import { createTypeLabel } from '../../../atoms/type-label.ts';
 import '../../../molecules/ev-training-guide.ts';
@@ -38,9 +39,7 @@ export class TrainingGuideDialog extends BaseDialog {
 
     const style = document.createElement('style');
     style.textContent = `
-      @media (min-width:641px) {
-        .training-guide-dialog .ds-dialog-header { position:sticky; top:0; z-index:1; background:var(--surface); }
-      }
+      .training-guide-dialog .ds-dialog-header { position:sticky; top:0; z-index:1; background:var(--surface); }
       @media (min-width:760px) {
         dialog.training-guide-dialog { width:min(810px,94vw); max-width:94vw; }
         .plan { grid-template-columns:minmax(0,1.05fr) minmax(0,1fr); align-items:start; }
@@ -115,7 +114,10 @@ export class TrainingGuideDialog extends BaseDialog {
       .move-type { color:var(--ink-soft); font-size:var(--font-size-2xs); }
       .category-legend { grid-column:1/-1; display:flex; flex-wrap:wrap; gap:var(--space-3); margin:0; font-size:var(--font-size-2xs); color:var(--ink-soft); }
       .category-legend > span { display:inline-flex; align-items:center; gap:var(--space-2); }
-      .category-legend img { width:32px; height:14px; image-rendering:pixelated; }
+      .category-legend type-label { font-size:inherit; font-weight:inherit; color:inherit; }
+      .ingame-rank { grid-column:1/-1; display:flex; align-items:center; flex-wrap:wrap; gap:var(--space-2); margin:0; font-size:var(--font-size-2xs); color:var(--ink-soft); }
+      .ingame-rank a { color:inherit; }
+      .rank-context { flex-basis:100%; }
       .projection,.dex-status { margin:0; color:var(--ink-soft); }
       .dex-status:empty { display:none; }
       .spots { margin-top:var(--space-5); padding-top:var(--space-4); border-top:1px solid var(--line); }
@@ -130,7 +132,8 @@ export class TrainingGuideDialog extends BaseDialog {
       <div class="type-list" aria-label="Pokémon types"></div></div></div>
       <div class="dex-nav" role="group" aria-label="National Pokédex"><button type="button" class="prev" aria-label="Previous Pokédex number">←</button>
       <button type="button" class="next" aria-label="Next Pokédex number">→</button></div></div>
-      <p class="category-legend" hidden><span><img src="icons/move-physical.png" alt="">Physical · Attack</span><span><img src="icons/move-special.png" alt="">Special · Sp. Atk</span></p>
+      <p class="category-legend" hidden><span><type-label category="physical" aria-hidden="true"></type-label>Physical · Attack</span><span><type-label category="special" aria-hidden="true"></type-label>Special · Sp. Atk</span></p>
+      <p class="ingame-rank" hidden></p>
       <p class="projection" hidden></p>
       <button type="button" class="restore" hidden></button>
       <div class="dex-status" role="status"></div><section class="training"><h3 class="section-title">Suggested training</h3>
@@ -149,7 +152,7 @@ export class TrainingGuideDialog extends BaseDialog {
       <p class="training-guide-attribution">Locations via Bulbapedia &amp; Marriland's EV training guides</p></section>`;
     this.spriteFallback = wireSpriteFallback(this.$body.querySelector('.dex-sprite')!);
     this.$body.addEventListener('keydown', event => {
-      if (event.key === 'Enter' && (event.target as Element).matches('summary, select')) event.stopPropagation();
+      if (event.key === 'Enter' && (event.target as Element).matches('summary, select, a')) event.stopPropagation();
     });
     this.$body.querySelector('.prev')!.addEventListener('click', () => void this.browse(-1));
     this.$body.querySelector('.next')!.addEventListener('click', () => void this.browse(1));
@@ -348,6 +351,28 @@ export class TrainingGuideDialog extends BaseDialog {
     const name = titleCase(mon?.name ?? entry.speciesName);
     const baseGame = matchGameVersion(store.activeParty?.baseGame);
     const gen = baseGame?.gen ?? 0;
+    const tierGuide = inGameGuide(baseGame?.name);
+    const rankLine = this.$body.querySelector<HTMLElement>('.ingame-rank')!;
+    rankLine.hidden = !tierGuide;
+    rankLine.replaceChildren();
+    if (tierGuide) {
+      const rank = inGameRank(baseGame!.name, id);
+      const badge = document.createElement('span');
+      badge.className = 'ds-pill-badge';
+      badge.textContent = rank ? `${rank.tiers.join('/')} tier` : 'Not ranked';
+      const source = document.createElement('a');
+      source.href = tierGuide.url;
+      source.target = '_blank';
+      source.rel = 'noopener noreferrer';
+      source.textContent = `Smogon · ${baseGame!.name} in-game`;
+      rankLine.append(badge, source);
+      if (rank) {
+        const context = document.createElement('span');
+        context.className = 'rank-context';
+        context.textContent = `Evolution-line ranking: ${rank.entries.join('; ')}.`;
+        rankLine.append(context);
+      }
+    }
     this.$body.querySelector<HTMLElement>('.category-legend')!.hidden = !usesTypeBasedMoveCategories(gen);
     const profile = mon ?? api.peekCached(entry.speciesName);
     const modernBase = profile?.baseStats ?? entry.baseStats;

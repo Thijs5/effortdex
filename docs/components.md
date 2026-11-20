@@ -76,7 +76,7 @@ listed with a leading dot are JavaScript properties, not HTML attributes.
 
 | Component | Use for | Inputs and behavior |
 | --- | --- | --- |
-| [type-label](../components/atoms/type-label.ts) | Consistent Pokémon type text, color marker and optional move-category icon | Attributes: `type`, optional `multiplier`, `generation`, `category`. `createTypeLabel(type, multiplier?, generation?)` creates one. Explicit `category` supports `physical`, `special`, `status`; generation supports historical type-based categories. |
+| [type-label](../components/atoms/type-label.ts) | Consistent Pokémon type text, color marker and optional move-category orb shape | Attributes: `type`, optional `multiplier`, `generation`, `category`. `createTypeLabel(type, multiplier?, generation?)` creates one. Explicit `category` supports `physical`, `special`, `status`; generation supports historical type-based categories. Filled diamond = physical, ring = special, dash = status; plain circle = no category. Category meaning is available as accessible text/title. |
 | [ds-item-button](../components/atoms/ds-item-button.ts) | Sprite + label choice or repeatable item action | Attributes: `icon`, `label`, `boost`, `active`, `disabled`, `capped`, `count`, `compact`; `icon` slot for custom artwork. Emits bubbling, composed `pick` with no detail. `capped` is visual; only `disabled` blocks interaction. |
 | [item-button-grid](../components/atoms/item-button-grid.ts) | A small collection of item choices | `.items: ItemButtonSpec[]`; `columns` attribute defaults to 3, stacks at narrow phone widths. Emits bubbling, composed `item-pick` with `{ id }`. Caller computes active/capped/disabled state. |
 | [level-input](../components/atoms/level-input.ts) | Pokémon level entry | `.value` is a raw string; caller parses and clamps. Numeric keypad and digit filtering. Set `aria-label` before connection; it moves to the inner input. Composed, bubbling `change`; Enter emits `next-input` on the host. Methods: `focus()`, `select()`. |
@@ -141,7 +141,7 @@ store state or routing and are not interchangeable generic atoms.
 
 | Need | Existing implementation |
 | --- | --- |
-| Pokémon search and selection | [pokemon-search](../components/organisms/pokemon-search.ts); reusable combobox behavior in [combobox.ts](../lib/combobox.ts) |
+| Pokémon search and selection | [pokemon-search](../components/organisms/pokemon-search.ts); `browse` enables empty-query browsing; `speciesComparator` sorts and `speciesAnnotation` supplies a row badge/description. Standard searches retain their result limit. Reusable combobox behavior in [combobox.ts](../lib/combobox.ts) |
 | Stat observations / level-up entry | [stat-reading-grid](../components/organisms/stat-reading-grid.ts) |
 | Evolution choices | [evolution-chain](../components/organisms/evolution-chain.ts) |
 | Pokémon details and history | [pokemon-detail](../components/organisms/pokemon-detail.ts), [ev-history-log](../components/organisms/ev-history-log.ts) |

@@ -19,6 +19,7 @@ import {
 import { titleCase, totalEvs, natureOptionsHtml, escapeHtml, sortedNatures, natureLabel, formatEvYield } from '../../../lib/utils.ts';
 import { POKERUS_ICON_SVG } from '../../../lib/icons.ts';
 import { updateNatureRecommendations, updateNatureRecommendationBadge } from '../../../lib/nature-recommendations.ts';
+import { inGameGuide, inGameRank, compareInGameRanks } from '../../../lib/ingame-tiers.ts';
 import { battleMatchup } from '../../../lib/battle-matchup.ts';
 import { matchGameVersion } from '../../../lib/game-versions.ts';
 import { api, store } from '../../../lib/services.ts';
@@ -172,17 +173,50 @@ const trainingGuideBtn = document.getElementById('party-training-guide-btn')!;
 const guideSearch = document.getElementById('guide-search') as import('../../organisms/pokemon-search.ts').PokemonSearch;
 const speciesGuide = document.getElementById('species-training-guide') as import('./pokemon/training-guide.ts').TrainingGuideDialog;
 const guideStatus = document.getElementById('training-guide-status')!;
+const guideSort = document.getElementById('guide-sort') as HTMLSelectElement;
+const guideTierContext = document.getElementById('guide-tier-context')!;
+const guideTierSource = document.getElementById('guide-tier-source') as HTMLAnchorElement;
 let guideRequest = 0;
+function configureGuideBrowser(reset = false): void {
+  const game = store.activeParty?.baseGame ?? '';
+  const guide = inGameGuide(game);
+  for (const option of guideSort.options) {
+    if (option.value === 'strongest' || option.value === 'weakest') option.disabled = !guide;
+  }
+  if (reset || (!guide && ['strongest', 'weakest'].includes(guideSort.value))) guideSort.value = guide ? 'strongest' : 'dex';
+  guideTierContext.textContent = guide
+    ? `In-game efficiency · ${game}. ${guide.tiers.join(' → ')}. A/B means conditional outcomes; sorting uses the first tier. Unranked species follow ranked species.`
+    : `No published Smogon in-game tier list is bundled for ${game || 'this game'}. Search and Pokédex browsing are still available.`;
+  guideTierSource.hidden = !guide;
+  if (guide) {
+    guideTierSource.href = guide.url;
+    guideTierSource.textContent = `Source: Smogon ${guide.games.join(' / ')} tiers`;
+  }
+  guideSearch.speciesAnnotation = guide ? species => {
+    const rank = inGameRank(game, species.id);
+    return rank ? { label: rank.tiers.join('/'), description: `Smogon ${rank.tiers.join('/')} tier · ${rank.entries.join('; ')} · ${game}` }
+      : { label: 'Not ranked', description: `No published in-game rank for this species in ${game}` };
+  } : null;
+  guideSearch.speciesComparator = guideSort.value === 'name' ? (a, b) => a.name.localeCompare(b.name)
+    : guideSort.value === 'dex' ? (a, b) => (a.id ?? Infinity) - (b.id ?? Infinity) || a.name.localeCompare(b.name)
+    : (a, b) => compareInGameRanks(game, a, b, guideSort.value === 'weakest' ? 'weakest' : 'strongest');
+}
+guideSort.addEventListener('change', () => configureGuideBrowser());
 trainingGuideBtn.addEventListener('click', () => {
   const token = ++guideRequest;
   guideStatus.hidden = true;
+  configureGuideBrowser(true);
+  guideSearch.allowedSpecies = null;
   guideSearch.hidden = false;
-  guideSearch.focus();
+  guideSearch.showChoices();
   void availableSpeciesFor(store.activeParty, api).then(allowed => {
     if (token === guideRequest) guideSearch.allowedSpecies = allowed;
   }).catch(() => {});
 });
-guideSearch.addEventListener('sheet-close', () => { guideSearch.hidden = true; });
+guideSearch.addEventListener('sheet-close', () => {
+  guideSearch.hidden = true;
+  trainingGuideBtn.focus({ preventScroll: true });
+});
 guideSearch.addEventListener('pokemon-pick', async event => {
   const token = ++guideRequest;
   const partyId = store.activeParty?.id;

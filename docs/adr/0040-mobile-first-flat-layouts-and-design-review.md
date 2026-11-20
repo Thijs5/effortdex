@@ -32,8 +32,8 @@ messages could move neighboring cards during selection.
   have one implementation, including historical generation rules. Comparable
   damage lists use the same ordering and multiplier/type row pattern, including
   neutral damage when the view represents all incoming attack types.
-- Keep selection geometry stable. Recent-opponent cards size independently of
-  the selected opponent. Omit the recent section when empty and use its space
+- Keep selection geometry stable. Reserve an equal, stable height for the current-opponent card and recent
+  grid; content changes must not stretch either section. Omit the recent section when empty and use its space
   for the opponent. Selected participants remain evident on their buttons;
   redundant counts and a layout-inserting selection prompt are unnecessary.
   Confirmation stays disabled until its requirements are met.

@@ -1,5 +1,5 @@
 import { api } from '../../lib/services.ts';
-import { titleCase, formatEvYield } from '../../lib/utils.ts';
+import { titleCase, formatEvYield, escapeHtml } from '../../lib/utils.ts';
 import { FALLBACK_SPRITE, FALLBACK_ONERROR } from '../../lib/constants.ts';
 import { BaseElement } from '../base-element.ts';
 import { attachPointerSelection, syncActiveDescendant } from '../../lib/combobox.ts';
@@ -22,6 +22,8 @@ const RECENT_OPPONENT_LIMIT = 24;
 // pre-formatted string instead (one row's worth of space can't lay out
 // a per-participant breakdown as stat/number pairs), used as-is.
 type EvModifier = (mon: DomainPokemon) => EvMap | string | undefined;
+type SpeciesComparator = (a: SpeciesListEntry, b: SpeciesListEntry) => number;
+type SpeciesAnnotation = (species: SpeciesListEntry) => { label: string; description: string } | null;
 
 /**
  * <pokemon-search placeholder="…" show-ev-yield>
@@ -56,6 +58,10 @@ type EvModifier = (mon: DomainPokemon) => EvMap | string | undefined;
  * `recent` (a settable property, not an attribute — it's data, not a
  * string) is a `{ name, sprite }[]`, most-recent-first. Assign it to
  * offer quick reselection of recently-picked species before typing.
+ *
+ * `browse` shows all allowed species even with empty input. Optional
+ * `speciesComparator` and `speciesAnnotation` properties supply sorting and
+ * a short per-row label/description; standard searches retain their limits.
  *
  * `allowedSpecies` (a settable property, `Set<string>|null`) restricts
  * suggestions/direct-pick to that set of species names when set; `null`
@@ -106,6 +112,7 @@ export class PokemonSearch extends BaseElement {
           font-size: var(--font-size-2xs);
           color: var(--ink-soft);
         }
+        .option-tier { flex:0 0 auto; min-width:3.4em; padding:var(--space-1) var(--space-2); border-radius:var(--radius-sm); background:var(--lcd); font:600 var(--font-size-2xs) var(--font-mono); text-align:center; text-transform:none; }
         .option-name {
           flex: 1 1 auto;
           min-width: 0;
@@ -305,6 +312,8 @@ export class PokemonSearch extends BaseElement {
   _showingRecent = false;
   _evModifier: EvModifier | null = null;
   _allowedSpecies: Set<string> | null = null; // null means unrestricted, see `allowedSpecies` setter
+  _speciesComparator: SpeciesComparator | null = null;
+  _speciesAnnotation: SpeciesAnnotation | null = null;
   _prevBodyOverflow = '';
   _onViewportChange: () => void = () => {};
   $wrap: HTMLElement;
@@ -447,6 +456,16 @@ export class PokemonSearch extends BaseElement {
     return this._allowedSpecies;
   }
 
+  set speciesComparator(compare: SpeciesComparator | null) {
+    this._speciesComparator = compare;
+    if (this._sheetOpen) this._onInput();
+  }
+
+  set speciesAnnotation(annotation: SpeciesAnnotation | null) {
+    this._speciesAnnotation = annotation;
+    if (this._sheetOpen) this._renderList();
+  }
+
   /**
    * Restricts suggestions/direct-pick to this set of species names —
    * e.g. a party's own generation-scoped dex (GitHub issue #31,
@@ -461,7 +480,7 @@ export class PokemonSearch extends BaseElement {
     // Live-refresh an already-open list (e.g. the party's game resolves
     // shortly after this field opens) the same way a species-list load
     // completing mid-type already does below.
-    if (this.$input.value.trim()) this._onInput();
+    if (this.$input.value.trim() || (this.hasAttribute('browse') && this._sheetOpen)) this._onInput();
   }
 
   set recent(list: Array<{ name: string; sprite?: string | null; id?: number | null }> | null | undefined) {
@@ -571,14 +590,14 @@ export class PokemonSearch extends BaseElement {
     // The list can finish loading after the user already started typing —
     // without this, suggestions silently never appear until the *next*
     // keystroke, which read as "autocomplete doesn't work."
-    if (this.$input.value.trim()) this._onInput();
+    if (this.$input.value.trim() || this.hasAttribute('browse')) this._onInput();
   }
 
   _onInput(): void {
     const q = this.$input.value.trim().toLowerCase();
     this._activeIndex = -1;
     this._showingRecent = false;
-    if (!q) {
+    if (!q && !this.hasAttribute('browse')) {
       this._showRecentOrHide();
       return;
     }
@@ -590,15 +609,20 @@ export class PokemonSearch extends BaseElement {
     // "79", "079" and "#79" all find Slowpoke.
     const qNum = q.replace(/^#/, '').replace(/^0+(?=\d)/, '');
     const byNumber = /^\d+$/.test(qNum);
-    this._matches = this._species
+    const matches = this._species
       .filter((s) => s.name.includes(q) || (byNumber && String(s.id).startsWith(qNum)))
-      .filter((s) => !this._allowedSpecies || this._allowedSpecies.has(s.name))
-      .slice(0, 8);
+      .filter((s) => !this._allowedSpecies || this._allowedSpecies.has(s.name));
+    if (this._speciesComparator) matches.sort(this._speciesComparator);
+    this._matches = this.hasAttribute('browse') ? matches : matches.slice(0, 8);
     this._renderList();
   }
 
   /** With nothing typed, offer recently-picked species instead of an empty field. */
   _showRecentOrHide(): void {
+    if (this.hasAttribute('browse')) {
+      this._onInput();
+      return;
+    }
     if (!this._recent.length) {
       this._hideList();
       return;
@@ -632,12 +656,16 @@ export class PokemonSearch extends BaseElement {
       header +
       this._matches
         .map(
-          (s) => `<li class="option" role="option" data-name="${s.name}">
+          (s) => {
+            const annotation = this._speciesAnnotation?.(s);
+            return `<li class="option" role="option" data-name="${s.name}">
             <img class="thumb" src="${s.sprite || FALLBACK_SPRITE}" alt="" loading="lazy" ${FALLBACK_ONERROR} />
             ${s.id ? `<span class="option-num">#${String(s.id).padStart(3, '0')}</span>` : ''}
             <span class="option-name">${titleCase(s.name)}</span>
+            ${annotation ? `<span class="option-tier" title="${escapeHtml(annotation.description)}" aria-label="${escapeHtml(annotation.description)}">${escapeHtml(annotation.label)}</span>` : ''}
             ${showEv ? '<span class="option-ev-yield"></span>' : ''}
-          </li>`
+          </li>`;
+          }
         )
         .join('');
     this.$list.hidden = false;

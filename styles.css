@@ -303,6 +303,8 @@ html:not([data-modal-open], :has(dialog[open])):has(#import-view:not([hidden])) 
   font-size: var(--font-size-md);
   color: var(--ink-soft);
 }
+.guide-browser-tools { display:grid; gap:var(--space-2); padding-top:var(--space-3); }
+.guide-browser-tools .hint, .guide-browser-tools a { margin:0; color:var(--ink-soft); font-size:var(--font-size-2xs); line-height:1.4; }
 
 /* "Added X!" toast under the party nav bar. */
 .status-line {
@@ -1550,18 +1552,18 @@ textarea.ds-field { resize: vertical; }
 }
 
 /* ADR 0031: search-only typing and a separate keyboard-free defeat review. */
-.battle-opponents { display: flex; align-items: stretch; gap: var(--space-3); min-width: 0; }
+.battle-opponents { display: flex; align-items: stretch; gap: var(--space-3); min-width: 0; --opponent-height: 14rem; }
 .battle-current { flex: 0 1 144px; min-width: 0; display: flex; flex-direction: column; }
 .battle-opponents:has(.battle-recents[hidden]) .battle-current { flex: 1; }
 .battle-opponents > div > .battle-sheet-eyebrow { display: block; margin: 0 0 var(--space-2); font-size: var(--font-size-2xs); line-height: 18px; white-space: nowrap; }
-.battle-opponent-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-1); flex: 1; width: 100%; min-height: 156px; min-width: 0; padding: var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--lcd); color: var(--ink); text-align: center; cursor: pointer; }
+.battle-opponent-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-1); flex: none; width: 100%; height: var(--opponent-height); min-width: 0; padding: var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--lcd); color: var(--ink); text-align: center; cursor: pointer; }
 .battle-opponent-card:hover { border-color: var(--teal); }
 .battle-opponent-art { width: 64px; height: 64px; display: grid; place-items: center; font-size: 28px; color: var(--ink-soft); }
 .battle-opponent-art img { width: 64px; height: 64px; image-rendering: pixelated; object-fit: contain; }
 .battle-opponent-copy { display: grid; gap: var(--space-1); min-width: 0; }
 #battle-opponent-name { font-family: var(--font-display); font-size: var(--font-size-sm); overflow-wrap: anywhere; }
 .battle-recents { flex: 1; min-width: 144px; display: flex; flex-direction: column; align-self: flex-start; }
-#battle-recent-opponents { flex: 1; min-height: 156px; grid-auto-rows: minmax(76px, 1fr); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-1); }
+#battle-recent-opponents { height: var(--opponent-height); grid-auto-rows: minmax(0, 1fr); display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: var(--space-1); }
 .battle-recent-card { display: grid; justify-items: center; align-content: center; gap: var(--space-1); min-width: 0; min-height: 76px; padding: var(--space-1); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; }
 .battle-recent-card:hover { border-color: var(--teal); }
 .battle-recent-card img { width: 40px; height: 40px; object-fit: contain; image-rendering: pixelated; }

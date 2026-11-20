@@ -54,7 +54,10 @@ separate Sp. Atk/Sp. Def, since that split didn't happen until Gen II.
 - **Training guide & Pokédex**: open Training guide from a party to look
   up a species without adding it. Browse training targets, all incoming
   type matchups, evolution methods and learned moves with type markers.
-  Type labels show the existing physical/special icons for Gen I–III;
+  Sort by game-specific Smogon in-game tiers (including conditional tiers),
+  alphabetically or by Pokédex number. Unsupported games keep ordinary browsing.
+  Type orbs use a diamond for physical, ring for special and dash for status;
+  Gen I–III categories follow historical type rules.
   species-only training locations are informational rather than battle actions.
 - **IVs**: record a roster Pokémon's Individual Values alongside its EVs.
 - **Competitive data**: pull up Smogon's competitive sets/analysis for a

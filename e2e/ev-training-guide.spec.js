@@ -24,7 +24,7 @@ test.describe('EV-training location guide', () => {
     await createParty(page, { name: 'Browse without catching', baseGame: 'FireRed' });
     await page.getByRole('button', { name: 'Training guide', exact: true }).click();
     const search = page.locator('#guide-search');
-    await search.getByRole('combobox').fill('Bulbasaur');
+    await search.getByRole('combobox', { name: 'Search a species…' }).fill('Bulbasaur');
     await search.getByRole('option').filter({ hasText: 'Bulbasaur' }).click();
     const guide = page.locator('#species-training-guide dialog');
     await expect(guide).toBeVisible();
@@ -73,7 +73,7 @@ test.describe('EV-training location guide', () => {
     await expect(dialog.locator('.evolution')).toContainText('Ivysaur');
     await expect(dialog.locator('.next-move')).toContainText('Next at Lv. 10 · Vine Whip');
     await expect(dialog.locator('.next-move type-label')).toHaveText('Grass');
-    await expect(dialog.locator('.next-move type-label .category')).toHaveAttribute('src', 'icons/move-special.png');
+    await expect(dialog.locator('.next-move type-label .orb')).toHaveAttribute('data-category', 'special');
     await dialog.locator('.learnset > summary').click();
     await expect(dialog.locator('.learnset li type-label')).toHaveText(['Grass']);
     await expect(dialog.locator('.stab')).toContainText('Poison attacks use Attack');

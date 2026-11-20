@@ -31,12 +31,19 @@ export async function assertStableOpponentCards(page) {
     await page.setViewportSize({ width, height: 844 });
     await page.locator('#battle-search .sheet-close').tap();
     await page.locator('#party-log-battle-btn').tap();
+    const assertEqualHeight = async () => {
+      const current = await page.locator('.battle-opponent-card').boundingBox();
+      const recent = await page.locator('#battle-recent-opponents').boundingBox();
+      expect(current?.height).toBe(recent?.height);
+    };
+    await assertEqualHeight();
     const before = await layout();
     await page.locator('#battle-recent-opponents').getByRole('button', { name: 'Choose Caterpie again' }).tap();
     await expect(page.locator('#battle-opponent-name')).toHaveText('Caterpie');
     await expect(page.locator('#battle-log-btn')).toBeEnabled();
     await expect(page.locator('#battle-log-btn')).toHaveCSS('transform', 'none');
     expect(await layout()).toEqual(before);
+    await assertEqualHeight();
     await page.screenshot({ path: test.info().outputPath(`recent-cards-${width}.png`) });
   }
 }

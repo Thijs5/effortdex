@@ -178,7 +178,20 @@
            shows; picking a species opens #add-pokemon-dialog for level /
            nature / stats (roster.ts). -->
       <pokemon-search id="add-search" hidden placeholder="Search a species&hellip;" sheet-title="Add a Pok&eacute;mon" force-sheet></pokemon-search>
-      <pokemon-search id="guide-search" hidden placeholder="Search a species&hellip;" sheet-title="Training guide" force-sheet></pokemon-search>
+      <pokemon-search id="guide-search" hidden placeholder="Search a species&hellip;" sheet-title="Training guide" force-sheet browse>
+        <div slot="sheet-extra" class="guide-browser-tools">
+          <label class="field-label">Sort Pokémon
+            <select id="guide-sort" class="ds-field" aria-label="Sort Pokémon">
+              <option value="strongest">Smogon tier · strongest first</option>
+              <option value="weakest">Smogon tier · weakest first</option>
+              <option value="name">Name · A–Z</option>
+              <option value="dex">National Pokédex number</option>
+            </select>
+          </label>
+          <p id="guide-tier-context" class="hint"></p>
+          <a id="guide-tier-source" target="_blank" rel="noopener noreferrer" hidden>Smogon source</a>
+        </div>
+      </pokemon-search>
       <training-guide-dialog id="species-training-guide"></training-guide-dialog>
       <p id="training-guide-status" class="status-line" aria-live="polite" hidden></p>
 

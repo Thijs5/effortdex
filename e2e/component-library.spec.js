@@ -42,9 +42,9 @@ for (const width of [390, 320, 1280]) {
       await page.goto('/components/');
       await page.getByLabel('Preview theme').selectOption(theme);
       await expect(page.locator('ev-summary').locator('.value').last()).toHaveText('510/510');
-      const typeIcon = page.locator('type-label[type="water"]').locator('.category');
+      const typeIcon = page.locator('type-label[type="water"]').locator('.orb');
       await expect(typeIcon).toBeVisible();
-      expect(await typeIcon.evaluate(/** @param {HTMLImageElement} img */ img => img.complete && img.naturalWidth > 0)).toBe(true);
+      await expect(typeIcon).toHaveAttribute('data-category', 'special');
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth)).toBe(true);
       await page.screenshot({ path: info.outputPath('catalog.png'), fullPage: true, animations: 'disabled' });
       await page.getByRole('button', { name: 'Open compact sheet' }).click();
