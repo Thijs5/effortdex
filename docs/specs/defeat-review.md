@@ -141,3 +141,9 @@ An additional WebKit recheck (2 passed) exercised the shared regression helper's
 new actual Change → input focus → recent list → Back flow at 390px and 320px,
 including unchanged opponent and geometry. No known material in-scope findings
 remain. Native-device software keyboard/PWA behavior is still a device check.
+
+Deployment follow-up: the v1.26.3 upload succeeded, but Pages reported no artifact
+in both retry and fresh runs while REST listed it. Artifact lookup during the
+upload job is the suspected visibility boundary. Separate build/upload from the
+Pages job with `needs: build`, ensuring upload job completion before deployment.
+Acceptance is a successful tagged Pages run and the expected live version.
