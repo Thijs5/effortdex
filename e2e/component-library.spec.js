@@ -42,6 +42,12 @@ for (const width of [390, 320, 1280]) {
       await page.goto('/components/');
       await page.getByLabel('Preview theme').selectOption(theme);
       await expect(page.locator('ev-summary').locator('.value').last()).toHaveText('510/510');
+      const gains = page.locator('ev-gain');
+      await expect(gains).toHaveText(['+1 HP EVs', '+2 ATK, +1 SPE', '0 EVs · capped']);
+      for (const gain of await gains.all()) {
+        await expect(gain.locator('.gain')).toBeVisible();
+        expect(await gain.evaluate(el => el.scrollWidth <= el.clientWidth)).toBe(true);
+      }
       const typeIcon = page.locator('type-label[type="water"]').locator('.orb');
       await expect(typeIcon).toBeVisible();
       await expect(typeIcon).toHaveAttribute('data-category', 'special');

@@ -756,7 +756,11 @@ function stageKnownBattle(mon: DomainPokemon): void {
   battleOpponentFallback.setVersionedSprite(versionedSpriteUrl(store.spriteBaseGame(), mon.id), mon.sprite || FALLBACK_SPRITE);
   battleConfirmState.textContent = '';
   const summary = formatEvYield(mon.evYield);
-  battleResultSummary.textContent = `Base yield: ${summary || 'No EV yield'}`;
+  const yieldLabel = document.createElement('span');
+  yieldLabel.textContent = 'Base yield:';
+  const yieldValue = document.createElement('ev-gain');
+  yieldValue.textContent = summary ? `${summary} EVs` : 'No EV yield';
+  battleResultSummary.replaceChildren(yieldLabel, yieldValue);
   battleResultSummary.hidden = false;
   battleLogBtn.textContent = 'Log defeat';
   updateBattleRecipients(mon);

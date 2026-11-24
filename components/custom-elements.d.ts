@@ -7,6 +7,7 @@
 // component is converted to `.ts`; the `import type` only resolves once
 // the target file exists as `.ts`.
 
+import type { EvGain } from './atoms/ev-gain.ts';
 import type { EvBar } from './atoms/ev-bar.ts';
 import type { GameBall } from './atoms/game-ball.ts';
 import type { LevelInput } from './atoms/level-input.ts';
@@ -32,6 +33,7 @@ import type { TrainingGuideDialog } from './pages/parties/pokemon/training-guide
 
 declare global {
   interface HTMLElementTagNameMap {
+    'ev-gain': EvGain;
     'ev-bar': EvBar;
     'game-ball': GameBall;
     'level-input': LevelInput;

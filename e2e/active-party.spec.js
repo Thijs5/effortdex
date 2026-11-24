@@ -559,9 +559,6 @@ test.describe('Keyboard-free defeat review', () => {
     await page.keyboard.press('Tab');
     await expect(search.locator('.sheet-close')).toBeFocused();
     await page.locator('#battle-choose-opponent-btn').tap();
-    await expect(search.getByRole('heading', { name: 'Choose defeated Pokémon' })).toBeFocused();
-    await expect(input).not.toBeFocused();
-    await input.tap();
     await expect(input).toBeFocused();
     await page.setViewportSize({ width: 390, height: 320 });
     await input.fill('Caterpie');

@@ -45,5 +45,14 @@ export async function assertStableOpponentCards(page) {
     expect(await layout()).toEqual(before);
     await assertEqualHeight();
     await page.screenshot({ path: test.info().outputPath(`recent-cards-${width}.png`) });
+    // Change is a typing action even when recent choices already exist.
+    const search = page.locator('#battle-search');
+    await page.locator('#battle-choose-opponent-btn').tap();
+    await expect(search.getByRole('combobox')).toBeFocused();
+    await expect(search.getByRole('option').first()).toBeVisible();
+    await search.locator('.sheet-back').tap();
+    await expect(search.getByRole('combobox')).toBeHidden();
+    await expect(page.locator('#battle-opponent-name')).toHaveText('Caterpie');
+    expect(await layout()).toEqual(before);
   }
 }

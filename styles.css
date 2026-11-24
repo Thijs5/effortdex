@@ -1523,8 +1523,8 @@ textarea.ds-field { resize: vertical; }
 .battle-opponents > div > .battle-sheet-eyebrow { display: block; margin: 0 0 var(--space-2); font-size: var(--font-size-2xs); line-height: 18px; white-space: nowrap; }
 .battle-opponent-card { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: var(--space-1); flex: none; width: 100%; height: var(--opponent-height); min-width: 0; padding: var(--space-2); border: 1px solid var(--line); border-radius: var(--radius-md); background: var(--lcd); color: var(--ink); text-align: center; cursor: pointer; }
 @media (hover: hover) and (pointer: fine) { .battle-opponent-card:hover { border-color: var(--teal); } }
-.battle-opponent-art { width: 64px; height: 64px; display: grid; place-items: center; font-size: 28px; color: var(--ink-soft); }
-.battle-opponent-art img { width: 64px; height: 64px; image-rendering: pixelated; object-fit: contain; }
+.battle-opponent-art { width: 88px; height: 88px; flex: 0 0 auto; display: grid; place-items: center; font-size: 28px; color: var(--ink-soft); }
+.battle-opponent-art img { width: 100%; height: 100%; image-rendering: pixelated; object-fit: contain; }
 .battle-opponent-copy { display: grid; gap: var(--space-1); min-width: 0; }
 #battle-opponent-name { font-family: var(--font-display); font-size: var(--font-size-sm); overflow-wrap: anywhere; }
 .battle-recents { flex: 1; min-width: 144px; display: flex; flex-direction: column; align-self: flex-start; }
@@ -1532,9 +1532,11 @@ textarea.ds-field { resize: vertical; }
 .battle-recent-card { display: grid; justify-items: center; align-content: center; gap: var(--space-1); min-width: 0; min-height: 76px; padding: var(--space-1); color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-sm); cursor: pointer; }
 @media (hover: hover) and (pointer: fine) { .battle-recent-card:hover { border-color: var(--teal); } }
 .battle-opponent-card:active, .battle-recent-card:active { border-color:var(--ink-soft); }
-.battle-recent-card img { width: 40px; height: 40px; object-fit: contain; image-rendering: pixelated; }
+.battle-recent-card img { width: 64px; max-width: 100%; height: 64px; object-fit: contain; image-rendering: pixelated; }
 .battle-recent-card span { width: 100%; overflow: hidden; text-overflow: ellipsis; font-size: var(--font-size-2xs); }
-#battle-opponent-hint, #battle-result-summary { font-size: var(--font-size-xs); color: var(--ink-soft); }
+#battle-opponent-hint { font-size: var(--font-size-xs); color: var(--ink-soft); }
+#battle-result-summary { display: grid; gap: var(--space-1); font-size: var(--font-size-2xs); color: var(--ink-soft); }
+#battle-result-summary ev-gain { justify-self: center; }
 .battle-confirm-state {
   position: absolute;
   width: 1px;
@@ -1560,7 +1562,7 @@ textarea.ds-field { resize: vertical; }
   font-size: var(--font-size-sm);
 }
 #battle-ev-gain {
-  color: var(--ink);
+  justify-self: end;
   text-align: end;
   overflow-wrap: anywhere;
   overflow-y: auto;

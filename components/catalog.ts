@@ -2,6 +2,7 @@ import { attachDesignSystem } from '../lib/design-system.ts';
 import { escapeHtml } from '../lib/utils.ts';
 import { BaseDialog } from './atoms/base-dialog.ts';
 import './atoms/type-label.ts';
+import './atoms/ev-gain.ts';
 import './atoms/ds-item-button.ts';
 import './atoms/item-button-grid.ts';
 import './atoms/level-input.ts';
@@ -37,6 +38,7 @@ document.querySelector('#examples')!.innerHTML = [
   ].join('')),
   section('pokemon', 'Pokémon presentation', [
     example('Type labels', 'components/atoms/type-label.ts', 'Type colors, multipliers and historical move categories use one component. Gen III uses type-based categories; modern categories can be explicit.', '<div class="row"><type-label type="water" multiplier="2" generation="3"></type-label><type-label type="grass" generation="3"></type-label><type-label type="normal" category="status"></type-label><type-label type="fire" multiplier="0.5"></type-label></div>'),
+    example('EV gains', 'components/atoms/ev-gain.ts', 'Informational gain values use one readable treatment. Callers supply game-aware text and label base yield versus applied gains. No interaction or selected state.', '<div class="row"><ev-gain>+1 HP EVs</ev-gain><ev-gain>+2 ATK, +1 SPE</ev-gain><ev-gain>0 EVs · capped</ev-gain></div>'),
     example('EV progress', 'components/atoms/ev-bar.ts · components/molecules/ev-summary.ts', 'Set properties for values, caps, actual stats and nature effects. This sample uses Gen III+ caps; preserve historical rules in real callers.', '<ev-summary id="sample-evs"></ev-summary>', `import './components/molecules/ev-summary.ts';\nconst summary = document.createElement('ev-summary');\nsummary.evs = { hp: 6, atk: 252, def: 0, spa: 0, spd: 0, spe: 252 };\nsummary.nature = { boost: 'atk', hinder: 'spa' };`),
     example('Game artwork', 'components/atoms/game-ball.ts', 'Game and generation colors belong to game-ball. Pair the decorative artwork with a readable game name.', '<div class="row"><game-ball id="sample-ball"></game-ball><span>Emerald</span><game-ball id="empty-ball"></game-ball><span>No game selected</span></div>', `import './components/atoms/game-ball.ts';\nconst ball = document.createElement('game-ball');\nball.name = 'Emerald';`),
   ].join('')),

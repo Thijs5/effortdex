@@ -29,8 +29,7 @@ for (const fontSize of [16, 22]) {
     }, fontSize);
     const search = page.locator('#layout-search');
     const cards = search.getByRole('option');
-    await expect(search.locator('.sheet-title')).toBeFocused();
-    await expect(search.getByRole('combobox')).not.toBeFocused();
+    await expect(search.getByRole('combobox')).toBeFocused();
     await expect(cards).toHaveCount(9);
     for (const yieldLabel of await search.locator('.option-ev-yield').all()) {
       await expect(yieldLabel).not.toBeEmpty();

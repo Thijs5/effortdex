@@ -2,6 +2,7 @@ import { api } from '../../lib/services.ts';
 import { titleCase, formatEvYield, escapeHtml } from '../../lib/utils.ts';
 import { FALLBACK_SPRITE, FALLBACK_ONERROR } from '../../lib/constants.ts';
 import { BaseElement } from '../base-element.ts';
+import '../atoms/ev-gain.ts';
 import { attachPointerSelection, syncActiveDescendant } from '../../lib/combobox.ts';
 import type { SpeciesListEntry, DomainPokemon } from '../../lib/pokeapi-client.ts';
 import type { EvMap } from '../../lib/constants.ts';
@@ -124,9 +125,6 @@ export class PokemonSearch extends BaseElement {
         .option-ev-yield {
           flex: 0 0 auto;
           max-width: 45%;
-          font-family: var(--font-mono);
-          font-size: var(--font-size-2xs);
-          color: var(--teal);
           text-align: right;
           white-space: normal;
           overflow-wrap: anywhere;
@@ -143,7 +141,7 @@ export class PokemonSearch extends BaseElement {
         }
         .suggestions:not(.recent-grid) li.option:has(.option-ev-yield) {
           display: grid;
-          grid-template-columns: 28px minmax(0, 1fr) auto;
+          grid-template-columns: 56px minmax(0, 1fr) auto;
           column-gap: var(--space-2);
           row-gap: 0;
           border: 1px solid var(--lcd-line);
@@ -151,7 +149,7 @@ export class PokemonSearch extends BaseElement {
         .suggestions:not(.recent-grid) li.option + li.option:has(.option-ev-yield) {
           margin-top: var(--space-1);
         }
-        .suggestions:not(.recent-grid) li.option:has(.option-ev-yield) .thumb { grid-area: 1 / 1 / span 2; }
+        .suggestions:not(.recent-grid) li.option:has(.option-ev-yield) .thumb { grid-area: 1 / 1 / span 2; width: 56px; height: 56px; }
         .suggestions:not(.recent-grid) li.option:has(.option-ev-yield) .option-num { grid-area: 1 / 3; }
         .suggestions:not(.recent-grid) li.option:has(.option-ev-yield) .option-name {
           grid-area: 1 / 2;
@@ -176,11 +174,12 @@ export class PokemonSearch extends BaseElement {
         .recent-grid .status { grid-column: 1 / -1; }
         .recent-grid li.option {
           display: grid;
-          grid-template-columns: 28px minmax(0, 1fr);
+          grid-template-columns: 64px minmax(0, 1fr);
           align-content: start;
           gap: var(--space-1) var(--space-2);
           border: 1px solid var(--lcd-line);
         }
+        .recent-grid .thumb { width: 64px; height: 64px; }
         .recent-grid .option-num { display: none; }
         .recent-grid .option-name { white-space: normal; overflow-wrap: anywhere; }
         .recent-grid .option-ev-yield { grid-column: 1 / -1; max-width: none; text-align: left; }
@@ -664,7 +663,7 @@ export class PokemonSearch extends BaseElement {
             ${s.id ? `<span class="option-num">#${String(s.id).padStart(3, '0')}</span>` : ''}
             <span class="option-name">${titleCase(s.name)}</span>
             ${annotation ? `<span class="option-tier" title="${escapeHtml(annotation.description)}" aria-label="${escapeHtml(annotation.description)}">${escapeHtml(annotation.label)}</span>` : ''}
-            ${showEv ? '<span class="option-ev-yield"></span>' : ''}
+            ${showEv ? '<ev-gain class="option-ev-yield"></ev-gain>' : ''}
           </li>`;
           }
         )
@@ -815,7 +814,7 @@ export class PokemonSearch extends BaseElement {
     this.$input.focus();
   }
 
-  /** Open the opponent picker without summoning the software keyboard. */
+  /** Review choices request the keyboard; reference browsing starts at its heading. */
   showChoices(): void {
     if (this.hasAttribute('review-flow')) {
       this.$wrap.classList.remove('reviewing');
@@ -827,8 +826,11 @@ export class PokemonSearch extends BaseElement {
     this._ensureSpecies();
     if (!this._sheetOpen) this._openSheet();
     if (!this.$input.value.trim()) this._showRecentOrHide();
-    this.$sheetTitle.setAttribute('tabindex', '-1');
-    this.$sheetTitle.focus({ preventScroll: true });
+    if (this.hasAttribute('review-flow')) this.$input.focus({ preventScroll: true });
+    else {
+      this.$sheetTitle.setAttribute('tabindex', '-1');
+      this.$sheetTitle.focus({ preventScroll: true });
+    }
   }
 
   /** Keyboard-free review view for a caller with an explicit confirm action. */
