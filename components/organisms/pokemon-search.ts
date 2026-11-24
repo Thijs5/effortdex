@@ -143,13 +143,13 @@ export class PokemonSearch extends BaseElement {
           display: grid;
           grid-template-columns: 56px minmax(0, 1fr) auto;
           column-gap: var(--space-2);
-          row-gap: 0;
+          row-gap: var(--space-1);
           border: 1px solid var(--lcd-line);
         }
         .suggestions:not(.recent-grid) li.option + li.option:has(.option-ev-yield) {
           margin-top: var(--space-1);
         }
-        .suggestions:not(.recent-grid) li.option:has(.option-ev-yield) .thumb { grid-area: 1 / 1 / span 2; width: 56px; height: 56px; }
+        .suggestions:not(.recent-grid) li.option:has(.option-ev-yield) .thumb { grid-area: 1 / 1 / span 2; width: 56px; height: 100%; min-height: 56px; }
         .suggestions:not(.recent-grid) li.option:has(.option-ev-yield) .option-num { grid-area: 1 / 3; }
         .suggestions:not(.recent-grid) li.option:has(.option-ev-yield) .option-name {
           grid-area: 1 / 2;
@@ -159,7 +159,8 @@ export class PokemonSearch extends BaseElement {
         .suggestions:not(.recent-grid) .option-ev-yield {
           grid-area: 2 / 2 / auto / span 2;
           max-width: none;
-          text-align: left;
+          justify-self: end;
+          align-self: end;
         }
         .wrap.sheet:not(.reviewing) .recent-grid:not([hidden]) {
           display: grid;
@@ -179,10 +180,10 @@ export class PokemonSearch extends BaseElement {
           gap: var(--space-1) var(--space-2);
           border: 1px solid var(--lcd-line);
         }
-        .recent-grid .thumb { width: 64px; height: 64px; }
+        .recent-grid .thumb { grid-area: 1 / 1 / span 2; width: 64px; height: 100%; min-height: 64px; }
         .recent-grid .option-num { display: none; }
-        .recent-grid .option-name { white-space: normal; overflow-wrap: anywhere; }
-        .recent-grid .option-ev-yield { grid-column: 1 / -1; max-width: none; text-align: left; }
+        .recent-grid .option-name { grid-area: 1 / 2; white-space: normal; overflow-wrap: anywhere; }
+        .recent-grid .option-ev-yield { grid-area: 2 / 2; max-width: none; justify-self: end; align-self: end; }
         li.status {
           padding: var(--space-2) var(--space-3);
           font-size: var(--font-size-2xs);

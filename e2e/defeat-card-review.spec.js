@@ -25,7 +25,7 @@ for (const theme of /** @type {const} */ (['light', 'dark'])) {
     await logPartyBattle(page, 'Caterpie');
     const search = page.locator('#battle-search');
     await page.locator('#battle-recent-opponents button').first().click();
-    await expect(page.locator('#battle-result-summary')).toHaveText('Base yield:+1 HP EVs');
+    await expect(page.locator('#battle-result-summary')).toHaveText('Base yield:+1 HP');
     const current = page.locator('#battle-choose-opponent-btn');
     const sprite = page.locator('#battle-opponent-sprite');
     for (const [width, fontSize] of [[390, 16], [320, 16], [320, 22], [1280, 16]]) {
@@ -53,7 +53,7 @@ for (const theme of /** @type {const} */ (['light', 'dark'])) {
     await page.screenshot({ path: info.outputPath('choices-keyboard.png') });
     await search.locator('.sheet-back').click();
     await expect(search.getByRole('combobox')).toBeHidden();
-    await expect(page.locator('#battle-result-summary')).toContainText('+1 HP EVs');
+    await expect(page.locator('#battle-result-summary')).toContainText('+1 HP');
     await current.click();
     await expect(search.getByRole('combobox')).toBeFocused();
     await search.getByRole('combobox').fill('Caterpie');

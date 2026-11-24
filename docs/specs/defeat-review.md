@@ -147,3 +147,56 @@ in both retry and fresh runs while REST listed it. Artifact lookup during the
 upload job is the suspected visibility boundary. Separate build/upload from the
 Pages job with `needs: build`, ensuring upload job completion before deployment.
 Acceptance is a successful tagged Pages run and the expected live version.
+
+## Neutral EV gains and two-row choice layout — 2026-11-24
+
+User correction: EV gain is information, not a selection/action state. The teal
+fill reused an accent without a task-specific semantic reason. Keep the shared
+`ev-gain` component, using neutral recessed surface/ink tokens and bold numbers.
+The surrounding Base yield / EV gain labels establish units, so show `+1 SPD`
+rather than `+1 SPD EVs` in the current-opponent badge and catalog examples.
+
+In Choose defeated Pokémon, reserve the left column across both text rows for
+the contained sprite. Name is on the first row; gain is on the second row at the
+right edge, beside the artwork rather than underneath it. Apply this relationship
+to both recent cards and typed results. Keep names/gains wrapping, list scrolling,
+keyboard focus, Back, explicit logging and sprite aspect ratios intact.
+
+Acceptance: runtime assertions check the sprite spans name and gain, gain starts
+to the right of the sprite and ends at the content right edge, and children stay
+inside each choice at 390px/320px and 16px/22px text. Capture both themes and
+short keyboard-sized views; compare the shared component's actual card/footer
+callers and live catalog, including zero/multiple-stat gains. Review desktop too.
+
+Review findings and evidence: neutral color is the user's visual preference;
+reusing an available accent was not a sufficient semantic justification. The
+shared component now uses `lcd-deep`/`ink`, keeping a readable distinct numeric
+surface without borrowing selected/action coloring. Removing the unit suffix
+from a stat-bearing badge avoids repeating the surrounding EV context; zero/cap
+wording remains explicit where there is no stat name.
+
+P2 layout finding: at 390px/16px, recent yield started beneath the artwork instead
+of beside it (evidence: `layout-neutral-before/.../test-failed-1.png`); inferred
+impact was weaker association and unnecessary row height. The recent gain spanned
+all columns while the sprite occupied only the first row. The new regression
+failed against that state. Both recent and typed rows now give artwork a two-row
+span and right-align the second-row gain. Runtime assertions enforce these visual
+relationships and containment, rather than restating grid declarations.
+
+Inspected final `recent-390.png`, `search-result.png`, `multiple-gains.png` at
+320px/22px dark, and light/dark actual `choices-keyboard.png` and review-card
+captures. Compared the real `ev-gain` opponent-card/footer callers and catalog
+samples, including multiple-stat/zero values. Sprites retain aspect ratio and
+span both text rows; labels and gain backgrounds stay inside their choices.
+Name/number/gain hierarchy remains readable, keyboard focus stays visible and
+Back retains the staged opponent. Existing artwork padding is preserved rather
+than cropping sprites. No new interaction or saved-state semantics were added.
+
+Correction validation: 389 unit tests and all 211 Playwright tests passed,
+including opt-in WebKit; typecheck and production build passed. Also ran the
+four picker layout cases under an iPhone 13 WebKit project in the Playwright
+container (4 passed): light/dark, 16px/22px text, 390px/320px, recent/typed and
+multiple-stat gains. Earlier focused runs hit a shared dev-server shutdown and
+navigation/readiness timeouts; clean isolated container runs passed. No known
+material in-scope findings remain. Emulation does not establish physical iPhone
+keyboard/PWA behavior or user validation. Unrelated mockup is untouched.

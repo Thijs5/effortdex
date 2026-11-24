@@ -13,8 +13,8 @@ export class EvGain extends BaseElement {
       box-sizing: border-box;
       padding: var(--space-1) var(--space-2);
       border-radius: var(--radius-sm);
-      background: var(--teal-soft);
-      color: var(--teal-strong);
+      background: var(--lcd-deep);
+      color: var(--ink);
       font: 700 var(--font-size-xs)/1.4 var(--font-mono);
       letter-spacing: normal;
       text-transform: none;
